@@ -4,8 +4,19 @@ using ERPPrototype.Data;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Syncfusion.Blazor;
+using Syncfusion.Licensing;
 
 var builder = WebApplication.CreateBuilder(args);
+
+var syncfusionLicenseKey =
+    builder.Configuration["Syncfusion:LicenseKey"]
+    ?? throw new InvalidOperationException(
+        "Syncfusion license key was not found. Add it to User Secrets.");
+
+SyncfusionLicenseProvider.RegisterLicense(syncfusionLicenseKey);
+
+builder.Services.AddSyncfusionBlazor();
 
 // Add services to the container.
 builder.Services.AddRazorComponents()

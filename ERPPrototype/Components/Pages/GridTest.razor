@@ -1,0 +1,98 @@
+﻿@page "/grid-test"
+@rendermode InteractiveServer
+
+<PageTitle>Grid Test</PageTitle>
+
+<h1>اختبار Syncfusion DataGrid</h1>
+
+<SfGrid DataSource="@WorkOrders"
+        AllowPaging="true"
+        AllowSorting="true"
+        AllowFiltering="true">
+
+    <GridPageSettings PageSize="5"></GridPageSettings>
+
+    <GridColumns>
+        <GridColumn Field="@nameof(TestWorkOrder.WorkOrderNumber)"
+                    HeaderText="رقم أمر العمل"
+                    Width="180">
+        </GridColumn>
+
+        <GridColumn Field="@nameof(TestWorkOrder.WorkType)"
+                    HeaderText="النوع"
+                    Width="120">
+        </GridColumn>
+
+        <GridColumn Field="@nameof(TestWorkOrder.Status)"
+                    HeaderText="الحالة"
+                    Width="180">
+        </GridColumn>
+
+        <GridColumn Field="@nameof(TestWorkOrder.AssignmentDate)"
+                    HeaderText="تاريخ الإسناد"
+                    Type="ColumnType.Date"
+                    Format="dd/MM/yyyy"
+                    Width="150">
+        </GridColumn>
+    </GridColumns>
+
+</SfGrid>
+
+@code {
+    private List<TestWorkOrder> WorkOrders = new()
+    {
+        new()
+        {
+            WorkOrderNumber = "203059001",
+            WorkType = 801,
+            Status = "تم التنفيذ",
+            AssignmentDate = new DateTime(2026, 7, 1)
+        },
+        new()
+        {
+            WorkOrderNumber = "203059001",
+            WorkType = 802,
+            Status = "جاري التنفيذ",
+            AssignmentDate = new DateTime(2026, 7, 2)
+        },
+        new()
+        {
+            WorkOrderNumber = "203059002",
+            WorkType = 801,
+            Status = "لم يتم التنفيذ",
+            AssignmentDate = new DateTime(2026, 7, 3)
+        },
+        new()
+        {
+            WorkOrderNumber = "203059003",
+            WorkType = 801,
+            Status = "تم التنفيذ",
+            AssignmentDate = new DateTime(2026, 7, 4)
+        },
+        new()
+        {
+            WorkOrderNumber = "203059004",
+            WorkType = 802,
+            Status = "تعديل مقايسة",
+            AssignmentDate = new DateTime(2026, 7, 5)
+        },
+        new()
+        {
+            WorkOrderNumber = "203059005",
+            WorkType = 801,
+            Status = "تم الإغلاق",
+            AssignmentDate = new DateTime(2026, 7, 6)
+        }
+    };
+
+    private sealed class TestWorkOrder
+    {
+        public string WorkOrderNumber { get; set; } = string.Empty;
+
+        public int WorkType { get; set; }
+
+        public string Status { get; set; } = string.Empty;
+
+        public DateTime AssignmentDate { get; set; }
+    }
+}
