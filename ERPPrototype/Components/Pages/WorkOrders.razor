@@ -1,0 +1,686 @@
+﻿@page "/work-orders"
+@rendermode InteractiveServer
+
+@using ERPPrototype.Data
+@using ERPPrototype.Data.Entities
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@using Syncfusion.Blazor.DropDowns
+@using Syncfusion.Blazor.Grids
+
+@attribute [Authorize(Roles = AppRoles.Employee)]
+
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject UserManager<ApplicationUser> UserManager
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject ILogger<WorkOrders> Logger
+
+<PageTitle>Work Orders</PageTitle>
+
+<div class="container-fluid py-4" dir="ltr">
+
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+        <div>
+            <h1 class="mb-1">Work Orders</h1>
+
+            @if (!string.IsNullOrWhiteSpace(DepartmentName))
+            {
+                <div class="text-muted">
+                    @BranchName — @DepartmentName
+                </div>
+            }
+        </div>
+    </div>
+
+    @if (IsLoading)
+    {
+        <div class="alert alert-info">
+            Loading work orders...
+        </div>
+    }
+    else if (!string.IsNullOrWhiteSpace(LoadingErrorMessage))
+    {
+        <div class="alert alert-danger">
+            @LoadingErrorMessage
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-secondary py-2">
+            Edit cells directly, then click <strong>Update</strong> to save.
+            Click <strong>Cancel</strong> to discard unsaved changes.
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(OperationErrorMessage))
+        {
+            <div class="alert alert-danger">
+                @OperationErrorMessage
+            </div>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(SuccessMessage))
+        {
+            <div class="alert alert-success">
+                @SuccessMessage
+            </div>
+        }
+
+        <SfGrid @ref="WorkOrdersGrid"
+                ID="EmployeeWorkOrdersGrid"
+                TValue="WorkOrder"
+                DataSource="@WorkOrderItems"
+                Toolbar="@ToolbarItems"
+                AllowSorting="true"
+                AllowFiltering="true"
+                AllowResizing="true"
+                AllowReordering="true"
+                AllowSelection="true"
+                ShowColumnChooser="true"
+                EnableAutoFill="true"
+                Height="600">
+
+            <GridEvents TValue="WorkOrder"
+                        OnBatchAdd="PrepareNewRow"
+                        OnBatchSave="SaveBatchAsync" />
+
+            <GridEditSettings AllowAdding="true"
+                              AllowEditing="true"
+                              AllowDeleting="true"
+                              Mode="EditMode.Batch"
+                              AllowEditOnSingleClick="true"
+                              NewRowPosition="NewRowPosition.Bottom"
+                              ShowConfirmDialog="true"
+                              ShowDeleteConfirmDialog="true" />
+
+            <GridFilterSettings Type="Syncfusion.Blazor.Grids.FilterType.Excel" />
+
+            <GridSelectionSettings Mode="Syncfusion.Blazor.Grids.SelectionMode.Cell"
+                                   Type="Syncfusion.Blazor.Grids.SelectionType.Multiple"
+                                   CellSelectionMode="Syncfusion.Blazor.Grids.CellSelectionMode.Box" />
+
+            <GridColumns>
+
+                <GridColumn Field="@nameof(WorkOrder.Id)"
+                            IsPrimaryKey="true"
+                            Visible="false"
+                            AllowEditing="false"
+                            AllowAdding="false" />
+
+                <GridColumn Field="@nameof(WorkOrder.WorkOrderNumber)"
+                            HeaderText="Work Order Number"
+                            ValidationRules="@RequiredValidation"
+                            Width="190" />
+
+                <GridColumn Field="@nameof(WorkOrder.WorkTypeCode)"
+                            HeaderText="Work Type"
+                            ValidationRules="@RequiredValidation"
+                            Width="130" />
+
+                <GridColumn Field="@nameof(WorkOrder.AssignmentDate)"
+                            HeaderText="Assignment Date"
+                            EditType="EditType.DatePickerEdit"
+                            Format="dd/MM/yyyy"
+                            Type="ColumnType.Date"
+                            Width="170" />
+
+                <GridColumn Field="@nameof(WorkOrder.Busket)"
+                            HeaderText="Busket"
+                            ValidationRules="@RequiredValidation"
+                            Width="280">
+
+                    <EditTemplate Context="busketContext">
+                        @{
+                            var workOrder = (WorkOrder)busketContext;
+                        }
+
+                        <SfDropDownList TValue="string"
+                                        TItem="string"
+                                        DataSource="@WorkOrderBuskets.All"
+                                        @bind-Value="workOrder.Busket"
+                                        AllowFiltering="true"
+                                        ShowClearButton="false"
+                                        PopupHeight="320px">
+                        </SfDropDownList>
+                    </EditTemplate>
+
+                </GridColumn>
+
+                <GridColumn Field="@nameof(WorkOrder.Status)"
+                            HeaderText="Status"
+                            ValidationRules="@RequiredValidation"
+                            Width="170" />
+
+                <GridColumn Field="@nameof(WorkOrder.Notes)"
+                            HeaderText="Notes"
+                            Width="320" />
+
+            </GridColumns>
+
+        </SfGrid>
+    }
+
+</div>
+
+@code {
+    private SfGrid<WorkOrder>? WorkOrdersGrid;
+
+    private List<WorkOrder> WorkOrderItems { get; set; } = [];
+
+    private readonly List<string> ToolbarItems =
+    [
+        "Add",
+        "Delete",
+        "Update",
+        "Cancel",
+        "Search",
+        "ColumnChooser"
+    ];
+
+    private readonly ValidationRules RequiredValidation = new()
+    {
+        Required = true
+    };
+
+    private string BranchName { get; set; } = string.Empty;
+
+    private string DepartmentName { get; set; } = string.Empty;
+
+    private string CurrentUserId { get; set; } = string.Empty;
+
+    private int CurrentDepartmentId { get; set; }
+
+    private string LoadingErrorMessage { get; set; } = string.Empty;
+
+    private string OperationErrorMessage { get; set; } = string.Empty;
+
+    private string SuccessMessage { get; set; } = string.Empty;
+
+    private bool IsLoading { get; set; } = true;
+
+    private int NextTemporaryId { get; set; } = -1;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadEmployeeSheetAsync();
+    }
+
+    private async Task LoadEmployeeSheetAsync()
+    {
+        IsLoading = true;
+        LoadingErrorMessage = string.Empty;
+
+        try
+        {
+            var authenticationState =
+                await AuthenticationStateProvider.GetAuthenticationStateAsync();
+
+            var currentUser =
+                await UserManager.GetUserAsync(authenticationState.User);
+
+            if (currentUser is null)
+            {
+                LoadingErrorMessage =
+                    "The current user could not be identified.";
+
+                return;
+            }
+
+            if (currentUser.DepartmentId is null)
+            {
+                LoadingErrorMessage =
+                    "This employee is not assigned to a department.";
+
+                return;
+            }
+
+            await using var dbContext =
+                await DbFactory.CreateDbContextAsync();
+
+            var department = await dbContext.Departments
+                .AsNoTracking()
+                .Include(item => item.Branch)
+                .Include(item => item.DepartmentType)
+                .SingleOrDefaultAsync(item =>
+                    item.Id == currentUser.DepartmentId.Value);
+
+            if (department is null)
+            {
+                LoadingErrorMessage =
+                    "The employee department could not be found.";
+
+                return;
+            }
+
+            CurrentUserId = currentUser.Id;
+            CurrentDepartmentId = department.Id;
+
+            BranchName = department.Branch.Name;
+            DepartmentName = department.DepartmentType.Name;
+
+            WorkOrderItems = await dbContext.WorkOrders
+                .AsNoTracking()
+                .Where(workOrder =>
+                    workOrder.DepartmentId == CurrentDepartmentId)
+                .OrderByDescending(workOrder =>
+                    workOrder.CreatedAt)
+                .ToListAsync();
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError(
+                exception,
+                "An error occurred while loading employee work orders.");
+
+            LoadingErrorMessage =
+                "An unexpected error occurred while loading the sheet.";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private void PrepareNewRow(
+        BeforeBatchAddArgs<WorkOrder> args)
+    {
+        OperationErrorMessage = string.Empty;
+        SuccessMessage = string.Empty;
+
+        args.DefaultData = new WorkOrder
+        {
+            Id = NextTemporaryId--,
+            DepartmentId = CurrentDepartmentId,
+            WorkYear = DateTime.Now.Year,
+            Busket = string.Empty,
+            Status = string.Empty,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = CurrentUserId
+        };
+    }
+
+    private async Task SaveBatchAsync(
+        BeforeBatchSaveArgs<WorkOrder> args)
+    {
+        OperationErrorMessage = string.Empty;
+        SuccessMessage = string.Empty;
+
+        if (args.BatchChanges is null)
+        {
+            return;
+        }
+
+        if (CurrentDepartmentId <= 0 ||
+            string.IsNullOrWhiteSpace(CurrentUserId))
+        {
+            args.Cancel = true;
+            OperationErrorMessage =
+                "The current employee context is invalid.";
+
+            return;
+        }
+
+        var addedRecords =
+            args.BatchChanges.AddedRecords ?? [];
+
+        var changedRecords =
+            args.BatchChanges.ChangedRecords ?? [];
+
+        var deletedRecords =
+            args.BatchChanges.DeletedRecords ?? [];
+
+        foreach (var workOrder in addedRecords)
+        {
+            NormalizeEditableFields(workOrder);
+        }
+
+        foreach (var workOrder in changedRecords)
+        {
+            NormalizeEditableFields(workOrder);
+        }
+
+        var validationError = ValidateRecords(
+            addedRecords.Concat(changedRecords));
+
+        if (!string.IsNullOrWhiteSpace(validationError))
+        {
+            args.Cancel = true;
+            OperationErrorMessage = validationError;
+
+            return;
+        }
+
+        try
+        {
+            await using var dbContext =
+                await DbFactory.CreateDbContextAsync();
+
+            await using var transaction =
+                await dbContext.Database.BeginTransactionAsync();
+
+            var deletedIds = deletedRecords
+                .Where(workOrder => workOrder.Id > 0)
+                .Select(workOrder => workOrder.Id)
+                .Distinct()
+                .ToHashSet();
+
+            var databaseRows = await dbContext.WorkOrders
+                .AsNoTracking()
+                .Where(workOrder =>
+                    workOrder.DepartmentId == CurrentDepartmentId)
+                .Select(workOrder => new WorkOrderKeySnapshot
+                {
+                    Id = workOrder.Id,
+                    WorkOrderNumber = workOrder.WorkOrderNumber,
+                    WorkTypeCode = workOrder.WorkTypeCode
+                })
+                .ToListAsync();
+
+            var finalRows = databaseRows
+                .Where(workOrder =>
+                    !deletedIds.Contains(workOrder.Id))
+                .ToList();
+
+            foreach (var changedRecord in changedRecords)
+            {
+                if (deletedIds.Contains(changedRecord.Id))
+                {
+                    continue;
+                }
+
+                var existingSnapshot = finalRows
+                    .SingleOrDefault(workOrder =>
+                        workOrder.Id == changedRecord.Id);
+
+                if (existingSnapshot is null)
+                {
+                    args.Cancel = true;
+                    OperationErrorMessage =
+                        "A modified work order could not be found in this department.";
+
+                    return;
+                }
+
+                existingSnapshot.WorkOrderNumber =
+                    changedRecord.WorkOrderNumber;
+
+                existingSnapshot.WorkTypeCode =
+                    changedRecord.WorkTypeCode;
+            }
+
+            var temporarySnapshotId = -1;
+
+            foreach (var addedRecord in addedRecords)
+            {
+                finalRows.Add(new WorkOrderKeySnapshot
+                {
+                    Id = temporarySnapshotId--,
+                    WorkOrderNumber =
+                        addedRecord.WorkOrderNumber,
+                    WorkTypeCode =
+                        addedRecord.WorkTypeCode
+                });
+            }
+
+            var duplicateGroup = finalRows
+                .GroupBy(workOrder =>
+                    CreateDuplicateKey(
+                        workOrder.WorkOrderNumber,
+                        workOrder.WorkTypeCode))
+                .FirstOrDefault(group => group.Count() > 1);
+
+            if (duplicateGroup is not null)
+            {
+                args.Cancel = true;
+
+                var duplicate = duplicateGroup.First();
+
+                OperationErrorMessage =
+                    $"Work Order Number '{duplicate.WorkOrderNumber}' " +
+                    $"with Work Type '{duplicate.WorkTypeCode}' " +
+                    "already exists in this department.";
+
+                return;
+            }
+
+            if (deletedIds.Count > 0)
+            {
+                var entitiesToDelete =
+                    await dbContext.WorkOrders
+                        .Where(workOrder =>
+                            workOrder.DepartmentId ==
+                                CurrentDepartmentId &&
+                            deletedIds.Contains(workOrder.Id))
+                        .ToListAsync();
+
+                if (entitiesToDelete.Count != deletedIds.Count)
+                {
+                    args.Cancel = true;
+                    OperationErrorMessage =
+                        "One or more selected work orders do not belong to this department.";
+
+                    return;
+                }
+
+                dbContext.WorkOrders.RemoveRange(
+                    entitiesToDelete);
+            }
+
+            var changedIds = changedRecords
+                .Where(workOrder =>
+                    workOrder.Id > 0 &&
+                    !deletedIds.Contains(workOrder.Id))
+                .Select(workOrder => workOrder.Id)
+                .Distinct()
+                .ToHashSet();
+
+            if (changedIds.Count > 0)
+            {
+                var entitiesToUpdate =
+                    await dbContext.WorkOrders
+                        .Where(workOrder =>
+                            workOrder.DepartmentId ==
+                                CurrentDepartmentId &&
+                            changedIds.Contains(workOrder.Id))
+                        .ToListAsync();
+
+                if (entitiesToUpdate.Count != changedIds.Count)
+                {
+                    args.Cancel = true;
+                    OperationErrorMessage =
+                        "One or more modified work orders do not belong to this department.";
+
+                    return;
+                }
+
+                var changedRecordsById = changedRecords
+                    .Where(workOrder =>
+                        changedIds.Contains(workOrder.Id))
+                    .ToDictionary(
+                        workOrder => workOrder.Id);
+
+                foreach (var entity in entitiesToUpdate)
+                {
+                    var changedRecord =
+                        changedRecordsById[entity.Id];
+
+                    entity.WorkOrderNumber =
+                        changedRecord.WorkOrderNumber;
+
+                    entity.WorkTypeCode =
+                        changedRecord.WorkTypeCode;
+
+                    entity.AssignmentDate =
+                        changedRecord.AssignmentDate;
+
+                    entity.Busket =
+                        changedRecord.Busket;
+
+                    entity.Status =
+                        changedRecord.Status;
+
+                    entity.Notes =
+                        changedRecord.Notes;
+
+                    entity.UpdatedAt =
+                        DateTime.UtcNow;
+
+                    entity.UpdatedBy =
+                        CurrentUserId;
+                }
+            }
+
+            foreach (var addedRecord in addedRecords)
+            {
+                addedRecord.Id = 0;
+                addedRecord.DepartmentId =
+                    CurrentDepartmentId;
+                addedRecord.WorkYear =
+                    DateTime.Now.Year;
+                addedRecord.CreatedAt =
+                    DateTime.UtcNow;
+                addedRecord.CreatedBy =
+                    CurrentUserId;
+                addedRecord.UpdatedAt = null;
+                addedRecord.UpdatedBy = null;
+
+                dbContext.WorkOrders.Add(addedRecord);
+            }
+
+            await dbContext.SaveChangesAsync();
+            await transaction.CommitAsync();
+
+            SuccessMessage =
+                "All changes were saved successfully.";
+        }
+        catch (DbUpdateException exception)
+        {
+            args.Cancel = true;
+
+            Logger.LogError(
+                exception,
+                "A database error occurred while saving work orders.");
+
+            OperationErrorMessage =
+                "The changes could not be saved. Check for duplicate or invalid values.";
+        }
+        catch (Exception exception)
+        {
+            args.Cancel = true;
+
+            Logger.LogError(
+                exception,
+                "An unexpected error occurred while saving work orders.");
+
+            OperationErrorMessage =
+                "An unexpected error occurred while saving the changes.";
+        }
+    }
+
+    private static void NormalizeEditableFields(
+        WorkOrder workOrder)
+    {
+        workOrder.WorkOrderNumber =
+            workOrder.WorkOrderNumber?.Trim() ?? string.Empty;
+
+        workOrder.WorkTypeCode =
+            workOrder.WorkTypeCode?.Trim() ?? string.Empty;
+
+        workOrder.Busket =
+            workOrder.Busket?.Trim() ?? string.Empty;
+
+        workOrder.Status =
+            workOrder.Status?.Trim() ?? string.Empty;
+
+        workOrder.Notes =
+            string.IsNullOrWhiteSpace(workOrder.Notes)
+                ? null
+                : workOrder.Notes.Trim();
+    }
+
+    private static string? ValidateRecords(
+        IEnumerable<WorkOrder> workOrders)
+    {
+        foreach (var workOrder in workOrders)
+        {
+            if (string.IsNullOrWhiteSpace(
+                    workOrder.WorkOrderNumber))
+            {
+                return "Work Order Number is required.";
+            }
+
+            if (workOrder.WorkOrderNumber.Length > 50)
+            {
+                return
+                    "Work Order Number cannot exceed 50 characters.";
+            }
+
+            if (string.IsNullOrWhiteSpace(
+                    workOrder.WorkTypeCode))
+            {
+                return "Work Type is required.";
+            }
+
+            if (workOrder.WorkTypeCode.Length > 20)
+            {
+                return
+                    "Work Type cannot exceed 20 characters.";
+            }
+
+            if (string.IsNullOrWhiteSpace(
+                    workOrder.Busket))
+            {
+                return "Busket is required.";
+            }
+
+            if (!WorkOrderBuskets.All.Contains(
+                    workOrder.Busket))
+            {
+                return
+                    "Select a valid value from the Busket list.";
+            }
+
+            if (string.IsNullOrWhiteSpace(
+                    workOrder.Status))
+            {
+                return "Status is required.";
+            }
+
+            if (workOrder.Status.Length > 150)
+            {
+                return
+                    "Status cannot exceed 150 characters.";
+            }
+
+            if (workOrder.Notes?.Length > 1000)
+            {
+                return
+                    "Notes cannot exceed 1000 characters.";
+            }
+        }
+
+        return null;
+    }
+
+    private static string CreateDuplicateKey(
+        string workOrderNumber,
+        string workTypeCode)
+    {
+        return string.Concat(
+            workOrderNumber.Trim().ToUpperInvariant(),
+            "\u001F",
+            workTypeCode.Trim().ToUpperInvariant());
+    }
+
+    private sealed class WorkOrderKeySnapshot
+    {
+        public int Id { get; set; }
+
+        public string WorkOrderNumber { get; set; } =
+            string.Empty;
+
+        public string WorkTypeCode { get; set; } =
+            string.Empty;
+    }
+}

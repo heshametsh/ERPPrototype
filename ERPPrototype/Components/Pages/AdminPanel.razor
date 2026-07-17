@@ -1,0 +1,395 @@
+﻿@page "/admin"
+@rendermode InteractiveServer
+
+@using ERPPrototype.Components.Admin
+@using ERPPrototype.Data
+@using ERPPrototype.Data.Entities
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+
+@attribute [Authorize(Roles = AppRoles.Admin)]
+
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+
+<PageTitle>لوحة الإدارة</PageTitle>
+
+<div class="container py-4" dir="rtl">
+    <h1 class="mb-4">لوحة الإدارة</h1>
+
+    <div class="border rounded-3 p-4 bg-white shadow-sm">
+        <h2 class="mb-4">إدارة الفروع</h2>
+
+        <div class="row g-3 align-items-end mb-4">
+            <div class="col-lg-8">
+                <label class="form-label">اسم الفرع</label>
+
+                <input class="form-control"
+                       placeholder="مثال: فرع الأحساء"
+                       @bind="NewBranchName" />
+            </div>
+
+            <div class="col-lg-auto">
+                <button type="button"
+                        class="btn btn-primary px-4"
+                        disabled="@IsSaving"
+                        @onclick="AddBranchAsync">
+
+                    @(IsSaving ? "جارٍ الحفظ..." : "إضافة فرع")
+                </button>
+            </div>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(Message))
+        {
+            <div class="alert @MessageCssClass mb-4">
+                @Message
+            </div>
+        }
+
+        @if (Branches.Count == 0)
+        {
+            <div class="border rounded-3 p-4 text-center">
+                لا توجد فروع مسجلة حاليًا.
+            </div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-bordered table-striped align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>اسم الفرع</th>
+                            <th style="width: 330px;">الإجراءات</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        @foreach (var branch in Branches)
+                        {
+                            <tr>
+                                <td>
+                                    @if (EditingBranchId == branch.Id)
+                                    {
+                                        <input class="form-control"
+                                               @bind="EditingBranchName" />
+                                    }
+                                    else
+                                    {
+                                        @branch.Name
+                                    }
+                                </td>
+
+                                <td>
+                                    @if (EditingBranchId == branch.Id)
+                                    {
+                                        <div class="d-flex gap-2">
+                                            <button type="button"
+                                                    class="btn btn-success btn-sm"
+                                                    disabled="@IsSaving"
+                                                    @onclick="SaveBranchEditAsync">
+                                                حفظ
+                                            </button>
+
+                                            <button type="button"
+                                                    class="btn btn-secondary btn-sm"
+                                                    disabled="@IsSaving"
+                                                    @onclick="CancelBranchEdit">
+                                                إلغاء
+                                            </button>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="d-flex flex-wrap gap-2">
+                                            <button type="button"
+                                                    class="btn btn-outline-primary btn-sm"
+                                                    disabled="@(EditingBranchId is not null || IsSaving)"
+                                                    @onclick="() => StartBranchEdit(branch)">
+                                                تعديل الاسم
+                                            </button>
+
+                                            <button type="button"
+                                                    class="btn btn-outline-success btn-sm"
+                                                    disabled="@(EditingBranchId is not null || IsSaving)"
+                                                    @onclick="() => OpenUserForm(branch)">
+                                                إضافة مستخدم
+                                            </button>
+
+                                            <button type="button"
+                                                    class="btn btn-outline-dark btn-sm"
+                                                    disabled="@(EditingBranchId is not null || IsSaving)"
+                                                    @onclick="() => OpenUsersList(branch)">
+                                                عرض المستخدمين
+                                            </button>
+                                        </div>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+
+        @if (SelectedBranchForUser is not null)
+        {
+            <BranchUserForm BranchId="@SelectedBranchForUser.Id"
+                            BranchName="@SelectedBranchForUser.Name"
+                            OnCancelled="CloseUserForm"
+                            OnUserCreated="HandleUserCreated" />
+        }
+        @if (SelectedBranchForUsersList is not null)
+        {
+            <BranchUsersList BranchId="@SelectedBranchForUsersList.Id"
+                             BranchName="@SelectedBranchForUsersList.Name"
+                             OnClosed="CloseUsersList" />
+        }
+    </div>
+</div>
+
+@code {
+    private List<Branch> Branches { get; set; } = [];
+
+    private string NewBranchName { get; set; } = string.Empty;
+
+    private int? EditingBranchId { get; set; }
+
+    private string EditingBranchName { get; set; } = string.Empty;
+
+    private Branch? SelectedBranchForUser { get; set; }
+
+    private Branch? SelectedBranchForUsersList { get; set; }
+
+    private string Message { get; set; } = string.Empty;
+
+    private string MessageCssClass { get; set; } = "alert-info";
+
+    private bool IsSaving { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadBranchesAsync();
+    }
+
+    private async Task LoadBranchesAsync()
+    {
+        await using var dbContext =
+            await DbFactory.CreateDbContextAsync();
+
+        Branches = await dbContext.Branches
+            .AsNoTracking()
+            .OrderBy(branch => branch.Name)
+            .ToListAsync();
+    }
+
+    private async Task AddBranchAsync()
+    {
+        Message = string.Empty;
+
+        var branchName = NewBranchName.Trim();
+
+        if (string.IsNullOrWhiteSpace(branchName))
+        {
+            ShowError("اكتب اسم الفرع أولًا.");
+            return;
+        }
+
+        IsSaving = true;
+
+        try
+        {
+            await using var dbContext =
+                await DbFactory.CreateDbContextAsync();
+
+            var alreadyExists = await dbContext.Branches
+                .AnyAsync(branch => branch.Name == branchName);
+
+            if (alreadyExists)
+            {
+                ShowError("يوجد فرع مسجل بنفس الاسم.");
+                return;
+            }
+
+            var departmentTypes = await dbContext.DepartmentTypes
+                .AsNoTracking()
+                .Where(departmentType =>
+                    StandardDepartmentTypes.All.Contains(
+                        departmentType.Name))
+                .ToListAsync();
+
+            if (departmentTypes.Count !=
+                StandardDepartmentTypes.All.Count)
+            {
+                ShowError(
+                    "تعذر إنشاء الفرع لأن أنواع الأقسام الأساسية غير مكتملة.");
+
+                return;
+            }
+
+            var branch = new Branch
+            {
+                Name = branchName
+            };
+
+            foreach (var departmentType in departmentTypes)
+            {
+                branch.Departments.Add(new Department
+                {
+                    DepartmentTypeId = departmentType.Id
+                });
+            }
+
+            dbContext.Branches.Add(branch);
+
+            await dbContext.SaveChangesAsync();
+
+            NewBranchName = string.Empty;
+
+            await LoadBranchesAsync();
+
+            ShowSuccess(
+                "تمت إضافة الفرع وإنشاء أقسامه الأساسية بنجاح.");
+        }
+        catch (DbUpdateException)
+        {
+            ShowError(
+                "تعذر حفظ الفرع. قد يكون الاسم مستخدمًا بالفعل.");
+        }
+        finally
+        {
+            IsSaving = false;
+        }
+    }
+
+    private void StartBranchEdit(Branch branch)
+    {
+        Message = string.Empty;
+
+        SelectedBranchForUser = null;
+        SelectedBranchForUsersList = null;
+
+        EditingBranchId = branch.Id;
+        EditingBranchName = branch.Name;
+    }
+
+    private void CancelBranchEdit()
+    {
+        EditingBranchId = null;
+        EditingBranchName = string.Empty;
+    }
+
+    private async Task SaveBranchEditAsync()
+    {
+        Message = string.Empty;
+
+        if (EditingBranchId is null)
+        {
+            return;
+        }
+
+        var branchName = EditingBranchName.Trim();
+
+        if (string.IsNullOrWhiteSpace(branchName))
+        {
+            ShowError("اسم الفرع لا يمكن أن يكون فارغًا.");
+            return;
+        }
+
+        IsSaving = true;
+
+        try
+        {
+            await using var dbContext =
+                await DbFactory.CreateDbContextAsync();
+
+            var branch = await dbContext.Branches
+                .SingleOrDefaultAsync(item =>
+                    item.Id == EditingBranchId.Value);
+
+            if (branch is null)
+            {
+                ShowError("الفرع المطلوب تعديله غير موجود.");
+
+                CancelBranchEdit();
+                return;
+            }
+
+            var alreadyExists = await dbContext.Branches
+                .AnyAsync(item =>
+                    item.Id != branch.Id &&
+                    item.Name == branchName);
+
+            if (alreadyExists)
+            {
+                ShowError("يوجد فرع آخر مسجل بنفس الاسم.");
+                return;
+            }
+
+            branch.Name = branchName;
+
+            await dbContext.SaveChangesAsync();
+
+            CancelBranchEdit();
+
+            await LoadBranchesAsync();
+
+            ShowSuccess("تم تعديل اسم الفرع بنجاح.");
+        }
+        catch (DbUpdateException)
+        {
+            ShowError(
+                "تعذر تعديل الفرع. قد يكون الاسم مستخدمًا بالفعل.");
+        }
+        finally
+        {
+            IsSaving = false;
+        }
+    }
+
+    private void OpenUserForm(Branch branch)
+    {
+        Message = string.Empty;
+
+        CancelBranchEdit();
+
+        SelectedBranchForUsersList = null;
+        SelectedBranchForUser = branch;
+    }
+
+    private void CloseUserForm()
+    {
+        SelectedBranchForUser = null;
+    }
+
+    private void OpenUsersList(Branch branch)
+    {
+        Message = string.Empty;
+
+        CancelBranchEdit();
+
+        SelectedBranchForUser = null;
+        SelectedBranchForUsersList = branch;
+    }
+
+    private void CloseUsersList()
+    {
+        SelectedBranchForUsersList = null;
+    }
+
+    private void HandleUserCreated()
+    {
+        Message = string.Empty;
+    }
+
+    private void ShowSuccess(string message)
+    {
+        Message = message;
+        MessageCssClass = "alert-success";
+    }
+
+    private void ShowError(string message)
+    {
+        Message = message;
+        MessageCssClass = "alert-danger";
+    }
+}

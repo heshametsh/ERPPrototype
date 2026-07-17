@@ -1,0 +1,206 @@
+﻿@using ERPPrototype.Data
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject UserManager<ApplicationUser> UserManager
+
+<div class="border rounded-3 p-4 mt-4 bg-light">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3 class="mb-1">مستخدمو الفرع</h3>
+            <div class="text-muted">@BranchName</div>
+        </div>
+
+        <button type="button"
+                class="btn btn-outline-secondary btn-sm"
+                @onclick="CloseAsync">
+            إغلاق
+        </button>
+    </div>
+
+    @if (IsLoading)
+    {
+        <div class="text-center py-4">
+            جارٍ تحميل المستخدمين...
+        </div>
+    }
+    else if (!string.IsNullOrWhiteSpace(ErrorMessage))
+    {
+        <div class="alert alert-danger mb-0">
+            @ErrorMessage
+        </div>
+    }
+    else if (Users.Count == 0)
+    {
+        <div class="border rounded-3 p-4 text-center bg-white">
+            لا يوجد مستخدمون مرتبطون بهذا الفرع.
+        </div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-bordered table-striped align-middle mb-0 bg-white">
+                <thead>
+                    <tr>
+                        <th>الاسم الكامل</th>
+                        <th>اسم المستخدم</th>
+                        <th>نوع المستخدم</th>
+                        <th>القسم</th>
+                        <th>حالة الحساب</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    @foreach (var user in Users)
+                    {
+                        <tr>
+                            <td>@user.FullName</td>
+                            <td>@user.UserName</td>
+                            <td>@GetRoleDisplayName(user.Role)</td>
+                            <td>@GetDepartmentDisplayName(user)</td>
+                            <td>
+                                @if (user.IsActive)
+                                {
+                                    <span class="badge bg-success">
+                                        نشط
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-secondary">
+                                        غير نشط
+                                    </span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public int BranchId { get; set; }
+
+    [Parameter]
+    public string BranchName { get; set; } = string.Empty;
+
+    [Parameter]
+    public EventCallback OnClosed { get; set; }
+
+    private List<BranchUserListItem> Users { get; set; } = [];
+
+    private bool IsLoading { get; set; }
+
+    private string ErrorMessage { get; set; } = string.Empty;
+
+    private int LoadedBranchId { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (BranchId <= 0 || LoadedBranchId == BranchId)
+        {
+            return;
+        }
+
+        LoadedBranchId = BranchId;
+
+        await LoadUsersAsync();
+    }
+
+    private async Task LoadUsersAsync()
+    {
+        IsLoading = true;
+        ErrorMessage = string.Empty;
+
+        try
+        {
+            await using var dbContext =
+                await DbFactory.CreateDbContextAsync();
+
+            var branchUsers = await dbContext.Users
+                .AsNoTracking()
+                .Include(user => user.Department)
+                    .ThenInclude(department =>
+                        department!.DepartmentType)
+                .Where(user => user.BranchId == BranchId)
+                .OrderBy(user => user.FullName)
+                .ToListAsync();
+
+            var result = new List<BranchUserListItem>();
+
+            foreach (var user in branchUsers)
+            {
+                var roles = await UserManager.GetRolesAsync(user);
+
+                result.Add(new BranchUserListItem
+                {
+                    FullName = user.FullName,
+                    UserName = user.UserName ?? string.Empty,
+                    Role = roles.SingleOrDefault() ?? string.Empty,
+                    DepartmentName =
+                        user.Department?.DepartmentType.Name,
+                    IsActive = user.IsActive
+                });
+            }
+
+            Users = result;
+        }
+        catch
+        {
+            ErrorMessage =
+                "حدث خطأ أثناء تحميل مستخدمي الفرع.";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private static string GetRoleDisplayName(string role)
+    {
+        return role switch
+        {
+            AppRoles.BranchManager => "مدير مشروع",
+            AppRoles.Employee => "موظف",
+            AppRoles.ProjectManager => "مدير مشاريع",
+            AppRoles.Admin => "مدير النظام",
+            _ => "غير محدد"
+        };
+    }
+
+    private static string GetDepartmentDisplayName(
+        BranchUserListItem user)
+    {
+        if (user.Role == AppRoles.BranchManager)
+        {
+            return "جميع أقسام الفرع";
+        }
+
+        return string.IsNullOrWhiteSpace(user.DepartmentName)
+            ? "غير محدد"
+            : user.DepartmentName;
+    }
+
+    private async Task CloseAsync()
+    {
+        await OnClosed.InvokeAsync();
+    }
+
+    private sealed class BranchUserListItem
+    {
+        public string FullName { get; set; } = string.Empty;
+
+        public string UserName { get; set; } = string.Empty;
+
+        public string Role { get; set; } = string.Empty;
+
+        public string? DepartmentName { get; set; }
+
+        public bool IsActive { get; set; }
+    }
+}

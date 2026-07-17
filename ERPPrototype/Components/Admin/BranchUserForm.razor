@@ -1,0 +1,274 @@
+﻿@using ERPPrototype.Data
+@using ERPPrototype.Data.Entities
+@using Microsoft.EntityFrameworkCore
+
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject UserManagementService UserManagementService
+
+<div class="border rounded-3 p-4 mt-4 bg-light">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+
+        <div>
+            <h3 class="mb-1">إضافة مستخدم</h3>
+            <div class="text-muted">@BranchName</div>
+        </div>
+
+        <button type="button"
+                class="btn btn-outline-secondary btn-sm"
+                disabled="@IsSaving"
+                @onclick="CancelAsync">
+            إغلاق
+        </button>
+
+    </div>
+
+    <div class="row g-3">
+
+        <div class="col-md-6">
+
+            <label class="form-label">
+                الاسم الكامل
+            </label>
+
+            <input class="form-control"
+                   @bind="Request.FullName" />
+
+        </div>
+
+        <div class="col-md-6">
+
+            <label class="form-label">
+                اسم المستخدم
+            </label>
+
+            <input class="form-control"
+                   autocomplete="off"
+                   @bind="Request.UserName" />
+
+        </div>
+
+        <div class="col-md-6">
+
+            <label class="form-label">
+                البريد الإلكتروني للاسترجاع
+            </label>
+
+            <input type="email"
+                   class="form-control"
+                   autocomplete="off"
+                   @bind="Request.Email" />
+
+        </div>
+
+        <div class="col-md-6">
+
+            <label class="form-label">
+                كلمة المرور المؤقتة
+            </label>
+
+            <input type="password"
+                   class="form-control"
+                   autocomplete="new-password"
+                   @bind="Request.TemporaryPassword" />
+
+        </div>
+
+        <div class="col-md-6">
+
+            <label class="form-label">
+                نوع المستخدم
+            </label>
+
+            <select class="form-select"
+                    @bind="Request.Role"
+                    @bind:after="RoleChanged">
+
+                <option value="@AppRoles.BranchManager">
+                    مدير مشروع
+                </option>
+
+                <option value="@AppRoles.Employee">
+                    موظف
+                </option>
+
+            </select>
+
+        </div>
+
+        @if (Request.Role == AppRoles.Employee)
+        {
+            <div class="col-md-6">
+
+                <label class="form-label">
+                    القسم
+                </label>
+
+                <select class="form-select"
+                        @bind="Request.DepartmentId">
+
+                    <option value="">
+                        اختر القسم
+                    </option>
+
+                    @foreach (var department in Departments)
+                    {
+                        <option value="@department.Id">
+                            @department.DepartmentType.Name
+                        </option>
+                    }
+
+                </select>
+
+            </div>
+        }
+
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(Message))
+    {
+        <div class="alert @MessageCssClass mt-4 mb-0">
+            @Message
+        </div>
+    }
+
+    <div class="mt-4">
+
+        <button type="button"
+                class="btn btn-primary px-4"
+                disabled="@IsSaving"
+                @onclick="CreateUserAsync">
+
+            @(IsSaving ? "جارٍ إنشاء المستخدم..." : "إنشاء المستخدم")
+
+        </button>
+
+    </div>
+
+</div>
+
+@code {
+    [Parameter]
+    public int BranchId { get; set; }
+
+    [Parameter]
+    public string BranchName { get; set; } = string.Empty;
+
+    [Parameter]
+    public EventCallback OnCancelled { get; set; }
+
+    [Parameter]
+    public EventCallback OnUserCreated { get; set; }
+
+    private CreateBranchUserRequest Request { get; set; } = new();
+
+    private List<Department> Departments { get; set; } = [];
+
+    private string Message { get; set; } = string.Empty;
+
+    private string MessageCssClass { get; set; } = "alert-danger";
+
+    private bool IsSaving { get; set; }
+
+    private int LoadedBranchId { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (BranchId <= 0 || LoadedBranchId == BranchId)
+        {
+            return;
+        }
+
+        LoadedBranchId = BranchId;
+
+        await LoadDepartmentsAsync();
+        ResetForm();
+    }
+
+    private async Task LoadDepartmentsAsync()
+    {
+        await using var dbContext =
+            await DbFactory.CreateDbContextAsync();
+
+        Departments = await dbContext.Departments
+            .AsNoTracking()
+            .Include(department => department.DepartmentType)
+            .Where(department => department.BranchId == BranchId)
+            .OrderBy(department => department.DepartmentType.Name)
+            .ToListAsync();
+    }
+
+    private void RoleChanged()
+    {
+        if (Request.Role == AppRoles.BranchManager)
+        {
+            Request.DepartmentId = null;
+        }
+
+        Message = string.Empty;
+    }
+
+    private async Task CreateUserAsync()
+    {
+        Message = string.Empty;
+
+        Request.BranchId = BranchId;
+
+        IsSaving = true;
+
+        try
+        {
+            var result =
+                await UserManagementService.CreateBranchUserAsync(Request);
+
+            if (!result.Succeeded)
+            {
+                ShowError(result.ErrorMessage);
+                return;
+            }
+
+            ShowSuccess("تم إنشاء المستخدم بنجاح.");
+
+            ResetForm();
+
+            await OnUserCreated.InvokeAsync();
+        }
+        catch
+        {
+            ShowError("حدث خطأ غير متوقع أثناء إنشاء المستخدم.");
+        }
+        finally
+        {
+            IsSaving = false;
+        }
+    }
+
+    private void ResetForm()
+    {
+        Request = new CreateBranchUserRequest
+        {
+            BranchId = BranchId,
+            Role = AppRoles.Employee
+        };
+    }
+
+    private async Task CancelAsync()
+    {
+        Message = string.Empty;
+        ResetForm();
+
+        await OnCancelled.InvokeAsync();
+    }
+
+    private void ShowSuccess(string message)
+    {
+        Message = message;
+        MessageCssClass = "alert-success";
+    }
+
+    private void ShowError(string message)
+    {
+        Message = message;
+        MessageCssClass = "alert-danger";
+    }
+}
