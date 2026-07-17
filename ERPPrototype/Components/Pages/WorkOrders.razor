@@ -1,5 +1,6 @@
 ﻿@page "/work-orders"
 @rendermode InteractiveServer
+@implements IAsyncDisposable
 
 @using ERPPrototype.Data
 @using ERPPrototype.Data.Entities
@@ -20,7 +21,6 @@
 <PageTitle>Work Orders</PageTitle>
 
 <div class="container-fluid py-4" dir="ltr">
-
     <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
         <div>
             <h1 class="mb-1">Work Orders</h1>
@@ -31,6 +31,19 @@
                     @BranchName — @DepartmentName
                 </div>
             }
+        </div>
+
+        <div class="text-end">
+            <button type="button"
+                    class="btn btn-primary px-4"
+                    disabled="@IsSaving"
+                    @onclick="SaveNowAsync">
+                @(IsSaving ? "Saving..." : "Save")
+            </button>
+
+            <div class="small mt-2 @SaveStateCssClass">
+                @SaveStateMessage
+            </div>
         </div>
     </div>
 
@@ -49,8 +62,10 @@
     else
     {
         <div class="alert alert-secondary py-2">
-            Edit cells directly, then click <strong>Update</strong> to save.
-            Click <strong>Cancel</strong> to discard unsaved changes.
+            Click any editable cell once and start typing.
+            Use <strong>Tab</strong> to move to the next cell.
+            Complete changes are saved automatically after 30 seconds
+            and checked every 3 minutes.
         </div>
 
         @if (!string.IsNullOrWhiteSpace(OperationErrorMessage))
@@ -82,7 +97,7 @@
                 Height="600">
 
             <GridEvents TValue="WorkOrder"
-                        OnBatchAdd="PrepareNewRow"
+                        CellSaved="CellSavedAsync"
                         OnBatchSave="SaveBatchAsync" />
 
             <GridEditSettings AllowAdding="true"
@@ -90,18 +105,18 @@
                               AllowDeleting="true"
                               Mode="EditMode.Batch"
                               AllowEditOnSingleClick="true"
+                              AllowNextRowEdit="true"
                               NewRowPosition="NewRowPosition.Bottom"
-                              ShowConfirmDialog="true"
+                              ShowConfirmDialog="false"
                               ShowDeleteConfirmDialog="true" />
 
             <GridFilterSettings Type="Syncfusion.Blazor.Grids.FilterType.Excel" />
 
-            <GridSelectionSettings Mode="Syncfusion.Blazor.Grids.SelectionMode.Cell"
+            <GridSelectionSettings Mode="Syncfusion.Blazor.Grids.SelectionMode.Both"
                                    Type="Syncfusion.Blazor.Grids.SelectionType.Multiple"
                                    CellSelectionMode="Syncfusion.Blazor.Grids.CellSelectionMode.Box" />
 
             <GridColumns>
-
                 <GridColumn Field="@nameof(WorkOrder.Id)"
                             IsPrimaryKey="true"
                             Visible="false"
@@ -110,12 +125,10 @@
 
                 <GridColumn Field="@nameof(WorkOrder.WorkOrderNumber)"
                             HeaderText="Work Order Number"
-                            ValidationRules="@RequiredValidation"
                             Width="190" />
 
                 <GridColumn Field="@nameof(WorkOrder.WorkTypeCode)"
                             HeaderText="Work Type"
-                            ValidationRules="@RequiredValidation"
                             Width="130" />
 
                 <GridColumn Field="@nameof(WorkOrder.AssignmentDate)"
@@ -127,9 +140,7 @@
 
                 <GridColumn Field="@nameof(WorkOrder.Busket)"
                             HeaderText="Busket"
-                            ValidationRules="@RequiredValidation"
                             Width="280">
-
                     <EditTemplate Context="busketContext">
                         @{
                             var workOrder = (WorkOrder)busketContext;
@@ -144,66 +155,70 @@
                                         PopupHeight="320px">
                         </SfDropDownList>
                     </EditTemplate>
-
                 </GridColumn>
 
                 <GridColumn Field="@nameof(WorkOrder.Status)"
                             HeaderText="Status"
-                            ValidationRules="@RequiredValidation"
                             Width="170" />
 
                 <GridColumn Field="@nameof(WorkOrder.Notes)"
                             HeaderText="Notes"
                             Width="320" />
-
             </GridColumns>
-
         </SfGrid>
     }
-
 </div>
 
 @code {
+    private const int BlankRowsTarget = 7;
+    private static readonly TimeSpan IdleSaveDelay = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan PeriodicSaveInterval = TimeSpan.FromMinutes(3);
+
     private SfGrid<WorkOrder>? WorkOrdersGrid;
 
     private List<WorkOrder> WorkOrderItems { get; set; } = [];
 
     private readonly List<string> ToolbarItems =
     [
-        "Add",
         "Delete",
-        "Update",
         "Cancel",
         "Search",
         "ColumnChooser"
     ];
 
-    private readonly ValidationRules RequiredValidation = new()
-    {
-        Required = true
-    };
-
     private string BranchName { get; set; } = string.Empty;
-
     private string DepartmentName { get; set; } = string.Empty;
-
     private string CurrentUserId { get; set; } = string.Empty;
-
     private int CurrentDepartmentId { get; set; }
 
     private string LoadingErrorMessage { get; set; } = string.Empty;
-
     private string OperationErrorMessage { get; set; } = string.Empty;
-
     private string SuccessMessage { get; set; } = string.Empty;
 
+    private string SaveStateMessage { get; set; } = "All changes saved";
+    private string SaveStateCssClass { get; set; } = "text-success";
+
     private bool IsLoading { get; set; } = true;
+    private bool IsSaving { get; set; }
+    private bool HasUnsavedChanges { get; set; }
 
     private int NextTemporaryId { get; set; } = -1;
 
+    private CancellationTokenSource? ComponentCancellation;
+    private CancellationTokenSource? IdleSaveCancellation;
+    private Task? PeriodicSaveTask;
+
     protected override async Task OnInitializedAsync()
     {
+        ComponentCancellation = new CancellationTokenSource();
+
         await LoadEmployeeSheetAsync();
+
+        if (string.IsNullOrWhiteSpace(LoadingErrorMessage))
+        {
+            PeriodicSaveTask = RunPeriodicSaveLoopAsync(
+                ComponentCancellation.Token);
+        }
     }
 
     private async Task LoadEmployeeSheetAsync()
@@ -223,7 +238,6 @@
             {
                 LoadingErrorMessage =
                     "The current user could not be identified.";
-
                 return;
             }
 
@@ -231,7 +245,6 @@
             {
                 LoadingErrorMessage =
                     "This employee is not assigned to a department.";
-
                 return;
             }
 
@@ -249,7 +262,6 @@
             {
                 LoadingErrorMessage =
                     "The employee department could not be found.";
-
                 return;
             }
 
@@ -263,9 +275,12 @@
                 .AsNoTracking()
                 .Where(workOrder =>
                     workOrder.DepartmentId == CurrentDepartmentId)
-                .OrderByDescending(workOrder =>
-                    workOrder.CreatedAt)
+                .OrderBy(workOrder =>
+                    workOrder.Id)
                 .ToListAsync();
+
+            AddBlankRows(BlankRowsTarget);
+            SetSavedState();
         }
         catch (Exception exception)
         {
@@ -282,13 +297,9 @@
         }
     }
 
-    private void PrepareNewRow(
-        BeforeBatchAddArgs<WorkOrder> args)
+    private WorkOrder CreateBlankRow()
     {
-        OperationErrorMessage = string.Empty;
-        SuccessMessage = string.Empty;
-
-        args.DefaultData = new WorkOrder
+        return new WorkOrder
         {
             Id = NextTemporaryId--,
             DepartmentId = CurrentDepartmentId,
@@ -298,6 +309,130 @@
             CreatedAt = DateTime.UtcNow,
             CreatedBy = CurrentUserId
         };
+    }
+
+    private void AddBlankRows(int count)
+    {
+        for (var index = 0; index < count; index++)
+        {
+            WorkOrderItems.Add(CreateBlankRow());
+        }
+    }
+
+    private async Task CellSavedAsync(
+        CellSavedArgs<WorkOrder> args)
+    {
+        OperationErrorMessage = string.Empty;
+        SuccessMessage = string.Empty;
+
+        HasUnsavedChanges = true;
+        SaveStateMessage = "Unsaved changes";
+        SaveStateCssClass = "text-warning";
+
+        ScheduleIdleSave();
+
+        var blankCount =
+            WorkOrderItems.Count(IsCompletelyBlank);
+
+        if (blankCount <= 2 && WorkOrdersGrid is not null)
+        {
+            var rowsToAdd = BlankRowsTarget - blankCount;
+
+            for (var index = 0; index < rowsToAdd; index++)
+            {
+                await WorkOrdersGrid.AddRecordAsync(
+                    CreateBlankRow(),
+                    WorkOrderItems.Count + index);
+            }
+        }
+    }
+
+    private void ScheduleIdleSave()
+    {
+        IdleSaveCancellation?.Cancel();
+        IdleSaveCancellation?.Dispose();
+
+        IdleSaveCancellation =
+            CancellationTokenSource.CreateLinkedTokenSource(
+                ComponentCancellation?.Token ??
+                CancellationToken.None);
+
+        _ = SaveAfterIdleDelayAsync(
+            IdleSaveCancellation.Token);
+    }
+
+    private async Task SaveAfterIdleDelayAsync(
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Task.Delay(
+                IdleSaveDelay,
+                cancellationToken);
+
+            await InvokeAsync(SaveNowAsync);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    private async Task RunPeriodicSaveLoopAsync(
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var timer =
+                new PeriodicTimer(PeriodicSaveInterval);
+
+            while (await timer.WaitForNextTickAsync(
+                       cancellationToken))
+            {
+                await InvokeAsync(SaveNowAsync);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    private async Task SaveNowAsync()
+    {
+        if (!HasUnsavedChanges ||
+            IsSaving ||
+            WorkOrdersGrid is null)
+        {
+            return;
+        }
+
+        IsSaving = true;
+        OperationErrorMessage = string.Empty;
+        SuccessMessage = string.Empty;
+
+        SaveStateMessage = "Saving...";
+        SaveStateCssClass = "text-primary";
+
+        try
+        {
+            await WorkOrdersGrid.EndEditAsync();
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError(
+                exception,
+                "An error occurred while requesting a grid save.");
+
+            HasUnsavedChanges = true;
+            OperationErrorMessage =
+                "An unexpected error occurred while saving.";
+
+            SaveStateMessage = "Save failed";
+            SaveStateCssClass = "text-danger";
+        }
+        finally
+        {
+            IsSaving = false;
+        }
     }
 
     private async Task SaveBatchAsync(
@@ -311,16 +446,6 @@
             return;
         }
 
-        if (CurrentDepartmentId <= 0 ||
-            string.IsNullOrWhiteSpace(CurrentUserId))
-        {
-            args.Cancel = true;
-            OperationErrorMessage =
-                "The current employee context is invalid.";
-
-            return;
-        }
-
         var addedRecords =
             args.BatchChanges.AddedRecords ?? [];
 
@@ -330,24 +455,45 @@
         var deletedRecords =
             args.BatchChanges.DeletedRecords ?? [];
 
-        foreach (var workOrder in addedRecords)
+        var newRecords = addedRecords
+            .Concat(
+                changedRecords.Where(
+                    workOrder => workOrder.Id <= 0))
+            .Where(workOrder =>
+                !IsCompletelyBlank(workOrder))
+            .GroupBy(workOrder => workOrder.Id)
+            .Select(group => group.Last())
+            .ToList();
+
+        var existingChangedRecords = changedRecords
+            .Where(workOrder => workOrder.Id > 0)
+            .ToList();
+
+        var existingDeletedRecords = deletedRecords
+            .Where(workOrder => workOrder.Id > 0)
+            .ToList();
+
+        foreach (var workOrder in newRecords)
         {
             NormalizeEditableFields(workOrder);
         }
 
-        foreach (var workOrder in changedRecords)
+        foreach (var workOrder in existingChangedRecords)
         {
             NormalizeEditableFields(workOrder);
         }
 
         var validationError = ValidateRecords(
-            addedRecords.Concat(changedRecords));
+            newRecords.Concat(existingChangedRecords));
 
         if (!string.IsNullOrWhiteSpace(validationError))
         {
             args.Cancel = true;
-            OperationErrorMessage = validationError;
+            HasUnsavedChanges = true;
 
+            OperationErrorMessage = validationError;
+            SaveStateMessage = "Required fields are incomplete";
+            SaveStateCssClass = "text-danger";
             return;
         }
 
@@ -359,8 +505,7 @@
             await using var transaction =
                 await dbContext.Database.BeginTransactionAsync();
 
-            var deletedIds = deletedRecords
-                .Where(workOrder => workOrder.Id > 0)
+            var deletedIds = existingDeletedRecords
                 .Select(workOrder => workOrder.Id)
                 .Distinct()
                 .ToHashSet();
@@ -382,13 +527,8 @@
                     !deletedIds.Contains(workOrder.Id))
                 .ToList();
 
-            foreach (var changedRecord in changedRecords)
+            foreach (var changedRecord in existingChangedRecords)
             {
-                if (deletedIds.Contains(changedRecord.Id))
-                {
-                    continue;
-                }
-
                 var existingSnapshot = finalRows
                     .SingleOrDefault(workOrder =>
                         workOrder.Id == changedRecord.Id);
@@ -396,9 +536,13 @@
                 if (existingSnapshot is null)
                 {
                     args.Cancel = true;
+                    HasUnsavedChanges = true;
+
                     OperationErrorMessage =
                         "A modified work order could not be found in this department.";
 
+                    SaveStateMessage = "Save failed";
+                    SaveStateCssClass = "text-danger";
                     return;
                 }
 
@@ -411,15 +555,15 @@
 
             var temporarySnapshotId = -1;
 
-            foreach (var addedRecord in addedRecords)
+            foreach (var newRecord in newRecords)
             {
                 finalRows.Add(new WorkOrderKeySnapshot
                 {
                     Id = temporarySnapshotId--,
                     WorkOrderNumber =
-                        addedRecord.WorkOrderNumber,
+                        newRecord.WorkOrderNumber,
                     WorkTypeCode =
-                        addedRecord.WorkTypeCode
+                        newRecord.WorkTypeCode
                 });
             }
 
@@ -428,19 +572,24 @@
                     CreateDuplicateKey(
                         workOrder.WorkOrderNumber,
                         workOrder.WorkTypeCode))
-                .FirstOrDefault(group => group.Count() > 1);
+                .FirstOrDefault(group =>
+                    group.Count() > 1);
 
             if (duplicateGroup is not null)
             {
                 args.Cancel = true;
+                HasUnsavedChanges = true;
 
-                var duplicate = duplicateGroup.First();
+                var duplicate =
+                    duplicateGroup.First();
 
                 OperationErrorMessage =
                     $"Work Order Number '{duplicate.WorkOrderNumber}' " +
                     $"with Work Type '{duplicate.WorkTypeCode}' " +
                     "already exists in this department.";
 
+                SaveStateMessage = "Duplicate work order";
+                SaveStateCssClass = "text-danger";
                 return;
             }
 
@@ -457,9 +606,13 @@
                 if (entitiesToDelete.Count != deletedIds.Count)
                 {
                     args.Cancel = true;
+                    HasUnsavedChanges = true;
+
                     OperationErrorMessage =
                         "One or more selected work orders do not belong to this department.";
 
+                    SaveStateMessage = "Save failed";
+                    SaveStateCssClass = "text-danger";
                     return;
                 }
 
@@ -467,10 +620,7 @@
                     entitiesToDelete);
             }
 
-            var changedIds = changedRecords
-                .Where(workOrder =>
-                    workOrder.Id > 0 &&
-                    !deletedIds.Contains(workOrder.Id))
+            var changedIds = existingChangedRecords
                 .Select(workOrder => workOrder.Id)
                 .Distinct()
                 .ToHashSet();
@@ -488,22 +638,24 @@
                 if (entitiesToUpdate.Count != changedIds.Count)
                 {
                     args.Cancel = true;
+                    HasUnsavedChanges = true;
+
                     OperationErrorMessage =
                         "One or more modified work orders do not belong to this department.";
 
+                    SaveStateMessage = "Save failed";
+                    SaveStateCssClass = "text-danger";
                     return;
                 }
 
-                var changedRecordsById = changedRecords
-                    .Where(workOrder =>
-                        changedIds.Contains(workOrder.Id))
-                    .ToDictionary(
+                var changedById =
+                    existingChangedRecords.ToDictionary(
                         workOrder => workOrder.Id);
 
                 foreach (var entity in entitiesToUpdate)
                 {
                     var changedRecord =
-                        changedRecordsById[entity.Id];
+                        changedById[entity.Id];
 
                     entity.WorkOrderNumber =
                         changedRecord.WorkOrderNumber;
@@ -531,32 +683,38 @@
                 }
             }
 
-            foreach (var addedRecord in addedRecords)
+            foreach (var newRecord in newRecords)
             {
-                addedRecord.Id = 0;
-                addedRecord.DepartmentId =
+                newRecord.Id = 0;
+                newRecord.DepartmentId =
                     CurrentDepartmentId;
-                addedRecord.WorkYear =
+                newRecord.WorkYear =
                     DateTime.Now.Year;
-                addedRecord.CreatedAt =
+                newRecord.CreatedAt =
                     DateTime.UtcNow;
-                addedRecord.CreatedBy =
+                newRecord.CreatedBy =
                     CurrentUserId;
-                addedRecord.UpdatedAt = null;
-                addedRecord.UpdatedBy = null;
+                newRecord.UpdatedAt = null;
+                newRecord.UpdatedBy = null;
 
-                dbContext.WorkOrders.Add(addedRecord);
+                dbContext.WorkOrders.Add(newRecord);
             }
 
             await dbContext.SaveChangesAsync();
             await transaction.CommitAsync();
 
+            IdleSaveCancellation?.Cancel();
+
+            HasUnsavedChanges = false;
             SuccessMessage =
                 "All changes were saved successfully.";
+
+            SetSavedState();
         }
         catch (DbUpdateException exception)
         {
             args.Cancel = true;
+            HasUnsavedChanges = true;
 
             Logger.LogError(
                 exception,
@@ -564,10 +722,14 @@
 
             OperationErrorMessage =
                 "The changes could not be saved. Check for duplicate or invalid values.";
+
+            SaveStateMessage = "Save failed";
+            SaveStateCssClass = "text-danger";
         }
         catch (Exception exception)
         {
             args.Cancel = true;
+            HasUnsavedChanges = true;
 
             Logger.LogError(
                 exception,
@@ -575,23 +737,47 @@
 
             OperationErrorMessage =
                 "An unexpected error occurred while saving the changes.";
+
+            SaveStateMessage = "Save failed";
+            SaveStateCssClass = "text-danger";
         }
+    }
+
+    private static bool IsCompletelyBlank(
+        WorkOrder workOrder)
+    {
+        return
+            string.IsNullOrWhiteSpace(
+                workOrder.WorkOrderNumber) &&
+            string.IsNullOrWhiteSpace(
+                workOrder.WorkTypeCode) &&
+            workOrder.AssignmentDate is null &&
+            string.IsNullOrWhiteSpace(
+                workOrder.Busket) &&
+            string.IsNullOrWhiteSpace(
+                workOrder.Status) &&
+            string.IsNullOrWhiteSpace(
+                workOrder.Notes);
     }
 
     private static void NormalizeEditableFields(
         WorkOrder workOrder)
     {
         workOrder.WorkOrderNumber =
-            workOrder.WorkOrderNumber?.Trim() ?? string.Empty;
+            workOrder.WorkOrderNumber?.Trim()
+            ?? string.Empty;
 
         workOrder.WorkTypeCode =
-            workOrder.WorkTypeCode?.Trim() ?? string.Empty;
+            workOrder.WorkTypeCode?.Trim()
+            ?? string.Empty;
 
         workOrder.Busket =
-            workOrder.Busket?.Trim() ?? string.Empty;
+            workOrder.Busket?.Trim()
+            ?? string.Empty;
 
         workOrder.Status =
-            workOrder.Status?.Trim() ?? string.Empty;
+            workOrder.Status?.Trim()
+            ?? string.Empty;
 
         workOrder.Notes =
             string.IsNullOrWhiteSpace(workOrder.Notes)
@@ -641,13 +827,7 @@
                     "Select a valid value from the Busket list.";
             }
 
-            if (string.IsNullOrWhiteSpace(
-                    workOrder.Status))
-            {
-                return "Status is required.";
-            }
-
-            if (workOrder.Status.Length > 150)
+            if (workOrder.Status?.Length > 150)
             {
                 return
                     "Status cannot exceed 150 characters.";
@@ -671,6 +851,33 @@
             workOrderNumber.Trim().ToUpperInvariant(),
             "\u001F",
             workTypeCode.Trim().ToUpperInvariant());
+    }
+
+    private void SetSavedState()
+    {
+        SaveStateMessage = "All changes saved";
+        SaveStateCssClass = "text-success";
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        IdleSaveCancellation?.Cancel();
+        IdleSaveCancellation?.Dispose();
+
+        ComponentCancellation?.Cancel();
+
+        if (PeriodicSaveTask is not null)
+        {
+            try
+            {
+                await PeriodicSaveTask;
+            }
+            catch (OperationCanceledException)
+            {
+            }
+        }
+
+        ComponentCancellation?.Dispose();
     }
 
     private sealed class WorkOrderKeySnapshot
