@@ -2,86 +2,177 @@
 
 @inject NavigationManager NavigationManager
 
-<div class="top-row ps-3 navbar navbar-dark">
-    <div class="container-fluid">
-        <a class="navbar-brand" href="">ERPPrototype</a>
-    </div>
-</div>
+<nav class="main-navbar">
+    <div class="navbar-inner">
 
-<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
+        <div class="navbar-left">
 
-<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
-    <nav class="nav flex-column">
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Home
+            <NavLink class="brand-link"
+                     href=""
+                     Match="NavLinkMatch.All">
+
+                <span class="brand-mark">WO</span>
+
+                <span class="brand-text">
+                    <strong>Work Orders</strong>
+                    <small>Contractor Prototype</small>
+                </span>
+
             </NavLink>
+
+            <div class="navigation-links">
+
+                <NavLink class="navigation-link"
+                         href=""
+                         Match="NavLinkMatch.All">
+                    الرئيسية
+                </NavLink>
+
+                <AuthorizeView Roles="Employee">
+                    <Authorized>
+                        <NavLink class="navigation-link"
+                                 href="work-orders">
+                            أوامر العمل
+                        </NavLink>
+                    </Authorized>
+                </AuthorizeView>
+
+                <AuthorizeView Roles="Admin">
+                    <Authorized>
+                        <NavLink class="navigation-link"
+                                 href="admin">
+                            لوحة الإدارة
+                        </NavLink>
+                    </Authorized>
+                </AuthorizeView>
+
+            </div>
+
         </div>
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="counter">
-                <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Counter
-            </NavLink>
-        </div>
+        <input id="navigation-toggle"
+               type="checkbox"
+               class="navigation-toggle"
+               title="فتح أو إغلاق القائمة" />
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="weather">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Weather
-            </NavLink>
-        </div>
+        <label for="navigation-toggle"
+               class="navigation-toggle-button"
+               aria-label="فتح القائمة">
+            <span></span>
+            <span></span>
+            <span></span>
+        </label>
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="auth">
-                <span class="bi bi-lock-nav-menu" aria-hidden="true"></span> Auth Required
-            </NavLink>
-        </div>
+        <div class="navbar-right">
 
-        <AuthorizeView>
-            <Authorized>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="Account/Manage">
-                        <span class="bi bi-person-fill-nav-menu" aria-hidden="true"></span> @context.User.Identity?.Name
+            <AuthorizeView>
+                <Authorized Context="authContext">
+
+                    <NavLink class="user-card"
+                             href="Account/Manage"
+                             title="@authContext.User.Identity?.Name">
+
+                        <span class="user-avatar">
+                            @GetUserInitial(authContext.User.Identity?.Name)
+                        </span>
+
+                        <span class="user-details">
+                            <small>الحساب الحالي</small>
+
+                            <strong>
+                                @GetDisplayUserName(
+                                    authContext.User.Identity?.Name)
+                            </strong>
+                        </span>
+
                     </NavLink>
-                </div>
-                <div class="nav-item px-3">
-                    <form action="Account/Logout" method="post">
+
+                    <form action="Account/Logout"
+                          method="post"
+                          class="logout-form">
+
                         <AntiforgeryToken />
-                        <input type="hidden" name="ReturnUrl" value="@currentUrl" />
-                        <button type="submit" class="nav-link">
-                            <span class="bi bi-arrow-bar-left-nav-menu" aria-hidden="true"></span> Logout
+
+                        <input type="hidden"
+                               name="ReturnUrl"
+                               value="@currentUrl" />
+
+                        <button type="submit"
+                                class="logout-button">
+                            تسجيل الخروج
                         </button>
+
                     </form>
-                </div>
-            </Authorized>
-            <NotAuthorized>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="Account/Register">
-                        <span class="bi bi-person-nav-menu" aria-hidden="true"></span> Register
+
+                </Authorized>
+
+                <NotAuthorized>
+
+                    <NavLink class="login-link"
+                             href="Account/Login">
+                        تسجيل الدخول
                     </NavLink>
-                </div>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="Account/Login">
-                        <span class="bi bi-person-badge-nav-menu" aria-hidden="true"></span> Login
-                    </NavLink>
-                </div>
-            </NotAuthorized>
-        </AuthorizeView>
-    </nav>
-</div>
+
+                </NotAuthorized>
+            </AuthorizeView>
+
+        </div>
+
+    </div>
+</nav>
 
 @code {
     private string? currentUrl;
 
     protected override void OnInitialized()
     {
-        currentUrl = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
+        currentUrl =
+            NavigationManager.ToBaseRelativePath(
+                NavigationManager.Uri);
+
         NavigationManager.LocationChanged += OnLocationChanged;
     }
 
-    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    private void OnLocationChanged(
+        object? sender,
+        LocationChangedEventArgs e)
     {
-        currentUrl = NavigationManager.ToBaseRelativePath(e.Location);
+        currentUrl =
+            NavigationManager.ToBaseRelativePath(e.Location);
+
         StateHasChanged();
+    }
+
+    private static string GetUserInitial(string? userName)
+    {
+        if (string.IsNullOrWhiteSpace(userName))
+        {
+            return "U";
+        }
+
+        return userName.Trim()[0]
+            .ToString()
+            .ToUpperInvariant();
+    }
+
+    private static string GetDisplayUserName(string? userName)
+    {
+        if (string.IsNullOrWhiteSpace(userName))
+        {
+            return "User";
+        }
+
+        var value = userName.Trim();
+        var atIndex = value.IndexOf('@');
+
+        if (atIndex > 0)
+        {
+            value = value[..atIndex];
+        }
+
+        return value.Length > 18
+            ? $"{value[..18]}..."
+            : value;
     }
 
     public void Dispose()
@@ -89,4 +180,3 @@
         NavigationManager.LocationChanged -= OnLocationChanged;
     }
 }
-

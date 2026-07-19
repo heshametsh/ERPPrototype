@@ -10,13 +10,57 @@
 @inject NavigationManager NavigationManager
 @inject IdentityRedirectManager RedirectManager
 
-<PageTitle>Log in</PageTitle>
+<PageTitle>تسجيل الدخول | Work Orders Prototype</PageTitle>
 
-<h1>Log in</h1>
+<div class="login-page">
 
-<div class="row">
-    <div class="col-lg-6">
-        <section>
+    <div class="login-visual">
+        <div class="visual-overlay"></div>
+
+        <div class="visual-content">
+            <span class="prototype-badge">TEST ENVIRONMENT</span>
+
+            <h1>Contractor Work Order Tracking</h1>
+
+            <p class="visual-title-ar">
+                نموذج تجريبي لمتابعة أوامر عمل المقاولين
+            </p>
+
+            <p class="visual-description">
+                نظام أولي قيد التطوير لاختبار إدارة ومتابعة أوامر العمل
+                والفروع والأقسام داخل شركات المقاولات.
+            </p>
+        </div>
+    </div>
+
+    <div class="login-panel">
+        <div class="login-card">
+
+            <div class="brand-header">
+                <div class="brand-mark">WO</div>
+
+                <div>
+                    <h2>تسجيل الدخول</h2>
+                    <p>Work Orders Prototype</p>
+                </div>
+            </div>
+
+            <div class="prototype-notice">
+                <div class="notice-title">
+                    بيئة تجريبية — Prototype
+                </div>
+
+                <p>
+                    هذا الموقع نموذج أولي قيد التطوير لنظام متابعة أوامر
+                    العمل الخاص بالمقاولين، ومخصص للاختبار والتحقق التقني فقط.
+                </p>
+
+                <p>
+                    الموقع ليس بوابة أو نظامًا رسميًا تابعًا للشركة السعودية
+                    للكهرباء، ويجب عدم إدخال أي بيانات حقيقية أو سرية داخله.
+                </p>
+            </div>
+
             <StatusMessage Message="@errorMessage" />
 
             <EditForm EditContext="editContext"
@@ -26,65 +70,67 @@
 
                 <DataAnnotationsValidator />
 
-                <h2>Use your account to log in.</h2>
-
-                <hr />
-
-                <ValidationSummary class="text-danger"
+                <ValidationSummary class="text-danger validation-summary"
                                    role="alert" />
 
-                <div class="form-floating mb-3">
+                <div class="login-field">
+                    <label for="Input.UserName">
+                        اسم المستخدم
+                    </label>
+
                     <InputText @bind-Value="Input.UserName"
                                id="Input.UserName"
                                class="form-control"
                                autocomplete="username"
                                aria-required="true"
-                               placeholder="username" />
-
-                    <label for="Input.UserName"
-                           class="form-label">
-                        Username
-                    </label>
+                               placeholder="أدخل اسم المستخدم" />
 
                     <ValidationMessage For="() => Input.UserName"
                                        class="text-danger" />
                 </div>
 
-                <div class="form-floating mb-3">
+                <div class="login-field">
+                    <label for="Input.Password">
+                        كلمة المرور
+                    </label>
+
                     <InputText type="password"
                                @bind-Value="Input.Password"
                                id="Input.Password"
                                class="form-control"
                                autocomplete="current-password"
                                aria-required="true"
-                               placeholder="password" />
-
-                    <label for="Input.Password"
-                           class="form-label">
-                        Password
-                    </label>
+                               placeholder="أدخل كلمة المرور" />
 
                     <ValidationMessage For="() => Input.Password"
                                        class="text-danger" />
                 </div>
 
-                <div class="checkbox mb-3">
-                    <label class="form-label">
+                <div class="remember-row">
+                    <label>
                         <InputCheckbox @bind-Value="Input.RememberMe"
-                                       class="darker-border-checkbox form-check-input" />
+                                       class="form-check-input" />
 
-                        Remember me
+                        <span>تذكر تسجيل الدخول</span>
                     </label>
                 </div>
 
                 <button type="submit"
-                        class="w-100 btn btn-lg btn-primary">
-                    Log in
+                        class="login-button">
+                    تسجيل الدخول
                 </button>
 
             </EditForm>
-        </section>
+
+            <div class="login-footer">
+                <span>Prototype Build</span>
+                <span>•</span>
+                <span>Contractor Operations</span>
+            </div>
+
+        </div>
     </div>
+
 </div>
 
 @code {
@@ -152,20 +198,20 @@
         else
         {
             errorMessage =
-                "Error: Invalid username or password.";
+                "خطأ: اسم المستخدم أو كلمة المرور غير صحيحة.";
         }
     }
 
     private sealed class InputModel
     {
-        [Required]
+        [Required(ErrorMessage = "اسم المستخدم مطلوب.")]
         public string UserName { get; set; } = string.Empty;
 
-        [Required]
+        [Required(ErrorMessage = "كلمة المرور مطلوبة.")]
         [DataType(DataType.Password)]
         public string Password { get; set; } = string.Empty;
 
-        [Display(Name = "Remember me?")]
+        [Display(Name = "تذكر تسجيل الدخول")]
         public bool RememberMe { get; set; }
     }
 }

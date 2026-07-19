@@ -37,18 +37,47 @@ public static class ApplicationSeeder
     }
 
     private static async Task EnsureInitialAdminAsync(
-        IServiceProvider services)
+    IServiceProvider services)
     {
         var userManager =
             services.GetRequiredService<UserManager<ApplicationUser>>();
+
+        var configuration =
+            services.GetRequiredService<IConfiguration>();
 
         var initialAdmin =
             await userManager.FindByEmailAsync(InitialAdminEmail);
 
         if (initialAdmin is null)
         {
-            throw new InvalidOperationException(
-                $"The initial admin account '{InitialAdminEmail}' was not found.");
+            var initialAdminPassword =
+                configuration["InitialAdmin:Password"];
+
+            if (string.IsNullOrWhiteSpace(initialAdminPassword))
+            {
+                throw new InvalidOperationException(
+                    "The initial admin account does not exist, and " +
+                    "'InitialAdmin:Password' was not configured.");
+            }
+
+            initialAdmin = new ApplicationUser
+            {
+                UserName = InitialAdminEmail,
+                Email = InitialAdminEmail,
+                EmailConfirmed = true,
+                FullName = "Initial Administrator",
+                IsActive = true,
+                MustChangePassword = true
+            };
+
+            var createResult =
+                await userManager.CreateAsync(
+                    initialAdmin,
+                    initialAdminPassword);
+
+            ThrowIfIdentityOperationFailed(
+                createResult,
+                $"Failed to create the initial admin account '{InitialAdminEmail}'");
         }
 
         var currentRoles = await userManager.GetRolesAsync(initialAdmin);
@@ -72,7 +101,9 @@ public static class ApplicationSeeder
         }
 
         var addResult =
-            await userManager.AddToRoleAsync(initialAdmin, AppRoles.Admin);
+            await userManager.AddToRoleAsync(
+                initialAdmin,
+                AppRoles.Admin);
 
         ThrowIfIdentityOperationFailed(
             addResult,

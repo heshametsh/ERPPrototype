@@ -1,0 +1,177 @@
+.home-hero {
+    position: relative;
+    display: flex;
+    align-items: center;
+    min-height: calc(100vh - 72px);
+    overflow: hidden;
+    background-image: url("/images/login-background.png");
+    background-position: center;
+    background-size: cover;
+    background-repeat: no-repeat;
+    font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+}
+
+.home-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient( 90deg, rgba(0, 35, 72, 0.90) 0%, rgba(0, 59, 105, 0.72) 42%, rgba(0, 75, 120, 0.34) 72%, rgba(0, 85, 120, 0.08) 100% );
+}
+
+.home-content {
+    position: relative;
+    z-index: 2;
+    width: min(760px, calc(100% - 60px));
+    margin-right: clamp(30px, 7vw, 120px);
+    padding: 70px 0;
+    color: white;
+    direction: rtl;
+}
+
+.prototype-badge {
+    display: inline-flex;
+    margin-bottom: 24px;
+    padding: 9px 16px;
+    border: 1px solid rgba(255, 255, 255, 0.65);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.13);
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 1.4px;
+    direction: ltr;
+    backdrop-filter: blur(8px);
+}
+
+.home-content h1 {
+    margin: 0;
+    font-size: clamp(2.6rem, 5vw, 5.5rem);
+    font-weight: 650;
+    line-height: 1.03;
+    direction: ltr;
+    text-align: right;
+    text-shadow: 0 4px 22px rgba(0, 0, 0, 0.25);
+}
+
+.home-content h2 {
+    margin: 24px 0 0;
+    font-size: clamp(1.6rem, 2.7vw, 2.8rem);
+    font-weight: 700;
+    line-height: 1.35;
+}
+
+.home-description {
+    max-width: 680px;
+    margin: 22px 0 0;
+    color: rgba(255, 255, 255, 0.92);
+    font-size: 1.12rem;
+    line-height: 1.9;
+}
+
+.prototype-notice {
+    max-width: 690px;
+    margin-top: 30px;
+    padding: 20px 22px;
+    border: 1px solid rgba(255, 202, 96, 0.7);
+    border-right: 5px solid #f2a91d;
+    border-radius: 14px;
+    background: rgba(255, 248, 232, 0.93);
+    color: #614514;
+    box-shadow: 0 18px 45px rgba(0, 0, 0, 0.18);
+    backdrop-filter: blur(10px);
+}
+
+    .prototype-notice strong {
+        display: block;
+        margin-bottom: 8px;
+        color: #8d5900;
+        font-size: 1.05rem;
+    }
+
+    .prototype-notice p {
+        margin: 5px 0;
+        font-size: 0.94rem;
+        line-height: 1.7;
+    }
+
+.home-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 13px;
+    margin-top: 30px;
+}
+
+    .home-actions ::deep .primary-action {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 180px;
+        min-height: 52px;
+        padding: 0 26px;
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        border-radius: 11px;
+        background: linear-gradient(135deg, #0067b9, #00a9ce);
+        color: white;
+        font-size: 1rem;
+        font-weight: 750;
+        text-decoration: none;
+        box-shadow: 0 12px 28px rgba(0, 74, 133, 0.35);
+        transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
+    }
+
+        .home-actions ::deep .primary-action:hover {
+            transform: translateY(-2px);
+            filter: brightness(1.05);
+            box-shadow: 0 16px 34px rgba(0, 74, 133, 0.42);
+        }
+
+@media (max-width: 820px) {
+    .home-hero {
+        align-items: flex-start;
+        background-position: center;
+    }
+
+    .home-overlay {
+        background: linear-gradient( rgba(0, 37, 72, 0.84), rgba(0, 59, 102, 0.76) );
+    }
+
+    .home-content {
+        width: calc(100% - 36px);
+        margin: 0 auto;
+        padding: 55px 0;
+    }
+
+        .home-content h1 {
+            font-size: clamp(2.2rem, 10vw, 3.6rem);
+            text-align: right;
+        }
+
+    .home-description {
+        font-size: 1rem;
+    }
+
+    .prototype-notice {
+        padding: 17px;
+    }
+}
+
+@media (max-width: 480px) {
+    .home-content {
+        padding: 38px 0;
+    }
+
+    .home-actions {
+        display: block;
+    }
+
+        .home-actions ::deep .primary-action {
+            width: 100%;
+        }
+    .home-hero:focus,
+    .home-hero:focus-visible,
+    .home-content:focus,
+    .home-content:focus-visible,
+    .home-content h1:focus,
+    .home-content h1:focus-visible {
+        outline: none;
+        box-shadow: none;
+    }
+}
