@@ -61,10 +61,9 @@
     else
     {
         <div class="alert alert-secondary py-2">
-            Click any editable cell once and start typing.
-            Use <strong>Tab</strong> to move to the next cell.
-            Complete changes are saved automatically after 30 seconds
-            and checked every 3 minutes.
+            Click a cell once to select it.
+            Use the arrow keys to move between cells.
+            Double-click or press <strong>F2</strong> to edit the current value.
         </div>
 
         @if (!string.IsNullOrWhiteSpace(OperationErrorMessage))
@@ -103,7 +102,7 @@
                               AllowEditing="true"
                               AllowDeleting="true"
                               Mode="EditMode.Batch"
-                              AllowEditOnSingleClick="true"
+                              AllowEditOnSingleClick="false"
                               AllowNextRowEdit="true"
                               NewRowPosition="NewRowPosition.Bottom"
                               ShowConfirmDialog="false"
@@ -173,10 +172,15 @@
 
 @code {
     private const int BlankRowsTarget = 7;
-    private static readonly TimeSpan IdleSaveDelay = TimeSpan.FromSeconds(30);
-    private static readonly TimeSpan PeriodicSaveInterval = TimeSpan.FromMinutes(3);
+
+    private static readonly TimeSpan IdleSaveDelay =
+        TimeSpan.FromSeconds(30);
+
+    private static readonly TimeSpan PeriodicSaveInterval =
+        TimeSpan.FromMinutes(3);
 
     private SfGrid<WorkOrder>? WorkOrdersGrid;
+
     private List<WorkOrder> WorkOrderItems { get; set; } = [];
 
     private readonly List<string> ToolbarItems =
@@ -190,14 +194,18 @@
     private string BranchName { get; set; } = string.Empty;
     private string DepartmentName { get; set; } = string.Empty;
     private string CurrentUserId { get; set; } = string.Empty;
+
     private int CurrentDepartmentId { get; set; }
 
     private string LoadingErrorMessage { get; set; } = string.Empty;
     private string OperationErrorMessage { get; set; } = string.Empty;
     private string SuccessMessage { get; set; } = string.Empty;
 
-    private string SaveStateMessage { get; set; } = "All changes saved";
-    private string SaveStateCssClass { get; set; } = "text-success";
+    private string SaveStateMessage { get; set; } =
+        "All changes saved";
+
+    private string SaveStateCssClass { get; set; } =
+        "text-success";
 
     private bool IsLoading { get; set; } = true;
     private bool IsSaving { get; set; }
@@ -222,6 +230,8 @@
         }
     }
 
+    
+
     private async Task LoadEmployeeSheetAsync()
     {
         IsLoading = true;
@@ -230,15 +240,18 @@
         try
         {
             var authenticationState =
-                await AuthenticationStateProvider.GetAuthenticationStateAsync();
+                await AuthenticationStateProvider
+                    .GetAuthenticationStateAsync();
 
             var currentUser =
-                await UserManager.GetUserAsync(authenticationState.User);
+                await UserManager.GetUserAsync(
+                    authenticationState.User);
 
             if (currentUser is null)
             {
                 LoadingErrorMessage =
                     "The current user could not be identified.";
+
                 return;
             }
 
@@ -246,16 +259,18 @@
             {
                 LoadingErrorMessage =
                     "This employee is not assigned to a department.";
+
                 return;
             }
 
             var sheet = await WorkOrderService.LoadSheetAsync(
-                 currentUser.Id);
+                currentUser.Id);
 
             if (sheet is null)
             {
                 LoadingErrorMessage =
                     "The employee department could not be found.";
+
                 return;
             }
 
@@ -309,7 +324,8 @@
         }
     }
 
-    private async Task CellSavedAsync(CellSavedArgs<WorkOrder> args)
+    private async Task CellSavedAsync(
+        CellSavedArgs<WorkOrder> args)
     {
         OperationErrorMessage = string.Empty;
         SuccessMessage = string.Empty;
@@ -321,11 +337,13 @@
         ScheduleIdleSave();
 
         var blankCount =
-            WorkOrderItems.Count(WorkOrderService.IsCompletelyBlank);
+            WorkOrderItems.Count(
+                WorkOrderService.IsCompletelyBlank);
 
         if (blankCount <= 2 && WorkOrdersGrid is not null)
         {
-            var rowsToAdd = BlankRowsTarget - blankCount;
+            var rowsToAdd =
+                BlankRowsTarget - blankCount;
 
             for (var index = 0; index < rowsToAdd; index++)
             {
@@ -343,9 +361,11 @@
 
         IdleSaveCancellation =
             CancellationTokenSource.CreateLinkedTokenSource(
-                ComponentCancellation?.Token ?? CancellationToken.None);
+                ComponentCancellation?.Token
+                ?? CancellationToken.None);
 
-        _ = SaveAfterIdleDelayAsync(IdleSaveCancellation.Token);
+        _ = SaveAfterIdleDelayAsync(
+            IdleSaveCancellation.Token);
     }
 
     private async Task SaveAfterIdleDelayAsync(
@@ -353,7 +373,10 @@
     {
         try
         {
-            await Task.Delay(IdleSaveDelay, cancellationToken);
+            await Task.Delay(
+                IdleSaveDelay,
+                cancellationToken);
+
             await InvokeAsync(SaveNowAsync);
         }
         catch (OperationCanceledException)
@@ -366,9 +389,12 @@
     {
         try
         {
-            using var timer = new PeriodicTimer(PeriodicSaveInterval);
+            using var timer =
+                new PeriodicTimer(
+                    PeriodicSaveInterval);
 
-            while (await timer.WaitForNextTickAsync(cancellationToken))
+            while (await timer.WaitForNextTickAsync(
+                       cancellationToken))
             {
                 await InvokeAsync(SaveNowAsync);
             }
@@ -405,6 +431,7 @@
                 "An error occurred while requesting a grid save.");
 
             HasUnsavedChanges = true;
+
             OperationErrorMessage =
                 "An unexpected error occurred while saving.";
 
@@ -430,27 +457,33 @@
 
         try
         {
-            var result = await WorkOrderService.SaveChangesAsync(
-                CurrentUserId,
-                args.BatchChanges.AddedRecords ?? [],
-                args.BatchChanges.ChangedRecords ?? [],
-                args.BatchChanges.DeletedRecords ?? [],
-                ComponentCancellation?.Token ?? CancellationToken.None);
+            var result =
+                await WorkOrderService.SaveChangesAsync(
+                    CurrentUserId,
+                    args.BatchChanges.AddedRecords ?? [],
+                    args.BatchChanges.ChangedRecords ?? [],
+                    args.BatchChanges.DeletedRecords ?? [],
+                    ComponentCancellation?.Token
+                    ?? CancellationToken.None);
 
             if (!result.Succeeded)
             {
                 args.Cancel = true;
                 HasUnsavedChanges = true;
-                OperationErrorMessage = result.ErrorMessage;
+                OperationErrorMessage =
+                    result.ErrorMessage;
 
-                SaveStateMessage = result.FailureType switch
-                {
-                    WorkOrderSaveFailureType.Validation =>
-                        "Required fields are incomplete",
-                    WorkOrderSaveFailureType.Duplicate =>
-                        "Duplicate work order",
-                    _ => "Save failed"
-                };
+                SaveStateMessage =
+                    result.FailureType switch
+                    {
+                        WorkOrderSaveFailureType.Validation =>
+                            "Required fields are incomplete",
+
+                        WorkOrderSaveFailureType.Duplicate =>
+                            "Duplicate work order",
+
+                        _ => "Save failed"
+                    };
 
                 SaveStateCssClass = "text-danger";
                 return;
@@ -458,6 +491,7 @@
 
             IdleSaveCancellation?.Cancel();
             HasUnsavedChanges = false;
+
             SuccessMessage =
                 "All changes were saved successfully.";
 
