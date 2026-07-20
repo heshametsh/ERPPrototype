@@ -7,7 +7,6 @@
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Authorization
 @using Microsoft.AspNetCore.Identity
-@using Microsoft.EntityFrameworkCore
 @using Syncfusion.Blazor.DropDowns
 @using Syncfusion.Blazor.Grids
 
@@ -15,7 +14,7 @@
 
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject UserManager<ApplicationUser> UserManager
-@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject WorkOrderService WorkOrderService
 @inject ILogger<WorkOrders> Logger
 
 <PageTitle>Work Orders</PageTitle>
@@ -175,7 +174,6 @@
     private static readonly TimeSpan PeriodicSaveInterval = TimeSpan.FromMinutes(3);
 
     private SfGrid<WorkOrder>? WorkOrdersGrid;
-
     private List<WorkOrder> WorkOrderItems { get; set; } = [];
 
     private readonly List<string> ToolbarItems =
@@ -248,17 +246,11 @@
                 return;
             }
 
-            await using var dbContext =
-                await DbFactory.CreateDbContextAsync();
+            var sheet = await WorkOrderService.LoadSheetAsync(
+                currentUser.DepartmentId.Value,
+                ComponentCancellation?.Token ?? CancellationToken.None);
 
-            var department = await dbContext.Departments
-                .AsNoTracking()
-                .Include(item => item.Branch)
-                .Include(item => item.DepartmentType)
-                .SingleOrDefaultAsync(item =>
-                    item.Id == currentUser.DepartmentId.Value);
-
-            if (department is null)
+            if (sheet is null)
             {
                 LoadingErrorMessage =
                     "The employee department could not be found.";
@@ -266,21 +258,17 @@
             }
 
             CurrentUserId = currentUser.Id;
-            CurrentDepartmentId = department.Id;
-
-            BranchName = department.Branch.Name;
-            DepartmentName = department.DepartmentType.Name;
-
-            WorkOrderItems = await dbContext.WorkOrders
-                .AsNoTracking()
-                .Where(workOrder =>
-                    workOrder.DepartmentId == CurrentDepartmentId)
-                .OrderBy(workOrder =>
-                    workOrder.Id)
-                .ToListAsync();
+            CurrentDepartmentId = currentUser.DepartmentId.Value;
+            BranchName = sheet.BranchName;
+            DepartmentName = sheet.DepartmentName;
+            WorkOrderItems = sheet.WorkOrders;
 
             AddBlankRows(BlankRowsTarget);
             SetSavedState();
+        }
+        catch (OperationCanceledException)
+            when (ComponentCancellation?.IsCancellationRequested == true)
+        {
         }
         catch (Exception exception)
         {
@@ -319,8 +307,7 @@
         }
     }
 
-    private async Task CellSavedAsync(
-        CellSavedArgs<WorkOrder> args)
+    private async Task CellSavedAsync(CellSavedArgs<WorkOrder> args)
     {
         OperationErrorMessage = string.Empty;
         SuccessMessage = string.Empty;
@@ -332,7 +319,7 @@
         ScheduleIdleSave();
 
         var blankCount =
-            WorkOrderItems.Count(IsCompletelyBlank);
+            WorkOrderItems.Count(WorkOrderService.IsCompletelyBlank);
 
         if (blankCount <= 2 && WorkOrdersGrid is not null)
         {
@@ -354,11 +341,9 @@
 
         IdleSaveCancellation =
             CancellationTokenSource.CreateLinkedTokenSource(
-                ComponentCancellation?.Token ??
-                CancellationToken.None);
+                ComponentCancellation?.Token ?? CancellationToken.None);
 
-        _ = SaveAfterIdleDelayAsync(
-            IdleSaveCancellation.Token);
+        _ = SaveAfterIdleDelayAsync(IdleSaveCancellation.Token);
     }
 
     private async Task SaveAfterIdleDelayAsync(
@@ -366,10 +351,7 @@
     {
         try
         {
-            await Task.Delay(
-                IdleSaveDelay,
-                cancellationToken);
-
+            await Task.Delay(IdleSaveDelay, cancellationToken);
             await InvokeAsync(SaveNowAsync);
         }
         catch (OperationCanceledException)
@@ -382,11 +364,9 @@
     {
         try
         {
-            using var timer =
-                new PeriodicTimer(PeriodicSaveInterval);
+            using var timer = new PeriodicTimer(PeriodicSaveInterval);
 
-            while (await timer.WaitForNextTickAsync(
-                       cancellationToken))
+            while (await timer.WaitForNextTickAsync(cancellationToken))
             {
                 await InvokeAsync(SaveNowAsync);
             }
@@ -446,285 +426,46 @@
             return;
         }
 
-        var addedRecords =
-            args.BatchChanges.AddedRecords ?? [];
-
-        var changedRecords =
-            args.BatchChanges.ChangedRecords ?? [];
-
-        var deletedRecords =
-            args.BatchChanges.DeletedRecords ?? [];
-
-        var newRecords = addedRecords
-            .Concat(
-                changedRecords.Where(
-                    workOrder => workOrder.Id <= 0))
-            .Where(workOrder =>
-                !IsCompletelyBlank(workOrder))
-            .GroupBy(workOrder => workOrder.Id)
-            .Select(group => group.Last())
-            .ToList();
-
-        var existingChangedRecords = changedRecords
-            .Where(workOrder => workOrder.Id > 0)
-            .ToList();
-
-        var existingDeletedRecords = deletedRecords
-            .Where(workOrder => workOrder.Id > 0)
-            .ToList();
-
-        foreach (var workOrder in newRecords)
-        {
-            NormalizeEditableFields(workOrder);
-        }
-
-        foreach (var workOrder in existingChangedRecords)
-        {
-            NormalizeEditableFields(workOrder);
-        }
-
-        var validationError = ValidateRecords(
-            newRecords.Concat(existingChangedRecords));
-
-        if (!string.IsNullOrWhiteSpace(validationError))
-        {
-            args.Cancel = true;
-            HasUnsavedChanges = true;
-
-            OperationErrorMessage = validationError;
-            SaveStateMessage = "Required fields are incomplete";
-            SaveStateCssClass = "text-danger";
-            return;
-        }
-
         try
         {
-            await using var dbContext =
-                await DbFactory.CreateDbContextAsync();
+            var result = await WorkOrderService.SaveChangesAsync(
+                CurrentDepartmentId,
+                CurrentUserId,
+                args.BatchChanges.AddedRecords ?? [],
+                args.BatchChanges.ChangedRecords ?? [],
+                args.BatchChanges.DeletedRecords ?? [],
+                ComponentCancellation?.Token ?? CancellationToken.None);
 
-            await using var transaction =
-                await dbContext.Database.BeginTransactionAsync();
-
-            var deletedIds = existingDeletedRecords
-                .Select(workOrder => workOrder.Id)
-                .Distinct()
-                .ToHashSet();
-
-            var databaseRows = await dbContext.WorkOrders
-                .AsNoTracking()
-                .Where(workOrder =>
-                    workOrder.DepartmentId == CurrentDepartmentId)
-                .Select(workOrder => new WorkOrderKeySnapshot
-                {
-                    Id = workOrder.Id,
-                    WorkOrderNumber = workOrder.WorkOrderNumber,
-                    WorkTypeCode = workOrder.WorkTypeCode
-                })
-                .ToListAsync();
-
-            var finalRows = databaseRows
-                .Where(workOrder =>
-                    !deletedIds.Contains(workOrder.Id))
-                .ToList();
-
-            foreach (var changedRecord in existingChangedRecords)
-            {
-                var existingSnapshot = finalRows
-                    .SingleOrDefault(workOrder =>
-                        workOrder.Id == changedRecord.Id);
-
-                if (existingSnapshot is null)
-                {
-                    args.Cancel = true;
-                    HasUnsavedChanges = true;
-
-                    OperationErrorMessage =
-                        "A modified work order could not be found in this department.";
-
-                    SaveStateMessage = "Save failed";
-                    SaveStateCssClass = "text-danger";
-                    return;
-                }
-
-                existingSnapshot.WorkOrderNumber =
-                    changedRecord.WorkOrderNumber;
-
-                existingSnapshot.WorkTypeCode =
-                    changedRecord.WorkTypeCode;
-            }
-
-            var temporarySnapshotId = -1;
-
-            foreach (var newRecord in newRecords)
-            {
-                finalRows.Add(new WorkOrderKeySnapshot
-                {
-                    Id = temporarySnapshotId--,
-                    WorkOrderNumber =
-                        newRecord.WorkOrderNumber,
-                    WorkTypeCode =
-                        newRecord.WorkTypeCode
-                });
-            }
-
-            var duplicateGroup = finalRows
-                .GroupBy(workOrder =>
-                    CreateDuplicateKey(
-                        workOrder.WorkOrderNumber,
-                        workOrder.WorkTypeCode))
-                .FirstOrDefault(group =>
-                    group.Count() > 1);
-
-            if (duplicateGroup is not null)
+            if (!result.Succeeded)
             {
                 args.Cancel = true;
                 HasUnsavedChanges = true;
+                OperationErrorMessage = result.ErrorMessage;
 
-                var duplicate =
-                    duplicateGroup.First();
+                SaveStateMessage = result.FailureType switch
+                {
+                    WorkOrderSaveFailureType.Validation =>
+                        "Required fields are incomplete",
+                    WorkOrderSaveFailureType.Duplicate =>
+                        "Duplicate work order",
+                    _ => "Save failed"
+                };
 
-                OperationErrorMessage =
-                    $"Work Order Number '{duplicate.WorkOrderNumber}' " +
-                    $"with Work Type '{duplicate.WorkTypeCode}' " +
-                    "already exists in this department.";
-
-                SaveStateMessage = "Duplicate work order";
                 SaveStateCssClass = "text-danger";
                 return;
             }
 
-            if (deletedIds.Count > 0)
-            {
-                var entitiesToDelete =
-                    await dbContext.WorkOrders
-                        .Where(workOrder =>
-                            workOrder.DepartmentId ==
-                                CurrentDepartmentId &&
-                            deletedIds.Contains(workOrder.Id))
-                        .ToListAsync();
-
-                if (entitiesToDelete.Count != deletedIds.Count)
-                {
-                    args.Cancel = true;
-                    HasUnsavedChanges = true;
-
-                    OperationErrorMessage =
-                        "One or more selected work orders do not belong to this department.";
-
-                    SaveStateMessage = "Save failed";
-                    SaveStateCssClass = "text-danger";
-                    return;
-                }
-
-                dbContext.WorkOrders.RemoveRange(
-                    entitiesToDelete);
-            }
-
-            var changedIds = existingChangedRecords
-                .Select(workOrder => workOrder.Id)
-                .Distinct()
-                .ToHashSet();
-
-            if (changedIds.Count > 0)
-            {
-                var entitiesToUpdate =
-                    await dbContext.WorkOrders
-                        .Where(workOrder =>
-                            workOrder.DepartmentId ==
-                                CurrentDepartmentId &&
-                            changedIds.Contains(workOrder.Id))
-                        .ToListAsync();
-
-                if (entitiesToUpdate.Count != changedIds.Count)
-                {
-                    args.Cancel = true;
-                    HasUnsavedChanges = true;
-
-                    OperationErrorMessage =
-                        "One or more modified work orders do not belong to this department.";
-
-                    SaveStateMessage = "Save failed";
-                    SaveStateCssClass = "text-danger";
-                    return;
-                }
-
-                var changedById =
-                    existingChangedRecords.ToDictionary(
-                        workOrder => workOrder.Id);
-
-                foreach (var entity in entitiesToUpdate)
-                {
-                    var changedRecord =
-                        changedById[entity.Id];
-
-                    entity.WorkOrderNumber =
-                        changedRecord.WorkOrderNumber;
-
-                    entity.WorkTypeCode =
-                        changedRecord.WorkTypeCode;
-
-                    entity.AssignmentDate =
-                        changedRecord.AssignmentDate;
-
-                    entity.Busket =
-                        changedRecord.Busket;
-
-                    entity.Status =
-                        changedRecord.Status;
-
-                    entity.Notes =
-                        changedRecord.Notes;
-
-                    entity.UpdatedAt =
-                        DateTime.UtcNow;
-
-                    entity.UpdatedBy =
-                        CurrentUserId;
-                }
-            }
-
-            foreach (var newRecord in newRecords)
-            {
-                newRecord.Id = 0;
-                newRecord.DepartmentId =
-                    CurrentDepartmentId;
-                newRecord.WorkYear =
-                    DateTime.Now.Year;
-                newRecord.CreatedAt =
-                    DateTime.UtcNow;
-                newRecord.CreatedBy =
-                    CurrentUserId;
-                newRecord.UpdatedAt = null;
-                newRecord.UpdatedBy = null;
-
-                dbContext.WorkOrders.Add(newRecord);
-            }
-
-            await dbContext.SaveChangesAsync();
-            await transaction.CommitAsync();
-
             IdleSaveCancellation?.Cancel();
-
             HasUnsavedChanges = false;
             SuccessMessage =
                 "All changes were saved successfully.";
 
             SetSavedState();
         }
-        catch (DbUpdateException exception)
+        catch (OperationCanceledException)
+            when (ComponentCancellation?.IsCancellationRequested == true)
         {
             args.Cancel = true;
-            HasUnsavedChanges = true;
-
-            Logger.LogError(
-                exception,
-                "A database error occurred while saving work orders.");
-
-            OperationErrorMessage =
-                "The changes could not be saved. Check for duplicate or invalid values.";
-
-            SaveStateMessage = "Save failed";
-            SaveStateCssClass = "text-danger";
         }
         catch (Exception exception)
         {
@@ -741,116 +482,6 @@
             SaveStateMessage = "Save failed";
             SaveStateCssClass = "text-danger";
         }
-    }
-
-    private static bool IsCompletelyBlank(
-        WorkOrder workOrder)
-    {
-        return
-            string.IsNullOrWhiteSpace(
-                workOrder.WorkOrderNumber) &&
-            string.IsNullOrWhiteSpace(
-                workOrder.WorkTypeCode) &&
-            workOrder.AssignmentDate is null &&
-            string.IsNullOrWhiteSpace(
-                workOrder.Busket) &&
-            string.IsNullOrWhiteSpace(
-                workOrder.Status) &&
-            string.IsNullOrWhiteSpace(
-                workOrder.Notes);
-    }
-
-    private static void NormalizeEditableFields(
-        WorkOrder workOrder)
-    {
-        workOrder.WorkOrderNumber =
-            workOrder.WorkOrderNumber?.Trim()
-            ?? string.Empty;
-
-        workOrder.WorkTypeCode =
-            workOrder.WorkTypeCode?.Trim()
-            ?? string.Empty;
-
-        workOrder.Busket =
-            workOrder.Busket?.Trim()
-            ?? string.Empty;
-
-        workOrder.Status =
-            workOrder.Status?.Trim()
-            ?? string.Empty;
-
-        workOrder.Notes =
-            string.IsNullOrWhiteSpace(workOrder.Notes)
-                ? null
-                : workOrder.Notes.Trim();
-    }
-
-    private static string? ValidateRecords(
-        IEnumerable<WorkOrder> workOrders)
-    {
-        foreach (var workOrder in workOrders)
-        {
-            if (string.IsNullOrWhiteSpace(
-                    workOrder.WorkOrderNumber))
-            {
-                return "Work Order Number is required.";
-            }
-
-            if (workOrder.WorkOrderNumber.Length > 50)
-            {
-                return
-                    "Work Order Number cannot exceed 50 characters.";
-            }
-
-            if (string.IsNullOrWhiteSpace(
-                    workOrder.WorkTypeCode))
-            {
-                return "Work Type is required.";
-            }
-
-            if (workOrder.WorkTypeCode.Length > 20)
-            {
-                return
-                    "Work Type cannot exceed 20 characters.";
-            }
-
-            if (string.IsNullOrWhiteSpace(
-                    workOrder.Busket))
-            {
-                return "Busket is required.";
-            }
-
-            if (!WorkOrderBuskets.All.Contains(
-                    workOrder.Busket))
-            {
-                return
-                    "Select a valid value from the Busket list.";
-            }
-
-            if (workOrder.Status?.Length > 150)
-            {
-                return
-                    "Status cannot exceed 150 characters.";
-            }
-
-            if (workOrder.Notes?.Length > 1000)
-            {
-                return
-                    "Notes cannot exceed 1000 characters.";
-            }
-        }
-
-        return null;
-    }
-
-    private static string CreateDuplicateKey(
-        string workOrderNumber,
-        string workTypeCode)
-    {
-        return string.Concat(
-            workOrderNumber.Trim().ToUpperInvariant(),
-            "\u001F",
-            workTypeCode.Trim().ToUpperInvariant());
     }
 
     private void SetSavedState()
@@ -878,16 +509,5 @@
         }
 
         ComponentCancellation?.Dispose();
-    }
-
-    private sealed class WorkOrderKeySnapshot
-    {
-        public int Id { get; set; }
-
-        public string WorkOrderNumber { get; set; } =
-            string.Empty;
-
-        public string WorkTypeCode { get; set; } =
-            string.Empty;
     }
 }

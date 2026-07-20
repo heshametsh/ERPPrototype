@@ -1,4 +1,4 @@
-using ERPPrototype.Components;
+﻿using ERPPrototype.Components;
 using ERPPrototype.Components.Account;
 using ERPPrototype.Data;
 using Microsoft.AspNetCore.Components.Authorization;
@@ -67,6 +67,7 @@ builder.Services.AddDbContextFactory<ApplicationDbContext>(
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
 builder.Services.AddScoped<UserManagementService>();
+builder.Services.AddScoped<WorkOrderService>();
 
 builder.Services.AddIdentityCore<ApplicationUser>(options =>
 {
