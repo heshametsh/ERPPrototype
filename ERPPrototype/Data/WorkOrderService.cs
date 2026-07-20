@@ -8,8 +8,8 @@ public sealed class WorkOrderService(
     ILogger<WorkOrderService> logger)
 {
     public async Task<WorkOrderSheetData?> LoadSheetAsync(
-     string userId,
-     CancellationToken cancellationToken = default)
+        string userId,
+        CancellationToken cancellationToken = default)
     {
         await using var dbContext =
             await dbFactory.CreateDbContextAsync(cancellationToken);
@@ -95,6 +95,22 @@ public sealed class WorkOrderService(
         await using var dbContext =
             await dbFactory.CreateDbContextAsync(cancellationToken);
 
+        var authorizedDepartmentId = await dbContext.Users
+            .AsNoTracking()
+            .Where(user =>
+                user.Id == userId &&
+                user.IsActive &&
+                user.DepartmentId != null)
+            .Select(user => user.DepartmentId)
+            .SingleOrDefaultAsync(cancellationToken);
+
+        if (authorizedDepartmentId is null ||
+            authorizedDepartmentId.Value != departmentId)
+        {
+            return WorkOrderSaveResult.ScopeFailure(
+                "The current user is not authorized to modify this department.");
+        }
+
         await using var transaction =
             await dbContext.Database.BeginTransactionAsync(cancellationToken);
 
@@ -104,68 +120,73 @@ public sealed class WorkOrderService(
                 .Select(workOrder => workOrder.Id)
                 .ToHashSet();
 
-            var databaseRows = await dbContext.WorkOrders
-                .AsNoTracking()
-                .Where(workOrder =>
-                    workOrder.DepartmentId == departmentId)
-                .Select(workOrder => new WorkOrderKeySnapshot
-                {
-                    Id = workOrder.Id,
-                    WorkOrderNumber = workOrder.WorkOrderNumber,
-                    WorkTypeCode = workOrder.WorkTypeCode
-                })
-                .ToListAsync(cancellationToken);
+            var changedIds = existingChangedRecords
+                .Select(workOrder => workOrder.Id)
+                .ToHashSet();
 
-            var finalRows = databaseRows
-                .Where(workOrder => !deletedIds.Contains(workOrder.Id))
+            var incomingRecords = newRecords
+                .Concat(existingChangedRecords)
                 .ToList();
 
-            foreach (var changedRecord in existingChangedRecords)
-            {
-                var existingSnapshot = finalRows
-                    .SingleOrDefault(workOrder =>
-                        workOrder.Id == changedRecord.Id);
-
-                if (existingSnapshot is null)
-                {
-                    return WorkOrderSaveResult.ScopeFailure(
-                        "A modified work order could not be found in this department.");
-                }
-
-                existingSnapshot.WorkOrderNumber =
-                    changedRecord.WorkOrderNumber;
-
-                existingSnapshot.WorkTypeCode =
-                    changedRecord.WorkTypeCode;
-            }
-
-            var temporarySnapshotId = -1;
-
-            foreach (var newRecord in newRecords)
-            {
-                finalRows.Add(new WorkOrderKeySnapshot
-                {
-                    Id = temporarySnapshotId--,
-                    WorkOrderNumber = newRecord.WorkOrderNumber,
-                    WorkTypeCode = newRecord.WorkTypeCode
-                });
-            }
-
-            var duplicateGroup = finalRows
+            var duplicateIncomingRecord = incomingRecords
                 .GroupBy(workOrder =>
                     CreateDuplicateKey(
                         workOrder.WorkOrderNumber,
                         workOrder.WorkTypeCode))
                 .FirstOrDefault(group => group.Count() > 1);
 
-            if (duplicateGroup is not null)
+            if (duplicateIncomingRecord is not null)
             {
-                var duplicate = duplicateGroup.First();
+                var duplicate = duplicateIncomingRecord.First();
 
                 return WorkOrderSaveResult.DuplicateFailure(
                     $"Work Order Number '{duplicate.WorkOrderNumber}' " +
                     $"with Work Type '{duplicate.WorkTypeCode}' " +
-                    "already exists in this department.");
+                    "is duplicated in the current changes.");
+            }
+
+            if (incomingRecords.Count > 0)
+            {
+                var incomingNumbers = incomingRecords
+                    .Select(workOrder => workOrder.WorkOrderNumber)
+                    .Distinct()
+                    .ToList();
+
+                var possibleConflicts = await dbContext.WorkOrders
+                    .AsNoTracking()
+                    .Where(workOrder =>
+                        workOrder.DepartmentId == departmentId &&
+                        incomingNumbers.Contains(workOrder.WorkOrderNumber) &&
+                        !changedIds.Contains(workOrder.Id) &&
+                        !deletedIds.Contains(workOrder.Id))
+                    .Select(workOrder => new
+                    {
+                        workOrder.WorkOrderNumber,
+                        workOrder.WorkTypeCode
+                    })
+                    .ToListAsync(cancellationToken);
+
+                var existingKeys = possibleConflicts
+                    .Select(workOrder =>
+                        CreateDuplicateKey(
+                            workOrder.WorkOrderNumber,
+                            workOrder.WorkTypeCode))
+                    .ToHashSet();
+
+                var conflictingRecord = incomingRecords
+                    .FirstOrDefault(workOrder =>
+                        existingKeys.Contains(
+                            CreateDuplicateKey(
+                                workOrder.WorkOrderNumber,
+                                workOrder.WorkTypeCode)));
+
+                if (conflictingRecord is not null)
+                {
+                    return WorkOrderSaveResult.DuplicateFailure(
+                        $"Work Order Number '{conflictingRecord.WorkOrderNumber}' " +
+                        $"with Work Type '{conflictingRecord.WorkTypeCode}' " +
+                        "already exists in this department.");
+                }
             }
 
             if (deletedIds.Count > 0)
@@ -184,10 +205,6 @@ public sealed class WorkOrderService(
 
                 dbContext.WorkOrders.RemoveRange(entitiesToDelete);
             }
-
-            var changedIds = existingChangedRecords
-                .Select(workOrder => workOrder.Id)
-                .ToHashSet();
 
             if (changedIds.Count > 0)
             {
@@ -210,14 +227,29 @@ public sealed class WorkOrderService(
                 {
                     var changedRecord = changedById[entity.Id];
 
-                    entity.WorkOrderNumber = changedRecord.WorkOrderNumber;
-                    entity.WorkTypeCode = changedRecord.WorkTypeCode;
-                    entity.AssignmentDate = changedRecord.AssignmentDate;
-                    entity.Busket = changedRecord.Busket;
-                    entity.Status = changedRecord.Status;
-                    entity.Notes = changedRecord.Notes;
-                    entity.UpdatedAt = DateTime.UtcNow;
-                    entity.UpdatedBy = userId;
+                    entity.WorkOrderNumber =
+                        changedRecord.WorkOrderNumber;
+
+                    entity.WorkTypeCode =
+                        changedRecord.WorkTypeCode;
+
+                    entity.AssignmentDate =
+                        changedRecord.AssignmentDate;
+
+                    entity.Busket =
+                        changedRecord.Busket;
+
+                    entity.Status =
+                        changedRecord.Status;
+
+                    entity.Notes =
+                        changedRecord.Notes;
+
+                    entity.UpdatedAt =
+                        DateTime.UtcNow;
+
+                    entity.UpdatedBy =
+                        userId;
                 }
             }
 
@@ -339,13 +371,6 @@ public sealed class WorkOrderService(
             "\u001F",
             workTypeCode.Trim().ToUpperInvariant());
     }
-
-    private sealed class WorkOrderKeySnapshot
-    {
-        public int Id { get; init; }
-        public string WorkOrderNumber { get; set; } = string.Empty;
-        public string WorkTypeCode { get; set; } = string.Empty;
-    }
 }
 
 public sealed record WorkOrderSheetData(
@@ -369,17 +394,36 @@ public sealed record WorkOrderSaveResult(
     string ErrorMessage)
 {
     public static WorkOrderSaveResult Success() =>
-        new(true, WorkOrderSaveFailureType.None, string.Empty);
+        new(
+            true,
+            WorkOrderSaveFailureType.None,
+            string.Empty);
 
-    public static WorkOrderSaveResult ValidationFailure(string message) =>
-        new(false, WorkOrderSaveFailureType.Validation, message);
+    public static WorkOrderSaveResult ValidationFailure(
+        string message) =>
+        new(
+            false,
+            WorkOrderSaveFailureType.Validation,
+            message);
 
-    public static WorkOrderSaveResult DuplicateFailure(string message) =>
-        new(false, WorkOrderSaveFailureType.Duplicate, message);
+    public static WorkOrderSaveResult DuplicateFailure(
+        string message) =>
+        new(
+            false,
+            WorkOrderSaveFailureType.Duplicate,
+            message);
 
-    public static WorkOrderSaveResult ScopeFailure(string message) =>
-        new(false, WorkOrderSaveFailureType.Scope, message);
+    public static WorkOrderSaveResult ScopeFailure(
+        string message) =>
+        new(
+            false,
+            WorkOrderSaveFailureType.Scope,
+            message);
 
-    public static WorkOrderSaveResult DatabaseFailure(string message) =>
-        new(false, WorkOrderSaveFailureType.Database, message);
+    public static WorkOrderSaveResult DatabaseFailure(
+        string message) =>
+        new(
+            false,
+            WorkOrderSaveFailureType.Database,
+            message);
 }
