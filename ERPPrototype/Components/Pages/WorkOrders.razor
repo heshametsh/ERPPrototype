@@ -247,8 +247,7 @@
             }
 
             var sheet = await WorkOrderService.LoadSheetAsync(
-                currentUser.DepartmentId.Value,
-                ComponentCancellation?.Token ?? CancellationToken.None);
+                 currentUser.Id);
 
             if (sheet is null)
             {
@@ -258,7 +257,7 @@
             }
 
             CurrentUserId = currentUser.Id;
-            CurrentDepartmentId = currentUser.DepartmentId.Value;
+            CurrentDepartmentId = sheet.DepartmentId;
             BranchName = sheet.BranchName;
             DepartmentName = sheet.DepartmentName;
             WorkOrderItems = sheet.WorkOrders;

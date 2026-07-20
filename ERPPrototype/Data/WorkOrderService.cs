@@ -8,23 +8,27 @@ public sealed class WorkOrderService(
     ILogger<WorkOrderService> logger)
 {
     public async Task<WorkOrderSheetData?> LoadSheetAsync(
-        int departmentId,
-        CancellationToken cancellationToken = default)
+     string userId,
+     CancellationToken cancellationToken = default)
     {
         await using var dbContext =
             await dbFactory.CreateDbContextAsync(cancellationToken);
 
-        var department = await dbContext.Departments
+        var userScope = await dbContext.Users
             .AsNoTracking()
-            .Where(item => item.Id == departmentId)
-            .Select(item => new
+            .Where(user =>
+                user.Id == userId &&
+                user.IsActive &&
+                user.DepartmentId != null)
+            .Select(user => new
             {
-                BranchName = item.Branch.Name,
-                DepartmentName = item.DepartmentType.Name
+                DepartmentId = user.DepartmentId!.Value,
+                BranchName = user.Department!.Branch.Name,
+                DepartmentName = user.Department.DepartmentType.Name
             })
             .SingleOrDefaultAsync(cancellationToken);
 
-        if (department is null)
+        if (userScope is null)
         {
             return null;
         }
@@ -32,13 +36,14 @@ public sealed class WorkOrderService(
         var workOrders = await dbContext.WorkOrders
             .AsNoTracking()
             .Where(workOrder =>
-                workOrder.DepartmentId == departmentId)
+                workOrder.DepartmentId == userScope.DepartmentId)
             .OrderBy(workOrder => workOrder.Id)
             .ToListAsync(cancellationToken);
 
         return new WorkOrderSheetData(
-            department.BranchName,
-            department.DepartmentName,
+            userScope.DepartmentId,
+            userScope.BranchName,
+            userScope.DepartmentName,
             workOrders);
     }
 
@@ -344,6 +349,7 @@ public sealed class WorkOrderService(
 }
 
 public sealed record WorkOrderSheetData(
+    int DepartmentId,
     string BranchName,
     string DepartmentName,
     List<WorkOrder> WorkOrders);
