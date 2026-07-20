@@ -145,14 +145,17 @@
                             var workOrder = (WorkOrder)busketContext;
                         }
 
-                        <SfDropDownList TValue="string"
-                                        TItem="string"
-                                        DataSource="@WorkOrderBuskets.All"
-                                        @bind-Value="workOrder.Busket"
-                                        AllowFiltering="true"
-                                        ShowClearButton="false"
-                                        PopupHeight="320px">
-                        </SfDropDownList>
+                        <SfComboBox TValue="string"
+                                    TItem="string"
+                                    DataSource="@WorkOrderBuskets.All"
+                                    @bind-Value="workOrder.Busket"
+                                    AllowFiltering="true"
+                                    AllowCustom="false"
+                                    Autofill="true"
+                                    ShowClearButton="false"
+                                    PopupHeight="320px"
+                                    Placeholder="اكتب أو اختر الباسكت">
+                        </SfComboBox>
                     </EditTemplate>
                 </GridColumn>
 
