@@ -48,7 +48,6 @@ public sealed class WorkOrderService(
     }
 
     public async Task<WorkOrderSaveResult> SaveChangesAsync(
-        int departmentId,
         string userId,
         IEnumerable<WorkOrder> addedRecords,
         IEnumerable<WorkOrder> changedRecords,
@@ -103,13 +102,13 @@ public sealed class WorkOrderService(
                 user.DepartmentId != null)
             .Select(user => user.DepartmentId)
             .SingleOrDefaultAsync(cancellationToken);
-
-        if (authorizedDepartmentId is null ||
-            authorizedDepartmentId.Value != departmentId)
+        if (authorizedDepartmentId is null)
         {
             return WorkOrderSaveResult.ScopeFailure(
-                "The current user is not authorized to modify this department.");
+                "The current user is not authorized to modify work orders.");
         }
+
+        var departmentId = authorizedDepartmentId.Value;
 
         await using var transaction =
             await dbContext.Database.BeginTransactionAsync(cancellationToken);
