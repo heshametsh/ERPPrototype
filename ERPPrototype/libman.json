@@ -1,0 +1,14 @@
+{
+  "version": "3.0",
+  "defaultProvider": "unpkg",
+  "libraries": [
+    {
+      "library": "tabulator-tables@6.5.0",
+      "destination": "wwwroot/lib/tabulator",
+      "files": [
+        "dist/css/tabulator.min.css",
+        "dist/js/tabulator.min.js"
+      ]
+    }
+  ]
+}
