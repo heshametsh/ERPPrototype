@@ -4,44 +4,72 @@
 @using Microsoft.JSInterop
 @inject IJSRuntime JSRuntime
 
-<PageTitle>Tabulator Test</PageTitle>
+<PageTitle>Work Orders</PageTitle>
 
-<div class="container-fluid p-3">
+<div class="work-orders-page tabulator-workorders-page">
 
-    <h1 class="mb-3">Tabulator Performance Test</h1>
+    <div class="page-header-row">
+        <div>
+            <h1>Work Orders</h1>
 
-    <div class="alert alert-info">
-        اختبار سرعة التمرير والتحرير والنسخ واللصق باستخدام 10,000 صف.
+            <div class="page-subtitle">
+                Test Branch — Tabulator Prototype
+            </div>
+        </div>
+
+        <div class="page-actions-box">
+            <div class="page-actions-buttons">
+                <button type="button"
+                        class="page-action-button page-action-button-secondary"
+                        onclick="window.tabulatorTest.undo('tabulator-test-table')">
+                    Undo
+                </button>
+
+                <button type="button"
+                        class="page-action-button page-action-button-secondary"
+                        onclick="window.tabulatorTest.redo('tabulator-test-table')">
+                    Redo
+                </button>
+
+                <button type="button"
+                        class="page-action-button page-action-button-primary"
+                        onclick="window.tabulatorTest.copyRange('tabulator-test-table')">
+                    Copy Selected Cells
+                </button>
+            </div>
+
+            <div class="save-status"
+                 id="tabulator-test-table-status">
+                Preparing test data...
+            </div>
+        </div>
     </div>
 
-    <div class="d-flex gap-2 mb-2">
-
-        <button type="button"
-                class="btn btn-outline-secondary btn-sm"
-                onclick="window.tabulatorTest.undo('tabulator-test-table')">
-            Undo
-        </button>
-
-        <button type="button"
-                class="btn btn-outline-secondary btn-sm"
-                onclick="window.tabulatorTest.redo('tabulator-test-table')">
-            Redo
-        </button>
-
-        <button type="button"
-                class="btn btn-outline-primary btn-sm"
-                onclick="window.tabulatorTest.copyRange('tabulator-test-table')">
-            Copy Selected Cells
-        </button>
-
+    <div class="grid-instructions">
+        Click a cell once to select it. Start typing to replace its value.
+        Double-click to edit the existing value.
     </div>
 
-    <div class="mb-2 fw-semibold"
-         id="tabulator-test-table-status">
-        جاري تجهيز البيانات...
+    <div class="work-order-search-row">
+        <div class="work-order-search-box">
+            <label class="work-order-search-label"
+                   for="tabulator-work-order-search">
+                بحث أمر العمل
+            </label>
+
+            <input id="tabulator-work-order-search"
+                   class="work-order-search-input"
+                   type="search"
+                   inputmode="numeric"
+                   autocomplete="off"
+                   placeholder="اكتب رقم أمر العمل..."
+                   oninput="window.tabulatorTest.filterByWorkOrder('tabulator-test-table', this.value)" />
+        </div>
     </div>
 
-    <div id="tabulator-test-table"></div>
+    <div class="tabulator-card">
+        <div id="tabulator-test-table"></div>
+    </div>
 
 </div>
 

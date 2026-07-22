@@ -397,3 +397,507 @@ textarea {
         padding: 16px;
     }
 }
+
+/* =========================================================
+   TABULATOR WORK TYPE FILTER POPUP
+   Global because Tabulator renders the popup outside the
+   page component's CSS-isolation scope.
+   ========================================================= */
+
+.tabulator-popup-container.work-type-filter-popup-shell {
+    box-sizing: border-box !important;
+    width: 260px;
+    height: 360px;
+    min-width: 230px !important;
+    min-height: 285px !important;
+    max-width: 520px !important;
+    max-height: 620px !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    border: 1px solid #c7d2dc !important;
+    border-radius: 6px !important;
+    background: #ffffff !important;
+    box-shadow: 0 12px 30px rgba(19, 43, 66, 0.18) !important;
+    color: #172d42;
+    font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+    direction: ltr;
+}
+
+    .tabulator-popup-container.work-type-filter-popup-shell.tabulator-popup {
+        padding: 0 !important;
+    }
+
+.work-type-filter-popup {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    padding: 10px 11px 12px;
+    overflow: hidden;
+    background: #ffffff;
+    color: #172d42;
+}
+
+.work-type-filter-popup-title {
+    flex: 0 0 auto;
+    margin: 0 0 8px;
+    color: #24394c;
+    font-size: 0.83rem;
+    font-weight: 700;
+}
+
+.work-type-filter-popup-search {
+    flex: 0 0 auto;
+    box-sizing: border-box;
+    width: 100%;
+    height: 32px;
+    margin: 0 0 8px;
+    padding: 5px 9px;
+    border: 1px solid #b8c8d5;
+    border-radius: 4px;
+    background: #ffffff;
+    color: #172d42;
+    font: inherit;
+    font-size: 0.82rem;
+    outline: none;
+}
+
+    .work-type-filter-popup-search:focus {
+        border-color: #1683c4;
+        box-shadow: 0 0 0 2px rgba(22, 131, 196, 0.12);
+    }
+
+.work-type-filter-select-all {
+    flex: 0 0 auto;
+    margin-bottom: 4px;
+    border-bottom: 1px solid #dfe6ec;
+    background: #f7f9fb;
+}
+
+.work-type-filter-options {
+    flex: 1 1 auto;
+    min-height: 70px;
+    margin: 0;
+    overflow-y: auto;
+    border-top: 1px solid #e3e9ee;
+    border-bottom: 1px solid #e3e9ee;
+    background: #ffffff;
+}
+
+.work-type-filter-option {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    min-height: 29px;
+    padding: 3px 5px;
+    cursor: pointer;
+    color: #23384a;
+    font-size: 0.82rem;
+    font-weight: 600;
+}
+
+    .work-type-filter-option:hover {
+        background: #edf6fc;
+    }
+
+    .work-type-filter-option input {
+        width: 15px;
+        height: 15px;
+        margin: 0;
+        accent-color: #1683c4;
+    }
+
+.work-type-filter-empty {
+    padding: 18px 8px;
+    color: #7a8d9d;
+    text-align: center;
+    font-size: 0.81rem;
+}
+
+.work-type-filter-actions {
+    flex: 0 0 auto;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 9px;
+}
+
+.work-type-filter-button {
+    min-width: 76px;
+    height: 31px;
+    padding: 0 10px;
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.work-type-filter-button-primary {
+    border: 1px solid #0b78c7;
+    background: #0b78c7;
+    color: #ffffff;
+}
+
+    .work-type-filter-button-primary:hover {
+        background: #086aaf;
+    }
+
+.work-type-filter-button-secondary {
+    border: 1px solid #aebdca;
+    background: #ffffff;
+    color: #334e63;
+}
+
+    .work-type-filter-button-secondary:hover {
+        background: #f4f7f9;
+    }
+
+.work-type-filter-resize-handle {
+    position: absolute;
+    right: 3px;
+    bottom: 3px;
+    z-index: 10;
+    width: 17px;
+    height: 17px;
+    cursor: nwse-resize;
+    touch-action: none;
+    background: linear-gradient( 135deg, transparent 0 45%, #8aa0b1 46% 54%, transparent 55% 66%, #8aa0b1 67% 75%, transparent 76% );
+    opacity: 0.9;
+}
+
+    .work-type-filter-resize-handle:hover {
+        opacity: 1;
+    }
+
+/* =========================================================
+   ASSIGNMENT DATE FILTER — EXCEL-LIKE TREE
+   ========================================================= */
+
+.tabulator-popup-container.assignment-date-filter-popup-shell {
+    box-sizing: border-box !important;
+    width: 275px;
+    height: 420px;
+    min-width: 245px !important;
+    min-height: 320px !important;
+    max-width: 540px !important;
+    max-height: 650px !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    border: 1px solid #c7d2dc !important;
+    border-radius: 6px !important;
+    background: #ffffff !important;
+    box-shadow: 0 12px 30px rgba(19, 43, 66, 0.18) !important;
+    color: #172d42;
+    font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+    direction: ltr;
+}
+
+.assignment-date-filter-popup-shell.tabulator-popup {
+    padding: 0 !important;
+}
+
+.date-filter-popup {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    padding: 10px 11px 12px;
+    overflow: hidden;
+    background: #ffffff;
+}
+
+.date-filter-popup-title {
+    flex: 0 0 auto;
+    margin: 0 0 8px;
+    color: #24394c;
+    font-size: 0.83rem;
+    font-weight: 700;
+}
+
+.date-filter-popup-search {
+    flex: 0 0 auto;
+    box-sizing: border-box;
+    width: 100%;
+    height: 32px;
+    margin: 0 0 8px;
+    padding: 5px 9px;
+    border: 1px solid #b8c8d5;
+    border-radius: 4px;
+    background: #ffffff;
+    color: #172d42;
+    font: inherit;
+    font-size: 0.82rem;
+    outline: none;
+}
+
+    .date-filter-popup-search:focus {
+        border-color: #1683c4;
+        box-shadow: 0 0 0 2px rgba(22, 131, 196, 0.12);
+    }
+
+.date-filter-check-row {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    min-height: 28px;
+    padding: 3px 5px;
+    color: #23384a;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+    .date-filter-check-row:hover {
+        background: #edf6fc;
+    }
+
+    .date-filter-check-row input,
+    .date-filter-group-header input,
+    .date-filter-month-header input {
+        width: 15px;
+        height: 15px;
+        margin: 0;
+        accent-color: #1683c4;
+    }
+
+.date-filter-select-all {
+    flex: 0 0 auto;
+    margin-bottom: 4px;
+    border-top: 1px solid #e3e9ee;
+    border-bottom: 1px solid #e3e9ee;
+    background: #f7f9fb;
+}
+
+.date-filter-tree {
+    flex: 1 1 auto;
+    min-height: 80px;
+    overflow-y: auto;
+    border-bottom: 1px solid #e3e9ee;
+    background: #ffffff;
+}
+
+.date-filter-group,
+.date-filter-month {
+    border-bottom: 1px solid #eef2f5;
+}
+
+.date-filter-group-header,
+.date-filter-month-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 29px;
+    padding: 3px 5px;
+    color: #20384c;
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+    .date-filter-group-header:hover,
+    .date-filter-month-header:hover {
+        background: #f3f8fc;
+    }
+
+.date-filter-month {
+    margin-left: 17px;
+}
+
+.date-filter-date-row {
+    margin-left: 38px;
+    font-weight: 500;
+}
+
+.date-filter-toggle {
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    border: 1px solid #aebdca;
+    border-radius: 2px;
+    background: #ffffff;
+    color: #40586c;
+    font-size: 14px;
+    line-height: 14px;
+    cursor: pointer;
+}
+
+    .date-filter-toggle:hover {
+        border-color: #1683c4;
+        color: #0b78c7;
+    }
+
+.date-filter-empty {
+    padding: 20px 8px;
+    color: #7a8d9d;
+    text-align: center;
+    font-size: 0.81rem;
+}
+
+.date-filter-actions {
+    flex: 0 0 auto;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 9px;
+}
+
+.date-filter-button {
+    min-width: 76px;
+    height: 31px;
+    padding: 0 10px;
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.date-filter-button-primary {
+    border: 1px solid #0b78c7;
+    background: #0b78c7;
+    color: #ffffff;
+}
+
+    .date-filter-button-primary:hover {
+        background: #086aaf;
+    }
+
+.date-filter-button-secondary {
+    border: 1px solid #aebdca;
+    background: #ffffff;
+    color: #334e63;
+}
+
+    .date-filter-button-secondary:hover {
+        background: #f4f7f9;
+    }
+
+.date-filter-resize-handle {
+    position: absolute;
+    right: 3px;
+    bottom: 3px;
+    z-index: 10;
+    width: 17px;
+    height: 17px;
+    cursor: nwse-resize;
+    touch-action: none;
+    background: linear-gradient( 135deg, transparent 0 45%, #8aa0b1 46% 54%, transparent 55% 66%, #8aa0b1 67% 75%, transparent 76% );
+}
+
+/* =========================================================
+   TABULATOR LIST EDITOR KEYBOARD HIGHLIGHT FIX
+   The "active" class marks the current cell value.
+   The "focused" class is the item reached by Arrow Up/Down.
+   Show blue only on the focused item so the highlight moves
+   with keyboard navigation.
+   ========================================================= */
+
+.tabulator-edit-list .tabulator-edit-list-item.active:not(.focused) {
+    background: #ffffff !important;
+    color: #23384a !important;
+    outline: none !important;
+}
+
+.tabulator-edit-list .tabulator-edit-list-item.focused,
+.tabulator-edit-list .tabulator-edit-list-item.active.focused {
+    background: #1d68cd !important;
+    color: #ffffff !important;
+    outline: none !important;
+}
+
+    .tabulator-edit-list .tabulator-edit-list-item.focused:hover,
+    .tabulator-edit-list .tabulator-edit-list-item.active.focused:hover {
+        background: #1d68cd !important;
+        color: #ffffff !important;
+    }
+
+/* =========================================================
+   FILTER POPUP SCROLLING + BUCKET FILTER
+   ========================================================= */
+
+.tabulator-popup-container.bucket-filter-popup-shell {
+    box-sizing: border-box !important;
+    width: 270px !important;
+    min-width: 240px !important;
+    max-width: 420px !important;
+    max-height: 430px !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    border: 1px solid #c7d2dc !important;
+    border-radius: 6px !important;
+    background: #ffffff !important;
+    box-shadow: 0 12px 30px rgba(19, 43, 66, 0.18) !important;
+    color: #172d42;
+    font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+    direction: ltr;
+}
+
+.bucket-filter-popup {
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    width: 100%;
+    max-height: 430px;
+    min-height: 0;
+    padding: 10px 11px 11px;
+    overflow: hidden;
+    background: #ffffff;
+}
+
+.bucket-filter-options {
+    flex: 1 1 auto;
+    min-height: 85px;
+    max-height: 265px;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+    border-top: 1px solid #e3e9ee;
+    border-bottom: 1px solid #e3e9ee;
+    background: #ffffff;
+}
+
+/*
+ * Scroll must remain available even when a popup is resized.
+ */
+.work-type-filter-options,
+.date-filter-tree,
+.bucket-filter-options {
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+    touch-action: pan-y;
+}
+
+    .work-type-filter-options::-webkit-scrollbar,
+    .date-filter-tree::-webkit-scrollbar,
+    .bucket-filter-options::-webkit-scrollbar {
+        width: 10px;
+    }
+
+    .work-type-filter-options::-webkit-scrollbar-track,
+    .date-filter-tree::-webkit-scrollbar-track,
+    .bucket-filter-options::-webkit-scrollbar-track {
+        background: #f2f5f7;
+    }
+
+    .work-type-filter-options::-webkit-scrollbar-thumb,
+    .date-filter-tree::-webkit-scrollbar-thumb,
+    .bucket-filter-options::-webkit-scrollbar-thumb {
+        border: 2px solid #f2f5f7;
+        border-radius: 999px;
+        background: #9aadb9;
+    }
+
+        .work-type-filter-options::-webkit-scrollbar-thumb:hover,
+        .date-filter-tree::-webkit-scrollbar-thumb:hover,
+        .bucket-filter-options::-webkit-scrollbar-thumb:hover {
+            background: #7f95a5;
+        }
