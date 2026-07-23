@@ -276,9 +276,33 @@ window.tabulatorTest = {
         data = Array.isArray(data) ? data : [];
         baskets = Array.isArray(baskets) ? baskets : [];
 
+        const directTypingFields = new Set([
+            "assignmentDate",
+            "basket"
+        ]);
+
+        const minimumExistingId = data.reduce(
+            function (minimum, row) {
+                const id = Number(row?.id);
+
+                return Number.isFinite(id)
+                    ? Math.min(minimum, id)
+                    : minimum;
+            },
+            0
+        );
+
         const state = {
             undoStack: [],
             redoStack: [],
+
+            nextTemporaryId:
+                minimumExistingId <= 0
+                    ? minimumExistingId - 1
+                    : -1,
+
+            activeCell: null,
+            deletedOriginalRowIds: new Set(),
 
             applyingHistory: false,
             pendingEdit: null,
@@ -288,6 +312,23 @@ window.tabulatorTest = {
              * نجمع هذه التعديلات هنا ثم نسجلها Transaction واحدة.
              */
             pendingRangeClear: null,
+
+            /*
+             * نحتفظ بنسخة القيم الأصلية فقط للمقارنة.
+             * لا نلون الصفوف ولا نغير شكل الشيت.
+             */
+            originalRows: new Map(
+                data.map(function (row) {
+                    return [
+                        String(row.id),
+                        window.tabulatorTest
+                            .createDirtySnapshot(row)
+                    ];
+                })
+            ),
+
+            dirtyRowIds: new Set(),
+            lastStatusMessage: "",
 
             maxTransactions: 100,
 
@@ -306,6 +347,7 @@ window.tabulatorTest = {
         };
 
         this.states[elementId] = state;
+        this.ensureStructureUi(elementId);
 
         const table = new Tabulator(element, {
             data: data,
@@ -646,8 +688,26 @@ window.tabulatorTest = {
          * الضغط خارج الشيت يوقف اختصاراته حتى لا تتعارض
          * مع حقول البحث والقوائم الموجودة في الصفحة.
          */
-        table.on("cellMouseDown", function () {
+        table.on("cellMouseDown", function (event, cell) {
             state.isActive = true;
+
+            if (cell) {
+                state.activeCell = {
+                    rowId: cell.getRow().getIndex(),
+                    field: cell.getField()
+                };
+            }
+        });
+
+        table.on("cellContext", function (event, cell) {
+            event.preventDefault();
+            state.isActive = true;
+
+            window.tabulatorTest.showStructureContextMenu(
+                elementId,
+                event,
+                cell
+            );
         });
 
         table.on("rangeAdded", function () {
@@ -661,6 +721,20 @@ window.tabulatorTest = {
         state.pointerDownHandler = function (event) {
             state.isActive =
                 element.contains(event.target);
+
+            const menu = document.getElementById(
+                `${elementId}-row-menu`
+            );
+
+            if (
+                menu &&
+                !menu.contains(event.target)
+            ) {
+                window.tabulatorTest
+                    .hideStructureContextMenu(
+                        elementId
+                    );
+            }
         };
 
         document.addEventListener(
@@ -1112,6 +1186,223 @@ window.tabulatorTest = {
         this.setStatus(
             elementId,
             `تم تحميل ${data.length.toLocaleString()} أمر عمل من قاعدة البيانات.`
+        );
+    },
+
+    /*
+     * الحقول التي تدخل في حساب الصفوف غير المحفوظة.
+     */
+    dirtyFields: [
+        "workOrderNumber",
+        "workTypeCode",
+        "assignmentDate",
+        "basket",
+        "status",
+        "notes"
+    ],
+
+    normalizeDirtyValue: function (value) {
+        return value === null || value === undefined
+            ? ""
+            : String(value);
+    },
+
+    createDirtySnapshot: function (rowData) {
+        const snapshot = {};
+
+        for (const field of this.dirtyFields) {
+            snapshot[field] =
+                this.normalizeDirtyValue(
+                    rowData?.[field]
+                );
+        }
+
+        return snapshot;
+    },
+
+    refreshDirtyRows: function (
+        elementId,
+        rowIds
+    ) {
+        const table =
+            this.tables[elementId];
+
+        const state =
+            this.states[elementId];
+
+        if (!table || !state) {
+            return;
+        }
+
+        const uniqueRowIds =
+            new Map();
+
+        for (const rowId of rowIds ?? []) {
+            uniqueRowIds.set(
+                String(rowId),
+                rowId
+            );
+        }
+
+        for (const [rowKey, rowId] of uniqueRowIds) {
+            const row =
+                table.getRow(rowId);
+
+            if (!row) {
+                state.dirtyRowIds.delete(rowKey);
+                continue;
+            }
+
+            const currentSnapshot =
+                this.createDirtySnapshot(
+                    row.getData()
+                );
+
+            const originalSnapshot =
+                state.originalRows.get(rowKey);
+
+            const isDirty =
+                !originalSnapshot ||
+                this.dirtyFields.some(
+                    field =>
+                        currentSnapshot[field] !==
+                        originalSnapshot[field]
+                );
+
+            if (isDirty) {
+                state.dirtyRowIds.add(rowKey);
+            } else {
+                state.dirtyRowIds.delete(rowKey);
+            }
+        }
+
+        this.renderStatus(elementId);
+    },
+
+    renderStatus: function (elementId) {
+        const statusElement =
+            document.getElementById(
+                `${elementId}-status`
+            );
+
+        if (!statusElement) {
+            return;
+        }
+
+        const state =
+            this.states[elementId];
+
+        const message =
+            state?.lastStatusMessage ?? "";
+
+        const dirtyCount =
+            state?.dirtyRowIds?.size ?? 0;
+
+        const deletedCount =
+            state?.deletedOriginalRowIds?.size ?? 0;
+
+        const unsavedCount =
+            dirtyCount + deletedCount;
+
+        const dirtyText =
+            `صفوف غير محفوظة: ${unsavedCount.toLocaleString()}`;
+
+        statusElement.textContent =
+            message
+                ? `${message} | ${dirtyText}`
+                : dirtyText;
+    },
+
+    /*
+     * ينهي تعديل الخلية الحالية قبل جمع الصفوف المعدلة.
+     * هذا يمنع تجاهل آخر قيمة كتبها المستخدم عند الضغط على Save.
+     */
+    commitActiveEditor: async function (elementId) {
+        const element =
+            document.getElementById(elementId);
+
+        const activeElement =
+            document.activeElement;
+
+        if (
+            element &&
+            activeElement &&
+            element.contains(activeElement) &&
+            this.isEditorTarget(activeElement)
+        ) {
+            activeElement.blur();
+
+            await new Promise(resolve =>
+                requestAnimationFrame(resolve)
+            );
+        }
+    },
+
+    /*
+     * يعيد الصفوف المعدلة فقط إلى Blazor.
+     * لا يعيد كل بيانات الشيت.
+     */
+    getDirtyRows: async function (elementId) {
+        await this.commitActiveEditor(elementId);
+
+        const table =
+            this.tables[elementId];
+
+        const state =
+            this.states[elementId];
+
+        if (!table || !state) {
+            return [];
+        }
+
+        const dirtyRows = [];
+
+        for (const rowKey of state.dirtyRowIds) {
+            const numericId = Number(rowKey);
+
+            const row = table.getRow(
+                Number.isNaN(numericId)
+                    ? rowKey
+                    : numericId
+            );
+
+            if (row) {
+                dirtyRows.push(row.getData());
+            }
+        }
+
+        return dirtyRows;
+    },
+
+    /*
+     * بعد نجاح الحفظ نعتبر القيم التي أرسلت للسيرفر
+     * هي النسخة الأصلية الجديدة. إذا عدل المستخدم أثناء الحفظ،
+     * يظل الصف غير محفوظ ولا نفقد هذا التعديل.
+     */
+    markRowsSaved: function (elementId, savedRows) {
+        const state =
+            this.states[elementId];
+
+        if (!state) {
+            return;
+        }
+
+        const savedIds = [];
+
+        for (const row of savedRows ?? []) {
+            const rowKey = String(row.id);
+
+            state.originalRows.set(
+                rowKey,
+                this.createDirtySnapshot(row)
+            );
+
+            savedIds.push(row.id);
+        }
+
+        this.refreshDirtyRows(
+            elementId,
+            savedIds
         );
     },
 
@@ -1712,6 +2003,13 @@ window.tabulatorTest = {
          */
         state.redoStack = [];
 
+        this.refreshDirtyRows(
+            elementId,
+            transaction.changes.map(
+                change => change.rowId
+            )
+        );
+
         this.setStatus(
             elementId,
 
@@ -1925,6 +2223,13 @@ window.tabulatorTest = {
                     change => change.field
                 )
             );
+
+        this.refreshDirtyRows(
+            elementId,
+            transaction.changes.map(
+                change => change.rowId
+            )
+        );
     },
 
     /*
@@ -2129,7 +2434,7 @@ window.tabulatorTest = {
             );
     },
 
-    undo: function (elementId) {
+    undo: async function (elementId) {
         const state =
             this.states[elementId];
 
@@ -2152,6 +2457,25 @@ window.tabulatorTest = {
             this.applyFilterSnapshot(
                 elementId,
                 transaction.oldFilters
+            );
+
+            state.redoStack.push(
+                transaction
+            );
+
+            this.setStatus(
+                elementId,
+                `تم التراجع عن: ${transaction.label}.`
+            );
+
+            return;
+        }
+
+        if (transaction.kind === "structure") {
+            await this.applyStructureTransaction(
+                elementId,
+                transaction,
+                "undo"
             );
 
             state.redoStack.push(
@@ -2189,7 +2513,7 @@ window.tabulatorTest = {
         );
     },
 
-    redo: function (elementId) {
+    redo: async function (elementId) {
         const state =
             this.states[elementId];
 
@@ -2212,6 +2536,25 @@ window.tabulatorTest = {
             this.applyFilterSnapshot(
                 elementId,
                 transaction.newFilters
+            );
+
+            state.undoStack.push(
+                transaction
+            );
+
+            this.setStatus(
+                elementId,
+                `تمت إعادة: ${transaction.label}.`
+            );
+
+            return;
+        }
+
+        if (transaction.kind === "structure") {
+            await this.applyStructureTransaction(
+                elementId,
+                transaction,
+                "redo"
             );
 
             state.undoStack.push(
@@ -2249,6 +2592,1223 @@ window.tabulatorTest = {
         );
     },
 
+    ensureStructureStyles: function () {
+        const styleId =
+            "tabulator-structure-ui-styles";
+
+        if (document.getElementById(styleId)) {
+            return;
+        }
+
+        const style =
+            document.createElement("style");
+
+        style.id = styleId;
+        style.textContent = `
+            .tabulator-row-context-menu {
+                position: fixed;
+                z-index: 4000;
+                width: 220px;
+                padding: 6px;
+                border: 1px solid #b9c8d4;
+                border-radius: 9px;
+                background: #ffffff;
+                box-shadow: 0 14px 34px rgba(15, 42, 70, 0.2);
+            }
+
+            .tabulator-row-context-menu[hidden] {
+                display: none;
+            }
+
+            .tabulator-row-context-menu button {
+                display: block;
+                width: 100%;
+                padding: 9px 11px;
+                border: 0;
+                border-radius: 6px;
+                background: transparent;
+                color: #173047;
+                text-align: left;
+                font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+                font-size: 0.88rem;
+                font-weight: 650;
+                cursor: pointer;
+            }
+
+            .tabulator-row-context-menu button:hover {
+                background: #eef7fc;
+                color: #0b5f95;
+            }
+
+            .tabulator-row-context-separator {
+                height: 1px;
+                margin: 5px 3px;
+                background: #dce5eb;
+            }
+
+            .tabulator-insert-dialog {
+                width: min(390px, calc(100vw - 32px));
+                padding: 0;
+                border: 1px solid #b8c8d4;
+                border-radius: 12px;
+                background: #ffffff;
+                color: #173047;
+                box-shadow: 0 22px 60px rgba(15, 42, 70, 0.25);
+            }
+
+            .tabulator-insert-dialog::backdrop {
+                background: rgba(11, 34, 57, 0.34);
+            }
+
+            .tabulator-insert-form {
+                padding: 22px;
+            }
+
+            .tabulator-insert-form h2 {
+                margin: 0 0 18px;
+                color: #0b2239;
+                font-size: 1.2rem;
+                font-weight: 800;
+            }
+
+            .tabulator-insert-label {
+                display: grid;
+                gap: 7px;
+                color: #2e4a60;
+                font-size: 0.9rem;
+                font-weight: 700;
+            }
+
+            .tabulator-insert-count {
+                box-sizing: border-box;
+                width: 100%;
+                height: 40px;
+                padding: 7px 10px;
+                border: 1px solid #99afbf;
+                border-radius: 7px;
+                color: #173047;
+                font: inherit;
+                outline: none;
+            }
+
+            .tabulator-insert-count:focus {
+                border-color: #0b78c7;
+                box-shadow: 0 0 0 3px rgba(11, 120, 199, 0.14);
+            }
+
+            .tabulator-insert-position {
+                display: grid;
+                gap: 9px;
+                margin: 17px 0 0;
+                padding: 14px;
+                border: 1px solid #d3dfe7;
+                border-radius: 8px;
+            }
+
+            .tabulator-insert-position legend {
+                float: none;
+                width: auto;
+                margin: 0 0 7px;
+                padding: 0 4px;
+                color: #2e4a60;
+                font-size: 0.88rem;
+                font-weight: 800;
+            }
+
+            .tabulator-insert-position label {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                margin: 0;
+                font-size: 0.9rem;
+            }
+
+            .tabulator-insert-actions {
+                display: flex;
+                justify-content: flex-end;
+                gap: 9px;
+                margin-top: 20px;
+            }
+
+            .tabulator-dialog-button {
+                min-width: 92px;
+                height: 38px;
+                padding: 0 14px;
+                border-radius: 7px;
+                font-size: 0.88rem;
+                font-weight: 750;
+                cursor: pointer;
+            }
+
+            .tabulator-dialog-cancel {
+                border: 1px solid #9eb0bd;
+                background: #ffffff;
+                color: #435c70;
+            }
+
+            .tabulator-dialog-confirm {
+                border: 1px solid #0b78c7;
+                background: #0b78c7;
+                color: #ffffff;
+            }
+        `;
+
+        document.head.appendChild(style);
+    },
+
+    /*
+     * تجهيز قائمة الكليك اليمين ونافذة إدراج الصفوف.
+     * يتم إنشاؤهما مرة واحدة لكل شيت.
+     */
+    ensureStructureUi: function (elementId) {
+        this.ensureStructureStyles();
+
+        let menu = document.getElementById(
+            `${elementId}-row-menu`
+        );
+
+        if (!menu) {
+            menu = document.createElement("div");
+            menu.id = `${elementId}-row-menu`;
+            menu.className = "tabulator-row-context-menu";
+            menu.hidden = true;
+
+            const createMenuButton = function (
+                text,
+                action
+            ) {
+                const button =
+                    document.createElement("button");
+
+                button.type = "button";
+                button.textContent = text;
+
+                button.addEventListener(
+                    "click",
+                    function () {
+                        window.tabulatorTest
+                            .hideStructureContextMenu(
+                                elementId
+                            );
+
+                        action();
+                    }
+                );
+
+                return button;
+            };
+
+            menu.append(
+                createMenuButton(
+                    "Insert 1 Row Above",
+                    function () {
+                        window.tabulatorTest.insertRows(
+                            elementId,
+                            1,
+                            "above"
+                        );
+                    }
+                ),
+                createMenuButton(
+                    "Insert 1 Row Below",
+                    function () {
+                        window.tabulatorTest.insertRows(
+                            elementId,
+                            1,
+                            "below"
+                        );
+                    }
+                ),
+                createMenuButton(
+                    "Insert Multiple Rows…",
+                    function () {
+                        window.tabulatorTest
+                            .openInsertDialog(
+                                elementId,
+                                "below"
+                            );
+                    }
+                )
+            );
+
+            const separator =
+                document.createElement("div");
+
+            separator.className =
+                "tabulator-row-context-separator";
+
+            menu.append(separator);
+
+            menu.append(
+                createMenuButton(
+                    "Delete Selected Rows",
+                    function () {
+                        window.tabulatorTest
+                            .deleteSelectedRows(
+                                elementId
+                            );
+                    }
+                )
+            );
+
+            document.body.appendChild(menu);
+        }
+
+        let dialog = document.getElementById(
+            `${elementId}-insert-dialog`
+        );
+
+        if (!dialog) {
+            dialog = document.createElement("dialog");
+            dialog.id = `${elementId}-insert-dialog`;
+            dialog.className = "tabulator-insert-dialog";
+
+            dialog.innerHTML = `
+                <form method="dialog" class="tabulator-insert-form">
+                    <h2>Insert Rows</h2>
+
+                    <label class="tabulator-insert-label">
+                        Number of rows
+                        <input
+                            class="tabulator-insert-count"
+                            type="number"
+                            min="1"
+                            max="1000"
+                            step="1"
+                            value="1" />
+                    </label>
+
+                    <fieldset class="tabulator-insert-position">
+                        <legend>Position</legend>
+
+                        <label>
+                            <input
+                                type="radio"
+                                name="${elementId}-insert-position"
+                                value="above" />
+                            Above selected row
+                        </label>
+
+                        <label>
+                            <input
+                                type="radio"
+                                name="${elementId}-insert-position"
+                                value="below"
+                                checked />
+                            Below selected row
+                        </label>
+                    </fieldset>
+
+                    <div class="tabulator-insert-actions">
+                        <button
+                            type="button"
+                            class="tabulator-dialog-button tabulator-dialog-cancel">
+                            Cancel
+                        </button>
+
+                        <button
+                            type="submit"
+                            class="tabulator-dialog-button tabulator-dialog-confirm">
+                            Insert
+                        </button>
+                    </div>
+                </form>
+            `;
+
+            const cancelButton =
+                dialog.querySelector(
+                    ".tabulator-dialog-cancel"
+                );
+
+            cancelButton.addEventListener(
+                "click",
+                function () {
+                    dialog.close();
+                }
+            );
+
+            dialog
+                .querySelector("form")
+                .addEventListener(
+                    "submit",
+                    function (event) {
+                        event.preventDefault();
+
+                        const countInput =
+                            dialog.querySelector(
+                                ".tabulator-insert-count"
+                            );
+
+                        const positionInput =
+                            dialog.querySelector(
+                                `input[name="${elementId}-insert-position"]:checked`
+                            );
+
+                        const count =
+                            Number.parseInt(
+                                countInput.value,
+                                10
+                            );
+
+                        const position =
+                            positionInput?.value === "above"
+                                ? "above"
+                                : "below";
+
+                        dialog.close();
+
+                        window.tabulatorTest.insertRows(
+                            elementId,
+                            count,
+                            position
+                        );
+                    }
+                );
+
+            dialog.addEventListener(
+                "click",
+                function (event) {
+                    if (event.target === dialog) {
+                        dialog.close();
+                    }
+                }
+            );
+
+            document.body.appendChild(dialog);
+        }
+    },
+
+    hideStructureContextMenu: function (elementId) {
+        const menu =
+            document.getElementById(
+                `${elementId}-row-menu`
+            );
+
+        if (menu) {
+            menu.hidden = true;
+        }
+    },
+
+    showStructureContextMenu: function (
+        elementId,
+        event,
+        cell
+    ) {
+        const table =
+            this.tables[elementId];
+
+        const state =
+            this.states[elementId];
+
+        if (!table || !state || !cell) {
+            return;
+        }
+
+        const selectedRows =
+            this.getSelectedRowComponents(
+                elementId
+            );
+
+        const clickedRowId =
+            cell.getRow().getIndex();
+
+        const clickedRowIsSelected =
+            selectedRows.some(
+                row =>
+                    String(row.getIndex()) ===
+                    String(clickedRowId)
+            );
+
+        if (!clickedRowIsSelected) {
+            for (const range of table.getRanges()) {
+                range.remove();
+            }
+
+            table.addRange(cell, cell);
+        }
+
+        state.activeCell = {
+            rowId: clickedRowId,
+            field: cell.getField()
+        };
+
+        const menu =
+            document.getElementById(
+                `${elementId}-row-menu`
+            );
+
+        if (!menu) {
+            return;
+        }
+
+        menu.hidden = false;
+
+        const menuWidth = 220;
+        const menuHeight = 170;
+
+        const left = Math.min(
+            event.clientX,
+            window.innerWidth - menuWidth - 10
+        );
+
+        const top = Math.min(
+            event.clientY,
+            window.innerHeight - menuHeight - 10
+        );
+
+        menu.style.left =
+            `${Math.max(8, left)}px`;
+
+        menu.style.top =
+            `${Math.max(8, top)}px`;
+    },
+
+    openInsertDialog: function (
+        elementId,
+        defaultPosition
+    ) {
+        const selectedRows =
+            this.getSelectedRowComponents(
+                elementId
+            );
+
+        if (selectedRows.length === 0) {
+            this.setStatus(
+                elementId,
+                "حدد أي خلية داخل الصف أولًا."
+            );
+
+            return;
+        }
+
+        this.ensureStructureUi(elementId);
+        this.hideStructureContextMenu(elementId);
+
+        const dialog =
+            document.getElementById(
+                `${elementId}-insert-dialog`
+            );
+
+        if (!dialog) {
+            return;
+        }
+
+        const countInput =
+            dialog.querySelector(
+                ".tabulator-insert-count"
+            );
+
+        countInput.value = "1";
+
+        const position =
+            defaultPosition === "above"
+                ? "above"
+                : "below";
+
+        const positionInput =
+            dialog.querySelector(
+                `input[name="${elementId}-insert-position"][value="${position}"]`
+            );
+
+        if (positionInput) {
+            positionInput.checked = true;
+        }
+
+        dialog.showModal();
+
+        window.requestAnimationFrame(
+            function () {
+                countInput.focus();
+                countInput.select();
+            }
+        );
+    },
+
+    cloneRowData: function (rowData) {
+        return {
+            id: rowData.id,
+            workOrderNumber:
+                rowData.workOrderNumber ?? "",
+            workTypeCode:
+                rowData.workTypeCode ?? "",
+            assignmentDate:
+                rowData.assignmentDate ?? "",
+            basket:
+                rowData.basket ?? "",
+            status:
+                rowData.status ?? "",
+            notes:
+                rowData.notes ?? ""
+        };
+    },
+
+    createBlankRow: function (state) {
+        const id = state.nextTemporaryId;
+        state.nextTemporaryId--;
+
+        return {
+            id: id,
+            workOrderNumber: "",
+            workTypeCode: "",
+            assignmentDate: "",
+            basket: "",
+            status: "",
+            notes: ""
+        };
+    },
+
+    /*
+     * إرجاع الصفوف التي يغطيها النطاق الحالي.
+     * تحديد خلية واحدة يعني اختيار صفها للإدراج.
+     */
+    getSelectedRowComponents: function (
+        elementId
+    ) {
+        const table =
+            this.tables[elementId];
+
+        const state =
+            this.states[elementId];
+
+        if (!table || !state) {
+            return [];
+        }
+
+        const activeRange =
+            this.getActiveRange(table);
+
+        const selectedById = new Map();
+
+        if (activeRange) {
+            const matrix =
+                activeRange.getStructuredCells();
+
+            if (Array.isArray(matrix)) {
+                for (const rowCells of matrix) {
+                    if (!Array.isArray(rowCells)) {
+                        continue;
+                    }
+
+                    for (const cell of rowCells) {
+                        const row = cell?.getRow?.();
+
+                        if (row) {
+                            selectedById.set(
+                                String(row.getIndex()),
+                                row
+                            );
+                        }
+                    }
+                }
+            }
+        }
+
+        if (
+            selectedById.size === 0 &&
+            state.activeCell
+        ) {
+            const row =
+                table.getRow(
+                    state.activeCell.rowId
+                );
+
+            if (row) {
+                selectedById.set(
+                    String(row.getIndex()),
+                    row
+                );
+            }
+        }
+
+        const positions = new Map();
+
+        table
+            .getRows()
+            .forEach(
+                function (row, index) {
+                    positions.set(
+                        String(row.getIndex()),
+                        index
+                    );
+                }
+            );
+
+        return Array.from(
+            selectedById.values()
+        ).sort(
+            function (first, second) {
+                return (
+                    (positions.get(
+                        String(first.getIndex())
+                    ) ?? 0) -
+                    (positions.get(
+                        String(second.getIndex())
+                    ) ?? 0)
+                );
+            }
+        );
+    },
+
+    insertRows: async function (
+        elementId,
+        requestedCount,
+        position
+    ) {
+        await this.commitActiveEditor(elementId);
+
+        const table =
+            this.tables[elementId];
+
+        const state =
+            this.states[elementId];
+
+        if (!table || !state) {
+            return;
+        }
+
+        const selectedRows =
+            this.getSelectedRowComponents(
+                elementId
+            );
+
+        if (selectedRows.length === 0) {
+            this.setStatus(
+                elementId,
+                "حدد أي خلية داخل الصف أولًا."
+            );
+
+            return;
+        }
+
+        const count = Math.min(
+            1000,
+            Math.max(
+                1,
+                Number.parseInt(
+                    requestedCount,
+                    10
+                ) || 1
+            )
+        );
+
+        const currentData =
+            table
+                .getData()
+                .map(
+                    row =>
+                        this.cloneRowData(row)
+                );
+
+        const positionsById = new Map();
+
+        currentData.forEach(
+            function (row, index) {
+                positionsById.set(
+                    String(row.id),
+                    index
+                );
+            }
+        );
+
+        const selectedPositions =
+            selectedRows
+                .map(
+                    row =>
+                        positionsById.get(
+                            String(row.getIndex())
+                        )
+                )
+                .filter(
+                    index =>
+                        Number.isInteger(index)
+                );
+
+        if (selectedPositions.length === 0) {
+            this.setStatus(
+                elementId,
+                "تعذر تحديد موضع الصف."
+            );
+
+            return;
+        }
+
+        const insertIndex =
+            position === "above"
+                ? Math.min(...selectedPositions)
+                : Math.max(...selectedPositions) + 1;
+
+        const insertedRows = [];
+
+        for (
+            let index = 0;
+            index < count;
+            index++
+        ) {
+            const data =
+                this.createBlankRow(state);
+
+            insertedRows.push({
+                index: insertIndex + index,
+                data: this.cloneRowData(data)
+            });
+        }
+
+        currentData.splice(
+            insertIndex,
+            0,
+            ...insertedRows.map(
+                record =>
+                    this.cloneRowData(record.data)
+            )
+        );
+
+        await this.replaceStructureData(
+            elementId,
+            currentData,
+            insertedRows[0].data.id
+        );
+
+        this.pushStructureTransaction(
+            elementId,
+            {
+                kind: "structure",
+                action: "insert",
+                label:
+                    count === 1
+                        ? "إضافة صف"
+                        : `إضافة ${count.toLocaleString()} صفوف`,
+                rows: insertedRows
+            }
+        );
+    },
+
+    deleteSelectedRows: async function (elementId) {
+        await this.commitActiveEditor(elementId);
+
+        const table =
+            this.tables[elementId];
+
+        if (!table) {
+            return;
+        }
+
+        const selectedRows =
+            this.getSelectedRowComponents(
+                elementId
+            );
+
+        if (selectedRows.length === 0) {
+            this.setStatus(
+                elementId,
+                "حدد خلية أو نطاق صفوف أولًا."
+            );
+
+            return;
+        }
+
+        const count =
+            selectedRows.length;
+
+        const confirmed = window.confirm(
+            count === 1
+                ? "هل تريد حذف الصف المحدد؟"
+                : `هل تريد حذف ${count.toLocaleString()} صفوف محددة؟`
+        );
+
+        if (!confirmed) {
+            return;
+        }
+
+        const currentData =
+            table
+                .getData()
+                .map(
+                    row =>
+                        this.cloneRowData(row)
+                );
+
+        const selectedIds = new Set(
+            selectedRows.map(
+                row =>
+                    String(row.getIndex())
+            )
+        );
+
+        const deletedRows = [];
+
+        currentData.forEach(
+            function (row, index) {
+                if (
+                    selectedIds.has(
+                        String(row.id)
+                    )
+                ) {
+                    deletedRows.push({
+                        index: index,
+                        data:
+                            window.tabulatorTest
+                                .cloneRowData(row)
+                    });
+                }
+            }
+        );
+
+        if (deletedRows.length === 0) {
+            return;
+        }
+
+        const remainingData =
+            currentData.filter(
+                row =>
+                    !selectedIds.has(
+                        String(row.id)
+                    )
+            );
+
+        const focusIndex = Math.min(
+            deletedRows[0].index,
+            remainingData.length - 1
+        );
+
+        const focusRowId =
+            focusIndex >= 0
+                ? remainingData[focusIndex].id
+                : null;
+
+        await this.replaceStructureData(
+            elementId,
+            remainingData,
+            focusRowId
+        );
+
+        this.pushStructureTransaction(
+            elementId,
+            {
+                kind: "structure",
+                action: "delete",
+                label:
+                    deletedRows.length === 1
+                        ? "حذف صف"
+                        : `حذف ${deletedRows.length.toLocaleString()} صفوف`,
+                rows: deletedRows
+            }
+        );
+    },
+
+    pushStructureTransaction: function (
+        elementId,
+        transaction
+    ) {
+        const state =
+            this.states[elementId];
+
+        if (
+            !state ||
+            !transaction?.rows?.length
+        ) {
+            return;
+        }
+
+        state.undoStack.push(transaction);
+
+        if (
+            state.undoStack.length >
+            state.maxTransactions
+        ) {
+            state.undoStack.shift();
+        }
+
+        state.redoStack = [];
+
+        this.renderStatus(elementId);
+
+        this.setStatus(
+            elementId,
+            `${transaction.label}. التراجع المتاح: ${state.undoStack.length}.`
+        );
+    },
+
+    applyStructureTransaction: async function (
+        elementId,
+        transaction,
+        direction
+    ) {
+        const table =
+            this.tables[elementId];
+
+        if (
+            !table ||
+            !transaction?.rows?.length
+        ) {
+            return;
+        }
+
+        const data =
+            table
+                .getData()
+                .map(
+                    row =>
+                        this.cloneRowData(row)
+                );
+
+        const rowIds = new Set(
+            transaction.rows.map(
+                record =>
+                    String(record.data.id)
+            )
+        );
+
+        const shouldInsert =
+            (
+                transaction.action === "insert" &&
+                direction === "redo"
+            ) ||
+            (
+                transaction.action === "delete" &&
+                direction === "undo"
+            );
+
+        let nextData;
+        let focusRowId = null;
+
+        if (shouldInsert) {
+            nextData = data;
+
+            const orderedRows =
+                Array.from(transaction.rows)
+                    .sort(
+                        (first, second) =>
+                            first.index - second.index
+                    );
+
+            for (const record of orderedRows) {
+                nextData.splice(
+                    Math.min(
+                        record.index,
+                        nextData.length
+                    ),
+                    0,
+                    this.cloneRowData(
+                        record.data
+                    )
+                );
+            }
+
+            focusRowId =
+                orderedRows[0].data.id;
+        } else {
+            const firstIndex =
+                Math.min(
+                    ...transaction.rows.map(
+                        record => record.index
+                    )
+                );
+
+            nextData =
+                data.filter(
+                    row =>
+                        !rowIds.has(
+                            String(row.id)
+                        )
+                );
+
+            const focusIndex =
+                Math.min(
+                    firstIndex,
+                    nextData.length - 1
+                );
+
+            focusRowId =
+                focusIndex >= 0
+                    ? nextData[focusIndex].id
+                    : null;
+        }
+
+        await this.replaceStructureData(
+            elementId,
+            nextData,
+            focusRowId
+        );
+    },
+
+    replaceStructureData: async function (
+        elementId,
+        data,
+        focusRowId
+    ) {
+        const table =
+            this.tables[elementId];
+
+        const state =
+            this.states[elementId];
+
+        if (!table || !state) {
+            return;
+        }
+
+        state.applyingHistory = true;
+
+        try {
+            await table.setData(data);
+
+            window.tabulatorFilters.apply(
+                this,
+                elementId
+            );
+
+            this.recalculateStructureState(
+                elementId
+            );
+        } finally {
+            state.applyingHistory = false;
+        }
+
+        if (
+            focusRowId !== null &&
+            focusRowId !== undefined
+        ) {
+            this.focusRow(
+                elementId,
+                focusRowId
+            );
+        }
+    },
+
+    recalculateStructureState: function (elementId) {
+        const table =
+            this.tables[elementId];
+
+        const state =
+            this.states[elementId];
+
+        if (!table || !state) {
+            return;
+        }
+
+        const currentRows =
+            table.getData();
+
+        const currentIds = new Set(
+            currentRows.map(
+                row =>
+                    String(row.id)
+            )
+        );
+
+        state.deletedOriginalRowIds =
+            new Set(
+                Array.from(
+                    state.originalRows.keys()
+                ).filter(
+                    rowId =>
+                        !currentIds.has(rowId)
+                )
+            );
+
+        state.dirtyRowIds.clear();
+
+        this.refreshDirtyRows(
+            elementId,
+            currentRows.map(
+                row => row.id
+            )
+        );
+    },
+
+    focusRow: function (
+        elementId,
+        rowId
+    ) {
+        const table =
+            this.tables[elementId];
+
+        const state =
+            this.states[elementId];
+
+        if (!table || !state) {
+            return;
+        }
+
+        const row =
+            table.getRow(rowId);
+
+        const cell =
+            row?.getCell(
+                "workOrderNumber"
+            );
+
+        if (!row || !cell) {
+            return;
+        }
+
+        const selectCell = function () {
+            for (const range of table.getRanges()) {
+                range.remove();
+            }
+
+            table.addRange(cell, cell);
+
+            state.activeCell = {
+                rowId: row.getIndex(),
+                field: "workOrderNumber"
+            };
+
+            window.requestAnimationFrame(
+                function () {
+                    const element =
+                        cell.getElement();
+
+                    element?.focus({
+                        preventScroll: true
+                    });
+                }
+            );
+        };
+
+        table
+            .scrollToRow(
+                row,
+                "center",
+                false
+            )
+            .then(selectCell)
+            .catch(selectCell);
+    },
+
+    getStructuralChangeSummary: function (
+        elementId
+    ) {
+        const table =
+            this.tables[elementId];
+
+        const state =
+            this.states[elementId];
+
+        if (!table || !state) {
+            return {
+                addedRows: 0,
+                deletedRows: 0
+            };
+        }
+
+        const addedRows =
+            table
+                .getData()
+                .filter(
+                    row =>
+                        !state.originalRows.has(
+                            String(row.id)
+                        )
+                )
+                .length;
+
+        return {
+            addedRows: addedRows,
+            deletedRows:
+                state.deletedOriginalRowIds.size
+        };
+    },
+
     copyRange: function (elementId) {
         const table =
             this.tables[elementId];
@@ -2264,15 +3824,15 @@ window.tabulatorTest = {
         elementId,
         message
     ) {
-        const statusElement =
-            document.getElementById(
-                `${elementId}-status`
-            );
+        const state =
+            this.states[elementId];
 
-        if (statusElement) {
-            statusElement.textContent =
-                message;
+        if (state) {
+            state.lastStatusMessage =
+                String(message ?? "");
         }
+
+        this.renderStatus(elementId);
     },
 
     destroy: function (elementId) {

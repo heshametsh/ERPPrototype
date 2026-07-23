@@ -3,6 +3,7 @@
 
 @using System.Globalization
 @using ERPPrototype.Data
+@using ERPPrototype.Data.Entities
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Authorization
 @using Microsoft.AspNetCore.Identity
@@ -57,9 +58,28 @@
                     </button>
 
                     <button type="button"
+                            class="page-action-button page-action-button-secondary"
+                            onclick="window.tabulatorTest.openInsertDialog('tabulator-test-table')">
+                        Insert Rows
+                    </button>
+
+                    <button type="button"
+                            class="page-action-button page-action-button-secondary"
+                            onclick="window.tabulatorTest.deleteSelectedRows('tabulator-test-table')">
+                        Delete Rows
+                    </button>
+
+                    <button type="button"
                             class="page-action-button page-action-button-primary"
                             onclick="window.tabulatorTest.copyRange('tabulator-test-table')">
                         Copy Selected Cells
+                    </button>
+
+                    <button type="button"
+                            class="page-action-button page-action-button-primary"
+                            disabled="@IsSaving"
+                            @onclick="SaveChangesAsync">
+                        @(IsSaving ? "Saving..." : "Save")
                     </button>
                 </div>
 
@@ -86,8 +106,8 @@
     else
     {
         <div class="grid-instructions">
-            This step loads real department data from SQL Server.
-            Editing is still browser-only until the save step is implemented and tested.
+            Select any cell, then use Insert Rows or right-click inside the sheet.
+            This step tests row insertion, deletion, Undo and Redo before database persistence.
         </div>
 
         <div class="work-order-search-row">
@@ -115,9 +135,13 @@
 </div>
 
 @code {
+    private const string TableId = "tabulator-test-table";
+
     private bool IsLoading = true;
+    private bool IsSaving;
     private bool GridInitialized;
 
+    private string CurrentUserId = string.Empty;
     private string BranchName = string.Empty;
     private string DepartmentName = string.Empty;
     private string ErrorMessage = string.Empty;
@@ -144,6 +168,8 @@
                 return;
             }
 
+            CurrentUserId = userId;
+
             var sheet =
                 await WorkOrderService.LoadSheetAsync(userId);
 
@@ -160,17 +186,20 @@
 
             Rows = sheet.WorkOrders
                 .Select(workOrder =>
-                    new TabulatorWorkOrderRow(
-                        workOrder.Id,
-                        workOrder.WorkOrderNumber,
-                        workOrder.WorkTypeCode,
-                        workOrder.AssignmentDate?.ToString(
-                            "dd/MM/yyyy",
-                            CultureInfo.InvariantCulture)
+                    new TabulatorWorkOrderRow
+                    {
+                        Id = workOrder.Id,
+                        WorkOrderNumber = workOrder.WorkOrderNumber,
+                        WorkTypeCode = workOrder.WorkTypeCode,
+                        AssignmentDate =
+                            workOrder.AssignmentDate?.ToString(
+                                "dd/MM/yyyy",
+                                CultureInfo.InvariantCulture)
                             ?? string.Empty,
-                        workOrder.Busket,
-                        workOrder.Status,
-                        workOrder.Notes ?? string.Empty))
+                        Basket = workOrder.Busket,
+                        Status = workOrder.Status,
+                        Notes = workOrder.Notes ?? string.Empty
+                    })
                 .ToList();
         }
         catch (Exception exception)
@@ -205,7 +234,7 @@
         {
             await JSRuntime.InvokeVoidAsync(
                 "tabulatorTest.initialize",
-                "tabulator-test-table",
+                TableId,
                 Rows,
                 WorkOrderBuskets.All);
         }
@@ -224,12 +253,171 @@
         }
     }
 
-    private sealed record TabulatorWorkOrderRow(
-        int Id,
-        string WorkOrderNumber,
-        string WorkTypeCode,
-        string AssignmentDate,
-        string Basket,
-        string Status,
-        string Notes);
+    private async Task SaveChangesAsync()
+    {
+        if (IsSaving || string.IsNullOrWhiteSpace(CurrentUserId))
+        {
+            return;
+        }
+
+        IsSaving = true;
+
+        try
+        {
+            var structuralChanges =
+                await JSRuntime.InvokeAsync<TabulatorStructureSummary>(
+                    "tabulatorTest.getStructuralChangeSummary",
+                    TableId);
+
+            if (
+                structuralChanges.AddedRows > 0 ||
+                structuralChanges.DeletedRows > 0)
+            {
+                await SetGridStatusAsync(
+                    "الإضافة والحذف يعملان كتجربة الآن، وسيتم ربط حفظهما بقاعدة البيانات في الخطوة التالية.");
+
+                return;
+            }
+
+            var changedRows =
+                await JSRuntime.InvokeAsync<List<TabulatorWorkOrderRow>>(
+                    "tabulatorTest.getDirtyRows",
+                    TableId);
+
+            if (changedRows.Count == 0)
+            {
+                await SetGridStatusAsync(
+                    "لا توجد تغييرات للحفظ.");
+
+                return;
+            }
+
+            var changedWorkOrders =
+                new List<WorkOrder>(changedRows.Count);
+
+            foreach (var row in changedRows)
+            {
+                if (!TryParseAssignmentDate(
+                        row.AssignmentDate,
+                        out var assignmentDate))
+                {
+                    await SetGridStatusAsync(
+                        $"تعذر الحفظ: تاريخ الإسناد غير صحيح في أمر العمل {row.WorkOrderNumber}.");
+
+                    return;
+                }
+
+                changedWorkOrders.Add(
+                    new WorkOrder
+                    {
+                        Id = row.Id,
+                        WorkOrderNumber = row.WorkOrderNumber ?? string.Empty,
+                        WorkTypeCode = row.WorkTypeCode ?? string.Empty,
+                        AssignmentDate = assignmentDate,
+                        Busket = row.Basket ?? string.Empty,
+                        Status = row.Status ?? string.Empty,
+                        Notes = row.Notes
+                    });
+            }
+
+            await SetGridStatusAsync("جارٍ حفظ التغييرات...");
+
+            var result =
+                await WorkOrderService.SaveChangesAsync(
+                    CurrentUserId,
+                    Array.Empty<WorkOrder>(),
+                    changedWorkOrders,
+                    Array.Empty<WorkOrder>());
+
+            if (!result.Succeeded)
+            {
+                await SetGridStatusAsync(
+                    $"فشل الحفظ: {result.ErrorMessage}");
+
+                return;
+            }
+
+            await JSRuntime.InvokeVoidAsync(
+                "tabulatorTest.markRowsSaved",
+                TableId,
+                changedRows);
+
+            await SetGridStatusAsync(
+                $"تم حفظ {changedRows.Count} صف بنجاح.");
+        }
+        catch (JSDisconnectedException)
+        {
+            Logger.LogWarning(
+                "The browser disconnected while saving Tabulator work orders.");
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError(
+                exception,
+                "An unexpected error occurred while saving Tabulator work orders.");
+
+            try
+            {
+                await SetGridStatusAsync(
+                    "حدث خطأ غير متوقع أثناء الحفظ.");
+            }
+            catch (JSDisconnectedException)
+            {
+            }
+        }
+        finally
+        {
+            IsSaving = false;
+        }
+    }
+
+    private async Task SetGridStatusAsync(string message)
+    {
+        await JSRuntime.InvokeVoidAsync(
+            "tabulatorTest.setStatus",
+            TableId,
+            message);
+    }
+
+    private static bool TryParseAssignmentDate(
+        string? value,
+        out DateTime? assignmentDate)
+    {
+        assignmentDate = null;
+
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return true;
+        }
+
+        if (!DateTime.TryParseExact(
+                value.Trim(),
+                "dd/MM/yyyy",
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.None,
+                out var parsedDate))
+        {
+            return false;
+        }
+
+        assignmentDate = parsedDate.Date;
+        return true;
+    }
+
+    private sealed class TabulatorStructureSummary
+    {
+        public int AddedRows { get; set; }
+        public int DeletedRows { get; set; }
+    }
+
+    private sealed class TabulatorWorkOrderRow
+    {
+        public int Id { get; set; }
+        public string WorkOrderNumber { get; set; } = string.Empty;
+        public string WorkTypeCode { get; set; } = string.Empty;
+        public string AssignmentDate { get; set; } = string.Empty;
+        public string Basket { get; set; } = string.Empty;
+        public string Status { get; set; } = string.Empty;
+        public string Notes { get; set; } = string.Empty;
+    }
 }
