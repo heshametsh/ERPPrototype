@@ -1,8 +1,20 @@
 ﻿@page "/tabulator-test"
 @rendermode InteractiveServer
 
+@using System.Globalization
+@using ERPPrototype.Data
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Identity
 @using Microsoft.JSInterop
+
+@attribute [Authorize(Roles = AppRoles.Employee)]
+
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject UserManager<ApplicationUser> UserManager
+@inject WorkOrderService WorkOrderService
 @inject IJSRuntime JSRuntime
+@inject ILogger<TabulatorTest> Logger
 
 <PageTitle>Work Orders</PageTitle>
 
@@ -13,77 +25,211 @@
             <h1>Work Orders</h1>
 
             <div class="page-subtitle">
-                Test Branch — Tabulator Prototype
+                @if (IsLoading)
+                {
+                    <span>Loading department data...</span>
+                }
+                else if (!string.IsNullOrWhiteSpace(DepartmentName))
+                {
+                    <span>@BranchName — @DepartmentName</span>
+                }
+                else
+                {
+                    <span>Tabulator Prototype</span>
+                }
             </div>
         </div>
 
-        <div class="page-actions-box">
-            <div class="page-actions-buttons">
-                <button type="button"
-                        class="page-action-button page-action-button-secondary"
-                        onclick="window.tabulatorTest.undo('tabulator-test-table')">
-                    Undo
-                </button>
+        @if (!IsLoading && string.IsNullOrWhiteSpace(ErrorMessage))
+        {
+            <div class="page-actions-box">
+                <div class="page-actions-buttons">
+                    <button type="button"
+                            class="page-action-button page-action-button-secondary"
+                            onclick="window.tabulatorTest.undo('tabulator-test-table')">
+                        Undo
+                    </button>
 
-                <button type="button"
-                        class="page-action-button page-action-button-secondary"
-                        onclick="window.tabulatorTest.redo('tabulator-test-table')">
-                    Redo
-                </button>
+                    <button type="button"
+                            class="page-action-button page-action-button-secondary"
+                            onclick="window.tabulatorTest.redo('tabulator-test-table')">
+                        Redo
+                    </button>
 
-                <button type="button"
-                        class="page-action-button page-action-button-primary"
-                        onclick="window.tabulatorTest.copyRange('tabulator-test-table')">
-                    Copy Selected Cells
-                </button>
+                    <button type="button"
+                            class="page-action-button page-action-button-primary"
+                            onclick="window.tabulatorTest.copyRange('tabulator-test-table')">
+                        Copy Selected Cells
+                    </button>
+                </div>
+
+                <div class="save-status"
+                     id="tabulator-test-table-status">
+                    Preparing database rows...
+                </div>
             </div>
+        }
+    </div>
 
-            <div class="save-status"
-                 id="tabulator-test-table-status">
-                Preparing test data...
+    @if (IsLoading)
+    {
+        <div class="alert alert-info">
+            Loading work orders from SQL Server...
+        </div>
+    }
+    else if (!string.IsNullOrWhiteSpace(ErrorMessage))
+    {
+        <div class="alert alert-danger">
+            @ErrorMessage
+        </div>
+    }
+    else
+    {
+        <div class="grid-instructions">
+            This step loads real department data from SQL Server.
+            Editing is still browser-only until the save step is implemented and tested.
+        </div>
+
+        <div class="work-order-search-row">
+            <div class="work-order-search-box">
+                <label class="work-order-search-label"
+                       for="tabulator-work-order-search">
+                    بحث أمر العمل
+                </label>
+
+                <input id="tabulator-work-order-search"
+                       class="work-order-search-input"
+                       type="search"
+                       inputmode="numeric"
+                       autocomplete="off"
+                       placeholder="اكتب رقم أمر العمل..."
+                       oninput="window.tabulatorTest.filterByWorkOrder('tabulator-test-table', this.value)" />
             </div>
         </div>
-    </div>
 
-    <div class="grid-instructions">
-        Click a cell once to select it. Start typing to replace its value.
-        Double-click to edit the existing value.
-    </div>
-
-    <div class="work-order-search-row">
-        <div class="work-order-search-box">
-            <label class="work-order-search-label"
-                   for="tabulator-work-order-search">
-                بحث أمر العمل
-            </label>
-
-            <input id="tabulator-work-order-search"
-                   class="work-order-search-input"
-                   type="search"
-                   inputmode="numeric"
-                   autocomplete="off"
-                   placeholder="اكتب رقم أمر العمل..."
-                   oninput="window.tabulatorTest.filterByWorkOrder('tabulator-test-table', this.value)" />
+        <div class="tabulator-card">
+            <div id="tabulator-test-table"></div>
         </div>
-    </div>
-
-    <div class="tabulator-card">
-        <div id="tabulator-test-table"></div>
-    </div>
+    }
 
 </div>
 
 @code {
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    private bool IsLoading = true;
+    private bool GridInitialized;
+
+    private string BranchName = string.Empty;
+    private string DepartmentName = string.Empty;
+    private string ErrorMessage = string.Empty;
+
+    private List<TabulatorWorkOrderRow> Rows = [];
+
+    protected override async Task OnInitializedAsync()
     {
-        if (!firstRender)
+        try
+        {
+            var authenticationState =
+                await AuthenticationStateProvider
+                    .GetAuthenticationStateAsync();
+
+            var userId =
+                UserManager.GetUserId(
+                    authenticationState.User);
+
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                ErrorMessage =
+                    "The current user could not be identified.";
+
+                return;
+            }
+
+            var sheet =
+                await WorkOrderService.LoadSheetAsync(userId);
+
+            if (sheet is null)
+            {
+                ErrorMessage =
+                    "The current user is not assigned to an active department.";
+
+                return;
+            }
+
+            BranchName = sheet.BranchName;
+            DepartmentName = sheet.DepartmentName;
+
+            Rows = sheet.WorkOrders
+                .Select(workOrder =>
+                    new TabulatorWorkOrderRow(
+                        workOrder.Id,
+                        workOrder.WorkOrderNumber,
+                        workOrder.WorkTypeCode,
+                        workOrder.AssignmentDate?.ToString(
+                            "dd/MM/yyyy",
+                            CultureInfo.InvariantCulture)
+                            ?? string.Empty,
+                        workOrder.Busket,
+                        workOrder.Status,
+                        workOrder.Notes ?? string.Empty))
+                .ToList();
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError(
+                exception,
+                "An error occurred while loading Tabulator work orders.");
+
+            ErrorMessage =
+                "An unexpected error occurred while loading work orders.";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(
+        bool firstRender)
+    {
+        if (
+            GridInitialized ||
+            IsLoading ||
+            !string.IsNullOrWhiteSpace(ErrorMessage))
         {
             return;
         }
 
-        await JSRuntime.InvokeVoidAsync(
-            "tabulatorTest.initialize",
-            "tabulator-test-table",
-            10000);
+        GridInitialized = true;
+
+        try
+        {
+            await JSRuntime.InvokeVoidAsync(
+                "tabulatorTest.initialize",
+                "tabulator-test-table",
+                Rows,
+                WorkOrderBuskets.All);
+        }
+        catch (Exception exception)
+        {
+            GridInitialized = false;
+
+            Logger.LogError(
+                exception,
+                "An error occurred while initializing Tabulator.");
+
+            ErrorMessage =
+                "The work-order sheet could not be initialized.";
+
+            StateHasChanged();
+        }
     }
+
+    private sealed record TabulatorWorkOrderRow(
+        int Id,
+        string WorkOrderNumber,
+        string WorkTypeCode,
+        string AssignmentDate,
+        string Basket,
+        string Status,
+        string Notes);
 }

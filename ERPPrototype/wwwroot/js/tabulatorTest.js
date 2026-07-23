@@ -1,4 +1,4 @@
-﻿window.tabulatorTest = {
+window.tabulatorTest = {
     tables: {},
     states: {},
 
@@ -218,7 +218,7 @@
         return input;
     },
 
-    initialize: function (elementId, rowCount) {
+    initialize: function (elementId, data, baskets) {
         const element = document.getElementById(elementId);
 
         if (!element) {
@@ -273,67 +273,8 @@
         delete this.tables[elementId];
         delete this.states[elementId];
 
-        const workTypes = [
-            "401",
-            "402",
-            "801",
-            "802"
-        ];
-
-        const baskets = [
-            "الحاجة إلى ترخيص",
-            "تحت التنفيذ",
-            "207",
-            "سلة المعاينة",
-            "تعديل المقايسة",
-            "الهندسة",
-            "إنشاء صرف وإرجاع",
-            "صرف وإرجاع",
-            "شهادة الإنجاز الابتدائية",
-            "شهادة الإنجاز النهائية",
-            "تجهيز الفاتورة",
-            "سلة الفواتير",
-            "السلة المالية",
-            "أمر العمل مغلق"
-        ];
-
-        const data = [];
-
-        for (let index = 0; index < rowCount; index++) {
-            const day =
-                String((index % 28) + 1).padStart(2, "0");
-
-            const month =
-                String((index % 12) + 1).padStart(2, "0");
-
-            data.push({
-                id: index + 1,
-
-                workOrderNumber:
-                    String(233000001 + index),
-
-                workTypeCode:
-                    workTypes[index % workTypes.length],
-
-                assignmentDate:
-                    `${day}/${month}/2026`,
-
-                basket:
-                    baskets[index % baskets.length],
-
-                status:
-                    index % 4 === 0
-                        ? "مشكلة"
-                        : index % 4 === 1
-                            ? "تحت التنفيذ"
-                            : "",
-
-                notes:
-                    index % 5 === 0
-                        ? "ملاحظة تجريبية لأمر العمل"
-                        : ""
-            });
-        }
+        data = Array.isArray(data) ? data : [];
+        baskets = Array.isArray(baskets) ? baskets : [];
 
         const state = {
             undoStack: [],
@@ -341,6 +282,12 @@
 
             applyingHistory: false,
             pendingEdit: null,
+
+            /*
+             * أثناء مسح نطاق، Tabulator يطلق cellEdited لكل خلية.
+             * نجمع هذه التعديلات هنا ثم نسجلها Transaction واحدة.
+             */
+            pendingRangeClear: null,
 
             maxTransactions: 100,
 
@@ -354,7 +301,7 @@
                 workOrderNumber: "",
                 workTypeCodes: [],
                 assignmentDates: [],
-                bucketValues: []
+                basketValues: []
             }
         };
 
@@ -367,7 +314,14 @@
             height: "650px",
             layout: "fitColumns",
             renderVertical: "virtual",
-            popupContainer: true,
+
+            /*
+             * Render popups under document.body. Their final position
+             * is calculated from the clicked header icon after render,
+             * which avoids page-scroll and container-offset errors.
+             */
+            popupContainer: false,
+            headerSortClickElement: "icon",
 
             keybindings: {
                 navDown: ["40", "13"]
@@ -453,22 +407,22 @@
                     headerHozAlign: "left",
 
                     headerPopupIcon:
-                        '<span class="work-type-filter-icon" title="Filter Work Type" aria-label="Filter Work Type">' +
-                        '<svg viewBox="0 0 24 24" aria-hidden="true">' +
-                        '<path d="M3 5h18l-7 8v5.2l-4 2V13L3 5z"></path>' +
-                        '</svg>' +
-                        '</span>',
+                        window.tabulatorFilters.icon(
+                            "Filter Work Type"
+                        ),
 
                     headerPopup: function (
                         event,
                         column,
                         onRendered
                     ) {
-                        return window.tabulatorTest
-                            .createWorkTypeFilterPopup(
+                        return window.tabulatorFilters
+                            .createValuePopup(
+                                window.tabulatorTest,
                                 elementId,
                                 column,
-                                onRendered
+                                onRendered,
+                                "workTypeCode"
                             );
                     }
                 },
@@ -478,26 +432,24 @@
                     editor:
                         window.tabulatorTest
                             .assignmentDateEditor,
-                    directTyping: true,
                     headerSort: false,
                     minWidth: 185,
                     widthGrow: 0.95,
                     headerHozAlign: "left",
 
                     headerPopupIcon:
-                        '<span class="work-type-filter-icon" title="Filter Assignment Date" aria-label="Filter Assignment Date">' +
-                        '<svg viewBox="0 0 24 24" aria-hidden="true">' +
-                        '<path d="M3 5h18l-7 8v5.2l-4 2V13L3 5z"></path>' +
-                        '</svg>' +
-                        '</span>',
+                        window.tabulatorFilters.icon(
+                            "Filter Assignment Date"
+                        ),
 
                     headerPopup: function (
                         event,
                         column,
                         onRendered
                     ) {
-                        return window.tabulatorTest
-                            .createAssignmentDateFilterPopup(
+                        return window.tabulatorFilters
+                            .createDatePopup(
+                                window.tabulatorTest,
                                 elementId,
                                 column,
                                 onRendered
@@ -505,10 +457,9 @@
                     }
                 },
                 {
-                    title: "Bucket",
+                    title: "Basket",
                     field: "basket",
                     editor: "list",
-                    directTyping: true,
                     headerSort: false,
                     minWidth: 250,
                     widthGrow: 1.45,
@@ -522,26 +473,26 @@
                         freetext: false,
                         verticalNavigation: "editor",
                         placeholderLoading: "Loading...",
-                        placeholderEmpty: "No matching buckets"
+                        placeholderEmpty: "No matching baskets"
                     },
 
                     headerPopupIcon:
-                        '<span class="work-type-filter-icon" title="Filter Bucket" aria-label="Filter Bucket">' +
-                        '<svg viewBox="0 0 24 24" aria-hidden="true">' +
-                        '<path d="M3 5h18l-7 8v5.2l-4 2V13L3 5z"></path>' +
-                        '</svg>' +
-                        '</span>',
+                        window.tabulatorFilters.icon(
+                            "Filter Basket"
+                        ),
 
                     headerPopup: function (
                         event,
                         column,
                         onRendered
                     ) {
-                        return window.tabulatorTest
-                            .createBucketFilterPopup(
+                        return window.tabulatorFilters
+                            .createValuePopup(
+                                window.tabulatorTest,
                                 elementId,
                                 column,
-                                onRendered
+                                onRendered,
+                                "basket"
                             );
                     }
                 },
@@ -566,24 +517,12 @@
 
         this.tables[elementId] = table;
 
-        window.requestAnimationFrame(
-            function () {
-                window.tabulatorTest
-                    .updateWorkTypeFilterIcon(
-                        elementId
-                    );
-
-                window.tabulatorTest
-                    .updateAssignmentDateFilterIcon(
-                        elementId
-                    );
-
-                window.tabulatorTest
-                    .updateBucketFilterIcon(
-                        elementId
-                    );
-            }
-        );
+        table.on("tableBuilt", function () {
+            window.tabulatorFilters.updateAllIcons(
+                window.tabulatorTest,
+                elementId
+            );
+        });
 
         /*
          * تسجيل القيمة قبل تعديل خلية واحدة.
@@ -637,6 +576,31 @@
                 return;
             }
 
+            /*
+             * لو التعديل ناتج عن Delete/Backspace لنطاق، لا نسجله
+             * كعملية منفصلة. نحدث العملية المجمعة فقط.
+             */
+            if (state.pendingRangeClear) {
+                const changeKey =
+                    `${String(rowId)}::${field}`;
+
+                const pendingChange =
+                    state.pendingRangeClear
+                        .changesByKey
+                        .get(changeKey);
+
+                if (pendingChange) {
+                    pendingChange.newValue =
+                        newValue;
+
+                    state.pendingRangeClear
+                        .changedFields
+                        .add(field);
+                }
+
+                return;
+            }
+
             window.tabulatorTest.pushTransaction(
                 elementId,
                 {
@@ -655,26 +619,12 @@
                 }
             );
 
-            if (field === "workTypeCode") {
-                window.tabulatorTest
-                    .refreshWorkTypeFilterState(
-                        elementId
-                    );
-            }
-
-            if (field === "assignmentDate") {
-                window.tabulatorTest
-                    .refreshAssignmentDateFilterState(
-                        elementId
-                    );
-            }
-
-            if (field === "basket") {
-                window.tabulatorTest
-                    .refreshBucketFilterState(
-                        elementId
-                    );
-            }
+            window.tabulatorFilters
+                .refreshFields(
+                    window.tabulatorTest,
+                    elementId,
+                    [field]
+                );
         });
 
         table.on("clipboardCopied", function () {
@@ -727,6 +677,58 @@
          * المفاتيح العربية والإنجليزية بنفس الشكل.
          */
         state.keyDownHandler = function (event) {
+            const modifierPressed =
+                event.ctrlKey || event.metaKey;
+
+            const shortcutCode =
+                event.code;
+
+            /*
+             * Undo / Redo يعملان على مستوى صفحة Work Orders كلها،
+             * وليس فقط عندما تكون آخر ضغطة داخل الشيت.
+             *
+             * نترك Ctrl+Z الطبيعي داخل input/textarea حتى لا نكسر
+             * تعديل النص أثناء الكتابة.
+             */
+            if (
+                modifierPressed &&
+                !event.altKey &&
+                !window.tabulatorTest.isEditorTarget(
+                    event.target
+                )
+            ) {
+                if (shortcutCode === "KeyZ") {
+                    event.preventDefault();
+                    event.stopImmediatePropagation();
+
+                    if (event.shiftKey) {
+                        window.tabulatorTest.redo(
+                            elementId
+                        );
+                    } else {
+                        window.tabulatorTest.undo(
+                            elementId
+                        );
+                    }
+
+                    return;
+                }
+
+                if (shortcutCode === "KeyY") {
+                    event.preventDefault();
+                    event.stopImmediatePropagation();
+
+                    window.tabulatorTest.redo(
+                        elementId
+                    );
+
+                    return;
+                }
+            }
+
+            /*
+             * الكتابة المباشرة والتنقل يظلان مرتبطين بالشيت نفسه.
+             */
             if (!state.isActive) {
                 return;
             }
@@ -745,6 +747,151 @@
                     event.target
                 )
             ) {
+                return;
+            }
+
+            /*
+             * Tabulator نفسه هو الذي يمسح النطاق. هنا لا نمنع الحدث
+             * ولا نغير الخلايا يدويًا؛ فقط نأخذ Snapshot قبل المسح،
+             * ثم نجمع cellEdited في عملية Undo واحدة بعد انتهاء الحدث.
+             */
+            if (
+                (event.key === "Delete" ||
+                    event.key === "Backspace") &&
+                !event.ctrlKey &&
+                !event.metaKey &&
+                !event.altKey
+            ) {
+                const structuredCells =
+                    activeRange.getStructuredCells();
+
+                const changesByKey =
+                    new Map();
+
+                if (Array.isArray(structuredCells)) {
+                    structuredCells.forEach(
+                        function (rowCells) {
+                            if (!Array.isArray(rowCells)) {
+                                return;
+                            }
+
+                            rowCells.forEach(
+                                function (cell) {
+                                    if (
+                                        !cell ||
+                                        typeof cell.getRow !==
+                                        "function" ||
+                                        typeof cell.getField !==
+                                        "function" ||
+                                        typeof cell.getValue !==
+                                        "function"
+                                    ) {
+                                        return;
+                                    }
+
+                                    const rowId =
+                                        cell
+                                            .getRow()
+                                            .getIndex();
+
+                                    const field =
+                                        cell.getField();
+
+                                    const oldValue =
+                                        cell.getValue();
+
+                                    const changeKey =
+                                        `${String(rowId)}::${field}`;
+
+                                    changesByKey.set(
+                                        changeKey,
+                                        {
+                                            rowId: rowId,
+                                            field: field,
+                                            oldValue: oldValue,
+                                            newValue: oldValue
+                                        }
+                                    );
+                                }
+                            );
+                        }
+                    );
+                }
+
+                if (changesByKey.size > 0) {
+                    const pendingRangeClear = {
+                        changesByKey:
+                            changesByKey,
+
+                        changedFields:
+                            new Set()
+                    };
+
+                    state.pendingRangeClear =
+                        pendingRangeClear;
+
+                    /*
+                     * Tabulator ينفذ المسح بصورة متزامنة لاحقًا في
+                     * نفس keydown. الـtimeout يعمل بعد انتهاء ذلك.
+                     */
+                    window.setTimeout(
+                        function () {
+                            if (
+                                state.pendingRangeClear !==
+                                pendingRangeClear
+                            ) {
+                                return;
+                            }
+
+                            state.pendingRangeClear =
+                                null;
+
+                            const changes =
+                                Array.from(
+                                    pendingRangeClear
+                                        .changesByKey
+                                        .values()
+                                )
+                                    .filter(
+                                        change =>
+                                            !Object.is(
+                                                change.oldValue,
+                                                change.newValue
+                                            )
+                                    );
+
+                            if (changes.length === 0) {
+                                return;
+                            }
+
+                            window.tabulatorTest
+                                .pushTransaction(
+                                    elementId,
+                                    {
+                                        type: "range-clear",
+                                        label: "مسح نطاق",
+                                        changes: changes
+                                    }
+                                );
+
+                            window.tabulatorFilters
+                                .refreshFields(
+                                    window.tabulatorTest,
+                                    elementId,
+                                    Array.from(
+                                        pendingRangeClear
+                                            .changedFields
+                                    )
+                                );
+                        },
+                        0
+                    );
+                }
+
+                /*
+                 * مهم: لا نستخدم preventDefault هنا، حتى يظل
+                 * مسح Tabulator الأصلي هو المسؤول عن التنفيذ.
+                 */
                 return;
             }
 
@@ -777,10 +924,10 @@
                      * وعمود التاريخ ذي المحرر المخصص.
                      */
                     if (
-                        columnDefinition.editor ===
-                        "input" ||
-                        columnDefinition.directTyping ===
-                        true
+                        columnDefinition.editor === "input" ||
+                        directTypingFields.has(
+                            cell.getField()
+                        )
                     ) {
                         event.preventDefault();
                         event.stopImmediatePropagation();
@@ -835,44 +982,6 @@
                 }
             }
 
-            const modifierPressed =
-                event.ctrlKey || event.metaKey;
-
-            if (
-                !modifierPressed ||
-                event.altKey
-            ) {
-                return;
-            }
-
-            const shortcutCode =
-                event.code;
-
-            if (shortcutCode === "KeyZ") {
-                event.preventDefault();
-                event.stopImmediatePropagation();
-
-                if (event.shiftKey) {
-                    window.tabulatorTest.redo(
-                        elementId
-                    );
-                } else {
-                    window.tabulatorTest.undo(
-                        elementId
-                    );
-                }
-
-                return;
-            }
-
-            if (shortcutCode === "KeyY") {
-                event.preventDefault();
-                event.stopImmediatePropagation();
-
-                window.tabulatorTest.redo(
-                    elementId
-                );
-            }
         };
 
         /*
@@ -1002,46 +1111,13 @@
 
         this.setStatus(
             elementId,
-            `تم إنشاء ${rowCount.toLocaleString()} صف تجريبي.`
-        );
-    },
-
-    /*
-     * منع عجلة الماوس واللمس داخل نافذة الفلتر
-     * من تحريك الجدول الموجود خلفها.
-     * العنصر الداخلي القابل للتمرير يظل يعمل طبيعيًا.
-     */
-    protectFilterPopupScrolling: function (
-        container
-    ) {
-        if (!container) {
-            return;
-        }
-
-        container.addEventListener(
-            "wheel",
-            function (event) {
-                event.stopPropagation();
-            },
-            {
-                passive: true
-            }
-        );
-
-        container.addEventListener(
-            "touchmove",
-            function (event) {
-                event.stopPropagation();
-            },
-            {
-                passive: true
-            }
+            `تم تحميل ${data.length.toLocaleString()} أمر عمل من قاعدة البيانات.`
         );
     },
 
     /*
      * البحث المستقل برقم أمر العمل.
-     * فلتر نوع العمل الموجود داخل رأس العمود يظل محفوظًا.
+     * بقية الفلاتر موجودة في tabulatorFilters.js.
      */
     filterByWorkOrder: function (elementId, value) {
         const state = this.states[elementId];
@@ -1053,2196 +1129,10 @@
         state.externalFilters.workOrderNumber =
             String(value ?? "").trim();
 
-        this.applyExternalFilters(elementId);
-    },
-
-    /*
-     * جلب جميع أنواع العمل الفعلية من بيانات الشيت.
-     * القيم ليست ثابتة داخل الكود.
-     */
-    getUniqueWorkTypes: function (elementId) {
-        const table = this.tables[elementId];
-
-        if (!table) {
-            return [];
-        }
-
-        return Array.from(
-            new Set(
-                table
-                    .getData()
-                    .map(function (row) {
-                        return String(
-                            row.workTypeCode ?? ""
-                        ).trim();
-                    })
-                    .filter(function (value) {
-                        return value !== "";
-                    })
-            )
-        ).sort(function (first, second) {
-            return first.localeCompare(
-                second,
-                undefined,
-                {
-                    numeric: true,
-                    sensitivity: "base"
-                }
-            );
-        });
-    },
-
-    /*
-     * إنشاء نافذة فلترة تشبه Excel:
-     * بحث داخلي + تحديد الكل + اختيارات متعددة.
-     */
-    createWorkTypeFilterPopup: function (
-        elementId,
-        column,
-        onRendered
-    ) {
-        const state = this.states[elementId];
-        const uniqueValues =
-            this.getUniqueWorkTypes(elementId);
-
-        const appliedValues =
-            state?.externalFilters
-                ?.workTypeCodes ?? [];
-
-        const pendingValues =
-            new Set(
-                appliedValues.length > 0
-                    ? appliedValues
-                    : uniqueValues
-            );
-
-        const container =
-            document.createElement("div");
-
-        container.className =
-            "work-type-filter-popup";
-
-        container.dir = "ltr";
-
-        this.protectFilterPopupScrolling(
-            container
-        );
-
-        const resizeHandle =
-            document.createElement("div");
-
-        resizeHandle.className =
-            "work-type-filter-resize-handle";
-
-        resizeHandle.title =
-            "Drag to resize";
-
-        const title =
-            document.createElement("div");
-
-        title.className =
-            "work-type-filter-popup-title";
-
-        title.textContent =
-            "Filter Work Type";
-
-        const searchInput =
-            document.createElement("input");
-
-        searchInput.className =
-            "work-type-filter-popup-search";
-
-        searchInput.type = "search";
-        searchInput.placeholder = "Search values...";
-        searchInput.autocomplete = "off";
-
-        const selectAllLabel =
-            document.createElement("label");
-
-        selectAllLabel.className =
-            "work-type-filter-option work-type-filter-select-all";
-
-        const selectAllCheckbox =
-            document.createElement("input");
-
-        selectAllCheckbox.type = "checkbox";
-
-        const selectAllText =
-            document.createElement("span");
-
-        selectAllText.textContent =
-            "Select All";
-
-        selectAllLabel.append(
-            selectAllCheckbox,
-            selectAllText
-        );
-
-        const optionsContainer =
-            document.createElement("div");
-
-        optionsContainer.className =
-            "work-type-filter-options";
-
-        const emptyMessage =
-            document.createElement("div");
-
-        emptyMessage.className =
-            "work-type-filter-empty";
-
-        emptyMessage.textContent =
-            "No matching values.";
-
-        const actions =
-            document.createElement("div");
-
-        actions.className =
-            "work-type-filter-actions";
-
-        const clearButton =
-            document.createElement("button");
-
-        clearButton.type = "button";
-        clearButton.className =
-            "work-type-filter-button work-type-filter-button-secondary";
-        clearButton.textContent = "Clear Filter";
-
-        const applyButton =
-            document.createElement("button");
-
-        applyButton.type = "button";
-        applyButton.className =
-            "work-type-filter-button work-type-filter-button-primary";
-        applyButton.textContent = "Apply";
-
-        actions.append(
-            clearButton,
-            applyButton
-        );
-
-        const updateSelectAllState = function () {
-            selectAllCheckbox.checked =
-                uniqueValues.length > 0 &&
-                pendingValues.size ===
-                uniqueValues.length;
-
-            selectAllCheckbox.indeterminate =
-                pendingValues.size > 0 &&
-                pendingValues.size <
-                uniqueValues.length;
-        };
-
-        const renderOptions = function () {
-            const query =
-                searchInput.value
-                    .trim()
-                    .toLocaleLowerCase();
-
-            optionsContainer.replaceChildren();
-
-            let visibleCount = 0;
-
-            uniqueValues.forEach(function (value) {
-                if (
-                    query !== "" &&
-                    !value
-                        .toLocaleLowerCase()
-                        .includes(query)
-                ) {
-                    return;
-                }
-
-                visibleCount++;
-
-                const optionLabel =
-                    document.createElement("label");
-
-                optionLabel.className =
-                    "work-type-filter-option";
-
-                const checkbox =
-                    document.createElement("input");
-
-                checkbox.type = "checkbox";
-                checkbox.value = value;
-                checkbox.checked =
-                    pendingValues.has(value);
-
-                const optionText =
-                    document.createElement("span");
-
-                optionText.textContent = value;
-
-                checkbox.addEventListener(
-                    "change",
-                    function () {
-                        if (checkbox.checked) {
-                            pendingValues.add(value);
-                        } else {
-                            pendingValues.delete(value);
-                        }
-
-                        updateSelectAllState();
-                    }
-                );
-
-                optionLabel.append(
-                    checkbox,
-                    optionText
-                );
-
-                optionsContainer.appendChild(
-                    optionLabel
-                );
-            });
-
-            if (visibleCount === 0) {
-                optionsContainer.appendChild(
-                    emptyMessage
-                );
-            }
-        };
-
-        selectAllCheckbox.addEventListener(
-            "change",
-            function () {
-                pendingValues.clear();
-
-                if (selectAllCheckbox.checked) {
-                    uniqueValues.forEach(
-                        value =>
-                            pendingValues.add(value)
-                    );
-                }
-
-                renderOptions();
-                updateSelectAllState();
-            }
-        );
-
-        searchInput.addEventListener(
-            "input",
-            renderOptions
-        );
-
-        clearButton.addEventListener(
-            "click",
-            function () {
-                if (!state) {
-                    return;
-                }
-
-                state.externalFilters.workTypeCodes = [];
-
-                window.tabulatorTest
-                    .applyExternalFilters(
-                        elementId
-                    );
-
-                window.tabulatorTest
-                    .updateWorkTypeFilterIcon(
-                        elementId
-                    );
-
-                column.getElement().click();
-            }
-        );
-
-        applyButton.addEventListener(
-            "click",
-            function () {
-                if (!state) {
-                    return;
-                }
-
-                const selectedValues =
-                    uniqueValues.filter(
-                        value =>
-                            pendingValues.has(value)
-                    );
-
-                state.externalFilters.workTypeCodes =
-                    selectedValues.length ===
-                        uniqueValues.length
-                        ? []
-                        : selectedValues;
-
-                window.tabulatorTest
-                    .applyExternalFilters(
-                        elementId
-                    );
-
-                window.tabulatorTest
-                    .updateWorkTypeFilterIcon(
-                        elementId
-                    );
-
-                column.getElement().click();
-            }
-        );
-
-        container.append(
-            title,
-            searchInput,
-            selectAllLabel,
-            optionsContainer,
-            actions,
-            resizeHandle
-        );
-
-        updateSelectAllState();
-        renderOptions();
-
-        if (typeof onRendered === "function") {
-            onRendered(function () {
-                const popupShell =
-                    container.closest(
-                        ".tabulator-popup-container"
-                    );
-
-                if (!popupShell) {
-                    searchInput.focus();
-                    return;
-                }
-
-                popupShell.classList.add(
-                    "work-type-filter-popup-shell"
-                );
-
-                const storageKey =
-                    "uds-work-type-filter-size";
-
-                let storedSize = null;
-
-                try {
-                    storedSize =
-                        JSON.parse(
-                            localStorage.getItem(
-                                storageKey
-                            )
-                        );
-                } catch {
-                    storedSize = null;
-                }
-
-                const initialWidth =
-                    Number(storedSize?.width) || 260;
-
-                const initialHeight =
-                    Number(storedSize?.height) || 360;
-
-                popupShell.style.width =
-                    `${Math.min(
-                        Math.max(initialWidth, 230),
-                        520
-                    )}px`;
-
-                popupShell.style.height =
-                    `${Math.min(
-                        Math.max(initialHeight, 285),
-                        620
-                    )}px`;
-
-                resizeHandle.addEventListener(
-                    "pointerdown",
-                    function (event) {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        event.stopImmediatePropagation();
-
-                        const startX = event.clientX;
-                        const startY = event.clientY;
-
-                        const startWidth =
-                            popupShell.offsetWidth;
-
-                        const startHeight =
-                            popupShell.offsetHeight;
-
-                        resizeHandle.setPointerCapture(
-                            event.pointerId
-                        );
-
-                        const handleMove =
-                            function (moveEvent) {
-                                moveEvent.preventDefault();
-                                moveEvent.stopPropagation();
-
-                                const nextWidth =
-                                    Math.min(
-                                        Math.max(
-                                            startWidth +
-                                            (
-                                                moveEvent.clientX -
-                                                startX
-                                            ),
-                                            230
-                                        ),
-                                        520
-                                    );
-
-                                const nextHeight =
-                                    Math.min(
-                                        Math.max(
-                                            startHeight +
-                                            (
-                                                moveEvent.clientY -
-                                                startY
-                                            ),
-                                            285
-                                        ),
-                                        620
-                                    );
-
-                                popupShell.style.width =
-                                    `${nextWidth}px`;
-
-                                popupShell.style.height =
-                                    `${nextHeight}px`;
-                            };
-
-                        const handleUp =
-                            function (upEvent) {
-                                upEvent.preventDefault();
-                                upEvent.stopPropagation();
-
-                                resizeHandle.removeEventListener(
-                                    "pointermove",
-                                    handleMove
-                                );
-
-                                resizeHandle.removeEventListener(
-                                    "pointerup",
-                                    handleUp
-                                );
-
-                                resizeHandle.removeEventListener(
-                                    "pointercancel",
-                                    handleUp
-                                );
-
-                                localStorage.setItem(
-                                    storageKey,
-                                    JSON.stringify({
-                                        width:
-                                            popupShell.offsetWidth,
-                                        height:
-                                            popupShell.offsetHeight
-                                    })
-                                );
-                            };
-
-                        resizeHandle.addEventListener(
-                            "pointermove",
-                            handleMove
-                        );
-
-                        resizeHandle.addEventListener(
-                            "pointerup",
-                            handleUp
-                        );
-
-                        resizeHandle.addEventListener(
-                            "pointercancel",
-                            handleUp
-                        );
-                    },
-                    true
-                );
-
-                searchInput.focus();
-            });
-        }
-
-        return container;
-    },
-
-    /*
-     * جلب جميع قيم Bucket الموجودة فعليًا في الشيت،
-     * بدون قيم ثابتة داخل الفلتر.
-     */
-    getUniqueBuckets: function (elementId) {
-        const table = this.tables[elementId];
-
-        if (!table) {
-            return [];
-        }
-
-        return Array.from(
-            new Set(
-                table
-                    .getData()
-                    .map(function (row) {
-                        return String(
-                            row.basket ?? ""
-                        ).trim();
-                    })
-                    .filter(function (value) {
-                        return value !== "";
-                    })
-            )
-        ).sort(function (first, second) {
-            return first.localeCompare(
-                second,
-                undefined,
-                {
-                    numeric: true,
-                    sensitivity: "base"
-                }
-            );
-        });
-    },
-
-    /*
-     * فلتر Bucket بأسلوب Excel:
-     * بحث + تحديد الكل + اختيار متعدد.
-     */
-    createBucketFilterPopup: function (
-        elementId,
-        column,
-        onRendered
-    ) {
-        const state = this.states[elementId];
-
-        const uniqueValues =
-            this.getUniqueBuckets(
-                elementId
-            );
-
-        const appliedValues =
-            state?.externalFilters
-                ?.bucketValues ?? [];
-
-        const pendingValues =
-            new Set(
-                appliedValues.length > 0
-                    ? appliedValues
-                    : uniqueValues
-            );
-
-        const container =
-            document.createElement("div");
-
-        container.className =
-            "bucket-filter-popup";
-
-        container.dir = "ltr";
-
-        this.protectFilterPopupScrolling(
-            container
-        );
-
-        const title =
-            document.createElement("div");
-
-        title.className =
-            "work-type-filter-popup-title";
-
-        title.textContent =
-            "Filter Bucket";
-
-        const searchInput =
-            document.createElement("input");
-
-        searchInput.type = "search";
-        searchInput.autocomplete = "off";
-        searchInput.placeholder =
-            "Search values...";
-        searchInput.className =
-            "work-type-filter-popup-search";
-
-        const selectAllLabel =
-            document.createElement("label");
-
-        selectAllLabel.className =
-            "work-type-filter-option work-type-filter-select-all";
-
-        const selectAllCheckbox =
-            document.createElement("input");
-
-        selectAllCheckbox.type =
-            "checkbox";
-
-        const selectAllText =
-            document.createElement("span");
-
-        selectAllText.textContent =
-            "Select All";
-
-        selectAllLabel.append(
-            selectAllCheckbox,
-            selectAllText
-        );
-
-        const optionsContainer =
-            document.createElement("div");
-
-        optionsContainer.className =
-            "bucket-filter-options";
-
-        const emptyMessage =
-            document.createElement("div");
-
-        emptyMessage.className =
-            "work-type-filter-empty";
-
-        emptyMessage.textContent =
-            "No matching values.";
-
-        const actions =
-            document.createElement("div");
-
-        actions.className =
-            "work-type-filter-actions";
-
-        const clearButton =
-            document.createElement("button");
-
-        clearButton.type = "button";
-        clearButton.className =
-            "work-type-filter-button work-type-filter-button-secondary";
-        clearButton.textContent =
-            "Clear Filter";
-
-        const applyButton =
-            document.createElement("button");
-
-        applyButton.type = "button";
-        applyButton.className =
-            "work-type-filter-button work-type-filter-button-primary";
-        applyButton.textContent =
-            "Apply";
-
-        actions.append(
-            clearButton,
-            applyButton
-        );
-
-        const updateSelectAllState =
-            function () {
-                selectAllCheckbox.checked =
-                    uniqueValues.length > 0 &&
-                    pendingValues.size ===
-                    uniqueValues.length;
-
-                selectAllCheckbox.indeterminate =
-                    pendingValues.size > 0 &&
-                    pendingValues.size <
-                    uniqueValues.length;
-            };
-
-        const renderOptions =
-            function () {
-                const query =
-                    searchInput.value
-                        .trim()
-                        .toLocaleLowerCase();
-
-                optionsContainer
-                    .replaceChildren();
-
-                let visibleCount = 0;
-
-                uniqueValues.forEach(
-                    function (value) {
-                        if (
-                            query !== "" &&
-                            !value
-                                .toLocaleLowerCase()
-                                .includes(query)
-                        ) {
-                            return;
-                        }
-
-                        visibleCount++;
-
-                        const optionLabel =
-                            document.createElement(
-                                "label"
-                            );
-
-                        optionLabel.className =
-                            "work-type-filter-option";
-
-                        const checkbox =
-                            document.createElement(
-                                "input"
-                            );
-
-                        checkbox.type =
-                            "checkbox";
-
-                        checkbox.checked =
-                            pendingValues.has(
-                                value
-                            );
-
-                        const optionText =
-                            document.createElement(
-                                "span"
-                            );
-
-                        optionText.textContent =
-                            value;
-
-                        checkbox.addEventListener(
-                            "change",
-                            function () {
-                                if (
-                                    checkbox.checked
-                                ) {
-                                    pendingValues.add(
-                                        value
-                                    );
-                                } else {
-                                    pendingValues.delete(
-                                        value
-                                    );
-                                }
-
-                                updateSelectAllState();
-                            }
-                        );
-
-                        optionLabel.append(
-                            checkbox,
-                            optionText
-                        );
-
-                        optionsContainer
-                            .appendChild(
-                                optionLabel
-                            );
-                    }
-                );
-
-                if (visibleCount === 0) {
-                    optionsContainer
-                        .appendChild(
-                            emptyMessage
-                        );
-                }
-            };
-
-        selectAllCheckbox.addEventListener(
-            "change",
-            function () {
-                pendingValues.clear();
-
-                if (
-                    selectAllCheckbox.checked
-                ) {
-                    uniqueValues.forEach(
-                        value =>
-                            pendingValues.add(
-                                value
-                            )
-                    );
-                }
-
-                renderOptions();
-                updateSelectAllState();
-            }
-        );
-
-        searchInput.addEventListener(
-            "input",
-            renderOptions
-        );
-
-        clearButton.addEventListener(
-            "click",
-            function () {
-                if (!state) {
-                    return;
-                }
-
-                state.externalFilters
-                    .bucketValues = [];
-
-                window.tabulatorTest
-                    .applyExternalFilters(
-                        elementId
-                    );
-
-                window.tabulatorTest
-                    .updateBucketFilterIcon(
-                        elementId
-                    );
-
-                column.getElement().click();
-            }
-        );
-
-        applyButton.addEventListener(
-            "click",
-            function () {
-                if (!state) {
-                    return;
-                }
-
-                const selectedValues =
-                    uniqueValues.filter(
-                        value =>
-                            pendingValues.has(
-                                value
-                            )
-                    );
-
-                state.externalFilters
-                    .bucketValues =
-                    selectedValues.length ===
-                        uniqueValues.length
-                        ? []
-                        : selectedValues;
-
-                window.tabulatorTest
-                    .applyExternalFilters(
-                        elementId
-                    );
-
-                window.tabulatorTest
-                    .updateBucketFilterIcon(
-                        elementId
-                    );
-
-                column.getElement().click();
-            }
-        );
-
-        container.append(
-            title,
-            searchInput,
-            selectAllLabel,
-            optionsContainer,
-            actions
-        );
-
-        updateSelectAllState();
-        renderOptions();
-
-        if (
-            typeof onRendered === "function"
-        ) {
-            onRendered(function () {
-                const popupShell =
-                    container.closest(
-                        ".tabulator-popup-container"
-                    );
-
-                popupShell?.classList.add(
-                    "bucket-filter-popup-shell"
-                );
-
-                searchInput.focus();
-            });
-        }
-
-        return container;
-    },
-
-    /*
-     * قراءة كل تواريخ الإسناد الفعلية من الشيت،
-     * مرتبة زمنيًا، بدون تكرار.
-     */
-    getUniqueAssignmentDates: function (elementId) {
-        const table = this.tables[elementId];
-
-        if (!table) {
-            return [];
-        }
-
-        const values = Array.from(
-            new Set(
-                table
-                    .getData()
-                    .map(function (row) {
-                        return window.tabulatorTest
-                            .normalizeAssignmentDate(
-                                row.assignmentDate
-                            );
-                    })
-                    .filter(function (value) {
-                        return (
-                            value !== null &&
-                            value !== ""
-                        );
-                    })
-            )
-        );
-
-        return values.sort(function (first, second) {
-            const firstParts =
-                first.split("/").map(Number);
-
-            const secondParts =
-                second.split("/").map(Number);
-
-            const firstTime =
-                Date.UTC(
-                    firstParts[2],
-                    firstParts[1] - 1,
-                    firstParts[0]
-                );
-
-            const secondTime =
-                Date.UTC(
-                    secondParts[2],
-                    secondParts[1] - 1,
-                    secondParts[0]
-                );
-
-            return firstTime - secondTime;
-        });
-    },
-
-    /*
-     * إنشاء فلتر تاريخ شبيه بـ Excel:
-     * سنة ← شهر ← تواريخ فعلية.
-     */
-    createAssignmentDateFilterPopup: function (
-        elementId,
-        column,
-        onRendered
-    ) {
-        const state = this.states[elementId];
-
-        const uniqueDates =
-            this.getUniqueAssignmentDates(
-                elementId
-            );
-
-        const appliedDates =
-            state?.externalFilters
-                ?.assignmentDates ?? [];
-
-        const pendingDates =
-            new Set(
-                appliedDates.length > 0
-                    ? appliedDates
-                    : uniqueDates
-            );
-
-        const monthNames = [
-            "",
-            "January",
-            "February",
-            "March",
-            "April",
-            "May",
-            "June",
-            "July",
-            "August",
-            "September",
-            "October",
-            "November",
-            "December"
-        ];
-
-        const grouped = new Map();
-
-        uniqueDates.forEach(function (dateValue) {
-            const parts =
-                dateValue.split("/").map(Number);
-
-            const day = parts[0];
-            const month = parts[1];
-            const year = parts[2];
-
-            if (!grouped.has(year)) {
-                grouped.set(year, new Map());
-            }
-
-            const months =
-                grouped.get(year);
-
-            if (!months.has(month)) {
-                months.set(month, []);
-            }
-
-            months.get(month).push({
-                day: day,
-                value: dateValue
-            });
-        });
-
-        const container =
-            document.createElement("div");
-
-        container.className =
-            "date-filter-popup";
-
-        container.dir = "ltr";
-
-        this.protectFilterPopupScrolling(
-            container
-        );
-
-        const title =
-            document.createElement("div");
-
-        title.className =
-            "date-filter-popup-title";
-
-        title.textContent =
-            "Filter Assignment Date";
-
-        const searchInput =
-            document.createElement("input");
-
-        searchInput.type = "search";
-        searchInput.autocomplete = "off";
-        searchInput.placeholder =
-            "Search dates...";
-        searchInput.className =
-            "date-filter-popup-search";
-
-        const selectAllLabel =
-            document.createElement("label");
-
-        selectAllLabel.className =
-            "date-filter-check-row date-filter-select-all";
-
-        const selectAllCheckbox =
-            document.createElement("input");
-
-        selectAllCheckbox.type = "checkbox";
-
-        const selectAllText =
-            document.createElement("span");
-
-        selectAllText.textContent =
-            "Select All";
-
-        selectAllLabel.append(
-            selectAllCheckbox,
-            selectAllText
-        );
-
-        const tree =
-            document.createElement("div");
-
-        tree.className =
-            "date-filter-tree";
-
-        const emptyMessage =
-            document.createElement("div");
-
-        emptyMessage.className =
-            "date-filter-empty";
-
-        emptyMessage.textContent =
-            "No matching dates.";
-
-        const actions =
-            document.createElement("div");
-
-        actions.className =
-            "date-filter-actions";
-
-        const clearButton =
-            document.createElement("button");
-
-        clearButton.type = "button";
-        clearButton.className =
-            "date-filter-button date-filter-button-secondary";
-        clearButton.textContent =
-            "Clear Filter";
-
-        const applyButton =
-            document.createElement("button");
-
-        applyButton.type = "button";
-        applyButton.className =
-            "date-filter-button date-filter-button-primary";
-        applyButton.textContent =
-            "Apply";
-
-        actions.append(
-            clearButton,
-            applyButton
-        );
-
-        const resizeHandle =
-            document.createElement("div");
-
-        resizeHandle.className =
-            "date-filter-resize-handle";
-
-        resizeHandle.title =
-            "Drag to resize";
-
-        const updateSelectAllState =
-            function () {
-                selectAllCheckbox.checked =
-                    uniqueDates.length > 0 &&
-                    pendingDates.size ===
-                    uniqueDates.length;
-
-                selectAllCheckbox.indeterminate =
-                    pendingDates.size > 0 &&
-                    pendingDates.size <
-                    uniqueDates.length;
-            };
-
-        const updateGroupCheckbox =
-            function (
-                checkbox,
-                groupDates
-            ) {
-                const selectedCount =
-                    groupDates.filter(
-                        value =>
-                            pendingDates.has(value)
-                    ).length;
-
-                checkbox.checked =
-                    selectedCount ===
-                    groupDates.length &&
-                    groupDates.length > 0;
-
-                checkbox.indeterminate =
-                    selectedCount > 0 &&
-                    selectedCount <
-                    groupDates.length;
-            };
-
-        const createToggle =
-            function (
-                initiallyExpanded
-            ) {
-                const button =
-                    document.createElement("button");
-
-                button.type = "button";
-                button.className =
-                    "date-filter-toggle";
-
-                button.textContent =
-                    initiallyExpanded
-                        ? "−"
-                        : "+";
-
-                return button;
-            };
-
-        const renderTree = function () {
-            const query =
-                searchInput.value
-                    .trim()
-                    .toLocaleLowerCase();
-
-            tree.replaceChildren();
-
-            let visibleDates = 0;
-
-            Array.from(grouped.keys())
-                .sort((a, b) => a - b)
-                .forEach(function (year) {
-                    const months =
-                        grouped.get(year);
-
-                    const yearDates = [];
-
-                    months.forEach(function (
-                        dates
-                    ) {
-                        dates.forEach(function (
-                            item
-                        ) {
-                            yearDates.push(
-                                item.value
-                            );
-                        });
-                    });
-
-                    const matchingYearDates =
-                        yearDates.filter(
-                            function (dateValue) {
-                                return (
-                                    query === "" ||
-                                    dateValue
-                                        .toLocaleLowerCase()
-                                        .includes(query) ||
-                                    String(year)
-                                        .includes(query)
-                                );
-                            }
-                        );
-
-                    if (
-                        query !== "" &&
-                        matchingYearDates.length === 0
-                    ) {
-                        return;
-                    }
-
-                    const yearGroup =
-                        document.createElement("div");
-
-                    yearGroup.className =
-                        "date-filter-group";
-
-                    const yearHeader =
-                        document.createElement("div");
-
-                    yearHeader.className =
-                        "date-filter-group-header";
-
-                    const yearToggle =
-                        createToggle(query !== "");
-
-                    const yearCheckbox =
-                        document.createElement("input");
-
-                    yearCheckbox.type =
-                        "checkbox";
-
-                    const yearLabel =
-                        document.createElement("span");
-
-                    yearLabel.textContent =
-                        String(year);
-
-                    yearHeader.append(
-                        yearToggle,
-                        yearCheckbox,
-                        yearLabel
-                    );
-
-                    const yearBody =
-                        document.createElement("div");
-
-                    yearBody.className =
-                        "date-filter-group-body";
-
-                    if (query === "") {
-                        yearBody.hidden = true;
-                    }
-
-                    yearToggle.addEventListener(
-                        "click",
-                        function () {
-                            yearBody.hidden =
-                                !yearBody.hidden;
-
-                            yearToggle.textContent =
-                                yearBody.hidden
-                                    ? "+"
-                                    : "−";
-                        }
-                    );
-
-                    yearCheckbox.addEventListener(
-                        "change",
-                        function () {
-                            yearDates.forEach(
-                                function (
-                                    dateValue
-                                ) {
-                                    if (
-                                        yearCheckbox.checked
-                                    ) {
-                                        pendingDates.add(
-                                            dateValue
-                                        );
-                                    } else {
-                                        pendingDates.delete(
-                                            dateValue
-                                        );
-                                    }
-                                }
-                            );
-
-                            renderTree();
-                            updateSelectAllState();
-                        }
-                    );
-
-                    updateGroupCheckbox(
-                        yearCheckbox,
-                        yearDates
-                    );
-
-                    Array.from(months.keys())
-                        .sort((a, b) => a - b)
-                        .forEach(function (
-                            month
-                        ) {
-                            const monthItems =
-                                months.get(month);
-
-                            const monthDates =
-                                monthItems.map(
-                                    item =>
-                                        item.value
-                                );
-
-                            const matchingItems =
-                                monthItems.filter(
-                                    function (
-                                        item
-                                    ) {
-                                        return (
-                                            query === "" ||
-                                            item.value
-                                                .toLocaleLowerCase()
-                                                .includes(
-                                                    query
-                                                ) ||
-                                            monthNames[
-                                                month
-                                            ]
-                                                .toLocaleLowerCase()
-                                                .includes(
-                                                    query
-                                                ) ||
-                                            String(month)
-                                                .includes(
-                                                    query
-                                                )
-                                        );
-                                    }
-                                );
-
-                            if (
-                                query !== "" &&
-                                matchingItems.length === 0
-                            ) {
-                                return;
-                            }
-
-                            const monthGroup =
-                                document.createElement("div");
-
-                            monthGroup.className =
-                                "date-filter-month";
-
-                            const monthHeader =
-                                document.createElement("div");
-
-                            monthHeader.className =
-                                "date-filter-month-header";
-
-                            const monthToggle =
-                                createToggle(
-                                    query !== ""
-                                );
-
-                            const monthCheckbox =
-                                document.createElement("input");
-
-                            monthCheckbox.type =
-                                "checkbox";
-
-                            const monthLabel =
-                                document.createElement("span");
-
-                            monthLabel.textContent =
-                                monthNames[month];
-
-                            monthHeader.append(
-                                monthToggle,
-                                monthCheckbox,
-                                monthLabel
-                            );
-
-                            const monthBody =
-                                document.createElement("div");
-
-                            monthBody.className =
-                                "date-filter-month-body";
-
-                            if (query === "") {
-                                monthBody.hidden = true;
-                            }
-
-                            monthToggle.addEventListener(
-                                "click",
-                                function () {
-                                    monthBody.hidden =
-                                        !monthBody.hidden;
-
-                                    monthToggle.textContent =
-                                        monthBody.hidden
-                                            ? "+"
-                                            : "−";
-                                }
-                            );
-
-                            monthCheckbox.addEventListener(
-                                "change",
-                                function () {
-                                    monthDates.forEach(
-                                        function (
-                                            dateValue
-                                        ) {
-                                            if (
-                                                monthCheckbox.checked
-                                            ) {
-                                                pendingDates.add(
-                                                    dateValue
-                                                );
-                                            } else {
-                                                pendingDates.delete(
-                                                    dateValue
-                                                );
-                                            }
-                                        }
-                                    );
-
-                                    renderTree();
-                                    updateSelectAllState();
-                                }
-                            );
-
-                            updateGroupCheckbox(
-                                monthCheckbox,
-                                monthDates
-                            );
-
-                            matchingItems.forEach(
-                                function (item) {
-                                    visibleDates++;
-
-                                    const dateRow =
-                                        document.createElement(
-                                            "label"
-                                        );
-
-                                    dateRow.className =
-                                        "date-filter-check-row date-filter-date-row";
-
-                                    const checkbox =
-                                        document.createElement(
-                                            "input"
-                                        );
-
-                                    checkbox.type =
-                                        "checkbox";
-
-                                    checkbox.checked =
-                                        pendingDates.has(
-                                            item.value
-                                        );
-
-                                    const text =
-                                        document.createElement(
-                                            "span"
-                                        );
-
-                                    text.textContent =
-                                        item.value;
-
-                                    checkbox.addEventListener(
-                                        "change",
-                                        function () {
-                                            if (
-                                                checkbox.checked
-                                            ) {
-                                                pendingDates.add(
-                                                    item.value
-                                                );
-                                            } else {
-                                                pendingDates.delete(
-                                                    item.value
-                                                );
-                                            }
-
-                                            updateSelectAllState();
-                                            updateGroupCheckbox(
-                                                monthCheckbox,
-                                                monthDates
-                                            );
-                                            updateGroupCheckbox(
-                                                yearCheckbox,
-                                                yearDates
-                                            );
-                                        }
-                                    );
-
-                                    dateRow.append(
-                                        checkbox,
-                                        text
-                                    );
-
-                                    monthBody.appendChild(
-                                        dateRow
-                                    );
-                                }
-                            );
-
-                            monthGroup.append(
-                                monthHeader,
-                                monthBody
-                            );
-
-                            yearBody.appendChild(
-                                monthGroup
-                            );
-                        });
-
-                    yearGroup.append(
-                        yearHeader,
-                        yearBody
-                    );
-
-                    tree.appendChild(
-                        yearGroup
-                    );
-                });
-
-            if (visibleDates === 0) {
-                tree.appendChild(
-                    emptyMessage
-                );
-            }
-        };
-
-        selectAllCheckbox.addEventListener(
-            "change",
-            function () {
-                pendingDates.clear();
-
-                if (
-                    selectAllCheckbox.checked
-                ) {
-                    uniqueDates.forEach(
-                        value =>
-                            pendingDates.add(value)
-                    );
-                }
-
-                renderTree();
-                updateSelectAllState();
-            }
-        );
-
-        searchInput.addEventListener(
-            "input",
-            renderTree
-        );
-
-        clearButton.addEventListener(
-            "click",
-            function () {
-                if (!state) {
-                    return;
-                }
-
-                state.externalFilters
-                    .assignmentDates = [];
-
-                window.tabulatorTest
-                    .applyExternalFilters(
-                        elementId
-                    );
-
-                window.tabulatorTest
-                    .updateAssignmentDateFilterIcon(
-                        elementId
-                    );
-
-                column.getElement().click();
-            }
-        );
-
-        applyButton.addEventListener(
-            "click",
-            function () {
-                if (!state) {
-                    return;
-                }
-
-                const selectedDates =
-                    uniqueDates.filter(
-                        value =>
-                            pendingDates.has(value)
-                    );
-
-                state.externalFilters
-                    .assignmentDates =
-                    selectedDates.length ===
-                        uniqueDates.length
-                        ? []
-                        : selectedDates;
-
-                window.tabulatorTest
-                    .applyExternalFilters(
-                        elementId
-                    );
-
-                window.tabulatorTest
-                    .updateAssignmentDateFilterIcon(
-                        elementId
-                    );
-
-                column.getElement().click();
-            }
-        );
-
-        container.append(
-            title,
-            searchInput,
-            selectAllLabel,
-            tree,
-            actions,
-            resizeHandle
-        );
-
-        updateSelectAllState();
-        renderTree();
-
-        if (
-            typeof onRendered === "function"
-        ) {
-            onRendered(function () {
-                const popupShell =
-                    container.closest(
-                        ".tabulator-popup-container"
-                    );
-
-                if (!popupShell) {
-                    searchInput.focus();
-                    return;
-                }
-
-                popupShell.classList.add(
-                    "assignment-date-filter-popup-shell"
-                );
-
-                const storageKey =
-                    "uds-assignment-date-filter-size";
-
-                let storedSize = null;
-
-                try {
-                    storedSize =
-                        JSON.parse(
-                            localStorage.getItem(
-                                storageKey
-                            )
-                        );
-                } catch {
-                    storedSize = null;
-                }
-
-                const initialWidth =
-                    Number(
-                        storedSize?.width
-                    ) || 275;
-
-                const initialHeight =
-                    Number(
-                        storedSize?.height
-                    ) || 420;
-
-                popupShell.style.width =
-                    `${Math.min(
-                        Math.max(
-                            initialWidth,
-                            245
-                        ),
-                        540
-                    )}px`;
-
-                popupShell.style.height =
-                    `${Math.min(
-                        Math.max(
-                            initialHeight,
-                            320
-                        ),
-                        650
-                    )}px`;
-
-                resizeHandle.addEventListener(
-                    "pointerdown",
-                    function (event) {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        event.stopImmediatePropagation();
-
-                        const startX =
-                            event.clientX;
-
-                        const startY =
-                            event.clientY;
-
-                        const startWidth =
-                            popupShell.offsetWidth;
-
-                        const startHeight =
-                            popupShell.offsetHeight;
-
-                        resizeHandle
-                            .setPointerCapture(
-                                event.pointerId
-                            );
-
-                        const handleMove =
-                            function (
-                                moveEvent
-                            ) {
-                                moveEvent
-                                    .preventDefault();
-
-                                moveEvent
-                                    .stopPropagation();
-
-                                const nextWidth =
-                                    Math.min(
-                                        Math.max(
-                                            startWidth +
-                                            (
-                                                moveEvent
-                                                    .clientX -
-                                                startX
-                                            ),
-                                            245
-                                        ),
-                                        540
-                                    );
-
-                                const nextHeight =
-                                    Math.min(
-                                        Math.max(
-                                            startHeight +
-                                            (
-                                                moveEvent
-                                                    .clientY -
-                                                startY
-                                            ),
-                                            320
-                                        ),
-                                        650
-                                    );
-
-                                popupShell.style.width =
-                                    `${nextWidth}px`;
-
-                                popupShell.style.height =
-                                    `${nextHeight}px`;
-                            };
-
-                        const handleUp =
-                            function (
-                                upEvent
-                            ) {
-                                upEvent
-                                    .preventDefault();
-
-                                upEvent
-                                    .stopPropagation();
-
-                                resizeHandle
-                                    .removeEventListener(
-                                        "pointermove",
-                                        handleMove
-                                    );
-
-                                resizeHandle
-                                    .removeEventListener(
-                                        "pointerup",
-                                        handleUp
-                                    );
-
-                                resizeHandle
-                                    .removeEventListener(
-                                        "pointercancel",
-                                        handleUp
-                                    );
-
-                                localStorage.setItem(
-                                    storageKey,
-                                    JSON.stringify({
-                                        width:
-                                            popupShell
-                                                .offsetWidth,
-                                        height:
-                                            popupShell
-                                                .offsetHeight
-                                    })
-                                );
-                            };
-
-                        resizeHandle
-                            .addEventListener(
-                                "pointermove",
-                                handleMove
-                            );
-
-                        resizeHandle
-                            .addEventListener(
-                                "pointerup",
-                                handleUp
-                            );
-
-                        resizeHandle
-                            .addEventListener(
-                                "pointercancel",
-                                handleUp
-                            );
-                    },
-                    true
-                );
-
-                searchInput.focus();
-            });
-        }
-
-        return container;
-    },
-
-    /*
-     * تطبيق بحث أمر العمل وفلتر أنواع العمل معًا.
-     */
-    applyExternalFilters: function (elementId) {
-        const table = this.tables[elementId];
-        const state = this.states[elementId];
-
-        if (!table || !state) {
-            return;
-        }
-
-        const workOrderNumber =
-            state.externalFilters.workOrderNumber
-                .toLocaleLowerCase();
-
-        const workTypeCodes =
-            new Set(
-                state.externalFilters.workTypeCodes
-            );
-
-        const hasWorkOrderSearch =
-            workOrderNumber !== "";
-
-        const hasWorkTypeFilter =
-            workTypeCodes.size > 0;
-
-        const assignmentDates =
-            new Set(
-                state.externalFilters
-                    .assignmentDates
-            );
-
-        const hasAssignmentDateFilter =
-            assignmentDates.size > 0;
-
-        const bucketValues =
-            new Set(
-                state.externalFilters
-                    .bucketValues
-            );
-
-        const hasBucketFilter =
-            bucketValues.size > 0;
-
-        if (
-            !hasWorkOrderSearch &&
-            !hasWorkTypeFilter &&
-            !hasAssignmentDateFilter &&
-            !hasBucketFilter
-        ) {
-            table.clearFilter();
-        } else {
-            table.setFilter(function (rowData) {
-                const matchesWorkOrder =
-                    !hasWorkOrderSearch ||
-                    String(
-                        rowData.workOrderNumber ?? ""
-                    )
-                        .toLocaleLowerCase()
-                        .includes(workOrderNumber);
-
-                const matchesWorkType =
-                    !hasWorkTypeFilter ||
-                    workTypeCodes.has(
-                        String(
-                            rowData.workTypeCode ?? ""
-                        ).trim()
-                    );
-
-                const normalizedDate =
-                    window.tabulatorTest
-                        .normalizeAssignmentDate(
-                            rowData.assignmentDate
-                        );
-
-                const matchesAssignmentDate =
-                    !hasAssignmentDateFilter ||
-                    assignmentDates.has(
-                        normalizedDate
-                    );
-
-                const matchesBucket =
-                    !hasBucketFilter ||
-                    bucketValues.has(
-                        String(
-                            rowData.basket ?? ""
-                        ).trim()
-                    );
-
-                return (
-                    matchesWorkOrder &&
-                    matchesWorkType &&
-                    matchesAssignmentDate &&
-                    matchesBucket
-                );
-            });
-        }
-
-        const visibleRows =
-            table.getDataCount("active");
-
-        const totalRows =
-            table.getDataCount();
-
-        this.setStatus(
-            elementId,
-            `المعروض ${visibleRows.toLocaleString()} من أصل ${totalRows.toLocaleString()} صف.`
-        );
-
-        this.updateWorkTypeFilterIcon(
+        window.tabulatorFilters.apply(
+            this,
             elementId
         );
-
-        this.updateAssignmentDateFilterIcon(
-            elementId
-        );
-
-        this.updateBucketFilterIcon(
-            elementId
-        );
-    },
-
-    /*
-     * تمييز أيقونة الفلتر عند وجود فلتر نشط.
-     */
-    updateWorkTypeFilterIcon: function (elementId) {
-        const table = this.tables[elementId];
-        const state = this.states[elementId];
-
-        if (!table || !state) {
-            return;
-        }
-
-        const column =
-            table.getColumn("workTypeCode");
-
-        const button =
-            column
-                ?.getElement()
-                ?.querySelector(
-                    ".tabulator-header-popup-button"
-                );
-
-        button?.classList.toggle(
-            "is-filtered",
-            state.externalFilters
-                .workTypeCodes.length > 0
-        );
-    },
-
-    /*
-     * تمييز أيقونة فلتر التاريخ عند وجود فلتر نشط.
-     */
-    updateAssignmentDateFilterIcon: function (
-        elementId
-    ) {
-        const table = this.tables[elementId];
-        const state = this.states[elementId];
-
-        if (!table || !state) {
-            return;
-        }
-
-        const column =
-            table.getColumn(
-                "assignmentDate"
-            );
-
-        const button =
-            column
-                ?.getElement()
-                ?.querySelector(
-                    ".tabulator-header-popup-button"
-                );
-
-        button?.classList.toggle(
-            "is-filtered",
-            state.externalFilters
-                .assignmentDates.length > 0
-        );
-    },
-
-    /*
-     * تمييز أيقونة فلتر Bucket عند وجود فلتر نشط.
-     */
-    updateBucketFilterIcon: function (
-        elementId
-    ) {
-        const table = this.tables[elementId];
-        const state = this.states[elementId];
-
-        if (!table || !state) {
-            return;
-        }
-
-        const column =
-            table.getColumn("basket");
-
-        const button =
-            column
-                ?.getElement()
-                ?.querySelector(
-                    ".tabulator-header-popup-button"
-                );
-
-        button?.classList.toggle(
-            "is-filtered",
-            state.externalFilters
-                .bucketValues.length > 0
-        );
-    },
-
-    /*
-     * تنظيف فلتر Bucket بعد تعديل القيم.
-     */
-    refreshBucketFilterState: function (
-        elementId
-    ) {
-        const state = this.states[elementId];
-
-        if (!state) {
-            return;
-        }
-
-        const uniqueValues =
-            this.getUniqueBuckets(
-                elementId
-            );
-
-        const uniqueSet =
-            new Set(uniqueValues);
-
-        const previousValues =
-            state.externalFilters
-                .bucketValues;
-
-        const nextValues =
-            previousValues.filter(
-                value =>
-                    uniqueSet.has(value)
-            );
-
-        const changed =
-            nextValues.length !==
-            previousValues.length;
-
-        state.externalFilters
-            .bucketValues =
-            nextValues;
-
-        if (changed) {
-            this.applyExternalFilters(
-                elementId
-            );
-        } else {
-            this.updateBucketFilterIcon(
-                elementId
-            );
-        }
-    },
-
-    /*
-     * أي نوع جديد تتم إضافته سيظهر في الفلتر عند فتحه.
-     * وإذا اختفت قيمة مستخدمة في الفلتر ننظفها بأمان.
-     */
-    refreshWorkTypeFilterState: function (elementId) {
-        const state = this.states[elementId];
-
-        if (!state) {
-            return;
-        }
-
-        const uniqueValues =
-            this.getUniqueWorkTypes(elementId);
-
-        const uniqueSet =
-            new Set(uniqueValues);
-
-        const previousValues =
-            state.externalFilters.workTypeCodes;
-
-        const nextValues =
-            previousValues.filter(
-                value =>
-                    uniqueSet.has(value)
-            );
-
-        const changed =
-            nextValues.length !==
-            previousValues.length;
-
-        state.externalFilters.workTypeCodes =
-            nextValues;
-
-        if (changed) {
-            this.applyExternalFilters(elementId);
-        } else {
-            this.updateWorkTypeFilterIcon(
-                elementId
-            );
-        }
-    },
-
-    /*
-     * تنظيف فلتر التاريخ بعد تعديل القيم.
-     */
-    refreshAssignmentDateFilterState: function (
-        elementId
-    ) {
-        const state = this.states[elementId];
-
-        if (!state) {
-            return;
-        }
-
-        const uniqueDates =
-            this.getUniqueAssignmentDates(
-                elementId
-            );
-
-        const uniqueSet =
-            new Set(uniqueDates);
-
-        const previousDates =
-            state.externalFilters
-                .assignmentDates;
-
-        const nextDates =
-            previousDates.filter(
-                value =>
-                    uniqueSet.has(value)
-            );
-
-        const changed =
-            nextDates.length !==
-            previousDates.length;
-
-        state.externalFilters
-            .assignmentDates =
-            nextDates;
-
-        if (changed) {
-            this.applyExternalFilters(
-                elementId
-            );
-        } else {
-            this.updateAssignmentDateFilterIcon(
-                elementId
-            );
-        }
     },
 
     /*
@@ -3543,17 +1433,14 @@
                 }
             );
 
-            if (
-                changes.some(
-                    change =>
-                        change.field ===
-                        "workTypeCode"
-                )
-            ) {
-                this.refreshWorkTypeFilterState(
-                    elementId
+            window.tabulatorFilters
+                .refreshFields(
+                    this,
+                    elementId,
+                    changes.map(
+                        change => change.field
+                    )
                 );
-            }
         }
 
         return Array.from(
@@ -3835,6 +1722,145 @@
     },
 
     /*
+     * أخذ نسخة مستقلة من حالة الفلاتر.
+     * لا نحتفظ بمراجع للمصفوفات حتى لا تتغير العملية القديمة لاحقًا.
+     */
+    cloneExternalFilters: function (filters) {
+        return {
+            workOrderNumber:
+                String(
+                    filters?.workOrderNumber ?? ""
+                ),
+
+            workTypeCodes:
+                Array.from(
+                    filters?.workTypeCodes ?? []
+                ),
+
+            assignmentDates:
+                Array.from(
+                    filters?.assignmentDates ?? []
+                ),
+
+            basketValues:
+                Array.from(
+                    filters?.basketValues ?? []
+                )
+        };
+    },
+
+    /*
+     * مقارنة حالتي فلترة قبل إضافة عملية إلى Undo.
+     */
+    externalFiltersEqual: function (
+        first,
+        second
+    ) {
+        return JSON.stringify(
+            this.cloneExternalFilters(first)
+        ) === JSON.stringify(
+            this.cloneExternalFilters(second)
+        );
+    },
+
+    /*
+     * تسجيل Apply أو Clear Filter كعملية واحدة في نفس سجل
+     * Undo / Redo المستخدم لتعديلات الخلايا.
+     */
+    pushFilterTransaction: function (
+        elementId,
+        oldFilters,
+        newFilters,
+        label
+    ) {
+        const state =
+            this.states[elementId];
+
+        if (
+            !state ||
+            this.externalFiltersEqual(
+                oldFilters,
+                newFilters
+            )
+        ) {
+            return;
+        }
+
+        const transaction = {
+            kind: "filter",
+            label: label,
+            oldFilters:
+                this.cloneExternalFilters(
+                    oldFilters
+                ),
+            newFilters:
+                this.cloneExternalFilters(
+                    newFilters
+                )
+        };
+
+        state.undoStack.push(
+            transaction
+        );
+
+        if (
+            state.undoStack.length >
+            state.maxTransactions
+        ) {
+            state.undoStack.shift();
+        }
+
+        state.redoStack = [];
+
+        this.setStatus(
+            elementId,
+            `${label}. التراجع المتاح: ${state.undoStack.length}.`
+        );
+    },
+
+    /*
+     * إعادة حالة فلترة سابقة أثناء Undo / Redo.
+     */
+    applyFilterSnapshot: function (
+        elementId,
+        filters
+    ) {
+        const state =
+            this.states[elementId];
+
+        if (!state) {
+            return;
+        }
+
+        state.applyingHistory = true;
+
+        try {
+            state.externalFilters =
+                this.cloneExternalFilters(
+                    filters
+                );
+
+            const searchInput =
+                document.getElementById(
+                    "tabulator-work-order-search"
+                );
+
+            if (searchInput) {
+                searchInput.value =
+                    state.externalFilters
+                        .workOrderNumber;
+            }
+
+            window.tabulatorFilters.apply(
+                this,
+                elementId
+            );
+        } finally {
+            state.applyingHistory = false;
+        }
+    },
+
+    /*
      * وضع القيم القديمة أو الجديدة
      * حسب عملية Undo أو Redo.
      */
@@ -3891,17 +1917,14 @@
             state.applyingHistory = false;
         }
 
-        if (
-            transaction.changes.some(
-                change =>
-                    change.field ===
-                    "workTypeCode"
-            )
-        ) {
-            this.refreshWorkTypeFilterState(
-                elementId
+        window.tabulatorFilters
+            .refreshFields(
+                this,
+                elementId,
+                transaction.changes.map(
+                    change => change.field
+                )
             );
-        }
     },
 
     /*
@@ -4125,6 +2148,24 @@
         const transaction =
             state.undoStack.pop();
 
+        if (transaction.kind === "filter") {
+            this.applyFilterSnapshot(
+                elementId,
+                transaction.oldFilters
+            );
+
+            state.redoStack.push(
+                transaction
+            );
+
+            this.setStatus(
+                elementId,
+                `تم التراجع عن: ${transaction.label}.`
+            );
+
+            return;
+        }
+
         this.applyTransactionValues(
             elementId,
             transaction,
@@ -4166,6 +2207,24 @@
 
         const transaction =
             state.redoStack.pop();
+
+        if (transaction.kind === "filter") {
+            this.applyFilterSnapshot(
+                elementId,
+                transaction.newFilters
+            );
+
+            state.undoStack.push(
+                transaction
+            );
+
+            this.setStatus(
+                elementId,
+                `تمت إعادة: ${transaction.label}.`
+            );
+
+            return;
+        }
 
         this.applyTransactionValues(
             elementId,
