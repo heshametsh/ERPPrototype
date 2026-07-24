@@ -1,4 +1,4 @@
-using ERPPrototype.Data.Entities;
+﻿using ERPPrototype.Data.Entities;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
@@ -89,6 +89,9 @@ public class ApplicationDbContext(
             entity.Property(workOrder => workOrder.WorkYear)
                 .IsRequired();
 
+            entity.Property(workOrder => workOrder.DisplayOrder)
+                .IsRequired();
+
             entity.Property(workOrder => workOrder.AssignmentDate);
 
             entity.Property(workOrder => workOrder.Busket)
@@ -113,6 +116,12 @@ public class ApplicationDbContext(
                 .WithMany(department => department.WorkOrders)
                 .HasForeignKey(workOrder => workOrder.DepartmentId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasIndex(workOrder => new
+            {
+                workOrder.DepartmentId,
+                workOrder.DisplayOrder
+            });
 
             entity.HasIndex(workOrder => new
             {

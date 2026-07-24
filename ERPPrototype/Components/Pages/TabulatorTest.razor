@@ -107,7 +107,7 @@
     {
         <div class="grid-instructions">
             Select any cell, then use Insert Rows or right-click inside the sheet.
-            This step tests row insertion, deletion, Undo and Redo before database persistence.
+            Insert or delete rows where needed, then press Save to store the changes in SQL Server.
         </div>
 
         <div class="work-order-search-row">
@@ -184,23 +184,7 @@
             BranchName = sheet.BranchName;
             DepartmentName = sheet.DepartmentName;
 
-            Rows = sheet.WorkOrders
-                .Select(workOrder =>
-                    new TabulatorWorkOrderRow
-                    {
-                        Id = workOrder.Id,
-                        WorkOrderNumber = workOrder.WorkOrderNumber,
-                        WorkTypeCode = workOrder.WorkTypeCode,
-                        AssignmentDate =
-                            workOrder.AssignmentDate?.ToString(
-                                "dd/MM/yyyy",
-                                CultureInfo.InvariantCulture)
-                            ?? string.Empty,
-                        Basket = workOrder.Busket,
-                        Status = workOrder.Status,
-                        Notes = workOrder.Notes ?? string.Empty
-                    })
-                .ToList();
+            Rows = MapRows(sheet.WorkOrders);
         }
         catch (Exception exception)
         {
@@ -264,27 +248,22 @@
 
         try
         {
-            var structuralChanges =
-                await JSRuntime.InvokeAsync<TabulatorStructureSummary>(
-                    "tabulatorTest.getStructuralChangeSummary",
-                    TableId);
+            await JSRuntime.InvokeVoidAsync(
+                "tabulatorTest.setSaving",
+                TableId,
+                true);
 
-            if (
-                structuralChanges.AddedRows > 0 ||
-                structuralChanges.DeletedRows > 0)
-            {
-                await SetGridStatusAsync(
-                    "الإضافة والحذف يعملان كتجربة الآن، وسيتم ربط حفظهما بقاعدة البيانات في الخطوة التالية.");
-
-                return;
-            }
-
-            var changedRows =
+            var dirtyRows =
                 await JSRuntime.InvokeAsync<List<TabulatorWorkOrderRow>>(
                     "tabulatorTest.getDirtyRows",
                     TableId);
 
-            if (changedRows.Count == 0)
+            var deletedRows =
+                await JSRuntime.InvokeAsync<List<TabulatorDeletedRow>>(
+                    "tabulatorTest.getDeletedRows",
+                    TableId);
+
+            if (dirtyRows.Count == 0 && deletedRows.Count == 0)
             {
                 await SetGridStatusAsync(
                     "لا توجد تغييرات للحفظ.");
@@ -292,10 +271,29 @@
                 return;
             }
 
-            var changedWorkOrders =
-                new List<WorkOrder>(changedRows.Count);
+            var blankAddedRow = dirtyRows
+                .FirstOrDefault(row =>
+                    row.Id <= 0 &&
+                    IsCompletelyBlank(row));
 
-            foreach (var row in changedRows)
+            if (blankAddedRow is not null)
+            {
+                await SetGridStatusAsync(
+                    "تعذر الحفظ: أكمل بيانات الصفوف الجديدة أو احذف الصفوف الفارغة أولًا.");
+
+                return;
+            }
+
+            var addedWorkOrders =
+                new List<WorkOrder>();
+
+            var changedWorkOrders =
+                new List<WorkOrder>();
+
+            var addedRowMappings =
+                new List<PendingAddedRowMapping>();
+
+            foreach (var row in dirtyRows)
             {
                 if (!TryParseAssignmentDate(
                         row.AssignmentDate,
@@ -307,27 +305,53 @@
                     return;
                 }
 
-                changedWorkOrders.Add(
-                    new WorkOrder
-                    {
-                        Id = row.Id,
-                        WorkOrderNumber = row.WorkOrderNumber ?? string.Empty,
-                        WorkTypeCode = row.WorkTypeCode ?? string.Empty,
-                        AssignmentDate = assignmentDate,
-                        Busket = row.Basket ?? string.Empty,
-                        Status = row.Status ?? string.Empty,
-                        Notes = row.Notes
-                    });
+                var workOrder = new WorkOrder
+                {
+                    Id = row.Id,
+                    DisplayOrder = row.DisplayOrder,
+                    WorkOrderNumber = row.WorkOrderNumber ?? string.Empty,
+                    WorkTypeCode = row.WorkTypeCode ?? string.Empty,
+                    AssignmentDate = assignmentDate,
+                    Busket = row.Basket ?? string.Empty,
+                    Status = row.Status ?? string.Empty,
+                    Notes = row.Notes
+                };
+
+                if (row.Id <= 0)
+                {
+                    addedWorkOrders.Add(workOrder);
+
+                    addedRowMappings.Add(
+                        new PendingAddedRowMapping
+                        {
+                            ClientKey = row.ClientKey,
+                            TemporaryId = row.Id,
+                            WorkOrder = workOrder
+                        });
+                }
+                else
+                {
+                    changedWorkOrders.Add(workOrder);
+                }
             }
 
-            await SetGridStatusAsync("جارٍ حفظ التغييرات...");
+            var deletedWorkOrders = deletedRows
+                .Where(row => row.Id > 0)
+                .Select(row => new WorkOrder
+                {
+                    Id = row.Id
+                })
+                .ToList();
+
+            await SetGridStatusAsync(
+                "جارٍ حفظ التغييرات...");
 
             var result =
                 await WorkOrderService.SaveChangesAsync(
                     CurrentUserId,
-                    Array.Empty<WorkOrder>(),
+                    addedWorkOrders,
                     changedWorkOrders,
-                    Array.Empty<WorkOrder>());
+                    deletedWorkOrders);
 
             if (!result.Succeeded)
             {
@@ -337,13 +361,41 @@
                 return;
             }
 
+            var refreshedSheet =
+                await WorkOrderService.LoadSheetAsync(
+                    CurrentUserId);
+
+            if (refreshedSheet is null)
+            {
+                await SetGridStatusAsync(
+                    "تم الحفظ، لكن تعذر إعادة تحميل الشيت.");
+
+                return;
+            }
+
+            Rows = MapRows(refreshedSheet.WorkOrders);
+
+            var savedRowMappings = addedRowMappings
+                .Select(mapping =>
+                    new TabulatorSavedRowMapping
+                    {
+                        ClientKey = mapping.ClientKey,
+                        TemporaryId = mapping.TemporaryId,
+                        DatabaseId = mapping.WorkOrder.Id
+                    })
+                .ToList();
+
             await JSRuntime.InvokeVoidAsync(
-                "tabulatorTest.markRowsSaved",
+                "tabulatorTest.replaceSavedData",
                 TableId,
-                changedRows);
+                Rows,
+                savedRowMappings);
+
+            var savedCount =
+                dirtyRows.Count + deletedWorkOrders.Count;
 
             await SetGridStatusAsync(
-                $"تم حفظ {changedRows.Count} صف بنجاح.");
+                $"تم حفظ {savedCount} صف بنجاح.");
         }
         catch (JSDisconnectedException)
         {
@@ -368,6 +420,17 @@
         finally
         {
             IsSaving = false;
+
+            try
+            {
+                await JSRuntime.InvokeVoidAsync(
+                    "tabulatorTest.setSaving",
+                    TableId,
+                    false);
+            }
+            catch (JSDisconnectedException)
+            {
+            }
         }
     }
 
@@ -377,6 +440,41 @@
             "tabulatorTest.setStatus",
             TableId,
             message);
+    }
+
+    private static List<TabulatorWorkOrderRow> MapRows(
+        IEnumerable<WorkOrder> workOrders)
+    {
+        return workOrders
+            .Select(workOrder =>
+                new TabulatorWorkOrderRow
+                {
+                    Id = workOrder.Id,
+                    DisplayOrder = workOrder.DisplayOrder,
+                    WorkOrderNumber = workOrder.WorkOrderNumber,
+                    WorkTypeCode = workOrder.WorkTypeCode,
+                    AssignmentDate =
+                        workOrder.AssignmentDate?.ToString(
+                            "dd/MM/yyyy",
+                            CultureInfo.InvariantCulture)
+                        ?? string.Empty,
+                    Basket = workOrder.Busket,
+                    Status = workOrder.Status,
+                    Notes = workOrder.Notes ?? string.Empty
+                })
+            .ToList();
+    }
+
+    private static bool IsCompletelyBlank(
+        TabulatorWorkOrderRow row)
+    {
+        return
+            string.IsNullOrWhiteSpace(row.WorkOrderNumber) &&
+            string.IsNullOrWhiteSpace(row.WorkTypeCode) &&
+            string.IsNullOrWhiteSpace(row.AssignmentDate) &&
+            string.IsNullOrWhiteSpace(row.Basket) &&
+            string.IsNullOrWhiteSpace(row.Status) &&
+            string.IsNullOrWhiteSpace(row.Notes);
     }
 
     private static bool TryParseAssignmentDate(
@@ -404,15 +502,30 @@
         return true;
     }
 
-    private sealed class TabulatorStructureSummary
+    private sealed class TabulatorDeletedRow
     {
-        public int AddedRows { get; set; }
-        public int DeletedRows { get; set; }
+        public int Id { get; set; }
+    }
+
+    private sealed class PendingAddedRowMapping
+    {
+        public string ClientKey { get; set; } = string.Empty;
+        public int TemporaryId { get; set; }
+        public WorkOrder WorkOrder { get; set; } = new();
+    }
+
+    private sealed class TabulatorSavedRowMapping
+    {
+        public string ClientKey { get; set; } = string.Empty;
+        public int TemporaryId { get; set; }
+        public int DatabaseId { get; set; }
     }
 
     private sealed class TabulatorWorkOrderRow
     {
         public int Id { get; set; }
+        public string ClientKey { get; set; } = string.Empty;
+        public long DisplayOrder { get; set; }
         public string WorkOrderNumber { get; set; } = string.Empty;
         public string WorkTypeCode { get; set; } = string.Empty;
         public string AssignmentDate { get; set; } = string.Empty;

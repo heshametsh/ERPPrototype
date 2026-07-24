@@ -1,4 +1,4 @@
-window.tabulatorTest = {
+﻿window.tabulatorTest = {
     tables: {},
     states: {},
 
@@ -276,6 +276,11 @@ window.tabulatorTest = {
         data = Array.isArray(data) ? data : [];
         baskets = Array.isArray(baskets) ? baskets : [];
 
+        data = data.map(
+            row =>
+                window.tabulatorTest.cloneRowData(row)
+        );
+
         const directTypingFields = new Set([
             "assignmentDate",
             "basket"
@@ -308,6 +313,14 @@ window.tabulatorTest = {
             pendingEdit: null,
 
             /*
+             * Quick mode: الكتابة المباشرة ثم الأسهم تنقل بين الخلايا.
+             * Text mode: Double Click يسمح بتحريك المؤشر داخل النص.
+             */
+            nextEditMode: null,
+            currentEditMode: null,
+            currentEditingCell: null,
+
+            /*
              * أثناء مسح نطاق، Tabulator يطلق cellEdited لكل خلية.
              * نجمع هذه التعديلات هنا ثم نسجلها Transaction واحدة.
              */
@@ -332,6 +345,7 @@ window.tabulatorTest = {
 
             maxTransactions: 100,
 
+            isSaving: false,
             isActive: false,
             keyDownHandler: null,
             copyHandler: null,
@@ -574,8 +588,25 @@ window.tabulatorTest = {
                 return;
             }
 
+            state.currentEditingCell = cell;
+
+            /*
+             * الكتابة المباشرة تدخل Quick mode.
+             * Double Click أو Enter يدخل Text mode، مثل F2 في Excel.
+             * Basket يظل في وضع القائمة حتى تعمل أسهم اختيار القيم طبيعيًا.
+             */
+            state.currentEditMode =
+                state.nextEditMode === "quick" &&
+                cell.getField() !== "basket"
+                    ? "quick"
+                    : "text";
+
+            state.nextEditMode = null;
+
             state.pendingEdit = {
                 rowId: cell.getRow().getIndex(),
+                clientKey:
+                    cell.getRow().getData().clientKey,
                 field: cell.getField(),
                 oldValue: cell.getValue()
             };
@@ -583,6 +614,9 @@ window.tabulatorTest = {
 
         table.on("cellEditCancelled", function () {
             state.pendingEdit = null;
+            state.nextEditMode = null;
+            state.currentEditMode = null;
+            state.currentEditingCell = null;
         });
 
         /*
@@ -592,6 +626,13 @@ window.tabulatorTest = {
             if (state.applyingHistory) {
                 return;
             }
+
+            /*
+             * لا نمسح nextEditMode هنا؛ أثناء التنقل بالسهم
+             * تحتاجه الخلية التالية لتظل في Quick mode.
+             */
+            state.currentEditMode = null;
+            state.currentEditingCell = null;
 
             const rowId =
                 cell.getRow().getIndex();
@@ -652,6 +693,8 @@ window.tabulatorTest = {
                     changes: [
                         {
                             rowId: rowId,
+                            clientKey:
+                                cell.getRow().getData().clientKey,
                             field: field,
 
                             oldValue: oldValue,
@@ -751,6 +794,10 @@ window.tabulatorTest = {
          * المفاتيح العربية والإنجليزية بنفس الشكل.
          */
         state.keyDownHandler = function (event) {
+            if (state.isSaving) {
+                return;
+            }
+
             const modifierPressed =
                 event.ctrlKey || event.metaKey;
 
@@ -807,20 +854,71 @@ window.tabulatorTest = {
                 return;
             }
 
+            /*
+             * في Quick mode تعمل الأسهم الأربعة كتنقل بين الخلايا.
+             * في Text mode نترك Left/Right لتحريك المؤشر داخل النص.
+             */
+            if (
+                window.tabulatorTest.isEditorTarget(
+                    event.target
+                )
+            ) {
+                const navigationByKey = {
+                    ArrowLeft: "navigateLeft",
+                    ArrowRight: "navigateRight",
+                    ArrowUp: "navigateUp",
+                    ArrowDown: "navigateDown"
+                };
+
+                const navigationName =
+                    navigationByKey[event.key];
+
+                if (
+                    state.currentEditMode === "quick" &&
+                    state.currentEditingCell &&
+                    navigationName
+                ) {
+                    event.preventDefault();
+                    event.stopImmediatePropagation();
+
+                    const editingCell =
+                        state.currentEditingCell;
+
+                    const navigationFunction =
+                        editingCell[navigationName];
+
+                    if (
+                        typeof navigationFunction ===
+                        "function"
+                    ) {
+                        /*
+                         * الخلية التالية تظل في Quick mode حتى يستمر
+                         * التنقل بالأسهم دون الدخول داخل النص.
+                         */
+                        state.nextEditMode = "quick";
+
+                        const moved =
+                            navigationFunction.call(
+                                editingCell
+                            );
+
+                        if (moved === false) {
+                            state.nextEditMode = null;
+                        }
+                    }
+
+                    return;
+                }
+
+                return;
+            }
+
             const activeRange =
                 window.tabulatorTest.getActiveRange(
                     table
                 );
 
             if (!activeRange) {
-                return;
-            }
-
-            if (
-                window.tabulatorTest.isEditorTarget(
-                    event.target
-                )
-            ) {
                 return;
             }
 
@@ -881,6 +979,8 @@ window.tabulatorTest = {
                                         changeKey,
                                         {
                                             rowId: rowId,
+                                            clientKey:
+                                                cell.getRow().getData().clientKey,
                                             field: field,
                                             oldValue: oldValue,
                                             newValue: oldValue
@@ -1008,6 +1108,11 @@ window.tabulatorTest = {
 
                         const typedCharacter =
                             event.key;
+
+                        state.nextEditMode =
+                            cell.getField() === "basket"
+                                ? "text"
+                                : "quick";
 
                         cell.edit();
 
@@ -1193,6 +1298,7 @@ window.tabulatorTest = {
      * الحقول التي تدخل في حساب الصفوف غير المحفوظة.
      */
     dirtyFields: [
+        "displayOrder",
         "workOrderNumber",
         "workTypeCode",
         "assignmentDate",
@@ -1367,7 +1473,9 @@ window.tabulatorTest = {
             );
 
             if (row) {
-                dirtyRows.push(row.getData());
+                dirtyRows.push({
+                    ...row.getData()
+                });
             }
         }
 
@@ -1693,6 +1801,8 @@ window.tabulatorTest = {
 
                     changes.push({
                         rowId: rowId,
+                        clientKey:
+                            row.getData().clientKey,
                         field: field,
 
                         oldValue: oldValue,
@@ -3124,9 +3234,48 @@ window.tabulatorTest = {
         );
     },
 
+    createClientKey: function () {
+        if (
+            window.crypto &&
+            typeof window.crypto.randomUUID ===
+                "function"
+        ) {
+            return window.crypto.randomUUID();
+        }
+
+        return (
+            "row-" +
+            Date.now().toString(36) +
+            "-" +
+            Math.random().toString(36).slice(2)
+        );
+    },
+
+    ensureClientKey: function (rowData) {
+        const existing = String(
+            rowData?.clientKey ?? ""
+        ).trim();
+
+        if (existing) {
+            return existing;
+        }
+
+        const id = Number(rowData?.id);
+
+        if (Number.isFinite(id) && id > 0) {
+            return `db:${id}`;
+        }
+
+        return `temp:${this.createClientKey()}`;
+    },
+
     cloneRowData: function (rowData) {
         return {
             id: rowData.id,
+            clientKey:
+                this.ensureClientKey(rowData),
+            displayOrder:
+                Number(rowData.displayOrder) || 0,
             workOrderNumber:
                 rowData.workOrderNumber ?? "",
             workTypeCode:
@@ -3142,12 +3291,102 @@ window.tabulatorTest = {
         };
     },
 
+    displayOrderStep: 1000000000,
+
+    rebalanceDisplayOrders: function (rows) {
+        const step = this.displayOrderStep;
+
+        rows.forEach(function (row, index) {
+            row.displayOrder =
+                (index + 1) * step;
+        });
+    },
+
+    allocateDisplayOrders: function (
+        rows,
+        insertIndex,
+        count
+    ) {
+        const allocate = () => {
+            const previousOrder =
+                insertIndex > 0
+                    ? Number(
+                        rows[insertIndex - 1]
+                            ?.displayOrder
+                    ) || 0
+                    : 0;
+
+            const nextOrder =
+                insertIndex < rows.length
+                    ? Number(
+                        rows[insertIndex]
+                            ?.displayOrder
+                    ) || 0
+                    : null;
+
+            if (nextOrder === null) {
+                return Array.from(
+                    { length: count },
+                    function (_, index) {
+                        return previousOrder +
+                            ((index + 1) *
+                                window.tabulatorTest
+                                    .displayOrderStep);
+                    }
+                );
+            }
+
+            const availableGap =
+                nextOrder - previousOrder;
+
+            if (availableGap <= count) {
+                return null;
+            }
+
+            const interval = Math.floor(
+                availableGap / (count + 1)
+            );
+
+            if (interval < 1) {
+                return null;
+            }
+
+            return Array.from(
+                { length: count },
+                function (_, index) {
+                    return previousOrder +
+                        ((index + 1) * interval);
+                }
+            );
+        };
+
+        let orders = allocate();
+
+        if (orders) {
+            return orders;
+        }
+
+        this.rebalanceDisplayOrders(rows);
+        orders = allocate();
+
+        if (!orders) {
+            throw new Error(
+                "Unable to allocate row display order."
+            );
+        }
+
+        return orders;
+    },
+
     createBlankRow: function (state) {
         const id = state.nextTemporaryId;
         state.nextTemporaryId--;
 
         return {
             id: id,
+            clientKey:
+                `temp:${this.createClientKey()}`,
+            displayOrder: 0,
             workOrderNumber: "",
             workTypeCode: "",
             assignmentDate: "",
@@ -3337,6 +3576,13 @@ window.tabulatorTest = {
                 ? Math.min(...selectedPositions)
                 : Math.max(...selectedPositions) + 1;
 
+        const displayOrders =
+            this.allocateDisplayOrders(
+                currentData,
+                insertIndex,
+                count
+            );
+
         const insertedRows = [];
 
         for (
@@ -3346,6 +3592,9 @@ window.tabulatorTest = {
         ) {
             const data =
                 this.createBlankRow(state);
+
+            data.displayOrder =
+                displayOrders[index];
 
             insertedRows.push({
                 index: insertIndex + index,
@@ -3773,6 +4022,376 @@ window.tabulatorTest = {
             )
             .then(selectCell)
             .catch(selectCell);
+    },
+
+    getDeletedRows: async function (elementId) {
+        await this.commitActiveEditor(elementId);
+
+        const state =
+            this.states[elementId];
+
+        if (!state) {
+            return [];
+        }
+
+        return Array.from(
+            state.deletedOriginalRowIds
+        ).map(function (rowId) {
+            return {
+                id: Number(rowId)
+            };
+        });
+    },
+
+    setSaving: function (
+        elementId,
+        isSaving
+    ) {
+        const element =
+            document.getElementById(elementId);
+
+        const state =
+            this.states[elementId];
+
+        if (!element || !state) {
+            return;
+        }
+
+        state.isSaving = Boolean(isSaving);
+
+        if (state.isSaving) {
+            const activeElement =
+                document.activeElement;
+
+            if (
+                activeElement &&
+                element.contains(activeElement) &&
+                typeof activeElement.blur ===
+                    "function"
+            ) {
+                activeElement.blur();
+            }
+
+            element.style.pointerEvents = "none";
+            element.setAttribute(
+                "aria-busy",
+                "true"
+            );
+        } else {
+            element.style.pointerEvents = "";
+            element.removeAttribute("aria-busy");
+        }
+    },
+
+    /*
+     * نستخدم ClientKey ثابتًا داخل جلسة المتصفح، منفصلًا عن Id
+     * القادم من SQL Server. بهذا يمكن إعادة ربط سجل Undo/Redo
+     * بعد أن تتحول IDs المؤقتة للصفوف الجديدة إلى IDs حقيقية.
+     */
+    rebaseHistoryAfterSave: function (
+        state,
+        oldRows,
+        savedRows,
+        savedRowMappings
+    ) {
+        const oldClientKeyById = new Map();
+        const oldIdByClientKey = new Map();
+
+        for (const row of oldRows ?? []) {
+            const clientKey =
+                this.ensureClientKey(row);
+
+            oldClientKeyById.set(
+                String(row.id),
+                clientKey
+            );
+
+            oldIdByClientKey.set(
+                clientKey,
+                row.id
+            );
+        }
+
+        const mappedClientKeyByDatabaseId =
+            new Map();
+
+        for (const mapping of savedRowMappings ?? []) {
+            const clientKey = String(
+                mapping?.clientKey ?? ""
+            ).trim();
+
+            const databaseId = Number(
+                mapping?.databaseId
+            );
+
+            if (
+                clientKey &&
+                Number.isFinite(databaseId) &&
+                databaseId > 0
+            ) {
+                mappedClientKeyByDatabaseId.set(
+                    String(databaseId),
+                    clientKey
+                );
+            }
+        }
+
+        const preparedRows = (savedRows ?? []).map(
+            row => {
+                const databaseId = Number(row?.id);
+
+                const clientKey =
+                    mappedClientKeyByDatabaseId.get(
+                        String(databaseId)
+                    ) ||
+                    oldClientKeyById.get(
+                        String(databaseId)
+                    ) ||
+                    this.ensureClientKey(row);
+
+                return this.cloneRowData({
+                    ...row,
+                    clientKey: clientKey
+                });
+            }
+        );
+
+        const currentIdByClientKey = new Map(
+            preparedRows.map(
+                row => [
+                    row.clientKey,
+                    row.id
+                ]
+            )
+        );
+
+        const temporaryIdByClientKey = new Map();
+        const usedIds = new Set(
+            preparedRows.map(
+                row => String(row.id)
+            )
+        );
+
+        const allocateTemporaryId = clientKey => {
+            if (
+                temporaryIdByClientKey.has(
+                    clientKey
+                )
+            ) {
+                return temporaryIdByClientKey.get(
+                    clientKey
+                );
+            }
+
+            let candidate =
+                Number(
+                    oldIdByClientKey.get(clientKey)
+                );
+
+            if (
+                !Number.isFinite(candidate) ||
+                candidate >= 0 ||
+                usedIds.has(String(candidate))
+            ) {
+                candidate = state.nextTemporaryId;
+
+                while (
+                    usedIds.has(String(candidate))
+                ) {
+                    candidate--;
+                }
+            }
+
+            state.nextTemporaryId =
+                Math.min(
+                    state.nextTemporaryId,
+                    candidate - 1
+                );
+
+            usedIds.add(String(candidate));
+            temporaryIdByClientKey.set(
+                clientKey,
+                candidate
+            );
+
+            return candidate;
+        };
+
+        const resolveRowId = (
+            clientKey,
+            fallbackId
+        ) => {
+            if (
+                currentIdByClientKey.has(
+                    clientKey
+                )
+            ) {
+                return currentIdByClientKey.get(
+                    clientKey
+                );
+            }
+
+            return allocateTemporaryId(
+                clientKey ||
+                    this.ensureClientKey({
+                        id: fallbackId
+                    })
+            );
+        };
+
+        const rebaseStack = stack => {
+            for (const transaction of stack ?? []) {
+                if (transaction?.kind === "filter") {
+                    continue;
+                }
+
+                if (
+                    transaction?.kind === "structure" &&
+                    Array.isArray(transaction.rows)
+                ) {
+                    for (const record of transaction.rows) {
+                        const rowData = record?.data;
+
+                        if (!rowData) {
+                            continue;
+                        }
+
+                        const clientKey =
+                            String(
+                                rowData.clientKey ?? ""
+                            ).trim() ||
+                            oldClientKeyById.get(
+                                String(rowData.id)
+                            ) ||
+                            this.ensureClientKey(rowData);
+
+                        rowData.clientKey = clientKey;
+                        rowData.id = resolveRowId(
+                            clientKey,
+                            rowData.id
+                        );
+                    }
+
+                    continue;
+                }
+
+                if (!Array.isArray(transaction?.changes)) {
+                    continue;
+                }
+
+                for (const change of transaction.changes) {
+                    const clientKey =
+                        String(
+                            change.clientKey ?? ""
+                        ).trim() ||
+                        oldClientKeyById.get(
+                            String(change.rowId)
+                        ) ||
+                        this.ensureClientKey({
+                            id: change.rowId
+                        });
+
+                    change.clientKey = clientKey;
+                    change.rowId = resolveRowId(
+                        clientKey,
+                        change.rowId
+                    );
+                }
+            }
+        };
+
+        rebaseStack(state.undoStack);
+        rebaseStack(state.redoStack);
+
+        return preparedRows;
+    },
+
+    replaceSavedData: async function (
+        elementId,
+        data,
+        savedRowMappings
+    ) {
+        const table =
+            this.tables[elementId];
+
+        const state =
+            this.states[elementId];
+
+        if (!table || !state) {
+            return;
+        }
+
+        data = Array.isArray(data)
+            ? data
+            : [];
+
+        const oldRows = table
+            .getData()
+            .map(
+                row => this.cloneRowData(row)
+            );
+
+        const minimumSavedId = data.reduce(
+            function (minimum, row) {
+                const id = Number(row?.id);
+
+                return Number.isFinite(id)
+                    ? Math.min(minimum, id)
+                    : minimum;
+            },
+            0
+        );
+
+        state.nextTemporaryId =
+            minimumSavedId <= 0
+                ? minimumSavedId - 1
+                : -1;
+
+        data = this.rebaseHistoryAfterSave(
+            state,
+            oldRows,
+            data,
+            savedRowMappings
+        );
+
+        state.applyingHistory = true;
+
+        try {
+            await table.setData(data);
+
+            state.originalRows = new Map(
+                data.map(function (row) {
+                    return [
+                        String(row.id),
+                        window.tabulatorTest
+                            .createDirtySnapshot(row)
+                    ];
+                })
+            );
+
+            state.dirtyRowIds.clear();
+            state.deletedOriginalRowIds.clear();
+
+            /*
+             * Save لا يمسح Undo أو Redo. أي Undo/Redo بعد الحفظ
+             * يعدل الشيت ويظهر كتغيير غير محفوظ يحتاج Save جديدًا.
+             */
+            state.pendingEdit = null;
+            state.pendingRangeClear = null;
+            state.nextEditMode = null;
+            state.currentEditMode = null;
+            state.currentEditingCell = null;
+            state.activeCell = null;
+
+            window.tabulatorFilters.apply(
+                this,
+                elementId
+            );
+        } finally {
+            state.applyingHistory = false;
+        }
+
+        this.renderStatus(elementId);
     },
 
     getStructuralChangeSummary: function (

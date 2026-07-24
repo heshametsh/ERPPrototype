@@ -1,4 +1,4 @@
-using ERPPrototype.Data.Entities;
+﻿using ERPPrototype.Data.Entities;
 using Microsoft.EntityFrameworkCore;
 
 namespace ERPPrototype.Data;
@@ -7,6 +7,8 @@ public sealed class WorkOrderService(
     IDbContextFactory<ApplicationDbContext> dbFactory,
     ILogger<WorkOrderService> logger)
 {
+    private const long DisplayOrderStep = 1_000_000_000L;
+
     public async Task<WorkOrderSheetData?> LoadSheetAsync(
         string userId,
         CancellationToken cancellationToken = default)
@@ -37,7 +39,8 @@ public sealed class WorkOrderService(
             .AsNoTracking()
             .Where(workOrder =>
                 workOrder.DepartmentId == userScope.DepartmentId)
-            .OrderBy(workOrder => workOrder.Id)
+            .OrderBy(workOrder => workOrder.DisplayOrder)
+            .ThenBy(workOrder => workOrder.Id)
             .ToListAsync(cancellationToken);
 
         return new WorkOrderSheetData(
@@ -54,11 +57,20 @@ public sealed class WorkOrderService(
         IEnumerable<WorkOrder> deletedRecords,
         CancellationToken cancellationToken = default)
     {
-        var newRecords = addedRecords
+        // Keep every Id == 0 record. Syncfusion may submit several new rows
+        // with Id 0 in one batch, so grouping all new rows by Id would lose data.
+        var newRecordCandidates = addedRecords
             .Concat(changedRecords.Where(workOrder => workOrder.Id <= 0))
             .Where(workOrder => !IsCompletelyBlank(workOrder))
-            .GroupBy(workOrder => workOrder.Id)
-            .Select(group => group.Last())
+            .ToList();
+
+        var newRecords = newRecordCandidates
+            .Where(workOrder => workOrder.Id == 0)
+            .Concat(
+                newRecordCandidates
+                    .Where(workOrder => workOrder.Id < 0)
+                    .GroupBy(workOrder => workOrder.Id)
+                    .Select(group => group.Last()))
             .ToList();
 
         var existingChangedRecords = changedRecords
@@ -72,6 +84,20 @@ public sealed class WorkOrderService(
             .GroupBy(workOrder => workOrder.Id)
             .Select(group => group.Last())
             .ToList();
+
+        var changedIds = existingChangedRecords
+            .Select(workOrder => workOrder.Id)
+            .ToHashSet();
+
+        var deletedIds = existingDeletedRecords
+            .Select(workOrder => workOrder.Id)
+            .ToHashSet();
+
+        if (changedIds.Overlaps(deletedIds))
+        {
+            return WorkOrderSaveResult.ValidationFailure(
+                "The same work order cannot be modified and deleted in one save operation.");
+        }
 
         foreach (var workOrder in newRecords)
         {
@@ -102,6 +128,7 @@ public sealed class WorkOrderService(
                 user.DepartmentId != null)
             .Select(user => user.DepartmentId)
             .SingleOrDefaultAsync(cancellationToken);
+
         if (authorizedDepartmentId is null)
         {
             return WorkOrderSaveResult.ScopeFailure(
@@ -115,14 +142,6 @@ public sealed class WorkOrderService(
 
         try
         {
-            var deletedIds = existingDeletedRecords
-                .Select(workOrder => workOrder.Id)
-                .ToHashSet();
-
-            var changedIds = existingChangedRecords
-                .Select(workOrder => workOrder.Id)
-                .ToHashSet();
-
             var incomingRecords = newRecords
                 .Concat(existingChangedRecords)
                 .ToList();
@@ -188,6 +207,8 @@ public sealed class WorkOrderService(
                 }
             }
 
+            var utcNow = DateTime.UtcNow;
+
             if (deletedIds.Count > 0)
             {
                 var entitiesToDelete = await dbContext.WorkOrders
@@ -216,7 +237,7 @@ public sealed class WorkOrderService(
                 if (entitiesToUpdate.Count != changedIds.Count)
                 {
                     return WorkOrderSaveResult.ScopeFailure(
-                        "One or more modified work orders do not belong to this department.");
+                        "One or more modified work orders are no longer available.");
                 }
 
                 var changedById = existingChangedRecords
@@ -224,40 +245,46 @@ public sealed class WorkOrderService(
 
                 foreach (var entity in entitiesToUpdate)
                 {
-                    var changedRecord = changedById[entity.Id];
+                    ApplyEditableFields(
+                        entity,
+                        changedById[entity.Id]);
 
-                    entity.WorkOrderNumber =
-                        changedRecord.WorkOrderNumber;
-
-                    entity.WorkTypeCode =
-                        changedRecord.WorkTypeCode;
-
-                    entity.AssignmentDate =
-                        changedRecord.AssignmentDate;
-
-                    entity.Busket =
-                        changedRecord.Busket;
-
-                    entity.Status =
-                        changedRecord.Status;
-
-                    entity.Notes =
-                        changedRecord.Notes;
-
-                    entity.UpdatedAt =
-                        DateTime.UtcNow;
-
-                    entity.UpdatedBy =
-                        userId;
+                    entity.UpdatedAt = utcNow;
+                    entity.UpdatedBy = userId;
                 }
             }
+
+            var nextAppendDisplayOrder =
+                await dbContext.WorkOrders
+                    .Where(workOrder =>
+                        workOrder.DepartmentId == departmentId)
+                    .Select(workOrder =>
+                        (long?)workOrder.DisplayOrder)
+                    .MaxAsync(cancellationToken)
+                ?? 0L;
 
             foreach (var newRecord in newRecords)
             {
                 newRecord.Id = 0;
                 newRecord.DepartmentId = departmentId;
                 newRecord.WorkYear = DateTime.Now.Year;
-                newRecord.CreatedAt = DateTime.UtcNow;
+
+                // Tabulator supplies the requested position. The temporary
+                // Syncfusion fallback page may still submit DisplayOrder = 0,
+                // so append those rows safely.
+                if (newRecord.DisplayOrder <= 0)
+                {
+                    nextAppendDisplayOrder += DisplayOrderStep;
+                    newRecord.DisplayOrder = nextAppendDisplayOrder;
+                }
+                else
+                {
+                    nextAppendDisplayOrder = Math.Max(
+                        nextAppendDisplayOrder,
+                        newRecord.DisplayOrder);
+                }
+
+                newRecord.CreatedAt = utcNow;
                 newRecord.CreatedBy = userId;
                 newRecord.UpdatedAt = null;
                 newRecord.UpdatedBy = null;
@@ -278,7 +305,7 @@ public sealed class WorkOrderService(
                 departmentId);
 
             return WorkOrderSaveResult.DatabaseFailure(
-                "The changes could not be saved. Check for duplicate or invalid values.");
+                "The changes could not be saved. Check for duplicate, linked, or invalid values.");
         }
     }
 
@@ -291,6 +318,24 @@ public sealed class WorkOrderService(
             string.IsNullOrWhiteSpace(workOrder.Busket) &&
             string.IsNullOrWhiteSpace(workOrder.Status) &&
             string.IsNullOrWhiteSpace(workOrder.Notes);
+    }
+
+    private static void ApplyEditableFields(
+        WorkOrder target,
+        WorkOrder source)
+    {
+        target.WorkOrderNumber = source.WorkOrderNumber;
+        target.WorkTypeCode = source.WorkTypeCode;
+
+        if (source.DisplayOrder > 0)
+        {
+            target.DisplayOrder = source.DisplayOrder;
+        }
+
+        target.AssignmentDate = source.AssignmentDate;
+        target.Busket = source.Busket;
+        target.Status = source.Status;
+        target.Notes = source.Notes;
     }
 
     private static void NormalizeEditableFields(WorkOrder workOrder)

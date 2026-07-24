@@ -10,6 +10,8 @@ public sealed class WorkOrder
 
     public int WorkYear { get; set; }
 
+    public long DisplayOrder { get; set; }
+
     public DateTime? AssignmentDate { get; set; }
 
     public string Busket { get; set; } = string.Empty;
