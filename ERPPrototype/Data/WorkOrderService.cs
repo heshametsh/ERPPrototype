@@ -1,4 +1,5 @@
 ﻿using ERPPrototype.Data.Entities;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 
 namespace ERPPrototype.Data;
@@ -160,7 +161,9 @@ public sealed class WorkOrderService(
                 return WorkOrderSaveResult.DuplicateFailure(
                     $"Work Order Number '{duplicate.WorkOrderNumber}' " +
                     $"with Work Type '{duplicate.WorkTypeCode}' " +
-                    "is duplicated in the current changes.");
+                    "is duplicated in the current changes.",
+                    duplicate.WorkOrderNumber,
+                    duplicate.WorkTypeCode);
             }
 
             if (incomingRecords.Count > 0)
@@ -173,7 +176,6 @@ public sealed class WorkOrderService(
                 var possibleConflicts = await dbContext.WorkOrders
                     .AsNoTracking()
                     .Where(workOrder =>
-                        workOrder.DepartmentId == departmentId &&
                         incomingNumbers.Contains(workOrder.WorkOrderNumber) &&
                         !changedIds.Contains(workOrder.Id) &&
                         !deletedIds.Contains(workOrder.Id))
@@ -203,7 +205,9 @@ public sealed class WorkOrderService(
                     return WorkOrderSaveResult.DuplicateFailure(
                         $"Work Order Number '{conflictingRecord.WorkOrderNumber}' " +
                         $"with Work Type '{conflictingRecord.WorkTypeCode}' " +
-                        "already exists in this department.");
+                        "already exists in the company.",
+                        conflictingRecord.WorkOrderNumber,
+                        conflictingRecord.WorkTypeCode);
                 }
             }
 
@@ -304,6 +308,12 @@ public sealed class WorkOrderService(
                 "A database error occurred while saving work orders for department {DepartmentId}.",
                 departmentId);
 
+            if (IsUniqueConstraintViolation(exception))
+            {
+                return WorkOrderSaveResult.DuplicateFailure(
+                    "The same Work Order Number and Work Type already exist in the company.");
+            }
+
             return WorkOrderSaveResult.DatabaseFailure(
                 "The changes could not be saved. Check for duplicate, linked, or invalid values.");
         }
@@ -341,10 +351,12 @@ public sealed class WorkOrderService(
     private static void NormalizeEditableFields(WorkOrder workOrder)
     {
         workOrder.WorkOrderNumber =
-            workOrder.WorkOrderNumber?.Trim() ?? string.Empty;
+            NormalizeIdentityDigits(
+                workOrder.WorkOrderNumber?.Trim() ?? string.Empty);
 
         workOrder.WorkTypeCode =
-            workOrder.WorkTypeCode?.Trim() ?? string.Empty;
+            NormalizeIdentityDigits(
+                workOrder.WorkTypeCode?.Trim() ?? string.Empty);
 
         workOrder.Busket =
             workOrder.Busket?.Trim() ?? string.Empty;
@@ -367,9 +379,11 @@ public sealed class WorkOrderService(
                 return "Work Order Number is required.";
             }
 
-            if (workOrder.WorkOrderNumber.Length > 50)
+            if (!IsExactAsciiDigits(
+                    workOrder.WorkOrderNumber,
+                    9))
             {
-                return "Work Order Number cannot exceed 50 characters.";
+                return "Work Order Number must contain exactly 9 digits.";
             }
 
             if (string.IsNullOrWhiteSpace(workOrder.WorkTypeCode))
@@ -377,9 +391,11 @@ public sealed class WorkOrderService(
                 return "Work Type is required.";
             }
 
-            if (workOrder.WorkTypeCode.Length > 20)
+            if (!IsExactAsciiDigits(
+                    workOrder.WorkTypeCode,
+                    3))
             {
-                return "Work Type cannot exceed 20 characters.";
+                return "Work Type must contain exactly 3 digits.";
             }
 
             if (string.IsNullOrWhiteSpace(workOrder.Busket))
@@ -404,6 +420,42 @@ public sealed class WorkOrderService(
         }
 
         return null;
+    }
+
+    private static string NormalizeIdentityDigits(string value)
+    {
+        return new string(
+            value.Select(character =>
+                character switch
+                {
+                    >= '\u0660' and <= '\u0669' =>
+                        (char)('0' + character - '\u0660'),
+
+                    >= '\u06F0' and <= '\u06F9' =>
+                        (char)('0' + character - '\u06F0'),
+
+                    _ => character
+                })
+            .ToArray());
+    }
+
+    private static bool IsExactAsciiDigits(
+        string value,
+        int requiredLength)
+    {
+        return
+            value.Length == requiredLength &&
+            value.All(character =>
+                character >= '0' &&
+                character <= '9');
+    }
+
+    private static bool IsUniqueConstraintViolation(
+        DbUpdateException exception)
+    {
+        return exception.InnerException is SqlException sqlException &&
+            (sqlException.Number == 2601 ||
+             sqlException.Number == 2627);
     }
 
     private static string CreateDuplicateKey(
@@ -435,7 +487,10 @@ public enum WorkOrderSaveFailureType
 public sealed record WorkOrderSaveResult(
     bool Succeeded,
     WorkOrderSaveFailureType FailureType,
-    string ErrorMessage)
+    string ErrorMessage,
+    string ErrorCode = "",
+    string? WorkOrderNumber = null,
+    string? WorkTypeCode = null)
 {
     public static WorkOrderSaveResult Success() =>
         new(
@@ -448,26 +503,34 @@ public sealed record WorkOrderSaveResult(
         new(
             false,
             WorkOrderSaveFailureType.Validation,
-            message);
+            message,
+            "validation_error");
 
     public static WorkOrderSaveResult DuplicateFailure(
-        string message) =>
+        string message,
+        string? workOrderNumber = null,
+        string? workTypeCode = null) =>
         new(
             false,
             WorkOrderSaveFailureType.Duplicate,
-            message);
+            message,
+            "duplicate_identity",
+            workOrderNumber,
+            workTypeCode);
 
     public static WorkOrderSaveResult ScopeFailure(
         string message) =>
         new(
             false,
             WorkOrderSaveFailureType.Scope,
-            message);
+            message,
+            "scope_error");
 
     public static WorkOrderSaveResult DatabaseFailure(
         string message) =>
         new(
             false,
             WorkOrderSaveFailureType.Database,
-            message);
+            message,
+            "database_error");
 }

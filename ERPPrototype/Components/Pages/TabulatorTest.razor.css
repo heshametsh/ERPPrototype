@@ -134,20 +134,36 @@
    COMPACT WORK ORDER SEARCH
    ========================= */
 
-.work-order-search-row {
-    display: flex;
-    justify-content: flex-end;
+.work-order-toolbar-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 280px;
+    grid-template-areas: "validation search";
+    align-items: stretch;
+    gap: 14px;
+    min-height: 72px;
     margin-bottom: 12px;
-    direction: rtl;
+    direction: ltr;
+}
+
+.validation-navigator-slot {
+    grid-area: validation;
+    display: flex;
+    align-items: stretch;
+    min-width: 0;
+    min-height: 72px;
 }
 
 .work-order-search-box {
+    grid-area: search;
+    box-sizing: border-box;
     width: 280px;
     max-width: 100%;
+    min-height: 72px;
     padding: 8px 10px 9px;
     border: 1px solid #8fb3cb;
     border-radius: 9px;
     background: #ffffff;
+    direction: rtl;
     box-shadow: 0 5px 14px rgba(15, 42, 70, 0.055);
 }
 
@@ -175,37 +191,30 @@
     font-weight: 750;
     outline: none;
     box-shadow: inset 0 1px 2px rgba(15, 42, 70, 0.04);
-    transition:
-        border-color 0.15s ease,
-        box-shadow 0.15s ease,
-        background-color 0.15s ease;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
 }
 
-.work-order-search-input::placeholder {
-    color: #7a8d9d;
-    font-weight: 600;
-}
+    .work-order-search-input::placeholder {
+        color: #7a8d9d;
+        font-weight: 600;
+    }
 
-.work-order-search-input:hover {
-    border-color: var(--uds-blue-600);
-    background: #ffffff;
-}
+    .work-order-search-input:hover {
+        border-color: var(--uds-blue-600);
+        background: #ffffff;
+    }
 
-.work-order-search-input:focus {
-    border-color: var(--uds-blue-600);
-    background: #ffffff;
-    box-shadow: 0 0 0 3px rgba(11, 120, 199, 0.14);
-}
+    .work-order-search-input:focus {
+        border-color: var(--uds-blue-600);
+        background: #ffffff;
+        box-shadow: 0 0 0 3px rgba(11, 120, 199, 0.14);
+    }
 
 /* =========================
    RESPONSIVE
    ========================= */
 
 @media (max-width: 800px) {
-    .work-order-search-box {
-        width: 100%;
-    }
-
     .tabulator-workorders-page {
         padding: 18px 14px 26px;
     }
@@ -223,16 +232,21 @@
     .page-actions-buttons {
         justify-content: flex-start;
     }
-}
 
+    .work-order-toolbar-row {
+        grid-template-columns: 1fr;
+        grid-template-areas:
+            "search"
+            "validation";
+        min-height: 0;
+    }
 
-@media (max-width: 800px) {
     .work-order-search-box {
         width: 100%;
     }
 
-    .work-order-search-hint {
-        grid-column: 1;
+    .validation-navigator-slot {
+        min-height: 68px;
     }
 }
 
@@ -266,9 +280,9 @@
     box-shadow: 0 8px 24px rgba(15, 42, 70, 0.07) !important;
 }
 
-.tabulator-workorders-page .tabulator-card::before {
-    display: none !important;
-}
+    .tabulator-workorders-page .tabulator-card::before {
+        display: none !important;
+    }
 
 .tabulator-workorders-page ::deep .tabulator {
     border: 0 !important;
@@ -279,52 +293,52 @@
     font-size: 14px !important;
 }
 
-.tabulator-workorders-page ::deep .tabulator .tabulator-header {
-    min-height: 49px;
-    border-top: 0 !important;
-    border-right: 0 !important;
-    border-bottom: 1px solid #d8e2ea !important;
-    border-left: 0 !important;
-    background: #f5f7f9 !important;
-    color: #14283b !important;
-}
+    .tabulator-workorders-page ::deep .tabulator .tabulator-header {
+        min-height: 49px;
+        border-top: 0 !important;
+        border-right: 0 !important;
+        border-bottom: 1px solid #d8e2ea !important;
+        border-left: 0 !important;
+        background: #f5f7f9 !important;
+        color: #14283b !important;
+    }
 
-.tabulator-workorders-page ::deep .tabulator .tabulator-header .tabulator-col {
-    min-height: 49px;
-    border-right: 1px solid #d8e2ea !important;
-    background: #f5f7f9 !important;
-}
+        .tabulator-workorders-page ::deep .tabulator .tabulator-header .tabulator-col {
+            min-height: 49px;
+            border-right: 1px solid #d8e2ea !important;
+            background: #f5f7f9 !important;
+        }
 
-.tabulator-workorders-page ::deep .tabulator .tabulator-header .tabulator-col:last-child {
-    border-right: 0 !important;
-}
+            .tabulator-workorders-page ::deep .tabulator .tabulator-header .tabulator-col:last-child {
+                border-right: 0 !important;
+            }
 
-.tabulator-workorders-page ::deep .tabulator .tabulator-col .tabulator-col-content {
-    min-height: 49px;
-    padding: 0 34px 0 10px !important;
-    display: flex;
-    align-items: center;
-}
+    .tabulator-workorders-page ::deep .tabulator .tabulator-col .tabulator-col-content {
+        min-height: 49px;
+        padding: 0 34px 0 10px !important;
+        display: flex;
+        align-items: center;
+    }
 
-.tabulator-workorders-page ::deep .tabulator .tabulator-col-title-holder {
-    width: 100%;
-}
+    .tabulator-workorders-page ::deep .tabulator .tabulator-col-title-holder {
+        width: 100%;
+    }
 
-.tabulator-workorders-page ::deep .tabulator .tabulator-col-title {
-    color: #14283b !important;
-    font-family: "Segoe UI", Tahoma, Arial, sans-serif !important;
-    font-size: 14px !important;
-    font-weight: 700 !important;
-    line-height: 1.2;
-    text-align: left !important;
-    white-space: nowrap;
-}
+    .tabulator-workorders-page ::deep .tabulator .tabulator-col-title {
+        color: #14283b !important;
+        font-family: "Segoe UI", Tahoma, Arial, sans-serif !important;
+        font-size: 14px !important;
+        font-weight: 700 !important;
+        line-height: 1.2;
+        text-align: left !important;
+        white-space: nowrap;
+    }
 
-.tabulator-workorders-page ::deep .tabulator .tabulator-col .tabulator-arrow {
-    right: 10px !important;
-    border-top-color: #7c8f9f !important;
-    border-bottom-color: #7c8f9f !important;
-}
+    .tabulator-workorders-page ::deep .tabulator .tabulator-col .tabulator-arrow {
+        right: 10px !important;
+        border-top-color: #7c8f9f !important;
+        border-bottom-color: #7c8f9f !important;
+    }
 
 .tabulator-workorders-page ::deep .tabulator-row {
     min-height: 38px !important;
@@ -332,38 +346,38 @@
     background: #ffffff !important;
 }
 
-.tabulator-workorders-page ::deep .tabulator-row:nth-child(even) {
-    background: #ffffff !important;
-}
+    .tabulator-workorders-page ::deep .tabulator-row:nth-child(even) {
+        background: #ffffff !important;
+    }
 
-.tabulator-workorders-page ::deep .tabulator-row:hover {
-    background: #f6f9fb !important;
-}
+    .tabulator-workorders-page ::deep .tabulator-row:hover {
+        background: #f6f9fb !important;
+    }
 
-.tabulator-workorders-page ::deep .tabulator-row .tabulator-cell {
-    min-height: 38px !important;
-    padding: 8px 9px !important;
-    border-right: 1px solid #d8e2ea !important;
-    border-bottom: 0 !important;
-    background: transparent !important;
-    color: #173047 !important;
-    font-family: "Segoe UI", Tahoma, Arial, sans-serif !important;
-    font-size: 14px !important;
-    font-weight: 400 !important;
-    line-height: 21px !important;
-}
+    .tabulator-workorders-page ::deep .tabulator-row .tabulator-cell {
+        min-height: 38px !important;
+        padding: 8px 9px !important;
+        border-right: 1px solid #d8e2ea !important;
+        border-bottom: 0 !important;
+        background: transparent !important;
+        color: #173047 !important;
+        font-family: "Segoe UI", Tahoma, Arial, sans-serif !important;
+        font-size: 14px !important;
+        font-weight: 400 !important;
+        line-height: 21px !important;
+    }
 
-.tabulator-workorders-page ::deep .tabulator-row .tabulator-cell:last-child {
-    border-right: 0 !important;
-}
+        .tabulator-workorders-page ::deep .tabulator-row .tabulator-cell:last-child {
+            border-right: 0 !important;
+        }
 
-.tabulator-workorders-page ::deep .tabulator .tabulator-header .tabulator-col:first-child,
-.tabulator-workorders-page ::deep .tabulator-row .tabulator-cell:first-child {
-    background: #f7f9fb !important;
-    color: #173047 !important;
-    font-weight: 700 !important;
-    text-align: center !important;
-}
+        .tabulator-workorders-page ::deep .tabulator .tabulator-header .tabulator-col:first-child,
+        .tabulator-workorders-page ::deep .tabulator-row .tabulator-cell:first-child {
+            background: #f7f9fb !important;
+            color: #173047 !important;
+            font-weight: 700 !important;
+            text-align: center !important;
+        }
 
 .tabulator-workorders-page ::deep .tabulator-cell[tabulator-field="basket"],
 .tabulator-workorders-page ::deep .tabulator-cell[tabulator-field="status"],
@@ -386,11 +400,11 @@
     color: #728797 !important;
 }
 
-.tabulator-workorders-page ::deep .tabulator-header-popup-button:hover,
-.tabulator-workorders-page ::deep .tabulator-header-popup-button.is-filtered {
-    color: #0b78c7 !important;
-    background: transparent !important;
-}
+    .tabulator-workorders-page ::deep .tabulator-header-popup-button:hover,
+    .tabulator-workorders-page ::deep .tabulator-header-popup-button.is-filtered {
+        color: #0b78c7 !important;
+        background: transparent !important;
+    }
 
 .tabulator-workorders-page ::deep .tabulator-cell.tabulator-range-selected,
 .tabulator-workorders-page ::deep .tabulator-cell.tabulator-selected,
@@ -466,11 +480,11 @@
     height: 15px;
 }
 
-.tabulator-workorders-page ::deep .excel-filter-icon svg {
-    width: 100%;
-    height: 100%;
-    fill: currentColor;
-}
+    .tabulator-workorders-page ::deep .excel-filter-icon svg {
+        width: 100%;
+        height: 100%;
+        fill: currentColor;
+    }
 
 /* Bucket autocomplete remains RTL while the column title stays English. */
 .tabulator-workorders-page ::deep
@@ -479,4 +493,270 @@
 .tabulator-cell[tabulator-field="basket"].tabulator-editing input {
     direction: rtl;
     text-align: right;
+}
+
+/* =========================================================
+   WORK-ORDER IDENTITY VALIDATION — STEP 10B
+   Clear, professional feedback while the user is typing.
+   ========================================================= */
+
+.tabulator-workorders-page ::deep .uds-identity-editor {
+    position: relative;
+    box-sizing: border-box;
+    width: 100%;
+    height: 100%;
+    min-height: 38px;
+    overflow: visible;
+    background: #ffffff;
+}
+
+.tabulator-workorders-page ::deep .uds-identity-editor-input {
+    box-sizing: border-box;
+    width: 100%;
+    height: 100%;
+    min-height: 38px;
+    margin: 0;
+    padding: 7px 56px 7px 9px;
+    border: 0;
+    outline: 0;
+    background: #ffffff;
+    color: #173047;
+    direction: ltr;
+    text-align: left;
+    font: inherit;
+    font-weight: 600;
+}
+
+.tabulator-workorders-page ::deep .uds-identity-editor-count {
+    position: absolute;
+    top: 50%;
+    right: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 38px;
+    height: 22px;
+    padding: 0 6px;
+    border: 1px solid #cbd7e0;
+    border-radius: 999px;
+    background: #f4f7f9;
+    color: #667b8d;
+    font-size: 11px;
+    font-weight: 800;
+    line-height: 1;
+    transform: translateY(-50%);
+    pointer-events: none;
+}
+
+.tabulator-workorders-page ::deep
+.uds-identity-editor.is-invalid .uds-identity-editor-input {
+    background: #ffffff;
+    color: #9f1f17;
+}
+
+.tabulator-workorders-page ::deep
+.uds-identity-editor.is-invalid .uds-identity-editor-count {
+    border-color: #f1a7a0;
+    background: #fff1f0;
+    color: #b42318;
+}
+
+.tabulator-workorders-page ::deep
+.uds-identity-editor.is-valid .uds-identity-editor-count {
+    border-color: #9dd6b4;
+    background: #edf9f1;
+    color: #157347;
+}
+
+.tabulator-workorders-page ::deep
+.tabulator-cell.tabulator-editing.uds-identity-cell-invalid {
+    background: #ffffff !important;
+    box-shadow: inset 0 0 0 2px #d92d20, 0 0 0 3px rgba(217, 45, 32, 0.11) !important;
+}
+
+.tabulator-workorders-page .uds-identity-validation-popover {
+    position: fixed;
+    z-index: 10000;
+    box-sizing: border-box;
+    min-height: 38px;
+    padding: 9px 12px 9px 36px;
+    border: 1px solid #e88c83;
+    border-radius: 8px;
+    background: #fff8f7;
+    color: #8f1d15;
+    direction: rtl;
+    text-align: right;
+    font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.45;
+    box-shadow: 0 8px 22px rgba(96, 22, 17, 0.16);
+    pointer-events: none;
+}
+
+    .tabulator-workorders-page .uds-identity-validation-popover::before {
+        content: "!";
+        position: absolute;
+        top: 50%;
+        left: 11px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 17px;
+        height: 17px;
+        border-radius: 50%;
+        background: #d92d20;
+        color: #ffffff;
+        font-size: 11px;
+        font-weight: 900;
+        transform: translateY(-50%);
+    }
+
+    .tabulator-workorders-page .uds-identity-validation-popover[hidden] {
+        display: none !important;
+    }
+
+/* =========================================================
+   CENTRAL VALIDATION NAVIGATOR — COMPACT TOOLBAR
+   Separate from the grid so validation never changes table position.
+   ========================================================= */
+
+.validation-navigator {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    box-sizing: border-box;
+    width: min(100%, 760px);
+    min-height: 72px;
+    padding: 8px 10px;
+    border: 1px solid #e4a19a;
+    border-left: 4px solid #d92d20;
+    border-radius: 9px;
+    background: #fffafa;
+    color: #7f1d1d;
+    direction: rtl;
+    box-shadow: 0 4px 12px rgba(127, 29, 29, 0.06);
+}
+
+    .validation-navigator[hidden] {
+        display: none !important;
+    }
+
+.validation-navigator-summary {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    min-width: 0;
+}
+
+.validation-navigator-icon {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: #d92d20;
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: 900;
+}
+
+.validation-navigator-copy {
+    display: grid;
+    gap: 1px;
+    min-width: 0;
+    text-align: right;
+}
+
+    .validation-navigator-copy strong {
+        color: #8f1d15;
+        font-size: 0.82rem;
+        font-weight: 800;
+        line-height: 1.25;
+    }
+
+    .validation-navigator-copy span {
+        overflow: hidden;
+        color: #a43a31;
+        font-size: 0.76rem;
+        font-weight: 650;
+        line-height: 1.35;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+.validation-navigator-actions {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 6px;
+    direction: ltr;
+}
+
+.validation-navigator-button {
+    min-width: 58px;
+    height: 30px;
+    padding: 0 9px;
+    border: 1px solid #d88980;
+    border-radius: 7px;
+    background: #ffffff;
+    color: #8f1d15;
+    font-size: 0.75rem;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+    .validation-navigator-button:hover:not(:disabled) {
+        border-color: #c43227;
+        background: #fff0ee;
+    }
+
+    .validation-navigator-button:disabled {
+        opacity: 0.45;
+        cursor: default;
+    }
+
+@media (max-width: 900px) {
+    .validation-navigator {
+        width: 100%;
+    }
+
+    .validation-navigator-copy span {
+        white-space: normal;
+    }
+}
+
+/* =========================================================
+   SIMPLE VALIDATION INDICATOR
+   Only the row warning icon and the top validation message are visible.
+   Invalid cells keep accessibility metadata but receive no custom color,
+   border, corner marker, animation, or current-error highlight.
+   ========================================================= */
+
+.tabulator-workorders-page ::deep
+.tabulator-row.uds-validation-error-row > .tabulator-cell:first-child {
+    position: relative;
+}
+
+.tabulator-workorders-page ::deep
+.tabulator-row.uds-validation-error-row > .tabulator-cell:first-child::after {
+    content: "!";
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #d92d20;
+    color: #ffffff;
+    font-size: 9px;
+    font-weight: 900;
+    line-height: 1;
+    pointer-events: none;
 }

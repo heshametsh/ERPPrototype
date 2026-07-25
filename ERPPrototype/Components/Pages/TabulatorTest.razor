@@ -1,5 +1,6 @@
-﻿@page "/tabulator-test"
+@page "/tabulator-test"
 @rendermode InteractiveServer
+@implements IAsyncDisposable
 
 @using System.Globalization
 @using ERPPrototype.Data
@@ -110,7 +111,45 @@
             Insert or delete rows where needed, then press Save to store the changes in SQL Server.
         </div>
 
-        <div class="work-order-search-row">
+        <div class="work-order-toolbar-row">
+            <div class="validation-navigator-slot">
+                <div class="validation-navigator"
+                     id="tabulator-test-table-validation-panel"
+                     role="status"
+                     aria-live="polite"
+                     hidden>
+                    <div class="validation-navigator-summary">
+                        <span class="validation-navigator-icon"
+                              aria-hidden="true">!</span>
+
+                        <div class="validation-navigator-copy">
+                            <strong id="tabulator-test-table-validation-title">
+                                توجد أخطاء تمنع الحفظ
+                            </strong>
+
+                            <span id="tabulator-test-table-validation-message">
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="validation-navigator-actions">
+                        <button type="button"
+                                class="validation-navigator-button"
+                                id="tabulator-test-table-validation-previous"
+                                onclick="window.tabulatorTest.previousValidationError('tabulator-test-table')">
+                            السابق
+                        </button>
+
+                        <button type="button"
+                                class="validation-navigator-button"
+                                id="tabulator-test-table-validation-next"
+                                onclick="window.tabulatorTest.nextValidationError('tabulator-test-table')">
+                            التالي
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             <div class="work-order-search-box">
                 <label class="work-order-search-label"
                        for="tabulator-work-order-search">
@@ -244,6 +283,16 @@
             return;
         }
 
+        var canSave =
+            await JSRuntime.InvokeAsync<bool>(
+                "tabulatorTest.validateBeforeSave",
+                TableId);
+
+        if (!canSave)
+        {
+            return;
+        }
+
         IsSaving = true;
 
         try
@@ -355,6 +404,58 @@
 
             if (!result.Succeeded)
             {
+                if (
+                    result.FailureType ==
+                        WorkOrderSaveFailureType.Duplicate &&
+                    !string.IsNullOrWhiteSpace(result.WorkOrderNumber) &&
+                    !string.IsNullOrWhiteSpace(result.WorkTypeCode))
+                {
+                    var duplicateRows = dirtyRows
+                        .Where(row =>
+                            string.Equals(
+                                row.WorkOrderNumber?.Trim(),
+                                result.WorkOrderNumber,
+                                StringComparison.Ordinal) &&
+                            string.Equals(
+                                row.WorkTypeCode?.Trim(),
+                                result.WorkTypeCode,
+                                StringComparison.Ordinal))
+                        .ToList();
+
+                    var duplicateMessage =
+                        $"رقم أمر العمل {result.WorkOrderNumber} " +
+                        $"مع النوع {result.WorkTypeCode} مسجل بالفعل.";
+
+                    var validationErrors = duplicateRows
+                        .SelectMany(row => new[]
+                        {
+                            new TabulatorValidationError
+                            {
+                                RowId = row.Id,
+                                Field = "workOrderNumber",
+                                Code = result.ErrorCode,
+                                Message = duplicateMessage
+                            },
+                            new TabulatorValidationError
+                            {
+                                RowId = row.Id,
+                                Field = "workTypeCode",
+                                Code = result.ErrorCode,
+                                Message = duplicateMessage
+                            }
+                        })
+                        .ToList();
+
+                    if (validationErrors.Count > 0)
+                    {
+                        await JSRuntime.InvokeVoidAsync(
+                            "tabulatorTest.applyExternalValidationErrors",
+                            TableId,
+                            validationErrors,
+                            true);
+                    }
+                }
+
                 await SetGridStatusAsync(
                     $"فشل الحفظ: {result.ErrorMessage}");
 
@@ -502,6 +603,29 @@
         return true;
     }
 
+    public async ValueTask DisposeAsync()
+    {
+        if (!GridInitialized)
+        {
+            return;
+        }
+
+        try
+        {
+            await JSRuntime.InvokeVoidAsync(
+                "tabulatorTest.destroy",
+                TableId);
+        }
+        catch (JSDisconnectedException)
+        {
+        }
+        catch (InvalidOperationException)
+        {
+        }
+
+        GridInitialized = false;
+    }
+
     private sealed class TabulatorDeletedRow
     {
         public int Id { get; set; }
@@ -519,6 +643,14 @@
         public string ClientKey { get; set; } = string.Empty;
         public int TemporaryId { get; set; }
         public int DatabaseId { get; set; }
+    }
+
+    private sealed class TabulatorValidationError
+    {
+        public int RowId { get; set; }
+        public string Field { get; set; } = string.Empty;
+        public string Code { get; set; } = string.Empty;
+        public string Message { get; set; } = string.Empty;
     }
 
     private sealed class TabulatorWorkOrderRow

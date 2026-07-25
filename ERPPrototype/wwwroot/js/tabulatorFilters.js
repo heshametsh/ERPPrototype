@@ -1,4 +1,6 @@
 window.tabulatorFilters = {
+    activePopups: new Map(),
+
     definitions: {
         workTypeCode: {
             stateKey: "workTypeCodes",
@@ -196,6 +198,104 @@ window.tabulatorFilters = {
         return handle;
     },
 
+    getActivePopup: function (elementId) {
+        const active = this.activePopups.get(elementId) ?? null;
+
+        if (active && !active.shell?.isConnected) {
+            active.observer?.disconnect();
+            active.anchorElement?.classList.remove("is-popup-open");
+            this.activePopups.delete(elementId);
+            return null;
+        }
+
+        return active;
+    },
+
+    closeActivePopup: function (elementId) {
+        const active = this.activePopups.get(elementId);
+
+        if (!active) {
+            return false;
+        }
+
+        active.observer?.disconnect();
+        active.anchorElement?.classList.remove("is-popup-open");
+
+        if (active.shell?.isConnected) {
+            active.shell.remove();
+        }
+
+        this.activePopups.delete(elementId);
+        return true;
+    },
+
+    registerActivePopup: function (
+        elementId,
+        field,
+        anchorElement,
+        shell
+    ) {
+        this.closeActivePopup(elementId);
+
+        if (!shell) {
+            return;
+        }
+
+        anchorElement?.classList.add("is-popup-open");
+
+        const active = {
+            field,
+            anchorElement,
+            shell,
+            observer: null
+        };
+
+        const observer = new MutationObserver(() => {
+            if (!shell.isConnected) {
+                observer.disconnect();
+                anchorElement?.classList.remove("is-popup-open");
+
+                if (this.activePopups.get(elementId) === active) {
+                    this.activePopups.delete(elementId);
+                }
+            }
+        });
+
+        active.observer = observer;
+        this.activePopups.set(elementId, active);
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
+    },
+
+    handleHeaderIconClick: function (
+        elementId,
+        button,
+        event
+    ) {
+        const active = this.getActivePopup(elementId);
+
+        if (!active) {
+            return true;
+        }
+
+        if (active.anchorElement === button) {
+            this.closeActivePopup(elementId);
+            event.preventDefault();
+            event.stopPropagation();
+            event.stopImmediatePropagation();
+            return false;
+        }
+
+        /*
+         * A different filter icon was clicked. Close the current popup, then
+         * allow Tabulator's own handler to open the newly requested filter.
+         */
+        this.closeActivePopup(elementId);
+        return true;
+    },
+
     mountPopup: function (
         container,
         onRendered,
@@ -224,6 +324,8 @@ window.tabulatorFilters = {
             );
 
             const {
+                elementId,
+                field,
                 storageKey,
                 anchorElement,
                 defaultWidth = 270,
@@ -233,6 +335,13 @@ window.tabulatorFilters = {
                 maxWidth = 540,
                 maxHeight = 650
             } = options;
+
+            this.registerActivePopup(
+                elementId,
+                field,
+                anchorElement,
+                shell
+            );
 
             let storedSize = null;
 
@@ -493,60 +602,26 @@ window.tabulatorFilters = {
     },
 
     closePopup: function (
+        elementId,
         popupContainer,
         afterClose = null
     ) {
-        const popupShell =
-            popupContainer?.closest(
-                ".tabulator-popup-container"
-            );
-
-        const outsideTarget = document.body;
-
-        outsideTarget.dispatchEvent(
-            new PointerEvent(
-                "pointerdown",
-                {
-                    bubbles: true,
-                    cancelable: true
-                }
-            )
+        const active = this.getActivePopup(elementId);
+        const popupShell = popupContainer?.closest(
+            ".tabulator-popup-container"
         );
 
-        outsideTarget.dispatchEvent(
-            new MouseEvent(
-                "mousedown",
-                {
-                    bubbles: true,
-                    cancelable: true
-                }
-            )
-        );
-
-        outsideTarget.dispatchEvent(
-            new MouseEvent(
-                "click",
-                {
-                    bubbles: true,
-                    cancelable: true
-                }
-            )
-        );
-
-        if (popupShell?.isConnected) {
+        if (active?.shell === popupShell) {
+            this.closeActivePopup(elementId);
+        } else if (popupShell?.isConnected) {
             popupShell.remove();
         }
 
-        window.requestAnimationFrame(
-            function () {
-                if (
-                    typeof afterClose ===
-                    "function"
-                ) {
-                    afterClose();
-                }
+        window.requestAnimationFrame(() => {
+            if (typeof afterClose === "function") {
+                afterClose();
             }
-        );
+        });
     },
 
     createValuePopup: function (
@@ -694,6 +769,7 @@ window.tabulatorFilters = {
             );
 
             this.closePopup(
+                elementId,
                 ui.container,
                 () => {
                     this.apply(
@@ -734,6 +810,7 @@ window.tabulatorFilters = {
             );
 
             this.closePopup(
+                elementId,
                 ui.container,
                 () => {
                     this.apply(
@@ -762,6 +839,8 @@ window.tabulatorFilters = {
             ui.container,
             onRendered,
             {
+                elementId,
+                field,
                 storageKey: definition.storageKey,
                 anchorElement:
                     column
@@ -1168,6 +1247,7 @@ window.tabulatorFilters = {
             );
 
             this.closePopup(
+                elementId,
                 ui.container,
                 () => {
                     this.apply(
@@ -1207,6 +1287,7 @@ window.tabulatorFilters = {
             );
 
             this.closePopup(
+                elementId,
                 ui.container,
                 () => {
                     this.apply(
@@ -1235,6 +1316,8 @@ window.tabulatorFilters = {
             ui.container,
             onRendered,
             {
+                elementId,
+                field: "assignmentDate",
                 storageKey: definition.storageKey,
                 anchorElement:
                     column

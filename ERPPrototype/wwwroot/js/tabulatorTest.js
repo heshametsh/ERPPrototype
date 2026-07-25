@@ -1,4 +1,4 @@
-﻿window.tabulatorTest = {
+window.tabulatorTest = {
     tables: {},
     states: {},
 
@@ -121,6 +121,1329 @@
         );
     },
 
+    normalizeIdentityDigits: function (value) {
+        return String(value ?? "")
+            .replace(/[٠-٩]/g, digit =>
+                String(digit.charCodeAt(0) - 1632))
+            .replace(/[۰-۹]/g, digit =>
+                String(digit.charCodeAt(0) - 1776));
+    },
+
+    validationFieldOrder: {
+        workOrderNumber: 0,
+        workTypeCode: 1,
+        assignmentDate: 2,
+        basket: 3,
+        status: 4,
+        notes: 5
+    },
+
+    validationFieldLabels: {
+        workOrderNumber: "رقم أمر العمل",
+        workTypeCode: "نوع أمر العمل",
+        assignmentDate: "تاريخ الإسناد",
+        basket: "السلة",
+        status: "الحالة",
+        notes: "الملاحظات"
+    },
+
+    getValidationCellKey: function (rowId, field) {
+        return `${String(rowId)}::${String(field)}`;
+    },
+
+    isCompletelyBlankRowData: function (rowData) {
+        return [
+            "workOrderNumber",
+            "workTypeCode",
+            "assignmentDate",
+            "basket",
+            "status",
+            "notes"
+        ].every(field =>
+            String(rowData?.[field] ?? "").trim() === ""
+        );
+    },
+
+    setCellValidationError: function (
+        elementId,
+        rowId,
+        field,
+        code,
+        message,
+        options = {}
+    ) {
+        const state = this.states[elementId];
+
+        if (!state || rowId === null || rowId === undefined || !field) {
+            return;
+        }
+
+        const key = this.getValidationCellKey(rowId, field);
+
+        state.validationErrors.set(key, {
+            key: key,
+            rowId: rowId,
+            field: field,
+            code: code || "validation_error",
+            message: String(message || "القيمة غير صحيحة."),
+            source: options.source || "client"
+        });
+
+        this.applyValidationStylesToRow(elementId, rowId);
+
+        if (!options.deferUi) {
+            this.syncValidationUi(elementId);
+        }
+    },
+
+    clearCellValidationError: function (
+        elementId,
+        rowId,
+        field,
+        options = {}
+    ) {
+        const state = this.states[elementId];
+
+        if (!state) {
+            return;
+        }
+
+        const key = this.getValidationCellKey(rowId, field);
+        const current = state.validationErrors.get(key);
+
+        if (
+            current &&
+            options.code &&
+            current.code !== options.code
+        ) {
+            return;
+        }
+
+        state.validationErrors.delete(key);
+        this.applyValidationStylesToRow(elementId, rowId);
+
+        if (!options.deferUi) {
+            this.syncValidationUi(elementId);
+        }
+    },
+
+    clearValidationErrorsByCode: function (
+        elementId,
+        code,
+        deferUi = false
+    ) {
+        const state = this.states[elementId];
+
+        if (!state) {
+            return;
+        }
+
+        const affectedRows = new Set();
+
+        for (const [key, error] of state.validationErrors) {
+            if (error.code === code) {
+                affectedRows.add(error.rowId);
+                state.validationErrors.delete(key);
+            }
+        }
+
+        for (const rowId of affectedRows) {
+            this.applyValidationStylesToRow(elementId, rowId);
+        }
+
+        if (!deferUi) {
+            this.syncValidationUi(elementId);
+        }
+    },
+
+    getSortedValidationErrors: function (elementId) {
+        const table = this.tables[elementId];
+        const state = this.states[elementId];
+
+        if (!table || !state) {
+            return [];
+        }
+
+        const rowPositions = new Map();
+        const rows = table.getRows();
+        const existingRowIds = new Set(
+            rows.map(row => String(row.getIndex()))
+        );
+
+        for (const [key, error] of state.validationErrors) {
+            if (!existingRowIds.has(String(error.rowId))) {
+                state.validationErrors.delete(key);
+            }
+        }
+
+        rows.forEach((row, index) => {
+            rowPositions.set(String(row.getIndex()), index);
+        });
+
+        return Array.from(state.validationErrors.values())
+            .sort((first, second) => {
+                const firstRow =
+                    rowPositions.get(String(first.rowId)) ?? Number.MAX_SAFE_INTEGER;
+                const secondRow =
+                    rowPositions.get(String(second.rowId)) ?? Number.MAX_SAFE_INTEGER;
+
+                if (firstRow !== secondRow) {
+                    return firstRow - secondRow;
+                }
+
+                const firstField =
+                    this.validationFieldOrder[first.field] ?? 999;
+                const secondField =
+                    this.validationFieldOrder[second.field] ?? 999;
+
+                return firstField - secondField;
+            });
+    },
+
+    getValidationRowNumber: function (elementId, rowId) {
+        const table = this.tables[elementId];
+
+        if (!table) {
+            return "?";
+        }
+
+        const rows = table.getRows();
+        const index = rows.findIndex(
+            row => String(row.getIndex()) === String(rowId)
+        );
+
+        return index >= 0 ? String(index + 1) : "?";
+    },
+
+    syncValidationUi: function (elementId) {
+        const state = this.states[elementId];
+
+        if (!state) {
+            return;
+        }
+
+        const errors = this.getSortedValidationErrors(elementId);
+        state.validationOrder = errors.map(error => error.key);
+
+        const panel = document.getElementById(
+            `${elementId}-validation-panel`
+        );
+
+        const title = document.getElementById(
+            `${elementId}-validation-title`
+        );
+
+        const message = document.getElementById(
+            `${elementId}-validation-message`
+        );
+
+        const previous = document.getElementById(
+            `${elementId}-validation-previous`
+        );
+
+        const next = document.getElementById(
+            `${elementId}-validation-next`
+        );
+
+        if (errors.length === 0) {
+            state.activeValidationIndex = -1;
+
+            if (panel) {
+                panel.hidden = true;
+            }
+
+            this.renderStatus(elementId);
+            return;
+        }
+
+        if (
+            state.activeValidationIndex < 0 ||
+            state.activeValidationIndex >= errors.length
+        ) {
+            state.activeValidationIndex = 0;
+        }
+
+        const activeError = errors[state.activeValidationIndex];
+
+        const fieldLabel =
+            this.validationFieldLabels[activeError.field] || activeError.field;
+        const rowNumber = this.getValidationRowNumber(
+            elementId,
+            activeError.rowId
+        );
+
+        if (panel) {
+            panel.hidden = false;
+        }
+
+        if (title) {
+            title.textContent =
+                `يوجد ${errors.length.toLocaleString()} ` +
+                `${errors.length === 1 ? "خطأ يمنع" : "أخطاء تمنع"} الحفظ`;
+        }
+
+        if (message) {
+            message.textContent =
+                `الصف ${rowNumber} — ${fieldLabel}: ${activeError.message}`;
+        }
+
+        if (previous) {
+            previous.disabled = errors.length <= 1;
+        }
+
+        if (next) {
+            next.disabled = errors.length <= 1;
+        }
+
+        this.applyVisibleValidationStyles(elementId);
+        this.renderStatus(elementId);
+    },
+
+    clearTableRanges: function (elementId) {
+        const table = this.tables[elementId];
+
+        if (!table) {
+            return;
+        }
+
+        /*
+         * Let Tabulator remove its own range state and rendered classes.
+         * Manually deleting Tabulator CSS classes can leave the internal
+         * active range pointing at a different cell than the visible border.
+         */
+        for (const range of table.getRanges()) {
+            try {
+                range.remove();
+            } catch {
+            }
+        }
+    },
+
+    bindHeaderFilterSelectionGuards: function (elementId) {
+        const table = this.tables[elementId];
+
+        if (!table) {
+            return;
+        }
+
+        const tableElement = table.element;
+
+        if (!tableElement) {
+            return;
+        }
+
+        const stopHeaderSelection = event => {
+            /*
+             * Keep pointer events from starting a whole-column range while
+             * still allowing Tabulator's own click handler to open a popup.
+             */
+            event.stopPropagation();
+        };
+
+        for (const button of tableElement.querySelectorAll(
+            ".tabulator-header-popup-button"
+        )) {
+            if (button.dataset.udsSelectionGuard === "true") {
+                continue;
+            }
+
+            button.dataset.udsSelectionGuard = "true";
+
+            /*
+             * Capture runs before Tabulator's target click listener. When the
+             * same icon owns the open popup, close it and cancel this click so
+             * Tabulator does not immediately open another copy.
+             */
+            button.addEventListener(
+                "click",
+                event => {
+                    window.tabulatorFilters.handleHeaderIconClick(
+                        elementId,
+                        button,
+                        event
+                    );
+                },
+                true
+            );
+
+            button.addEventListener("pointerdown", stopHeaderSelection);
+            button.addEventListener("mousedown", stopHeaderSelection);
+            button.addEventListener("click", stopHeaderSelection);
+        }
+    },
+
+    applyValidationStylesToRow: function (elementId, rowOrId) {
+        const table = this.tables[elementId];
+        const state = this.states[elementId];
+
+        if (!table || !state) {
+            return;
+        }
+
+        const row =
+            typeof rowOrId === "object" && rowOrId?.getData
+                ? rowOrId
+                : table.getRow(rowOrId);
+
+        if (!row) {
+            return;
+        }
+
+        const rowKey = String(row.getIndex());
+        const rowErrors = Array.from(state.validationErrors.values())
+            .filter(error => String(error.rowId) === rowKey);
+
+        const rowElement = row.getElement();
+        rowElement?.classList.toggle(
+            "uds-validation-error-row",
+            rowErrors.length > 0
+        );
+
+        for (const cell of row.getCells()) {
+            const field = cell.getField();
+            const cellElement = cell.getElement();
+
+            if (!field || !cellElement) {
+                continue;
+            }
+
+            const key = this.getValidationCellKey(row.getIndex(), field);
+            const error = state.validationErrors.get(key);
+
+            /*
+             * Validation is intentionally row-only in the UI. Remove any
+             * obsolete cell-level classes left by older builds, while keeping
+             * semantic metadata for accessibility and browser tooltips.
+             */
+            cellElement.classList.remove(
+                "uds-validation-error-cell",
+                "uds-validation-current-error-cell"
+            );
+
+            if (error) {
+                cellElement.setAttribute("aria-invalid", "true");
+                cellElement.setAttribute("title", error.message);
+            } else {
+                cellElement.removeAttribute("aria-invalid");
+
+                if (
+                    cellElement.getAttribute("title") &&
+                    !cellElement.classList.contains("tabulator-editing")
+                ) {
+                    cellElement.removeAttribute("title");
+                }
+            }
+        }
+    },
+
+    applyVisibleValidationStyles: function (elementId) {
+        const table = this.tables[elementId];
+
+        if (!table) {
+            return;
+        }
+
+        for (const row of table.getRows("visible")) {
+            this.applyValidationStylesToRow(elementId, row);
+        }
+    },
+
+    focusValidationError: async function (elementId, index) {
+        const table = this.tables[elementId];
+        const state = this.states[elementId];
+        const errors = this.getSortedValidationErrors(elementId);
+
+        if (!table || !state || errors.length === 0) {
+            return false;
+        }
+
+        const normalizedIndex =
+            ((Number(index) || 0) % errors.length + errors.length) % errors.length;
+
+        state.activeValidationIndex = normalizedIndex;
+        state.validationOrder = errors.map(error => error.key);
+
+        const error = errors[normalizedIndex];
+
+        /*
+         * Next/Previous only updates the message and brings the relevant row
+         * and column into view. It does not create a red cell marker and does
+         * not interfere with the user's normal blue spreadsheet selection.
+         */
+        this.syncValidationUi(elementId);
+
+        const row = table.getRow(error.rowId);
+
+        if (!row) {
+            return false;
+        }
+
+        try {
+            await Promise.resolve(
+                table.scrollToRow(row, "center", false)
+            );
+        } catch {
+        }
+
+        try {
+            await Promise.resolve(
+                table.scrollToColumn(error.field, "center", false)
+            );
+        } catch {
+        }
+
+        await new Promise(resolve =>
+            window.requestAnimationFrame(resolve)
+        );
+
+        this.applyVisibleValidationStyles(elementId);
+        return true;
+    },
+
+    nextValidationError: function (elementId) {
+        const state = this.states[elementId];
+
+        if (!state) {
+            return;
+        }
+
+        this.focusValidationError(
+            elementId,
+            state.activeValidationIndex + 1
+        );
+    },
+
+    previousValidationError: function (elementId) {
+        const state = this.states[elementId];
+
+        if (!state) {
+            return;
+        }
+
+        this.focusValidationError(
+            elementId,
+            state.activeValidationIndex - 1
+        );
+    },
+
+    validateCellValue: function (
+        elementId,
+        rowData,
+        field,
+        options = {}
+    ) {
+        const state = this.states[elementId];
+        const value = String(rowData?.[field] ?? "").trim();
+        const forceRequired = options.forceRequired === true;
+
+        if (field === "workOrderNumber") {
+            if (value === "") {
+                return forceRequired
+                    ? {
+                        code: "required",
+                        message: "رقم أمر العمل مطلوب ويجب أن يتكون من 9 أرقام."
+                    }
+                    : null;
+            }
+
+            if (!/^[0-9]{9}$/.test(value)) {
+                return {
+                    code: "identity_format",
+                    message: "يجب أن يتكون رقم أمر العمل من 9 أرقام بالضبط."
+                };
+            }
+        }
+
+        if (field === "workTypeCode") {
+            if (value === "") {
+                return forceRequired
+                    ? {
+                        code: "required",
+                        message: "نوع أمر العمل مطلوب ويجب أن يتكون من 3 أرقام."
+                    }
+                    : null;
+            }
+
+            if (!/^[0-9]{3}$/.test(value)) {
+                return {
+                    code: "identity_format",
+                    message: "يجب أن يتكون نوع أمر العمل من 3 أرقام بالضبط."
+                };
+            }
+        }
+
+        if (field === "assignmentDate" && value !== "") {
+            if (this.normalizeAssignmentDate(value) === null) {
+                return {
+                    code: "invalid_date",
+                    message: "أدخل تاريخًا صحيحًا بالشكل يوم/شهر/سنة."
+                };
+            }
+        }
+
+        if (field === "basket") {
+            if (value === "") {
+                return forceRequired
+                    ? {
+                        code: "required",
+                        message: "اختيار السلة مطلوب."
+                    }
+                    : null;
+            }
+
+            if (state?.basketValues && !state.basketValues.has(value)) {
+                return {
+                    code: "invalid_option",
+                    message: "اختر قيمة صحيحة من قائمة السلة."
+                };
+            }
+        }
+
+        if (field === "status" && value.length > 150) {
+            return {
+                code: "max_length",
+                message: "الحالة لا يمكن أن تتجاوز 150 حرفًا."
+            };
+        }
+
+        if (field === "notes" && value.length > 1000) {
+            return {
+                code: "max_length",
+                message: "الملاحظات لا يمكن أن تتجاوز 1000 حرف."
+            };
+        }
+
+        return null;
+    },
+
+    validateRow: function (elementId, rowOrId, options = {}) {
+        const table = this.tables[elementId];
+
+        if (!table) {
+            return;
+        }
+
+        const row =
+            typeof rowOrId === "object" && rowOrId?.getData
+                ? rowOrId
+                : table.getRow(rowOrId);
+
+        if (!row) {
+            return;
+        }
+
+        const rowData = row.getData();
+        const isBlank = this.isCompletelyBlankRowData(rowData);
+        const forceRequired =
+            options.forceRequired === true || !isBlank;
+
+        for (const field of Object.keys(this.validationFieldOrder)) {
+            const result = this.validateCellValue(
+                elementId,
+                rowData,
+                field,
+                { forceRequired: forceRequired }
+            );
+
+            if (result) {
+                this.setCellValidationError(
+                    elementId,
+                    row.getIndex(),
+                    field,
+                    result.code,
+                    result.message,
+                    { deferUi: true }
+                );
+            } else {
+                this.clearCellValidationError(
+                    elementId,
+                    row.getIndex(),
+                    field,
+                    { deferUi: true }
+                );
+            }
+        }
+
+        this.applyValidationStylesToRow(elementId, row);
+    },
+
+    validateRows: function (elementId, rowIds, options = {}) {
+        const table = this.tables[elementId];
+
+        if (!table) {
+            return;
+        }
+
+        const uniqueRowIds = new Set(
+            Array.from(rowIds ?? []).map(rowId => String(rowId))
+        );
+
+        for (const rowId of uniqueRowIds) {
+            const numericId = Number(rowId);
+            const row = table.getRow(
+                Number.isNaN(numericId) ? rowId : numericId
+            );
+
+            if (row) {
+                this.validateRow(elementId, row, options);
+            }
+        }
+
+        this.refreshIdentityDuplicateErrors(elementId, true);
+        this.syncValidationUi(elementId);
+    },
+
+    refreshIdentityDuplicateErrors: function (
+        elementId,
+        deferUi = false
+    ) {
+        const table = this.tables[elementId];
+
+        if (!table) {
+            return;
+        }
+
+        this.clearValidationErrorsByCode(
+            elementId,
+            "duplicate_identity",
+            true
+        );
+
+        const groups = new Map();
+
+        for (const row of table.getRows()) {
+            const data = row.getData();
+            const number = String(data.workOrderNumber ?? "").trim();
+            const type = String(data.workTypeCode ?? "").trim();
+
+            if (!/^[0-9]{9}$/.test(number) || !/^[0-9]{3}$/.test(type)) {
+                continue;
+            }
+
+            const key = `${number}::${type}`;
+
+            if (!groups.has(key)) {
+                groups.set(key, []);
+            }
+
+            groups.get(key).push(row);
+        }
+
+        for (const rows of groups.values()) {
+            if (rows.length <= 1) {
+                continue;
+            }
+
+            for (const row of rows) {
+                const message =
+                    "رقم أمر العمل ونوعه مكرران داخل الشيت.";
+
+                this.setCellValidationError(
+                    elementId,
+                    row.getIndex(),
+                    "workOrderNumber",
+                    "duplicate_identity",
+                    message,
+                    { deferUi: true }
+                );
+
+                this.setCellValidationError(
+                    elementId,
+                    row.getIndex(),
+                    "workTypeCode",
+                    "duplicate_identity",
+                    message,
+                    { deferUi: true }
+                );
+            }
+        }
+
+        if (!deferUi) {
+            this.syncValidationUi(elementId);
+        }
+    },
+
+    validateBeforeSave: async function (elementId) {
+        await this.commitActiveEditor(elementId);
+
+        const state = this.states[elementId];
+
+        if (!state) {
+            return false;
+        }
+
+        this.validateRows(
+            elementId,
+            state.dirtyRowIds,
+            { forceRequired: true }
+        );
+
+        const errors = this.getSortedValidationErrors(elementId);
+
+        if (errors.length > 0) {
+            this.setStatus(
+                elementId,
+                `لا يمكن الحفظ قبل تصحيح ${errors.length.toLocaleString()} ` +
+                `${errors.length === 1 ? "خطأ" : "أخطاء"}.`
+            );
+
+            await this.focusValidationError(elementId, 0);
+            return false;
+        }
+
+        return true;
+    },
+
+    applyExternalValidationErrors: function (
+        elementId,
+        errors,
+        focusFirst = true
+    ) {
+        const state = this.states[elementId];
+
+        if (!state || !Array.isArray(errors)) {
+            return;
+        }
+
+        for (const error of errors) {
+            this.setCellValidationError(
+                elementId,
+                error.rowId ?? error.RowId,
+                error.field ?? error.FieldName,
+                error.code ?? error.ErrorCode ?? "server_validation",
+                error.message ?? error.Message ?? "القيمة غير صحيحة.",
+                {
+                    source: "server",
+                    deferUi: true
+                }
+            );
+        }
+
+        this.syncValidationUi(elementId);
+
+        if (focusFirst && state.validationErrors.size > 0) {
+            this.focusValidationError(elementId, 0);
+        }
+    },
+
+    fixedDigitsEditor: function (
+        cell,
+        onRendered,
+        success,
+        cancel,
+        editorParams
+    ) {
+        const requiredLength =
+            Number(editorParams?.requiredLength) || 1;
+
+        const requiredPattern =
+            new RegExp(`^[0-9]{${requiredLength}}$`);
+
+        const fieldLabel =
+            editorParams?.label ||
+            (requiredLength === 9
+                ? "رقم أمر العمل"
+                : "نوع أمر العمل");
+
+        const wrapper = document.createElement("div");
+        wrapper.className = "uds-identity-editor";
+
+        const input = document.createElement("input");
+        input.className = "uds-identity-editor-input";
+        input.type = "text";
+        input.inputMode = "numeric";
+        input.autocomplete = "off";
+        input.maxLength = requiredLength;
+        input.pattern = `[0-9]{${requiredLength}}`;
+        input.value = window.tabulatorTest
+            .normalizeIdentityDigits(cell.getValue())
+            .trim();
+
+        const counter = document.createElement("span");
+        counter.className = "uds-identity-editor-count";
+        counter.setAttribute("aria-hidden", "true");
+
+        wrapper.append(input, counter);
+
+        const cellElement = cell.getElement();
+        const tableElementId =
+            cell.getTable()?.element?.id || "";
+        const validationRowId =
+            cell.getRow().getIndex();
+        const validationField =
+            cell.getField();
+
+        const pageElement =
+            cell.getTable()?.element?.closest(
+                ".tabulator-workorders-page"
+            ) || document.body;
+
+        const popoverId =
+            `uds-identity-validation-${Date.now()}-${Math.random()
+                .toString(36)
+                .slice(2)}`;
+
+        let popover = null;
+        let completed = false;
+        let lastAcceptedValue = input.value;
+        let rejectedInputTimer = null;
+
+        input.setAttribute("aria-describedby", popoverId);
+
+        const positionPopover = function () {
+            if (!popover || popover.hidden) {
+                return;
+            }
+
+            const rect = input.getBoundingClientRect();
+            const gap = 7;
+            const viewportPadding = 10;
+            const popoverWidth = Math.min(
+                Math.max(rect.width, 235),
+                340
+            );
+
+            popover.style.width = `${popoverWidth}px`;
+
+            let left = rect.left;
+            left = Math.max(
+                viewportPadding,
+                Math.min(
+                    left,
+                    window.innerWidth - popoverWidth - viewportPadding
+                )
+            );
+
+            popover.style.left = `${left}px`;
+
+            const measuredHeight =
+                popover.offsetHeight || 42;
+
+            const hasRoomBelow =
+                rect.bottom + gap + measuredHeight <=
+                window.innerHeight - viewportPadding;
+
+            if (hasRoomBelow) {
+                popover.classList.remove("is-above");
+                popover.style.top = `${rect.bottom + gap}px`;
+            } else {
+                popover.classList.add("is-above");
+                popover.style.top = `${Math.max(
+                    viewportPadding,
+                    rect.top - measuredHeight - gap
+                )}px`;
+            }
+        };
+
+        const ensurePopover = function () {
+            if (popover) {
+                return popover;
+            }
+
+            popover = document.createElement("div");
+            popover.id = popoverId;
+            popover.className =
+                "uds-identity-validation-popover";
+            popover.setAttribute("role", "alert");
+            popover.hidden = true;
+            pageElement.appendChild(popover);
+            return popover;
+        };
+
+        const hideValidationMessage = function () {
+            if (popover) {
+                popover.hidden = true;
+            }
+        };
+
+        const showValidationMessage = function (message) {
+            const messageElement = ensurePopover();
+            messageElement.textContent = message;
+            messageElement.hidden = false;
+
+            window.requestAnimationFrame(positionPopover);
+        };
+
+        const clearRejectedInputTimer = function () {
+            if (rejectedInputTimer !== null) {
+                window.clearTimeout(rejectedInputTimer);
+                rejectedInputTimer = null;
+            }
+        };
+
+        const setVisualState = function (state) {
+            wrapper.classList.remove(
+                "is-neutral",
+                "is-invalid",
+                "is-valid"
+            );
+            wrapper.classList.add(`is-${state}`);
+
+            cellElement.classList.toggle(
+                "uds-identity-cell-invalid",
+                state === "invalid"
+            );
+
+            input.setAttribute(
+                "aria-invalid",
+                state === "invalid" ? "true" : "false"
+            );
+
+            const valueLength = input.value.trim().length;
+
+            counter.textContent =
+                state === "valid"
+                    ? `✓ ${valueLength}/${requiredLength}`
+                    : `${valueLength}/${requiredLength}`;
+        };
+
+        const currentLengthMessage = function () {
+            const valueLength = input.value.trim().length;
+
+            return `${fieldLabel}: مطلوب ${requiredLength} أرقام بالضبط — تم إدخال ${valueLength}.`;
+        };
+
+        const updateValidationState = function (
+            forceMessage = false
+        ) {
+            clearRejectedInputTimer();
+
+            const value = input.value.trim();
+            const isValid = requiredPattern.test(value);
+
+            if (isValid) {
+                setVisualState("valid");
+                hideValidationMessage();
+                input.removeAttribute("title");
+
+                if (tableElementId) {
+                    window.tabulatorTest.clearCellValidationError(
+                        tableElementId,
+                        validationRowId,
+                        validationField
+                    );
+                }
+
+                return true;
+            }
+
+            if (value.length === 0 && !forceMessage) {
+                const emptyMessage =
+                    `${fieldLabel}: مطلوب ${requiredLength} أرقام بالضبط.`;
+
+                setVisualState("neutral");
+                hideValidationMessage();
+                input.title = emptyMessage;
+
+                if (tableElementId) {
+                    window.tabulatorTest.setCellValidationError(
+                        tableElementId,
+                        validationRowId,
+                        validationField,
+                        "required",
+                        emptyMessage
+                    );
+                }
+
+                return false;
+            }
+
+            const message = currentLengthMessage();
+
+            setVisualState("invalid");
+            input.title = message;
+            showValidationMessage(message);
+
+            if (tableElementId) {
+                window.tabulatorTest.setCellValidationError(
+                    tableElementId,
+                    validationRowId,
+                    validationField,
+                    "identity_format",
+                    message
+                );
+            }
+
+            return false;
+        };
+
+        const showRejectedInput = function (message) {
+            clearRejectedInputTimer();
+
+            setVisualState("invalid");
+            input.title = message;
+            showValidationMessage(message);
+
+            if (tableElementId) {
+                window.tabulatorTest.setCellValidationError(
+                    tableElementId,
+                    validationRowId,
+                    validationField,
+                    "identity_format",
+                    message
+                );
+            }
+
+            rejectedInputTimer = window.setTimeout(
+                function () {
+                    updateValidationState(
+                        input.value.trim().length > 0
+                    );
+                },
+                1200
+            );
+        };
+
+        const cleanup = function () {
+            clearRejectedInputTimer();
+            cellElement.classList.remove(
+                "uds-identity-cell-invalid"
+            );
+
+            window.removeEventListener(
+                "resize",
+                positionPopover
+            );
+            document.removeEventListener(
+                "scroll",
+                positionPopover,
+                true
+            );
+
+            if (popover) {
+                popover.remove();
+                popover = null;
+            }
+        };
+
+        const setAcceptedValue = function (
+            value,
+            caretPosition
+        ) {
+            input.value = value;
+            lastAcceptedValue = value;
+
+            const nextPosition = Math.min(
+                Math.max(Number(caretPosition) || 0, 0),
+                value.length
+            );
+
+            input.setSelectionRange(
+                nextPosition,
+                nextPosition
+            );
+
+            updateValidationState(value.length > 0);
+        };
+
+        const commit = function (cancelWhenInvalid) {
+            if (completed) {
+                return;
+            }
+
+            const value = input.value.trim();
+
+            if (!requiredPattern.test(value)) {
+                updateValidationState(true);
+
+                if (cancelWhenInvalid) {
+                    completed = true;
+                    cleanup();
+                    cancel();
+                } else {
+                    input.focus();
+                    input.select();
+                }
+
+                return;
+            }
+
+            completed = true;
+            cleanup();
+            success(value);
+        };
+
+        input.addEventListener("focus", function () {
+            if (
+                input.value.trim().length > 0 &&
+                !requiredPattern.test(input.value.trim())
+            ) {
+                updateValidationState(true);
+            }
+        });
+
+        input.addEventListener("keydown", function (event) {
+            if (event.key === "Enter") {
+                event.preventDefault();
+                event.stopPropagation();
+                commit(false);
+                return;
+            }
+
+            if (event.key === "Escape") {
+                completed = true;
+                event.preventDefault();
+                event.stopPropagation();
+                cleanup();
+                cancel();
+
+                if (tableElementId) {
+                    window.setTimeout(() => {
+                        window.tabulatorTest.validateRow(
+                            tableElementId,
+                            validationRowId
+                        );
+                        window.tabulatorTest.refreshIdentityDuplicateErrors(
+                            tableElementId
+                        );
+                    }, 0);
+                }
+
+                return;
+            }
+
+            const isPrintableKey =
+                event.key.length === 1 &&
+                !event.ctrlKey &&
+                !event.metaKey &&
+                !event.altKey;
+
+            if (!isPrintableKey) {
+                return;
+            }
+
+            const normalizedKey = window.tabulatorTest
+                .normalizeIdentityDigits(event.key);
+
+            if (!/^[0-9]$/.test(normalizedKey)) {
+                event.preventDefault();
+                showRejectedInput("يسمح بإدخال الأرقام فقط.");
+                return;
+            }
+
+            const selectionStart =
+                input.selectionStart ?? input.value.length;
+            const selectionEnd =
+                input.selectionEnd ?? selectionStart;
+
+            const nextLength =
+                input.value.length -
+                (selectionEnd - selectionStart) +
+                1;
+
+            if (nextLength > requiredLength) {
+                event.preventDefault();
+                showRejectedInput(
+                    `الحد الأقصى ${requiredLength} أرقام.`
+                );
+            }
+        });
+
+        input.addEventListener("paste", function (event) {
+            const clipboardText =
+                event.clipboardData?.getData("text") ?? "";
+
+            const normalizedClipboard =
+                window.tabulatorTest
+                    .normalizeIdentityDigits(clipboardText)
+                    .trim();
+
+            const selectionStart =
+                input.selectionStart ?? input.value.length;
+            const selectionEnd =
+                input.selectionEnd ?? selectionStart;
+
+            const proposedValue =
+                input.value.slice(0, selectionStart) +
+                normalizedClipboard +
+                input.value.slice(selectionEnd);
+
+            if (!/^[0-9]*$/.test(normalizedClipboard)) {
+                event.preventDefault();
+                showRejectedInput(
+                    "القيمة الملصقة يجب أن تحتوي على أرقام فقط."
+                );
+                return;
+            }
+
+            if (proposedValue.length > requiredLength) {
+                event.preventDefault();
+                showRejectedInput(
+                    `القيمة الملصقة تتجاوز ${requiredLength} أرقام.`
+                );
+                return;
+            }
+
+            event.preventDefault();
+
+            setAcceptedValue(
+                proposedValue,
+                selectionStart + normalizedClipboard.length
+            );
+        });
+
+        input.addEventListener("input", function () {
+            const rawValue = input.value;
+            const normalized = window.tabulatorTest
+                .normalizeIdentityDigits(rawValue);
+
+            if (
+                !/^[0-9]*$/.test(normalized) ||
+                normalized.length > requiredLength
+            ) {
+                input.value = lastAcceptedValue;
+                input.setSelectionRange(
+                    lastAcceptedValue.length,
+                    lastAcceptedValue.length
+                );
+
+                showRejectedInput(
+                    normalized.length > requiredLength
+                        ? `الحد الأقصى ${requiredLength} أرقام.`
+                        : "يسمح بإدخال الأرقام فقط."
+                );
+                return;
+            }
+
+            const selectionStart =
+                input.selectionStart ?? normalized.length;
+
+            input.value = normalized;
+            lastAcceptedValue = normalized;
+
+            const nextPosition = Math.min(
+                selectionStart,
+                normalized.length
+            );
+
+            input.setSelectionRange(
+                nextPosition,
+                nextPosition
+            );
+
+            updateValidationState(normalized.length > 0);
+        });
+
+        input.addEventListener("blur", function () {
+            commit(true);
+        });
+
+        window.addEventListener("resize", positionPopover);
+        document.addEventListener(
+            "scroll",
+            positionPopover,
+            true
+        );
+
+        onRendered(function () {
+            updateValidationState(false);
+            input.focus();
+            input.select();
+        });
+
+        return wrapper;
+    },
+
     assignmentDateEditor: function (
         cell,
         onRendered,
@@ -128,6 +1451,13 @@
         cancel
     ) {
         const input = document.createElement("input");
+        const cellElement = cell.getElement();
+        const tableElement = cellElement?.closest(".tabulator");
+        const elementId = tableElement?.id ?? null;
+        const rowId = cell.getRow().getIndex();
+        const field = cell.getField();
+        const validationMessage =
+            "أدخل تاريخًا صحيحًا بالشكل يوم/شهر/سنة.";
 
         input.type = "text";
         input.inputMode = "numeric";
@@ -151,22 +1481,91 @@
 
         let completed = false;
 
-        const clearError = function () {
+        const clearCentralError = function () {
+            if (!elementId) {
+                return;
+            }
+
+            window.tabulatorTest.clearCellValidationError(
+                elementId,
+                rowId,
+                field,
+                { code: "invalid_date" }
+            );
+        };
+
+        const publishCentralError = function () {
+            if (!elementId) {
+                return;
+            }
+
+            window.tabulatorTest.setCellValidationError(
+                elementId,
+                rowId,
+                field,
+                "invalid_date",
+                validationMessage
+            );
+
+            const state =
+                window.tabulatorTest.states[elementId];
+            const errors =
+                window.tabulatorTest.getSortedValidationErrors(
+                    elementId
+                );
+            const key =
+                window.tabulatorTest.getValidationCellKey(
+                    rowId,
+                    field
+                );
+            const index = errors.findIndex(
+                error => error.key === key
+            );
+
+            if (state && index >= 0) {
+                state.activeValidationIndex = index;
+                window.tabulatorTest.syncValidationUi(
+                    elementId
+                );
+            }
+        };
+
+        const clearLocalError = function () {
             input.style.boxShadow = "none";
             input.style.background = "#ffffff";
             input.removeAttribute("title");
             input.setAttribute("aria-invalid", "false");
         };
 
-        const showError = function () {
+        const showLocalError = function (focusEditor) {
             input.style.boxShadow =
                 "inset 0 0 0 2px #c62828";
             input.style.background = "#fff7f7";
-            input.title =
-                "Enter a valid date in DD/MM/YYYY format.";
+            input.title = validationMessage;
             input.setAttribute("aria-invalid", "true");
-            input.focus();
-            input.select();
+
+            if (focusEditor) {
+                input.focus();
+                input.select();
+            }
+        };
+
+        const updateLiveValidation = function () {
+            const normalized =
+                window.tabulatorTest
+                    .normalizeAssignmentDate(
+                        input.value
+                    );
+
+            if (normalized === null) {
+                showLocalError(false);
+                publishCentralError();
+                return false;
+            }
+
+            clearLocalError();
+            clearCentralError();
+            return true;
         };
 
         const commit = function () {
@@ -181,16 +1580,21 @@
                     );
 
             if (normalized === null) {
-                showError();
+                showLocalError(true);
+                publishCentralError();
                 return;
             }
 
             completed = true;
-            clearError();
+            clearLocalError();
+            clearCentralError();
             success(normalized);
         };
 
-        input.addEventListener("input", clearError);
+        input.addEventListener(
+            "input",
+            updateLiveValidation
+        );
 
         input.addEventListener("keydown", function (event) {
             if (event.key === "Enter") {
@@ -204,6 +1608,7 @@
                 completed = true;
                 event.preventDefault();
                 event.stopPropagation();
+                clearCentralError();
                 cancel();
             }
         });
@@ -282,6 +1687,8 @@
         );
 
         const directTypingFields = new Set([
+            "workOrderNumber",
+            "workTypeCode",
             "assignmentDate",
             "basket"
         ]);
@@ -343,6 +1750,11 @@
             dirtyRowIds: new Set(),
             lastStatusMessage: "",
 
+            validationErrors: new Map(),
+            validationOrder: [],
+            activeValidationIndex: -1,
+            basketValues: new Set(baskets),
+
             maxTransactions: 100,
 
             isSaving: false,
@@ -390,6 +1802,7 @@
             history: false,
 
             selectableRange: 1,
+            selectableRangeInitializeDefault: false,
             selectableRangeColumns: true,
             selectableRangeRows: true,
             selectableRangeClearCells: true,
@@ -444,11 +1857,22 @@
                 resizable: "header"
             },
 
+            rowFormatter: function (row) {
+                window.tabulatorTest.applyValidationStylesToRow(
+                    elementId,
+                    row
+                );
+            },
+
             columns: [
                 {
                     title: "Work Order Number",
                     field: "workOrderNumber",
-                    editor: "input",
+                    editor:
+                        window.tabulatorTest.fixedDigitsEditor,
+                    editorParams: {
+                        requiredLength: 9
+                    },
                     minWidth: 210,
                     widthGrow: 1.15,
                     headerHozAlign: "left"
@@ -456,7 +1880,11 @@
                 {
                     title: "Work Type",
                     field: "workTypeCode",
-                    editor: "input",
+                    editor:
+                        window.tabulatorTest.fixedDigitsEditor,
+                    editorParams: {
+                        requiredLength: 3
+                    },
                     headerSort: false,
                     minWidth: 150,
                     widthGrow: 0.8,
@@ -578,6 +2006,33 @@
                 window.tabulatorTest,
                 elementId
             );
+
+            window.tabulatorTest.bindHeaderFilterSelectionGuards(
+                elementId
+            );
+
+            /*
+             * The sheet must open without a preselected first cell.
+             */
+            window.requestAnimationFrame(() => {
+                window.tabulatorTest.clearTableRanges(elementId);
+            });
+
+            window.tabulatorTest.validateRows(
+                elementId,
+                table.getRows().map(row => row.getIndex()),
+                { forceRequired: false }
+            );
+        });
+
+        table.on("renderComplete", function () {
+            window.tabulatorTest.bindHeaderFilterSelectionGuards(
+                elementId
+            );
+
+            window.tabulatorTest.applyVisibleValidationStyles(
+                elementId
+            );
         });
 
         /*
@@ -597,7 +2052,7 @@
              */
             state.currentEditMode =
                 state.nextEditMode === "quick" &&
-                cell.getField() !== "basket"
+                    cell.getField() !== "basket"
                     ? "quick"
                     : "text";
 
@@ -612,11 +2067,22 @@
             };
         });
 
-        table.on("cellEditCancelled", function () {
+        table.on("cellEditCancelled", function (cell) {
             state.pendingEdit = null;
             state.nextEditMode = null;
             state.currentEditMode = null;
             state.currentEditingCell = null;
+
+            if (cell) {
+                window.tabulatorTest.validateRow(
+                    elementId,
+                    cell.getRow()
+                );
+
+                window.tabulatorTest.refreshIdentityDuplicateErrors(
+                    elementId
+                );
+            }
         });
 
         /*
@@ -1107,7 +2573,14 @@
                         event.stopImmediatePropagation();
 
                         const typedCharacter =
-                            event.key;
+                            directTypingFields.has(
+                                cell.getField()
+                            ) &&
+                                (cell.getField() === "workOrderNumber" ||
+                                    cell.getField() === "workTypeCode")
+                                ? window.tabulatorTest
+                                    .normalizeIdentityDigits(event.key)
+                                : event.key;
 
                         state.nextEditMode =
                             cell.getField() === "basket"
@@ -1410,13 +2883,26 @@
         const unsavedCount =
             dirtyCount + deletedCount;
 
+        const errorCount =
+            state?.validationErrors?.size ?? 0;
+
         const dirtyText =
             `صفوف غير محفوظة: ${unsavedCount.toLocaleString()}`;
 
+        const errorText =
+            errorCount > 0
+                ? `أخطاء: ${errorCount.toLocaleString()}`
+                : "";
+
+        const summaryText =
+            errorText
+                ? `${dirtyText} | ${errorText}`
+                : dirtyText;
+
         statusElement.textContent =
             message
-                ? `${message} | ${dirtyText}`
-                : dirtyText;
+                ? `${message} | ${summaryText}`
+                : summaryText;
     },
 
     /*
@@ -1767,18 +3253,29 @@
 
                     let newValue = pastedValue;
 
+                    if (
+                        field === "workOrderNumber" ||
+                        field === "workTypeCode"
+                    ) {
+                        newValue = this
+                            .normalizeIdentityDigits(pastedValue)
+                            .trim();
+                    }
+
                     if (field === "assignmentDate") {
-                        newValue =
+                        const normalizedDate =
                             this.normalizeAssignmentDate(
                                 pastedValue
                             );
 
                         /*
-                         * لا نستبدل التاريخ القديم بقيمة غير صالحة.
+                         * نحتفظ بالقيمة الخاطئة مؤقتًا ونميزها
+                         * داخل نظام الأخطاء بدل تجاهلها بصمت.
                          */
-                        if (newValue === null) {
-                            continue;
-                        }
+                        newValue =
+                            normalizedDate === null
+                                ? String(pastedValue ?? "").trim()
+                                : normalizedDate;
                     }
 
                     const oldValue =
@@ -1842,6 +3339,12 @@
                         change => change.field
                     )
                 );
+
+            if (
+                this.getSortedValidationErrors(elementId).length > 0
+            ) {
+                this.focusValidationError(elementId, 0);
+            }
         }
 
         return Array.from(
@@ -2113,11 +3616,20 @@
          */
         state.redoStack = [];
 
-        this.refreshDirtyRows(
-            elementId,
+        const affectedRowIds =
             transaction.changes.map(
                 change => change.rowId
-            )
+            );
+
+        this.refreshDirtyRows(
+            elementId,
+            affectedRowIds
+        );
+
+        this.validateRows(
+            elementId,
+            affectedRowIds,
+            { forceRequired: false }
         );
 
         this.setStatus(
@@ -2334,11 +3846,20 @@
                 )
             );
 
-        this.refreshDirtyRows(
-            elementId,
+        const affectedRowIds =
             transaction.changes.map(
                 change => change.rowId
-            )
+            );
+
+        this.refreshDirtyRows(
+            elementId,
+            affectedRowIds
+        );
+
+        this.validateRows(
+            elementId,
+            affectedRowIds,
+            { forceRequired: false }
         );
     },
 
@@ -3238,7 +4759,7 @@
         if (
             window.crypto &&
             typeof window.crypto.randomUUID ===
-                "function"
+            "function"
         ) {
             return window.crypto.randomUUID();
         }
@@ -3912,6 +5433,12 @@
             state.applyingHistory = false;
         }
 
+        this.validateRows(
+            elementId,
+            table.getRows().map(row => row.getIndex()),
+            { forceRequired: false }
+        );
+
         if (
             focusRowId !== null &&
             focusRowId !== undefined
@@ -4067,7 +5594,7 @@
                 activeElement &&
                 element.contains(activeElement) &&
                 typeof activeElement.blur ===
-                    "function"
+                "function"
             ) {
                 activeElement.blur();
             }
@@ -4233,9 +5760,9 @@
 
             return allocateTemporaryId(
                 clientKey ||
-                    this.ensureClientKey({
-                        id: fallbackId
-                    })
+                this.ensureClientKey({
+                    id: fallbackId
+                })
             );
         };
 
@@ -4354,6 +5881,10 @@
             savedRowMappings
         );
 
+        state.validationErrors.clear();
+        state.validationOrder = [];
+        state.activeValidationIndex = -1;
+
         state.applyingHistory = true;
 
         try {
@@ -4390,6 +5921,12 @@
         } finally {
             state.applyingHistory = false;
         }
+
+        this.validateRows(
+            elementId,
+            table.getRows().map(row => row.getIndex()),
+            { forceRequired: false }
+        );
 
         this.renderStatus(elementId);
     },
@@ -4455,6 +5992,8 @@
     },
 
     destroy: function (elementId) {
+        window.tabulatorFilters?.closeActivePopup?.(elementId);
+
         const table =
             this.tables[elementId];
 

@@ -74,16 +74,29 @@ public class ApplicationDbContext(
 
         builder.Entity<WorkOrder>(entity =>
         {
-            entity.ToTable("WorkOrders");
+            entity.ToTable(
+                "WorkOrders",
+                tableBuilder =>
+                {
+                    tableBuilder.HasCheckConstraint(
+                        "CK_WorkOrders_WorkOrderNumber_NineDigits",
+                        "DATALENGTH([WorkOrderNumber]) = 9 AND [WorkOrderNumber] COLLATE Latin1_General_100_BIN2 NOT LIKE '%[^0-9]%'");
+
+                    tableBuilder.HasCheckConstraint(
+                        "CK_WorkOrders_WorkTypeCode_ThreeDigits",
+                        "DATALENGTH([WorkTypeCode]) = 3 AND [WorkTypeCode] COLLATE Latin1_General_100_BIN2 NOT LIKE '%[^0-9]%'");
+                });
 
             entity.HasKey(workOrder => workOrder.Id);
 
             entity.Property(workOrder => workOrder.WorkOrderNumber)
-                .HasMaxLength(50)
+                .IsUnicode(false)
+                .HasMaxLength(9)
                 .IsRequired();
 
             entity.Property(workOrder => workOrder.WorkTypeCode)
-                .HasMaxLength(20)
+                .IsUnicode(false)
+                .HasMaxLength(3)
                 .IsRequired();
 
             entity.Property(workOrder => workOrder.WorkYear)
@@ -125,10 +138,11 @@ public class ApplicationDbContext(
 
             entity.HasIndex(workOrder => new
             {
-                workOrder.DepartmentId,
                 workOrder.WorkOrderNumber,
                 workOrder.WorkTypeCode
             })
+            .HasDatabaseName(
+                "UX_WorkOrders_WorkOrderNumber_WorkTypeCode")
             .IsUnique();
         });
 

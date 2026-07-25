@@ -4,6 +4,7 @@ using ERPPrototype.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace ERPPrototype.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260724074046_EnforceWorkOrderIdentityRules")]
+    partial class EnforceWorkOrderIdentityRules
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -199,21 +202,11 @@ namespace ERPPrototype.Migrations
                         .HasMaxLength(450)
                         .HasColumnType("nvarchar(450)");
 
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("DeletedBy")
-                        .HasMaxLength(450)
-                        .HasColumnType("nvarchar(450)");
-
                     b.Property<int>("DepartmentId")
                         .HasColumnType("int");
 
                     b.Property<long>("DisplayOrder")
                         .HasColumnType("bigint");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("bit");
 
                     b.Property<string>("Notes")
                         .HasMaxLength(1000)
@@ -233,13 +226,15 @@ namespace ERPPrototype.Migrations
 
                     b.Property<string>("WorkOrderNumber")
                         .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
+                        .HasMaxLength(9)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(9)");
 
                     b.Property<string>("WorkTypeCode")
                         .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
+                        .HasMaxLength(3)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(3)");
 
                     b.Property<int>("WorkYear")
                         .HasColumnType("int");
@@ -248,10 +243,16 @@ namespace ERPPrototype.Migrations
 
                     b.HasIndex("DepartmentId", "DisplayOrder");
 
-                    b.HasIndex("DepartmentId", "WorkOrderNumber", "WorkTypeCode")
-                        .IsUnique();
+                    b.HasIndex("WorkOrderNumber", "WorkTypeCode")
+                        .IsUnique()
+                        .HasDatabaseName("UX_WorkOrders_WorkOrderNumber_WorkTypeCode");
 
-                    b.ToTable("WorkOrders", (string)null);
+                    b.ToTable("WorkOrders", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_WorkOrders_WorkOrderNumber_NineDigits", "DATALENGTH([WorkOrderNumber]) = 9 AND [WorkOrderNumber] NOT LIKE '%[^0-9]%'");
+
+                            t.HasCheckConstraint("CK_WorkOrders_WorkTypeCode_ThreeDigits", "DATALENGTH([WorkTypeCode]) = 3 AND [WorkTypeCode] NOT LIKE '%[^0-9]%'");
+                        });
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole", b =>
