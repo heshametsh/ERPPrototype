@@ -1424,47 +1424,49 @@ window.tabulatorFilters = {
         elementId,
         fields
     ) {
+        const table = host.tables[elementId];
         const state = host.states[elementId];
 
-        if (!state) {
+        if (!table || !state) {
             return;
         }
 
-        let changed = false;
+        const uniqueFields =
+            Array.from(new Set(fields ?? []));
 
-        Array.from(new Set(fields))
-            .filter(field => this.getDefinition(field))
-            .forEach(field => {
-                const definition = this.getDefinition(field);
-                const available = new Set(
-                    this.getUniqueValues(
-                        host,
-                        elementId,
-                        field
-                    )
-                );
+        const shouldReapplyActiveFilter =
+            uniqueFields.some(field => {
+                if (field === "workOrderNumber") {
+                    return String(
+                        state.externalFilters.workOrderNumber ?? ""
+                    ).trim() !== "";
+                }
 
-                const previous =
-                    state.externalFilters[
-                    definition.stateKey
-                    ] ?? [];
+                const definition =
+                    this.getDefinition(field);
 
-                const next = previous.filter(value =>
-                    available.has(value)
-                );
+                if (!definition) {
+                    return false;
+                }
 
-                if (next.length !== previous.length) {
+                return (
                     state.externalFilters[
                         definition.stateKey
-                    ] = next;
-                    changed = true;
-                }
+                    ] ?? []
+                ).length > 0;
             });
 
-        if (changed) {
+        /*
+         * Filter option values are rebuilt only when the popup opens.
+         * Scanning every row after every cell edit made large sheets pause.
+         * Re-run the table filter only when the edited field currently has
+         * an active filter; otherwise update the icons with no data scan.
+         */
+        if (shouldReapplyActiveFilter) {
             this.apply(host, elementId);
-        } else {
-            this.updateAllIcons(host, elementId);
+            return;
         }
+
+        this.updateAllIcons(host, elementId);
     }
 };

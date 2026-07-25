@@ -1,9 +1,7 @@
 ﻿@using ERPPrototype.Data
-@using Microsoft.AspNetCore.Identity
 @using Microsoft.EntityFrameworkCore
 
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
-@inject UserManager<ApplicationUser> UserManager
 
 <div class="border rounded-3 p-4 mt-4 bg-light">
 
@@ -122,33 +120,25 @@
             await using var dbContext =
                 await DbFactory.CreateDbContextAsync();
 
-            var branchUsers = await dbContext.Users
-                .AsNoTracking()
-                .Include(user => user.Department)
-                    .ThenInclude(department =>
-                        department!.DepartmentType)
-                .Where(user => user.BranchId == BranchId)
-                .OrderBy(user => user.FullName)
-                .ToListAsync();
-
-            var result = new List<BranchUserListItem>();
-
-            foreach (var user in branchUsers)
-            {
-                var roles = await UserManager.GetRolesAsync(user);
-
-                result.Add(new BranchUserListItem
+            Users = await (
+                from user in dbContext.Users.AsNoTracking()
+                join userRole in dbContext.UserRoles.AsNoTracking()
+                    on user.Id equals userRole.UserId
+                join role in dbContext.Roles.AsNoTracking()
+                    on userRole.RoleId equals role.Id
+                where user.BranchId == BranchId
+                orderby user.FullName
+                select new BranchUserListItem
                 {
                     FullName = user.FullName,
                     UserName = user.UserName ?? string.Empty,
-                    Role = roles.SingleOrDefault() ?? string.Empty,
-                    DepartmentName =
-                        user.Department?.DepartmentType.Name,
+                    Role = role.Name ?? string.Empty,
+                    DepartmentName = user.DepartmentId == null
+                        ? null
+                        : user.Department!.DepartmentType.Name,
                     IsActive = user.IsActive
-                });
-            }
-
-            Users = result;
+                })
+                .ToListAsync();
         }
         catch
         {

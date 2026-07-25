@@ -1,4 +1,5 @@
 ﻿using ERPPrototype.Data.Entities;
+using System.Diagnostics;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 
@@ -33,16 +34,26 @@ public sealed class WorkOrderService(
                 $"Work year must be between {MinimumWorkYear} and {MaximumWorkYear}.");
         }
 
+        var totalStopwatch = Stopwatch.StartNew();
+
         await using var dbContext =
             await dbFactory.CreateDbContextAsync(cancellationToken);
 
-        var userScope = await dbContext.Users
-            .AsNoTracking()
-            .Where(user =>
+        var scopeStopwatch = Stopwatch.StartNew();
+
+        var userScope = await (
+            from user in dbContext.Users.AsNoTracking()
+            join userRole in dbContext.UserRoles.AsNoTracking()
+                on user.Id equals userRole.UserId
+            join role in dbContext.Roles.AsNoTracking()
+                on userRole.RoleId equals role.Id
+            where
                 user.Id == userId &&
                 user.IsActive &&
-                user.DepartmentId != null)
-            .Select(user => new
+                !user.MustChangePassword &&
+                user.DepartmentId != null &&
+                role.Name == AppRoles.Employee
+            select new
             {
                 DepartmentId = user.DepartmentId!.Value,
                 BranchName = user.Department!.Branch.Name,
@@ -50,10 +61,14 @@ public sealed class WorkOrderService(
             })
             .SingleOrDefaultAsync(cancellationToken);
 
+        scopeStopwatch.Stop();
+
         if (userScope is null)
         {
             return null;
         }
+
+        var yearsStopwatch = Stopwatch.StartNew();
 
         var availableYears = await dbContext.WorkOrders
             .AsNoTracking()
@@ -62,6 +77,8 @@ public sealed class WorkOrderService(
             .Select(workOrder => workOrder.WorkYear)
             .Distinct()
             .ToListAsync(cancellationToken);
+
+        yearsStopwatch.Stop();
 
         availableYears.Add(DateTime.Now.Year);
         availableYears.Add(workYear);
@@ -72,6 +89,8 @@ public sealed class WorkOrderService(
             .OrderByDescending(year => year)
             .ToList();
 
+        var rowsStopwatch = Stopwatch.StartNew();
+
         var workOrders = await dbContext.WorkOrders
             .AsNoTracking()
             .Where(workOrder =>
@@ -79,7 +98,31 @@ public sealed class WorkOrderService(
                 workOrder.WorkYear == workYear)
             .OrderBy(workOrder => workOrder.DisplayOrder)
             .ThenBy(workOrder => workOrder.Id)
+            .Select(workOrder => new WorkOrderSheetRow(
+                workOrder.Id,
+                workOrder.DisplayOrder,
+                workOrder.WorkOrderNumber,
+                workOrder.WorkTypeCode,
+                workOrder.AssignmentDate,
+                workOrder.Busket,
+                workOrder.Status,
+                workOrder.Notes,
+                workOrder.RowVersion))
             .ToListAsync(cancellationToken);
+
+        rowsStopwatch.Stop();
+        totalStopwatch.Stop();
+
+        logger.LogInformation(
+            "Loaded {WorkOrderCount} work orders for department {DepartmentId}, year {WorkYear}. " +
+            "Scope: {ScopeMilliseconds} ms; years: {YearsMilliseconds} ms; rows: {RowsMilliseconds} ms; total: {TotalMilliseconds} ms.",
+            workOrders.Count,
+            userScope.DepartmentId,
+            workYear,
+            scopeStopwatch.ElapsedMilliseconds,
+            yearsStopwatch.ElapsedMilliseconds,
+            rowsStopwatch.ElapsedMilliseconds,
+            totalStopwatch.ElapsedMilliseconds);
 
         return new WorkOrderSheetData(
             userScope.DepartmentId,
@@ -117,8 +160,8 @@ public sealed class WorkOrderService(
             return WorkOrderSaveResult.ValidationFailure(
                 $"Work year must be between {MinimumWorkYear} and {MaximumWorkYear}.");
         }
-        // Keep every Id == 0 record. Syncfusion may submit several new rows
-        // with Id 0 in one batch, so grouping all new rows by Id would lose data.
+        // Keep every Id == 0 record. Several newly inserted rows can share Id 0
+        // before saving, so grouping all new rows by Id would lose data.
         var newRecordCandidates = addedRecords
             .Concat(changedRecords.Where(workOrder => workOrder.Id <= 0))
             .Where(workOrder => !IsCompletelyBlank(workOrder))
@@ -195,13 +238,19 @@ public sealed class WorkOrderService(
         await using var dbContext =
             await dbFactory.CreateDbContextAsync(cancellationToken);
 
-        var authorizedDepartmentId = await dbContext.Users
-            .AsNoTracking()
-            .Where(user =>
+        var authorizedDepartmentId = await (
+            from user in dbContext.Users.AsNoTracking()
+            join userRole in dbContext.UserRoles.AsNoTracking()
+                on user.Id equals userRole.UserId
+            join role in dbContext.Roles.AsNoTracking()
+                on userRole.RoleId equals role.Id
+            where
                 user.Id == userId &&
                 user.IsActive &&
-                user.DepartmentId != null)
-            .Select(user => user.DepartmentId)
+                !user.MustChangePassword &&
+                user.DepartmentId != null &&
+                role.Name == AppRoles.Employee
+            select user.DepartmentId)
             .SingleOrDefaultAsync(cancellationToken);
 
         if (authorizedDepartmentId is null)
@@ -742,7 +791,18 @@ public sealed record WorkOrderSheetData(
     string DepartmentName,
     int WorkYear,
     List<int> AvailableYears,
-    List<WorkOrder> WorkOrders);
+    List<WorkOrderSheetRow> WorkOrders);
+
+public sealed record WorkOrderSheetRow(
+    int Id,
+    long DisplayOrder,
+    string WorkOrderNumber,
+    string WorkTypeCode,
+    DateTime? AssignmentDate,
+    string Busket,
+    string Status,
+    string? Notes,
+    byte[] RowVersion);
 
 public enum WorkOrderSaveFailureType
 {

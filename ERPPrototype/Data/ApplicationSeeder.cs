@@ -1,4 +1,4 @@
-using ERPPrototype.Data.Entities;
+﻿using ERPPrototype.Data.Entities;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
@@ -6,8 +6,6 @@ namespace ERPPrototype.Data;
 
 public static class ApplicationSeeder
 {
-    private const string InitialAdminEmail = "heshammastoura@outlook.com";
-
     public static async Task SeedAsync(IServiceProvider services)
     {
         await EnsureRolesAsync(services);
@@ -37,7 +35,7 @@ public static class ApplicationSeeder
     }
 
     private static async Task EnsureInitialAdminAsync(
-    IServiceProvider services)
+        IServiceProvider services)
     {
         var userManager =
             services.GetRequiredService<UserManager<ApplicationUser>>();
@@ -45,27 +43,78 @@ public static class ApplicationSeeder
         var configuration =
             services.GetRequiredService<IConfiguration>();
 
-        var initialAdmin =
-            await userManager.FindByEmailAsync(InitialAdminEmail);
+        var existingAdmins =
+            await userManager.GetUsersInRoleAsync(AppRoles.Admin);
 
-        if (initialAdmin is null)
+        if (existingAdmins.Count > 1)
+        {
+            throw new InvalidOperationException(
+                "More than one Admin account exists. " +
+                "The current product rules allow exactly one Admin account.");
+        }
+
+        var configuredEmail =
+            configuration["InitialAdmin:Email"]?.Trim();
+
+        ApplicationUser? initialAdmin =
+            existingAdmins.SingleOrDefault();
+
+        if (initialAdmin is not null)
+        {
+            if (
+                !string.IsNullOrWhiteSpace(configuredEmail) &&
+                !string.Equals(
+                    initialAdmin.Email,
+                    configuredEmail,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException(
+                    "The configured InitialAdmin email does not match " +
+                    "the existing Admin account. Remove the obsolete " +
+                    "configuration or correct it before startup.");
+            }
+        }
+        else
         {
             var initialAdminPassword =
                 configuration["InitialAdmin:Password"];
 
+            var initialAdminFullName =
+                configuration["InitialAdmin:FullName"]?.Trim();
+
+            if (string.IsNullOrWhiteSpace(configuredEmail))
+            {
+                throw new InvalidOperationException(
+                    "The initial Admin account does not exist, and " +
+                    "'InitialAdmin:Email' was not configured.");
+            }
+
             if (string.IsNullOrWhiteSpace(initialAdminPassword))
             {
                 throw new InvalidOperationException(
-                    "The initial admin account does not exist, and " +
+                    "The initial Admin account does not exist, and " +
                     "'InitialAdmin:Password' was not configured.");
+            }
+
+            var conflictingUser =
+                await userManager.FindByEmailAsync(configuredEmail);
+
+            if (conflictingUser is not null)
+            {
+                throw new InvalidOperationException(
+                    "InitialAdmin:Email belongs to an existing non-Admin " +
+                    "account. The application will not promote that account " +
+                    "automatically.");
             }
 
             initialAdmin = new ApplicationUser
             {
-                UserName = InitialAdminEmail,
-                Email = InitialAdminEmail,
+                UserName = configuredEmail,
+                Email = configuredEmail,
                 EmailConfirmed = true,
-                FullName = "Initial Administrator",
+                FullName = string.IsNullOrWhiteSpace(initialAdminFullName)
+                    ? "Initial Administrator"
+                    : initialAdminFullName,
                 IsActive = true,
                 MustChangePassword = true
             };
@@ -77,37 +126,60 @@ public static class ApplicationSeeder
 
             ThrowIfIdentityOperationFailed(
                 createResult,
-                $"Failed to create the initial admin account '{InitialAdminEmail}'");
-        }
+                $"Failed to create the initial Admin account '{configuredEmail}'");
 
-        var currentRoles = await userManager.GetRolesAsync(initialAdmin);
-
-        if (currentRoles.Count == 1 &&
-            currentRoles.Contains(AppRoles.Admin))
-        {
-            return;
-        }
-
-        if (currentRoles.Count > 0)
-        {
-            var removeResult =
-                await userManager.RemoveFromRolesAsync(
+            var addRoleResult =
+                await userManager.AddToRoleAsync(
                     initialAdmin,
-                    currentRoles);
+                    AppRoles.Admin);
+
+            if (!addRoleResult.Succeeded)
+            {
+                await userManager.DeleteAsync(initialAdmin);
+
+                ThrowIfIdentityOperationFailed(
+                    addRoleResult,
+                    "Failed to assign the Admin role to the initial Admin");
+            }
+        }
+
+        if (!initialAdmin.IsActive)
+        {
+            initialAdmin.IsActive = true;
+
+            var activateResult =
+                await userManager.UpdateAsync(initialAdmin);
 
             ThrowIfIdentityOperationFailed(
-                removeResult,
-                "Failed to remove existing roles from the initial admin");
+                activateResult,
+                "Failed to activate the initial Admin account");
         }
 
-        var addResult =
-            await userManager.AddToRoleAsync(
-                initialAdmin,
-                AppRoles.Admin);
+        var currentRoles =
+            await userManager.GetRolesAsync(initialAdmin);
 
-        ThrowIfIdentityOperationFailed(
-            addResult,
-            "Failed to assign the Admin role to the initial admin");
+        var unexpectedRoles = currentRoles
+            .Where(roleName => roleName != AppRoles.Admin)
+            .ToList();
+
+        if (unexpectedRoles.Count > 0)
+        {
+            throw new InvalidOperationException(
+                "The single Admin account has unexpected additional roles: " +
+                string.Join(", ", unexpectedRoles));
+        }
+
+        if (!currentRoles.Contains(AppRoles.Admin))
+        {
+            var addResult =
+                await userManager.AddToRoleAsync(
+                    initialAdmin,
+                    AppRoles.Admin);
+
+            ThrowIfIdentityOperationFailed(
+                addResult,
+                "Failed to assign the Admin role to the initial Admin");
+        }
     }
 
     private static async Task EnsureStandardDepartmentStructureAsync(

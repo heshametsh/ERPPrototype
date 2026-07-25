@@ -18,28 +18,33 @@ public sealed class UserManagementService
     }
 
     public async Task<UserCreationResult> CreateBranchUserAsync(
-        CreateBranchUserRequest request)
+        string actorUserId,
+        CreateBranchUserRequest request,
+        CancellationToken cancellationToken = default)
     {
+        if (string.IsNullOrWhiteSpace(actorUserId))
+        {
+            return UserCreationResult.Failure(
+                "تعذر التحقق من حساب مدير النظام.");
+        }
+
         var fullName = request.FullName.Trim();
         var userName = request.UserName.Trim();
         var email = request.Email.Trim();
 
         if (string.IsNullOrWhiteSpace(fullName))
         {
-            return UserCreationResult.Failure(
-                "اكتب الاسم الكامل.");
+            return UserCreationResult.Failure("اكتب الاسم الكامل.");
         }
 
         if (string.IsNullOrWhiteSpace(userName))
         {
-            return UserCreationResult.Failure(
-                "اكتب اسم المستخدم.");
+            return UserCreationResult.Failure("اكتب اسم المستخدم.");
         }
 
         if (string.IsNullOrWhiteSpace(email))
         {
-            return UserCreationResult.Failure(
-                "اكتب البريد الإلكتروني.");
+            return UserCreationResult.Failure("اكتب البريد الإلكتروني.");
         }
 
         if (string.IsNullOrWhiteSpace(request.TemporaryPassword))
@@ -56,11 +61,32 @@ public sealed class UserManagementService
         }
 
         await using var dbContext =
-            await _dbFactory.CreateDbContextAsync();
+            await _dbFactory.CreateDbContextAsync(cancellationToken);
+
+        var actorIsAdmin = await (
+            from account in dbContext.Users.AsNoTracking()
+            join userRole in dbContext.UserRoles.AsNoTracking()
+                on account.Id equals userRole.UserId
+            join role in dbContext.Roles.AsNoTracking()
+                on userRole.RoleId equals role.Id
+            where
+                account.Id == actorUserId &&
+                account.IsActive &&
+                role.Name == AppRoles.Admin
+            select account.Id)
+            .AnyAsync(cancellationToken);
+
+        if (!actorIsAdmin)
+        {
+            return UserCreationResult.Failure(
+                "غير مصرح لهذا الحساب بإنشاء مستخدمين.");
+        }
 
         var branchExists = await dbContext.Branches
             .AsNoTracking()
-            .AnyAsync(branch => branch.Id == request.BranchId);
+            .AnyAsync(
+                branch => branch.Id == request.BranchId,
+                cancellationToken);
 
         if (!branchExists)
         {
@@ -80,9 +106,11 @@ public sealed class UserManagementService
 
             var departmentExists = await dbContext.Departments
                 .AsNoTracking()
-                .AnyAsync(department =>
-                    department.Id == request.DepartmentId.Value
-                    && department.BranchId == request.BranchId);
+                .AnyAsync(
+                    department =>
+                        department.Id == request.DepartmentId.Value &&
+                        department.BranchId == request.BranchId,
+                    cancellationToken);
 
             if (!departmentExists)
             {
@@ -91,6 +119,31 @@ public sealed class UserManagementService
             }
 
             departmentId = request.DepartmentId;
+        }
+
+        var fixedAccountAlreadyExists = await (
+            from account in dbContext.Users.AsNoTracking()
+            join userRole in dbContext.UserRoles.AsNoTracking()
+                on account.Id equals userRole.UserId
+            join role in dbContext.Roles.AsNoTracking()
+                on userRole.RoleId equals role.Id
+            where
+                role.Name == request.Role &&
+                account.BranchId == request.BranchId &&
+                (
+                    request.Role == AppRoles.BranchManager ||
+                    account.DepartmentId == departmentId
+                )
+            select account.Id)
+            .AnyAsync(cancellationToken);
+
+        if (fixedAccountAlreadyExists)
+        {
+            return request.Role == AppRoles.BranchManager
+                ? UserCreationResult.Failure(
+                    "يوجد بالفعل حساب مدير مشروع ثابت لهذا الفرع.")
+                : UserCreationResult.Failure(
+                    "يوجد بالفعل حساب موظف ثابت لهذا القسم.");
         }
 
         var existingUserName =
@@ -111,7 +164,7 @@ public sealed class UserManagementService
                 "البريد الإلكتروني مستخدم بالفعل.");
         }
 
-        var user = new ApplicationUser
+        var newUser = new ApplicationUser
         {
             FullName = fullName,
             UserName = userName,
@@ -124,33 +177,31 @@ public sealed class UserManagementService
         };
 
         var createResult = await _userManager.CreateAsync(
-            user,
+            newUser,
             request.TemporaryPassword);
 
         if (!createResult.Succeeded)
         {
-            var errorMessage = string.Join(
-                " ",
-                createResult.Errors.Select(error =>
-                    error.Description));
-
-            return UserCreationResult.Failure(errorMessage);
+            return UserCreationResult.Failure(
+                string.Join(
+                    " ",
+                    createResult.Errors.Select(error =>
+                        error.Description)));
         }
 
         var roleResult = await _userManager.AddToRoleAsync(
-            user,
+            newUser,
             request.Role);
 
         if (!roleResult.Succeeded)
         {
-            await _userManager.DeleteAsync(user);
+            await _userManager.DeleteAsync(newUser);
 
-            var errorMessage = string.Join(
-                " ",
-                roleResult.Errors.Select(error =>
-                    error.Description));
-
-            return UserCreationResult.Failure(errorMessage);
+            return UserCreationResult.Failure(
+                string.Join(
+                    " ",
+                    roleResult.Errors.Select(error =>
+                        error.Description)));
         }
 
         return UserCreationResult.Success();
@@ -178,23 +229,18 @@ public sealed class UserCreationResult
 {
     public bool Succeeded { get; private init; }
 
-    public string ErrorMessage { get; private init; } =
-        string.Empty;
+    public string ErrorMessage { get; private init; } = string.Empty;
 
-    public static UserCreationResult Success()
-    {
-        return new UserCreationResult
+    public static UserCreationResult Success() =>
+        new()
         {
             Succeeded = true
         };
-    }
 
-    public static UserCreationResult Failure(string errorMessage)
-    {
-        return new UserCreationResult
+    public static UserCreationResult Failure(string errorMessage) =>
+        new()
         {
             Succeeded = false,
             ErrorMessage = errorMessage
         };
-    }
 }

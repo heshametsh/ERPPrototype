@@ -3,6 +3,13 @@
   "defaultProvider": "unpkg",
   "libraries": [
     {
+      "library": "bootstrap@5.3.3",
+      "destination": "wwwroot/lib/bootstrap",
+      "files": [
+        "dist/css/bootstrap.min.css"
+      ]
+    },
+    {
       "library": "tabulator-tables@6.5.0",
       "destination": "wwwroot/lib/tabulator",
       "files": [

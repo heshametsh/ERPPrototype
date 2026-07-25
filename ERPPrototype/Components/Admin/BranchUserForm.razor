@@ -1,9 +1,12 @@
 ﻿@using ERPPrototype.Data
 @using ERPPrototype.Data.Entities
 @using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Identity
 
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
 @inject UserManagementService UserManagementService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject UserManager<ApplicationUser> UserManager
 
 <div class="border rounded-3 p-4 mt-4 bg-light">
 
@@ -51,7 +54,7 @@
         <div class="col-md-6">
 
             <label class="form-label">
-                البريد الإلكتروني للاسترجاع
+                البريد الإلكتروني
             </label>
 
             <input type="email"
@@ -218,8 +221,22 @@
 
         try
         {
+            var authenticationState =
+                await AuthenticationStateProvider.GetAuthenticationStateAsync();
+
+            var actorUserId =
+                UserManager.GetUserId(authenticationState.User);
+
+            if (string.IsNullOrWhiteSpace(actorUserId))
+            {
+                ShowError("تعذر التحقق من حساب مدير النظام.");
+                return;
+            }
+
             var result =
-                await UserManagementService.CreateBranchUserAsync(Request);
+                await UserManagementService.CreateBranchUserAsync(
+                    actorUserId,
+                    Request);
 
             if (!result.Succeeded)
             {

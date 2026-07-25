@@ -1,0 +1,40 @@
+# Visual Studio / .NET build output
+.vs/
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+artifacts/
+
+# User-specific IDE files
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Test and coverage output
+TestResults/
+coverage/
+*.coverage
+*.coveragexml
+
+# Publish output and machine-specific deployment metadata
+publish/
+Properties/PublishProfiles/
+Properties/ServiceDependencies/
+Properties/serviceDependencies*.json
+
+# Local secrets and certificates
+appsettings.Local.json
+*.pfx
+*.snk
+
+# Logs and temporary files
+*.log
+*.tmp
+*.bak
+*.orig
+
+# OS files
+.DS_Store
+Thumbs.db

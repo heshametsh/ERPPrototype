@@ -1,300 +1,158 @@
-﻿@page "/work-orders"
+@page "/work-orders"
 @rendermode InteractiveServer
 @implements IAsyncDisposable
 
+@using System.Globalization
 @using ERPPrototype.Data
 @using ERPPrototype.Data.Entities
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Authorization
 @using Microsoft.AspNetCore.Identity
-@using Syncfusion.Blazor.DropDowns
-@using Syncfusion.Blazor.Grids
+@using Microsoft.JSInterop
 
 @attribute [Authorize(Roles = AppRoles.Employee)]
 
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject UserManager<ApplicationUser> UserManager
 @inject WorkOrderService WorkOrderService
+@inject IJSRuntime JSRuntime
 @inject ILogger<WorkOrders> Logger
 
 <PageTitle>Work Orders</PageTitle>
 
-<div class="container-fluid work-orders-page" dir="ltr">
-    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+<div class="work-orders-page">
+    <div class="work-orders-header">
         <div>
-            <h1 class="mb-1">Work Orders</h1>
+            <h1>Work Orders</h1>
 
-            @if (!string.IsNullOrWhiteSpace(DepartmentName))
-            {
-                <div class="text-muted">
-                    @BranchName — @DepartmentName
-                </div>
-            }
-        </div>
+            <div class="work-orders-context">
+                @if (IsLoading)
+                {
+                    <span>Loading department data...</span>
+                }
+                else if (!string.IsNullOrWhiteSpace(DepartmentName))
+                {
+                    <span>@BranchName — @DepartmentName</span>
+                }
+                else
+                {
+                    <span>Work Orders</span>
+                }
 
-        <div class="text-end">
-            <button type="button"
-                    class="btn btn-primary px-4"
-                    disabled="@IsSaving"
-                    @onclick="SaveNowAsync">
-                @(IsSaving ? "Saving..." : "Save")
-            </button>
-
-            <div class="small mt-2 @SaveStateCssClass">
-                @SaveStateMessage
+                @if (!IsLoading && string.IsNullOrWhiteSpace(ErrorMessage))
+                {
+                    <label class="work-year-selector">
+                        <span>Year</span>
+                        <select class="work-year-select"
+                                value="@SelectedWorkYear"
+                                disabled="@(IsSaving || IsYearLoading)"
+                                @onchange="ChangeWorkYearAsync">
+                            @foreach (var year in AvailableWorkYears)
+                            {
+                                <option value="@year">@year</option>
+                            }
+                        </select>
+                    </label>
+                }
             </div>
         </div>
+
+        @if (!IsLoading && string.IsNullOrWhiteSpace(ErrorMessage))
+        {
+            <div class="work-orders-actions">
+                <button type="button"
+                        class="save-button"
+                        disabled="@(IsSaving || IsYearLoading)"
+                        @onclick="SaveChangesAsync">
+                    @(IsSaving ? "Saving..." : IsYearLoading ? "Loading..." : "Save")
+                </button>
+
+                <div id="work-orders-table-status"
+                     class="save-status"
+                     role="status"
+                     aria-live="polite">
+                    Preparing rows...
+                </div>
+            </div>
+        }
     </div>
 
     @if (IsLoading)
     {
-        <div class="alert alert-info">
-            Loading work orders...
-        </div>
+        <div class="alert alert-info">Loading work orders from SQL Server...</div>
     }
-    else if (!string.IsNullOrWhiteSpace(LoadingErrorMessage))
+    else if (!string.IsNullOrWhiteSpace(ErrorMessage))
     {
-        <div class="alert alert-danger">
-            @LoadingErrorMessage
-        </div>
+        <div class="alert alert-danger">@ErrorMessage</div>
     }
     else
     {
-        <div class="alert alert-secondary py-2">
-            Click a cell once to select it.
-            Use the arrow keys to move between cells.
-            Double-click or press <strong>F2</strong> to edit the current value.
+        <div class="phase-note">
+            Performance baseline: display, direct cell editing, year switching, and delta save only.
         </div>
 
-        @if (!string.IsNullOrWhiteSpace(OperationErrorMessage))
-        {
-            <div class="alert alert-danger">
-                @OperationErrorMessage
-            </div>
-        }
-
-        @if (!string.IsNullOrWhiteSpace(SuccessMessage))
-        {
-            <div class="alert alert-success">
-                @SuccessMessage
-            </div>
-        }
-
-        <SfGrid @ref="WorkOrdersGrid"
-                ID="EmployeeWorkOrdersGrid"
-                TValue="WorkOrder"
-                DataSource="@WorkOrderItems"
-                Toolbar="@ToolbarItems"
-                AllowSorting="true"
-                AllowFiltering="true"
-                AllowResizing="true"
-                AllowReordering="true"
-                AllowSelection="true"
-                ShowColumnChooser="true"
-                EnableAutoFill="true"
-                Height="600">
-
-            <GridEvents TValue="WorkOrder"
-                        CellSaved="CellSavedAsync"
-                        OnBatchSave="SaveBatchAsync" />
-
-            <GridEditSettings AllowAdding="true"
-                              AllowEditing="true"
-                              AllowDeleting="true"
-                              Mode="EditMode.Batch"
-                              AllowEditOnSingleClick="false"
-                              AllowNextRowEdit="true"
-                              NewRowPosition="NewRowPosition.Bottom"
-                              ShowConfirmDialog="false"
-                              ShowDeleteConfirmDialog="true" />
-
-            <GridFilterSettings Type="Syncfusion.Blazor.Grids.FilterType.Excel" />
-
-            <GridSelectionSettings Mode="Syncfusion.Blazor.Grids.SelectionMode.Both"
-                                   Type="Syncfusion.Blazor.Grids.SelectionType.Multiple"
-                                   CellSelectionMode="Syncfusion.Blazor.Grids.CellSelectionMode.Box" />
-
-            <GridColumns>
-                <GridColumn Field="@nameof(WorkOrder.Id)"
-                            IsPrimaryKey="true"
-                            Visible="false"
-                            AllowEditing="false"
-                            AllowAdding="false" />
-
-                <GridColumn Field="@nameof(WorkOrder.WorkOrderNumber)"
-                            HeaderText="Work Order Number"
-                            Width="190" />
-
-                <GridColumn Field="@nameof(WorkOrder.WorkTypeCode)"
-                            HeaderText="Work Type"
-                            Width="130" />
-
-                <GridColumn Field="@nameof(WorkOrder.AssignmentDate)"
-                            HeaderText="Assignment Date"
-                            EditType="EditType.DatePickerEdit"
-                            Format="dd/MM/yyyy"
-                            Type="ColumnType.Date"
-                            Width="170" />
-
-                <GridColumn Field="@nameof(WorkOrder.Busket)"
-                            HeaderText="Busket"
-                            Width="280">
-                    <EditTemplate Context="busketContext">
-                        @{
-                            var workOrder = (WorkOrder)busketContext;
-                        }
-
-                        <SfComboBox TValue="string"
-                                    TItem="string"
-                                    DataSource="@WorkOrderBuskets.All"
-                                    @bind-Value="workOrder.Busket"
-                                    AllowFiltering="true"
-                                    AllowCustom="false"
-                                    Autofill="true"
-                                    ShowClearButton="false"
-                                    PopupHeight="320px"
-                                    Placeholder="اكتب أو اختر الباسكت">
-                        </SfComboBox>
-                    </EditTemplate>
-                </GridColumn>
-
-                <GridColumn Field="@nameof(WorkOrder.Status)"
-                            HeaderText="Status"
-                            Width="170" />
-
-                <GridColumn Field="@nameof(WorkOrder.Notes)"
-                            HeaderText="Notes"
-                            Width="320" />
-            </GridColumns>
-        </SfGrid>
+        <div class="tabulator-card">
+            <div id="work-orders-table"></div>
+        </div>
     }
 </div>
 
 @code {
-    private const int BlankRowsTarget = 7;
+    private const string TableId = "work-orders-table";
 
-    private static readonly TimeSpan IdleSaveDelay =
-        TimeSpan.FromSeconds(30);
+    private bool IsLoading = true;
+    private bool IsSaving;
+    private bool IsYearLoading;
+    private bool GridInitialized;
 
-    private static readonly TimeSpan PeriodicSaveInterval =
-        TimeSpan.FromMinutes(3);
+    private int SelectedWorkYear = DateTime.Now.Year;
 
-    private SfGrid<WorkOrder>? WorkOrdersGrid;
+    private string CurrentUserId = string.Empty;
+    private string BranchName = string.Empty;
+    private string DepartmentName = string.Empty;
+    private string ErrorMessage = string.Empty;
 
-    private List<WorkOrder> WorkOrderItems { get; set; } = [];
-
-    private readonly List<string> ToolbarItems =
-    [
-        "Delete",
-        "Cancel",
-        "Search",
-        "ColumnChooser"
-    ];
-
-    private string BranchName { get; set; } = string.Empty;
-    private string DepartmentName { get; set; } = string.Empty;
-    private string CurrentUserId { get; set; } = string.Empty;
-
-    private int CurrentDepartmentId { get; set; }
-
-    private string LoadingErrorMessage { get; set; } = string.Empty;
-    private string OperationErrorMessage { get; set; } = string.Empty;
-    private string SuccessMessage { get; set; } = string.Empty;
-
-    private string SaveStateMessage { get; set; } =
-        "All changes saved";
-
-    private string SaveStateCssClass { get; set; } =
-        "text-success";
-
-    private bool IsLoading { get; set; } = true;
-    private bool IsSaving { get; set; }
-    private bool HasUnsavedChanges { get; set; }
-
-    private int NextTemporaryId { get; set; } = -1;
-
-    private CancellationTokenSource? ComponentCancellation;
-    private CancellationTokenSource? IdleSaveCancellation;
-    private Task? PeriodicSaveTask;
+    private List<int> AvailableWorkYears = [DateTime.Now.Year];
+    private List<TabulatorWorkOrderRow> Rows = [];
 
     protected override async Task OnInitializedAsync()
     {
-        ComponentCancellation = new CancellationTokenSource();
-
-        await LoadEmployeeSheetAsync();
-
-        if (string.IsNullOrWhiteSpace(LoadingErrorMessage))
-        {
-            PeriodicSaveTask = RunPeriodicSaveLoopAsync(
-                ComponentCancellation.Token);
-        }
-    }
-
-    
-
-    private async Task LoadEmployeeSheetAsync()
-    {
-        IsLoading = true;
-        LoadingErrorMessage = string.Empty;
-
         try
         {
             var authenticationState =
-                await AuthenticationStateProvider
-                    .GetAuthenticationStateAsync();
+                await AuthenticationStateProvider.GetAuthenticationStateAsync();
 
-            var currentUser =
-                await UserManager.GetUserAsync(
-                    authenticationState.User);
+            var userId = UserManager.GetUserId(authenticationState.User);
 
-            if (currentUser is null)
+            if (string.IsNullOrWhiteSpace(userId))
             {
-                LoadingErrorMessage =
-                    "The current user could not be identified.";
-
+                ErrorMessage = "The current user could not be identified.";
                 return;
             }
 
-            if (currentUser.DepartmentId is null)
-            {
-                LoadingErrorMessage =
-                    "This employee is not assigned to a department.";
-
-                return;
-            }
+            CurrentUserId = userId;
 
             var sheet = await WorkOrderService.LoadSheetAsync(
-                currentUser.Id);
+                CurrentUserId,
+                SelectedWorkYear);
 
             if (sheet is null)
             {
-                LoadingErrorMessage =
-                    "The employee department could not be found.";
-
+                ErrorMessage =
+                    "The current user is not assigned to an active department.";
                 return;
             }
 
-            CurrentUserId = currentUser.Id;
-            CurrentDepartmentId = sheet.DepartmentId;
-            BranchName = sheet.BranchName;
-            DepartmentName = sheet.DepartmentName;
-            WorkOrderItems = sheet.WorkOrders;
-
-            AddBlankRows(BlankRowsTarget);
-            SetSavedState();
-        }
-        catch (OperationCanceledException)
-            when (ComponentCancellation?.IsCancellationRequested == true)
-        {
+            ApplySheet(sheet);
         }
         catch (Exception exception)
         {
             Logger.LogError(
                 exception,
-                "An error occurred while loading employee work orders.");
+                "An error occurred while loading work orders.");
 
-            LoadingErrorMessage =
-                "An unexpected error occurred while loading the sheet.";
+            ErrorMessage =
+                "An unexpected error occurred while loading work orders.";
         }
         finally
         {
@@ -302,247 +160,454 @@
         }
     }
 
-    private WorkOrder CreateBlankRow()
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        return new WorkOrder
+        if (
+            GridInitialized ||
+            IsLoading ||
+            IsYearLoading ||
+            !string.IsNullOrWhiteSpace(ErrorMessage))
         {
-            Id = NextTemporaryId--,
-            DepartmentId = CurrentDepartmentId,
-            WorkYear = DateTime.Now.Year,
-            Busket = string.Empty,
-            Status = string.Empty,
-            CreatedAt = DateTime.UtcNow,
-            CreatedBy = CurrentUserId
-        };
-    }
-
-    private void AddBlankRows(int count)
-    {
-        for (var index = 0; index < count; index++)
-        {
-            WorkOrderItems.Add(CreateBlankRow());
+            return;
         }
-    }
 
-    private async Task CellSavedAsync(
-        CellSavedArgs<WorkOrder> args)
-    {
-        OperationErrorMessage = string.Empty;
-        SuccessMessage = string.Empty;
+        GridInitialized = true;
 
-        HasUnsavedChanges = true;
-        SaveStateMessage = "Unsaved changes";
-        SaveStateCssClass = "text-warning";
-
-        ScheduleIdleSave();
-
-        var blankCount =
-            WorkOrderItems.Count(
-                WorkOrderService.IsCompletelyBlank);
-
-        if (blankCount <= 2 && WorkOrdersGrid is not null)
-        {
-            var rowsToAdd =
-                BlankRowsTarget - blankCount;
-
-            for (var index = 0; index < rowsToAdd; index++)
-            {
-                await WorkOrdersGrid.AddRecordAsync(
-                    CreateBlankRow(),
-                    WorkOrderItems.Count + index);
-            }
-        }
-    }
-
-    private void ScheduleIdleSave()
-    {
-        IdleSaveCancellation?.Cancel();
-        IdleSaveCancellation?.Dispose();
-
-        IdleSaveCancellation =
-            CancellationTokenSource.CreateLinkedTokenSource(
-                ComponentCancellation?.Token
-                ?? CancellationToken.None);
-
-        _ = SaveAfterIdleDelayAsync(
-            IdleSaveCancellation.Token);
-    }
-
-    private async Task SaveAfterIdleDelayAsync(
-        CancellationToken cancellationToken)
-    {
         try
         {
-            await Task.Delay(
-                IdleSaveDelay,
-                cancellationToken);
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
-            await InvokeAsync(SaveNowAsync);
+            await JSRuntime.InvokeVoidAsync(
+                "tabulatorTest.initialize",
+                TableId,
+                Rows);
+
+            stopwatch.Stop();
+
+            Logger.LogInformation(
+                "Transferred and initialized {WorkOrderCount} minimal Tabulator rows in {ElapsedMilliseconds} ms.",
+                Rows.Count,
+                stopwatch.ElapsedMilliseconds);
         }
-        catch (OperationCanceledException)
+        catch (Exception exception)
         {
+            GridInitialized = false;
+
+            Logger.LogError(
+                exception,
+                "An error occurred while initializing the minimal Tabulator grid.");
+
+            ErrorMessage = "The work-order sheet could not be initialized.";
+            StateHasChanged();
         }
     }
 
-    private async Task RunPeriodicSaveLoopAsync(
-        CancellationToken cancellationToken)
+    private async Task SaveChangesAsync()
     {
-        try
-        {
-            using var timer =
-                new PeriodicTimer(
-                    PeriodicSaveInterval);
-
-            while (await timer.WaitForNextTickAsync(
-                       cancellationToken))
-            {
-                await InvokeAsync(SaveNowAsync);
-            }
-        }
-        catch (OperationCanceledException)
-        {
-        }
-    }
-
-    private async Task SaveNowAsync()
-    {
-        if (!HasUnsavedChanges ||
+        if (
             IsSaving ||
-            WorkOrdersGrid is null)
+            IsYearLoading ||
+            string.IsNullOrWhiteSpace(CurrentUserId))
         {
             return;
         }
 
         IsSaving = true;
-        OperationErrorMessage = string.Empty;
-        SuccessMessage = string.Empty;
-
-        SaveStateMessage = "Saving...";
-        SaveStateCssClass = "text-primary";
 
         try
         {
-            await WorkOrdersGrid.EndEditAsync();
+            await JSRuntime.InvokeVoidAsync(
+                "tabulatorTest.setSaving",
+                TableId,
+                true);
+
+            var dirtyRows =
+                await JSRuntime.InvokeAsync<List<TabulatorWorkOrderRow>>(
+                    "tabulatorTest.getDirtyRows",
+                    TableId);
+
+            if (dirtyRows.Count == 0)
+            {
+                await SetGridStatusAsync("لا توجد تغييرات للحفظ.");
+                return;
+            }
+
+            var changedWorkOrders = new List<WorkOrder>();
+
+            foreach (var row in dirtyRows)
+            {
+                if (!TryParseAssignmentDate(
+                        row.AssignmentDate,
+                        out var assignmentDate))
+                {
+                    await SetGridStatusAsync(
+                        $"تعذر الحفظ: تاريخ الإسناد غير صحيح في أمر العمل {row.WorkOrderNumber}.");
+                    return;
+                }
+
+                changedWorkOrders.Add(
+                    new WorkOrder
+                    {
+                        Id = row.Id,
+                        RowVersion = DecodeRowVersion(row.RowVersion),
+                        WorkYear = assignmentDate?.Year ?? SelectedWorkYear,
+                        DisplayOrder = row.DisplayOrder,
+                        WorkOrderNumber = row.WorkOrderNumber ?? string.Empty,
+                        WorkTypeCode = row.WorkTypeCode ?? string.Empty,
+                        AssignmentDate = assignmentDate,
+                        Busket = row.Basket ?? string.Empty,
+                        Status = row.Status ?? string.Empty,
+                        Notes = row.Notes
+                    });
+            }
+
+            await SetGridStatusAsync("جارٍ حفظ التغييرات...");
+
+            var result = await WorkOrderService.SaveChangesAsync(
+                CurrentUserId,
+                SelectedWorkYear,
+                [],
+                changedWorkOrders,
+                []);
+
+            if (!result.Succeeded)
+            {
+                await SetGridStatusAsync(CreateFailureMessage(result));
+                return;
+            }
+
+            var savedRecords = result.SavedRecords ?? [];
+
+            var savedRows = savedRecords
+                .Where(record => record.WorkYear == SelectedWorkYear)
+                .Select(MapSavedRow)
+                .ToList();
+
+            var movedRowIds = savedRecords
+                .Where(record => record.WorkYear != SelectedWorkYear)
+                .Select(record => record.Id)
+                .ToList();
+
+            MergeRowsAfterSave(savedRows, movedRowIds);
+
+            await JSRuntime.InvokeVoidAsync(
+                "tabulatorTest.applySavedRows",
+                TableId,
+                savedRows,
+                movedRowIds);
+
+            var message = movedRowIds.Count > 0
+                ? $"تم حفظ {savedRecords.Count} صف، ونقل {movedRowIds.Count} صف إلى سنة تاريخ الإسناد."
+                : $"تم حفظ {savedRecords.Count} صف بنجاح.";
+
+            await SetGridStatusAsync(message);
+        }
+        catch (JSDisconnectedException)
+        {
+            Logger.LogWarning(
+                "The browser disconnected while saving work orders.");
         }
         catch (Exception exception)
         {
             Logger.LogError(
                 exception,
-                "An error occurred while requesting a grid save.");
+                "An unexpected error occurred while saving work orders.");
 
-            HasUnsavedChanges = true;
-
-            OperationErrorMessage =
-                "An unexpected error occurred while saving.";
-
-            SaveStateMessage = "Save failed";
-            SaveStateCssClass = "text-danger";
+            try
+            {
+                await SetGridStatusAsync(
+                    "حدث خطأ غير متوقع أثناء الحفظ.");
+            }
+            catch (JSDisconnectedException)
+            {
+            }
         }
         finally
         {
             IsSaving = false;
+
+            try
+            {
+                await JSRuntime.InvokeVoidAsync(
+                    "tabulatorTest.setSaving",
+                    TableId,
+                    false);
+            }
+            catch (JSDisconnectedException)
+            {
+            }
         }
     }
 
-    private async Task SaveBatchAsync(
-        BeforeBatchSaveArgs<WorkOrder> args)
+    private async Task ChangeWorkYearAsync(ChangeEventArgs args)
     {
-        OperationErrorMessage = string.Empty;
-        SuccessMessage = string.Empty;
+        if (
+            IsSaving ||
+            IsYearLoading ||
+            string.IsNullOrWhiteSpace(CurrentUserId) ||
+            !int.TryParse(
+                args.Value?.ToString(),
+                NumberStyles.None,
+                CultureInfo.InvariantCulture,
+                out var requestedYear) ||
+            requestedYear == SelectedWorkYear)
+        {
+            return;
+        }
 
-        if (args.BatchChanges is null)
+        if (GridInitialized)
+        {
+            var hasUnsavedChanges =
+                await JSRuntime.InvokeAsync<bool>(
+                    "tabulatorTest.hasUnsavedChanges",
+                    TableId);
+
+            if (hasUnsavedChanges)
+            {
+                await SetGridStatusAsync(
+                    "احفظ التغييرات الحالية قبل الانتقال إلى سنة أخرى.");
+
+                StateHasChanged();
+                return;
+            }
+        }
+
+        await LoadWorkYearAsync(requestedYear);
+    }
+
+    private async Task LoadWorkYearAsync(int workYear)
+    {
+        IsYearLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            var sheet = await WorkOrderService.LoadSheetAsync(
+                CurrentUserId,
+                workYear);
+
+            if (sheet is null)
+            {
+                await SetGridStatusAsync(
+                    "تعذر تحميل سنة العمل المطلوبة.");
+                return;
+            }
+
+            if (GridInitialized)
+            {
+                await JSRuntime.InvokeVoidAsync(
+                    "tabulatorTest.destroy",
+                    TableId);
+
+                GridInitialized = false;
+            }
+
+            ApplySheet(sheet);
+        }
+        catch (JSDisconnectedException)
+        {
+            Logger.LogWarning(
+                "The browser disconnected while changing the work-order year.");
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError(
+                exception,
+                "An error occurred while loading work-order year {WorkYear}.",
+                workYear);
+
+            await SetGridStatusAsync(
+                "حدث خطأ أثناء تحميل سنة العمل المطلوبة.");
+        }
+        finally
+        {
+            IsYearLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void ApplySheet(WorkOrderSheetData sheet)
+    {
+        BranchName = sheet.BranchName;
+        DepartmentName = sheet.DepartmentName;
+        SelectedWorkYear = sheet.WorkYear;
+        AvailableWorkYears = sheet.AvailableYears;
+        Rows = MapRows(sheet.WorkOrders, sheet.WorkYear);
+    }
+
+    private async Task SetGridStatusAsync(string message)
+    {
+        if (!GridInitialized)
+        {
+            return;
+        }
+
+        await JSRuntime.InvokeVoidAsync(
+            "tabulatorTest.setStatus",
+            TableId,
+            message);
+    }
+
+    private void MergeRowsAfterSave(
+        IEnumerable<TabulatorWorkOrderRow> savedRows,
+        IReadOnlyCollection<int> movedRowIds)
+    {
+        var movedIds = movedRowIds.ToHashSet();
+
+        var mergedRows = Rows
+            .Where(row => !movedIds.Contains(row.Id))
+            .ToDictionary(row => row.Id);
+
+        foreach (var savedRow in savedRows)
+        {
+            mergedRows[savedRow.Id] = savedRow;
+        }
+
+        Rows = mergedRows.Values
+            .OrderBy(row => row.DisplayOrder)
+            .ThenBy(row => row.Id)
+            .ToList();
+    }
+
+    private static string CreateFailureMessage(WorkOrderSaveResult result)
+    {
+        return result.FailureType switch
+        {
+            WorkOrderSaveFailureType.Duplicate =>
+                "تعذر الحفظ: رقم أمر العمل مع نوع العمل مسجل بالفعل.",
+
+            WorkOrderSaveFailureType.Concurrency =>
+                "تعذر الحفظ: تم تعديل هذا الصف من جلسة أخرى. حدّث الصفحة ثم أعد التعديل.",
+
+            WorkOrderSaveFailureType.Scope =>
+                "تعذر الحفظ: هذا الصف خارج نطاق القسم المسموح للمستخدم.",
+
+            WorkOrderSaveFailureType.Validation =>
+                $"تعذر الحفظ: {result.ErrorMessage}",
+
+            _ => "تعذر حفظ التغييرات بسبب خطأ في قاعدة البيانات."
+        };
+    }
+
+    private static TabulatorWorkOrderRow MapSavedRow(
+        WorkOrderSavedRecord record) =>
+        new()
+        {
+            Id = record.Id,
+            WorkYear = record.WorkYear,
+            DisplayOrder = record.DisplayOrder,
+            WorkOrderNumber = record.WorkOrderNumber,
+            WorkTypeCode = record.WorkTypeCode,
+            AssignmentDate = record.AssignmentDate?.ToString(
+                "dd/MM/yyyy",
+                CultureInfo.InvariantCulture) ?? string.Empty,
+            Basket = record.Busket,
+            Status = record.Status,
+            Notes = record.Notes ?? string.Empty,
+            RowVersion = Convert.ToBase64String(record.RowVersion)
+        };
+
+    private static List<TabulatorWorkOrderRow> MapRows(
+        IEnumerable<WorkOrderSheetRow> workOrders,
+        int workYear)
+    {
+        return workOrders
+            .Select(workOrder =>
+                new TabulatorWorkOrderRow
+                {
+                    Id = workOrder.Id,
+                    WorkYear = workYear,
+                    DisplayOrder = workOrder.DisplayOrder,
+                    WorkOrderNumber = workOrder.WorkOrderNumber,
+                    WorkTypeCode = workOrder.WorkTypeCode,
+                    AssignmentDate = workOrder.AssignmentDate?.ToString(
+                        "dd/MM/yyyy",
+                        CultureInfo.InvariantCulture) ?? string.Empty,
+                    Basket = workOrder.Busket,
+                    Status = workOrder.Status,
+                    Notes = workOrder.Notes ?? string.Empty,
+                    RowVersion = Convert.ToBase64String(
+                        workOrder.RowVersion)
+                })
+            .ToList();
+    }
+
+    private static bool TryParseAssignmentDate(
+        string? value,
+        out DateTime? assignmentDate)
+    {
+        assignmentDate = null;
+
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return true;
+        }
+
+        if (!DateTime.TryParseExact(
+                value.Trim(),
+                "dd/MM/yyyy",
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.None,
+                out var parsedDate))
+        {
+            return false;
+        }
+
+        assignmentDate = parsedDate.Date;
+        return true;
+    }
+
+    private static byte[] DecodeRowVersion(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return [];
+        }
+
+        try
+        {
+            return Convert.FromBase64String(value);
+        }
+        catch (FormatException)
+        {
+            return [];
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (!GridInitialized)
         {
             return;
         }
 
         try
         {
-            var result =
-                await WorkOrderService.SaveChangesAsync(
-                    CurrentUserId,
-                    args.BatchChanges.AddedRecords ?? [],
-                    args.BatchChanges.ChangedRecords ?? [],
-                    args.BatchChanges.DeletedRecords ?? [],
-                    ComponentCancellation?.Token
-                    ?? CancellationToken.None);
-
-            if (!result.Succeeded)
-            {
-                args.Cancel = true;
-                HasUnsavedChanges = true;
-                OperationErrorMessage =
-                    result.ErrorMessage;
-
-                SaveStateMessage =
-                    result.FailureType switch
-                    {
-                        WorkOrderSaveFailureType.Validation =>
-                            "Required fields are incomplete",
-
-                        WorkOrderSaveFailureType.Duplicate =>
-                            "Duplicate work order",
-
-                        _ => "Save failed"
-                    };
-
-                SaveStateCssClass = "text-danger";
-                return;
-            }
-
-            IdleSaveCancellation?.Cancel();
-            HasUnsavedChanges = false;
-
-            SuccessMessage =
-                "All changes were saved successfully.";
-
-            SetSavedState();
+            await JSRuntime.InvokeVoidAsync(
+                "tabulatorTest.destroy",
+                TableId);
         }
-        catch (OperationCanceledException)
-            when (ComponentCancellation?.IsCancellationRequested == true)
+        catch (JSDisconnectedException)
         {
-            args.Cancel = true;
         }
-        catch (Exception exception)
+        catch (InvalidOperationException)
         {
-            args.Cancel = true;
-            HasUnsavedChanges = true;
-
-            Logger.LogError(
-                exception,
-                "An unexpected error occurred while saving work orders.");
-
-            OperationErrorMessage =
-                "An unexpected error occurred while saving the changes.";
-
-            SaveStateMessage = "Save failed";
-            SaveStateCssClass = "text-danger";
         }
+
+        GridInitialized = false;
     }
 
-    private void SetSavedState()
+    private sealed class TabulatorWorkOrderRow
     {
-        SaveStateMessage = "All changes saved";
-        SaveStateCssClass = "text-success";
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        IdleSaveCancellation?.Cancel();
-        IdleSaveCancellation?.Dispose();
-
-        ComponentCancellation?.Cancel();
-
-        if (PeriodicSaveTask is not null)
-        {
-            try
-            {
-                await PeriodicSaveTask;
-            }
-            catch (OperationCanceledException)
-            {
-            }
-        }
-
-        ComponentCancellation?.Dispose();
+        public int Id { get; set; }
+        public int WorkYear { get; set; }
+        public long DisplayOrder { get; set; }
+        public string WorkOrderNumber { get; set; } = string.Empty;
+        public string WorkTypeCode { get; set; } = string.Empty;
+        public string AssignmentDate { get; set; } = string.Empty;
+        public string Basket { get; set; } = string.Empty;
+        public string Status { get; set; } = string.Empty;
+        public string Notes { get; set; } = string.Empty;
+        public string RowVersion { get; set; } = string.Empty;
     }
 }

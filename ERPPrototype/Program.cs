@@ -5,19 +5,8 @@ using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
-using Syncfusion.Blazor;
-using Syncfusion.Licensing;
 
 var builder = WebApplication.CreateBuilder(args);
-
-var syncfusionLicenseKey =
-    builder.Configuration["Syncfusion:LicenseKey"]
-    ?? throw new InvalidOperationException(
-        "Syncfusion license key was not found. Add it to User Secrets.");
-
-SyncfusionLicenseProvider.RegisterLicense(syncfusionLicenseKey);
-
-builder.Services.AddSyncfusionBlazor();
 
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
@@ -30,67 +19,53 @@ builder.Services.AddScoped<
 
 builder.Services.AddAuthentication(options =>
 {
-    options.DefaultScheme =
-        IdentityConstants.ApplicationScheme;
-
-    options.DefaultSignInScheme =
-        IdentityConstants.ExternalScheme;
+    options.DefaultScheme = IdentityConstants.ApplicationScheme;
+    options.DefaultSignInScheme = IdentityConstants.ExternalScheme;
 })
-    .AddIdentityCookies();
+.AddIdentityCookies();
 
 var originalConnectionString =
     builder.Configuration.GetConnectionString("DefaultConnection")
     ?? throw new InvalidOperationException(
         "Connection string 'DefaultConnection' not found.");
 
-// Azure SQL may need additional time during startup or resume.
-// Preserve all existing connection settings and only increase
-// the connection timeout.
-var connectionStringBuilder =
+var connectionString =
     new SqlConnectionStringBuilder(originalConnectionString)
     {
         ConnectTimeout = 30
-    };
-
-var connectionString =
-    connectionStringBuilder.ConnectionString;
+    }
+    .ConnectionString;
 
 builder.Services.AddDbContext<ApplicationDbContext>(
-    options =>
-        options.UseSqlServer(connectionString));
+    options => options.UseSqlServer(connectionString));
 
 builder.Services.AddDbContextFactory<ApplicationDbContext>(
-    options =>
-        options.UseSqlServer(connectionString),
+    options => options.UseSqlServer(connectionString),
     ServiceLifetime.Scoped);
 
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
-
 builder.Services.AddScoped<UserManagementService>();
 builder.Services.AddScoped<WorkOrderService>();
 
 builder.Services.AddIdentityCore<ApplicationUser>(options =>
 {
+    // Accounts are created by the application administrator and are marked
+    // as confirmed at creation time. Public registration is not available.
     options.SignIn.RequireConfirmedAccount = true;
 
-    options.Stores.SchemaVersion =
-        IdentitySchemaVersions.Version3;
-})
-    .AddRoles<IdentityRole>()
-    .AddEntityFrameworkStores<ApplicationDbContext>()
-    .AddSignInManager()
-    .AddDefaultTokenProviders();
+    options.Lockout.AllowedForNewUsers = true;
+    options.Lockout.MaxFailedAccessAttempts = 5;
+    options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
 
-builder.Services.AddSingleton<
-    IEmailSender<ApplicationUser>,
-    IdentityNoOpEmailSender>();
+    options.Stores.SchemaVersion = IdentitySchemaVersions.Version3;
+})
+.AddRoles<IdentityRole>()
+.AddEntityFrameworkStores<ApplicationDbContext>()
+.AddSignInManager()
+.AddDefaultTokenProviders();
 
 var app = builder.Build();
 
-// The application previously stopped with HTTP 500.30 when
-// Azure SQL timed out while the startup seeder was running.
-// Retry the entire idempotent seeding operation using a fresh
-// dependency-injection scope for every attempt.
 const int startupSeedMaxAttempts = 3;
 
 var startupLogger =
@@ -104,15 +79,12 @@ for (var attempt = 1;
 {
     try
     {
-        using var scope =
-            app.Services.CreateScope();
+        using var scope = app.Services.CreateScope();
 
-        await ApplicationSeeder.SeedAsync(
-            scope.ServiceProvider);
+        await ApplicationSeeder.SeedAsync(scope.ServiceProvider);
 
         startupLogger.LogInformation(
-            "Application database initialization succeeded " +
-            "on attempt {Attempt}.",
+            "Application database initialization succeeded on attempt {Attempt}.",
             attempt);
 
         break;
@@ -120,8 +92,7 @@ for (var attempt = 1;
     catch (SqlException exception)
         when (attempt < startupSeedMaxAttempts)
     {
-        var delay =
-            TimeSpan.FromSeconds(attempt * 5);
+        var delay = TimeSpan.FromSeconds(attempt * 5);
 
         startupLogger.LogWarning(
             exception,
@@ -137,8 +108,7 @@ for (var attempt = 1;
     catch (TimeoutException exception)
         when (attempt < startupSeedMaxAttempts)
     {
-        var delay =
-            TimeSpan.FromSeconds(attempt * 5);
+        var delay = TimeSpan.FromSeconds(attempt * 5);
 
         startupLogger.LogWarning(
             exception,
@@ -155,8 +125,7 @@ for (var attempt = 1;
     {
         startupLogger.LogCritical(
             exception,
-            "Application database initialization failed " +
-            "after attempt {Attempt}.",
+            "Application database initialization failed after attempt {Attempt}.",
             attempt);
 
         throw;

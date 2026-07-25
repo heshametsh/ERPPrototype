@@ -6,6 +6,7 @@
 @using ERPPrototype.Data
 
 @inject SignInManager<ApplicationUser> SignInManager
+@inject UserManager<ApplicationUser> UserManager
 @inject ILogger<Login> Logger
 @inject NavigationManager NavigationManager
 @inject IdentityRedirectManager RedirectManager
@@ -167,27 +168,47 @@
             return;
         }
 
+        var userName = Input.UserName.Trim();
+        var user = await UserManager.FindByNameAsync(userName);
+
+        if (user is null || !user.IsActive)
+        {
+            errorMessage =
+                "خطأ: اسم المستخدم أو كلمة المرور غير صحيحة، أو الحساب غير نشط.";
+
+            return;
+        }
+
         var result = await SignInManager.PasswordSignInAsync(
-            Input.UserName.Trim(),
+            user,
             Input.Password,
             Input.RememberMe,
-            lockoutOnFailure: false);
+            lockoutOnFailure: true);
 
         if (result.Succeeded)
         {
-            Logger.LogInformation("User logged in.");
+            Logger.LogInformation(
+                "User {UserId} logged in.",
+                user.Id);
+
+            if (user.MustChangePassword)
+            {
+                RedirectManager.RedirectTo(
+                    "Account/Manage/ChangePassword",
+                    new()
+                    {
+                        ["returnUrl"] = ReturnUrl
+                    });
+
+                return;
+            }
 
             RedirectManager.RedirectTo(ReturnUrl);
         }
         else if (result.RequiresTwoFactor)
         {
-            RedirectManager.RedirectTo(
-                "Account/LoginWith2fa",
-                new()
-                {
-                    ["returnUrl"] = ReturnUrl,
-                    ["rememberMe"] = Input.RememberMe
-                });
+            errorMessage =
+                "خطأ: التحقق بخطوتين غير مفعّل في النسخة الحالية. تواصل مع مدير النظام.";
         }
         else if (result.IsLockedOut)
         {
