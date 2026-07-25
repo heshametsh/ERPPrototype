@@ -1,4 +1,4 @@
-@page "/work-orders"
+﻿@page "/work-orders"
 @rendermode InteractiveServer
 @implements IAsyncDisposable
 
@@ -20,85 +20,193 @@
 
 <PageTitle>Work Orders</PageTitle>
 
-<div class="work-orders-page">
-    <div class="work-orders-header">
-        <div>
-            <h1>Work Orders</h1>
+<div class="work-orders-page tabulator-workorders-page">
 
-            <div class="work-orders-context">
-                @if (IsLoading)
-                {
-                    <span>Loading department data...</span>
-                }
-                else if (!string.IsNullOrWhiteSpace(DepartmentName))
-                {
-                    <span>@BranchName — @DepartmentName</span>
-                }
-                else
-                {
-                    <span>Work Orders</span>
-                }
+    <div class="work-orders-sticky-controls">
+        <div class="page-header-row">
+            <div class="page-title-block">
+                <h1>Work Orders</h1>
 
-                @if (!IsLoading && string.IsNullOrWhiteSpace(ErrorMessage))
-                {
-                    <label class="work-year-selector">
-                        <span>Year</span>
-                        <select class="work-year-select"
-                                value="@SelectedWorkYear"
-                                disabled="@(IsSaving || IsYearLoading)"
-                                @onchange="ChangeWorkYearAsync">
-                            @foreach (var year in AvailableWorkYears)
-                            {
-                                <option value="@year">@year</option>
-                            }
-                        </select>
-                    </label>
-                }
+                <div class="page-context-row">
+                    <div class="page-subtitle">
+                        @if (IsLoading)
+                        {
+                            <span>Loading department data...</span>
+                        }
+                        else if (!string.IsNullOrWhiteSpace(DepartmentName))
+                        {
+                            <span>@BranchName — @DepartmentName</span>
+                        }
+                        else
+                        {
+                            <span>Work Orders</span>
+                        }
+                    </div>
+
+                    @if (!IsLoading && string.IsNullOrWhiteSpace(ErrorMessage))
+                    {
+                        <label class="work-year-selector">
+                            <span>Year</span>
+
+                            <select @key="YearSelectorRenderKey"
+                                    class="work-year-select"
+                                    value="@SelectedWorkYear"
+                                    disabled="@(IsSaving || IsYearLoading)"
+                                    @onchange="ChangeWorkYearAsync">
+                                @foreach (var year in AvailableWorkYears)
+                                {
+                                    <option value="@year">@year</option>
+                                }
+                            </select>
+                        </label>
+                    }
+                </div>
             </div>
+
+            @if (!IsLoading && string.IsNullOrWhiteSpace(ErrorMessage))
+            {
+                <div class="page-actions-box">
+                    <div class="page-actions-buttons">
+                        <button type="button"
+                                class="page-action-button page-action-button-secondary"
+                                disabled="@IsYearLoading"
+                                onclick="window.tabulatorTest.undo('tabulator-test-table')">
+                            Undo
+                        </button>
+
+                        <button type="button"
+                                class="page-action-button page-action-button-secondary"
+                                disabled="@IsYearLoading"
+                                onclick="window.tabulatorTest.redo('tabulator-test-table')">
+                            Redo
+                        </button>
+
+                        <button type="button"
+                                class="page-action-button page-action-button-secondary"
+                                disabled="@IsYearLoading"
+                                onclick="window.tabulatorTest.openInsertDialog('tabulator-test-table')">
+                            Insert Rows
+                        </button>
+
+                        <button type="button"
+                                class="page-action-button page-action-button-secondary"
+                                disabled="@IsYearLoading"
+                                onclick="window.tabulatorTest.deleteSelectedRows('tabulator-test-table')">
+                            Delete Rows
+                        </button>
+
+                        <button type="button"
+                                class="page-action-button page-action-button-primary"
+                                disabled="@IsYearLoading"
+                                onclick="window.tabulatorTest.copyRange('tabulator-test-table')">
+                            Copy Selected Cells
+                        </button>
+
+                        <button type="button"
+                                class="page-action-button page-action-button-primary"
+                                disabled="@(IsSaving || IsYearLoading)"
+                                @onclick="SaveChangesAsync">
+                            @(IsYearLoading ? "Loading..." : IsSaving ? "Saving..." : "Save")
+                        </button>
+                    </div>
+
+                    <div class="save-status"
+                         id="tabulator-test-table-status">
+                        Preparing database rows...
+                    </div>
+                </div>
+            }
         </div>
 
-        @if (!IsLoading && string.IsNullOrWhiteSpace(ErrorMessage))
+        @if (IsLoading)
         {
-            <div class="work-orders-actions">
-                <button type="button"
-                        class="save-button"
-                        disabled="@(IsSaving || IsYearLoading)"
-                        @onclick="SaveChangesAsync">
-                    @(IsSaving ? "Saving..." : IsYearLoading ? "Loading..." : "Save")
-                </button>
+            <div class="alert alert-info">
+                Loading work orders from SQL Server...
+            </div>
+        }
+        else if (!string.IsNullOrWhiteSpace(ErrorMessage))
+        {
+            <div class="alert alert-danger">
+                @ErrorMessage
+            </div>
+        }
+        else
+        {
+            <div class="grid-instructions">
+                Select any cell, then use Insert Rows or right-click inside the sheet.
+                Insert or delete rows where needed, then press Save to store the changes in SQL Server.
+            </div>
 
-                <div id="work-orders-table-status"
-                     class="save-status"
-                     role="status"
-                     aria-live="polite">
-                    Preparing rows...
+            <div class="work-order-toolbar-row">
+                <div class="validation-navigator-slot">
+                    <div class="validation-navigator"
+                         id="tabulator-test-table-validation-panel"
+                         role="status"
+                         aria-live="polite"
+                         hidden>
+                        <div class="validation-navigator-summary">
+                            <span class="validation-navigator-icon"
+                                  aria-hidden="true">!</span>
+
+                            <div class="validation-navigator-copy">
+                                <strong id="tabulator-test-table-validation-title">
+                                    توجد أخطاء تمنع الحفظ
+                                </strong>
+
+                                <span id="tabulator-test-table-validation-message">
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="validation-navigator-actions">
+                            <button type="button"
+                                    class="validation-navigator-button"
+                                    id="tabulator-test-table-validation-previous"
+                                    onclick="window.tabulatorTest.previousValidationError('tabulator-test-table')">
+                                السابق
+                            </button>
+
+                            <button type="button"
+                                    class="validation-navigator-button"
+                                    id="tabulator-test-table-validation-next"
+                                    onclick="window.tabulatorTest.nextValidationError('tabulator-test-table')">
+                                التالي
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="work-order-search-box">
+                    <label class="work-order-search-label"
+                           for="tabulator-work-order-search">
+                        بحث أمر العمل
+                    </label>
+
+                    <input @key="SelectedWorkYear"
+                           id="tabulator-work-order-search"
+                           class="work-order-search-input"
+                           type="search"
+                           inputmode="numeric"
+                           autocomplete="off"
+                           disabled="@IsYearLoading"
+                           placeholder="اكتب رقم أمر العمل..."
+                           oninput="window.tabulatorTest.filterByWorkOrder('tabulator-test-table', this.value)" />
                 </div>
             </div>
         }
     </div>
 
-    @if (IsLoading)
+    @if (!IsLoading && string.IsNullOrWhiteSpace(ErrorMessage))
     {
-        <div class="alert alert-info">Loading work orders from SQL Server...</div>
-    }
-    else if (!string.IsNullOrWhiteSpace(ErrorMessage))
-    {
-        <div class="alert alert-danger">@ErrorMessage</div>
-    }
-    else
-    {
-        <div class="phase-note">
-            Performance baseline: display, direct cell editing, year switching, and delta save only.
-        </div>
-
         <div class="tabulator-card">
-            <div id="work-orders-table"></div>
+            <div id="tabulator-test-table"></div>
         </div>
     }
+
 </div>
 
 @code {
-    private const string TableId = "work-orders-table";
+    private const string TableId = "tabulator-test-table";
 
     private bool IsLoading = true;
     private bool IsSaving;
@@ -106,6 +214,7 @@
     private bool GridInitialized;
 
     private int SelectedWorkYear = DateTime.Now.Year;
+    private int YearSelectorRenderKey;
 
     private string CurrentUserId = string.Empty;
     private string BranchName = string.Empty;
@@ -120,26 +229,33 @@
         try
         {
             var authenticationState =
-                await AuthenticationStateProvider.GetAuthenticationStateAsync();
+                await AuthenticationStateProvider
+                    .GetAuthenticationStateAsync();
 
-            var userId = UserManager.GetUserId(authenticationState.User);
+            var userId =
+                UserManager.GetUserId(
+                    authenticationState.User);
 
             if (string.IsNullOrWhiteSpace(userId))
             {
-                ErrorMessage = "The current user could not be identified.";
+                ErrorMessage =
+                    "The current user could not be identified.";
+
                 return;
             }
 
             CurrentUserId = userId;
 
-            var sheet = await WorkOrderService.LoadSheetAsync(
-                CurrentUserId,
-                SelectedWorkYear);
+            var sheet =
+                await WorkOrderService.LoadSheetAsync(
+                    userId,
+                    SelectedWorkYear);
 
             if (sheet is null)
             {
                 ErrorMessage =
                     "The current user is not assigned to an active department.";
+
                 return;
             }
 
@@ -149,7 +265,7 @@
         {
             Logger.LogError(
                 exception,
-                "An error occurred while loading work orders.");
+                "An error occurred while loading Tabulator work orders.");
 
             ErrorMessage =
                 "An unexpected error occurred while loading work orders.";
@@ -160,7 +276,8 @@
         }
     }
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    protected override async Task OnAfterRenderAsync(
+        bool firstRender)
     {
         if (
             GridInitialized ||
@@ -175,19 +292,21 @@
 
         try
         {
-            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+            var initializationStopwatch =
+                System.Diagnostics.Stopwatch.StartNew();
 
             await JSRuntime.InvokeVoidAsync(
                 "tabulatorTest.initialize",
                 TableId,
-                Rows);
+                Rows,
+                WorkOrderBuskets.All);
 
-            stopwatch.Stop();
+            initializationStopwatch.Stop();
 
             Logger.LogInformation(
-                "Transferred and initialized {WorkOrderCount} minimal Tabulator rows in {ElapsedMilliseconds} ms.",
+                "Transferred and initialized {WorkOrderCount} Tabulator rows in {ElapsedMilliseconds} ms.",
                 Rows.Count,
-                stopwatch.ElapsedMilliseconds);
+                initializationStopwatch.ElapsedMilliseconds);
         }
         catch (Exception exception)
         {
@@ -195,9 +314,11 @@
 
             Logger.LogError(
                 exception,
-                "An error occurred while initializing the minimal Tabulator grid.");
+                "An error occurred while initializing Tabulator.");
 
-            ErrorMessage = "The work-order sheet could not be initialized.";
+            ErrorMessage =
+                "The work-order sheet could not be initialized.";
+
             StateHasChanged();
         }
     }
@@ -208,6 +329,16 @@
             IsSaving ||
             IsYearLoading ||
             string.IsNullOrWhiteSpace(CurrentUserId))
+        {
+            return;
+        }
+
+        var canSave =
+            await JSRuntime.InvokeAsync<bool>(
+                "tabulatorTest.validateBeforeSave",
+                TableId);
+
+        if (!canSave)
         {
             return;
         }
@@ -226,13 +357,42 @@
                     "tabulatorTest.getDirtyRows",
                     TableId);
 
-            if (dirtyRows.Count == 0)
+            var deletedRows =
+                await JSRuntime.InvokeAsync<List<TabulatorDeletedRow>>(
+                    "tabulatorTest.getDeletedRows",
+                    TableId);
+
+            if (dirtyRows.Count == 0 && deletedRows.Count == 0)
             {
-                await SetGridStatusAsync("لا توجد تغييرات للحفظ.");
+                await SetGridStatusAsync(
+                    "لا توجد تغييرات للحفظ.");
+
                 return;
             }
 
-            var changedWorkOrders = new List<WorkOrder>();
+            var blankAddedRow = dirtyRows
+                .FirstOrDefault(row =>
+                    row.Id <= 0 &&
+                    IsCompletelyBlank(row));
+
+            if (blankAddedRow is not null)
+            {
+                await SetGridStatusAsync(
+                    "تعذر الحفظ: أكمل بيانات الصفوف الجديدة أو احذف الصفوف الفارغة أولًا.");
+
+                return;
+            }
+
+            var addedWorkOrders =
+                new List<WorkOrder>();
+
+            var changedWorkOrders =
+                new List<WorkOrder>();
+
+            var addedRowMappings =
+                new List<PendingAddedRowMapping>();
+            var movedToOtherYearsCount = 0;
+            var destinationYears = new HashSet<int>();
 
             foreach (var row in dirtyRows)
             {
@@ -242,76 +402,299 @@
                 {
                     await SetGridStatusAsync(
                         $"تعذر الحفظ: تاريخ الإسناد غير صحيح في أمر العمل {row.WorkOrderNumber}.");
+
                     return;
                 }
 
-                changedWorkOrders.Add(
-                    new WorkOrder
-                    {
-                        Id = row.Id,
-                        RowVersion = DecodeRowVersion(row.RowVersion),
-                        WorkYear = assignmentDate?.Year ?? SelectedWorkYear,
-                        DisplayOrder = row.DisplayOrder,
-                        WorkOrderNumber = row.WorkOrderNumber ?? string.Empty,
-                        WorkTypeCode = row.WorkTypeCode ?? string.Empty,
-                        AssignmentDate = assignmentDate,
-                        Busket = row.Basket ?? string.Empty,
-                        Status = row.Status ?? string.Empty,
-                        Notes = row.Notes
-                    });
+                var destinationYear =
+                    assignmentDate?.Year ?? SelectedWorkYear;
+
+                if (destinationYear != SelectedWorkYear)
+                {
+                    movedToOtherYearsCount++;
+                    destinationYears.Add(destinationYear);
+                }
+
+                var workOrder = new WorkOrder
+                {
+                    Id = row.Id,
+                    RowVersion = DecodeRowVersion(row.RowVersion),
+                    WorkYear = destinationYear,
+                    DisplayOrder = row.DisplayOrder,
+                    WorkOrderNumber = row.WorkOrderNumber ?? string.Empty,
+                    WorkTypeCode = row.WorkTypeCode ?? string.Empty,
+                    AssignmentDate = assignmentDate,
+                    Busket = row.Basket ?? string.Empty,
+                    Status = row.Status ?? string.Empty,
+                    Notes = row.Notes
+                };
+
+                if (row.Id <= 0)
+                {
+                    addedWorkOrders.Add(workOrder);
+
+                    addedRowMappings.Add(
+                        new PendingAddedRowMapping
+                        {
+                            ClientKey = row.ClientKey,
+                            TemporaryId = row.Id,
+                            WorkOrder = workOrder
+                        });
+                }
+                else
+                {
+                    changedWorkOrders.Add(workOrder);
+                }
             }
 
-            await SetGridStatusAsync("جارٍ حفظ التغييرات...");
+            var deletedWorkOrders = deletedRows
+                .Where(row => row.Id > 0)
+                .Select(row => new WorkOrder
+                {
+                    Id = row.Id,
+                    RowVersion = DecodeRowVersion(row.RowVersion),
+                    WorkYear = SelectedWorkYear
+                })
+                .ToList();
 
-            var result = await WorkOrderService.SaveChangesAsync(
-                CurrentUserId,
-                SelectedWorkYear,
-                [],
-                changedWorkOrders,
-                []);
+            await SetGridStatusAsync(
+                "جارٍ حفظ التغييرات...");
+
+            var result =
+                await WorkOrderService.SaveChangesAsync(
+                    CurrentUserId,
+                    SelectedWorkYear,
+                    addedWorkOrders,
+                    changedWorkOrders,
+                    deletedWorkOrders);
 
             if (!result.Succeeded)
             {
-                await SetGridStatusAsync(CreateFailureMessage(result));
+                if (
+                    result.FailureType ==
+                        WorkOrderSaveFailureType.Duplicate &&
+                    !string.IsNullOrWhiteSpace(result.WorkOrderNumber) &&
+                    !string.IsNullOrWhiteSpace(result.WorkTypeCode))
+                {
+                    var duplicateRows = dirtyRows
+                        .Where(row =>
+                            string.Equals(
+                                row.WorkOrderNumber?.Trim(),
+                                result.WorkOrderNumber,
+                                StringComparison.Ordinal) &&
+                            string.Equals(
+                                row.WorkTypeCode?.Trim(),
+                                result.WorkTypeCode,
+                                StringComparison.Ordinal))
+                        .ToList();
+
+                    var duplicateLocation =
+                        result.ExistingWorkYear is int existingWorkYear
+                            ? string.IsNullOrWhiteSpace(
+                                result.ExistingDepartmentName)
+                                ? $" في سنة {existingWorkYear}"
+                                : $" في قسم {result.ExistingDepartmentName}، سنة {existingWorkYear}"
+                            : string.Empty;
+
+                    var duplicateMessage =
+                        $"رقم أمر العمل {result.WorkOrderNumber} " +
+                        $"مع النوع {result.WorkTypeCode} " +
+                        $"مسجل بالفعل{duplicateLocation}.";
+
+                    var validationErrors = duplicateRows
+                        .SelectMany(row => new[]
+                        {
+                            new TabulatorValidationError
+                            {
+                                RowId = row.Id,
+                                Field = "workOrderNumber",
+                                Code = result.ErrorCode,
+                                Message = duplicateMessage
+                            },
+                            new TabulatorValidationError
+                            {
+                                RowId = row.Id,
+                                Field = "workTypeCode",
+                                Code = result.ErrorCode,
+                                Message = duplicateMessage
+                            }
+                        })
+                        .ToList();
+
+                    if (validationErrors.Count > 0)
+                    {
+                        await JSRuntime.InvokeVoidAsync(
+                            "tabulatorTest.applyExternalValidationErrors",
+                            TableId,
+                            validationErrors,
+                            true);
+                    }
+                }
+
+                if (
+                    result.FailureType ==
+                        WorkOrderSaveFailureType.Concurrency)
+                {
+                    var conflictMessage =
+                        "تم تعديل أمر العمل أو نقله أو حذفه من جلسة أخرى بعد فتح الشيت. " +
+                        "لم يتم حفظ تغييراتك. حدّث الصفحة ثم أعد التعديل.";
+
+                    if (result.WorkOrderId is int conflictId)
+                    {
+                        var conflictRow = dirtyRows
+                            .FirstOrDefault(row =>
+                                row.Id == conflictId);
+
+                        if (conflictRow is not null)
+                        {
+                            await JSRuntime.InvokeVoidAsync(
+                                "tabulatorTest.applyExternalValidationErrors",
+                                TableId,
+                                new[]
+                                {
+                                    new TabulatorValidationError
+                                    {
+                                        RowId = conflictRow.Id,
+                                        Field = "workOrderNumber",
+                                        Code = result.ErrorCode,
+                                        Message = conflictMessage
+                                    }
+                                },
+                                true);
+                        }
+                    }
+
+                    await SetGridStatusAsync(
+                        $"فشل الحفظ: {conflictMessage}");
+
+                    return;
+                }
+
+                await SetGridStatusAsync(
+                    $"فشل الحفظ: {result.ErrorMessage}");
+
                 return;
             }
 
-            var savedRecords = result.SavedRecords ?? [];
+            var savedRecords =
+                result.SavedRecords ??
+                Array.Empty<WorkOrderSavedRecord>();
 
-            var savedRows = savedRecords
-                .Where(record => record.WorkYear == SelectedWorkYear)
-                .Select(MapSavedRow)
+            var savedRowMappings = addedRowMappings
+                .Select(mapping =>
+                    new TabulatorSavedRowMapping
+                    {
+                        ClientKey = mapping.ClientKey,
+                        TemporaryId = mapping.TemporaryId,
+                        DatabaseId = mapping.WorkOrder.Id
+                    })
                 .ToList();
 
-            var movedRowIds = savedRecords
-                .Where(record => record.WorkYear != SelectedWorkYear)
-                .Select(record => record.Id)
+            var clientKeyByDatabaseId = dirtyRows
+                .Where(row => row.Id > 0)
+                .GroupBy(row => row.Id)
+                .ToDictionary(
+                    group => group.Key,
+                    group => group.Last().ClientKey);
+
+            foreach (var mapping in savedRowMappings)
+            {
+                if (mapping.DatabaseId > 0)
+                {
+                    clientKeyByDatabaseId[mapping.DatabaseId] =
+                        mapping.ClientKey;
+                }
+            }
+
+            var savedRowsInCurrentYear = savedRecords
+                .Where(record =>
+                    record.WorkYear == SelectedWorkYear)
+                .Select(record =>
+                    MapSavedRow(
+                        record,
+                        clientKeyByDatabaseId.GetValueOrDefault(
+                            record.Id,
+                            $"db:{record.Id}")))
                 .ToList();
 
-            MergeRowsAfterSave(savedRows, movedRowIds);
+            var temporaryIdByDatabaseId = savedRowMappings
+                .Where(mapping => mapping.DatabaseId > 0)
+                .ToDictionary(
+                    mapping => mapping.DatabaseId,
+                    mapping => mapping.TemporaryId);
+
+            var removedRowIds = new HashSet<int>(
+                result.DeletedRecordIds ??
+                Array.Empty<int>());
+
+            // Remove every temporary client row that has just received a
+            // database Id. Without this, the Blazor-side Rows collection can
+            // retain both the negative temporary Id and the saved database Id.
+            foreach (var mapping in savedRowMappings)
+            {
+                removedRowIds.Add(mapping.TemporaryId);
+            }
+
+            foreach (var movedRecord in savedRecords
+                .Where(record =>
+                    record.WorkYear != SelectedWorkYear))
+            {
+                removedRowIds.Add(
+                    temporaryIdByDatabaseId.GetValueOrDefault(
+                        movedRecord.Id,
+                        movedRecord.Id));
+            }
+
+            AvailableWorkYears = AvailableWorkYears
+                .Concat(savedRecords.Select(record =>
+                    record.WorkYear))
+                .Append(DateTime.Now.Year)
+                .Append(SelectedWorkYear)
+                .Distinct()
+                .OrderByDescending(year => year)
+                .ToList();
+
+            Rows = MergeRowsAfterSave(
+                Rows,
+                savedRowsInCurrentYear,
+                removedRowIds);
 
             await JSRuntime.InvokeVoidAsync(
-                "tabulatorTest.applySavedRows",
+                "tabulatorTest.applySavedDelta",
                 TableId,
-                savedRows,
-                movedRowIds);
+                savedRowsInCurrentYear,
+                savedRowMappings,
+                removedRowIds.ToList());
 
-            var message = movedRowIds.Count > 0
-                ? $"تم حفظ {savedRecords.Count} صف، ونقل {movedRowIds.Count} صف إلى سنة تاريخ الإسناد."
-                : $"تم حفظ {savedRecords.Count} صف بنجاح.";
+            var savedCount =
+                dirtyRows.Count + deletedWorkOrders.Count;
 
-            await SetGridStatusAsync(message);
+            if (movedToOtherYearsCount > 0)
+            {
+                var destinationYearsText = string.Join(
+                    "، ",
+                    destinationYears
+                        .OrderByDescending(year => year));
+
+                await SetGridStatusAsync(
+                    $"تم حفظ {savedCount} صف بنجاح، وتم توزيع {movedToOtherYearsCount} صف حسب سنة تاريخ الإسناد إلى: {destinationYearsText}.");
+            }
+            else
+            {
+                await SetGridStatusAsync(
+                    $"تم حفظ {savedCount} صف بنجاح.");
+            }
         }
         catch (JSDisconnectedException)
         {
             Logger.LogWarning(
-                "The browser disconnected while saving work orders.");
+                "The browser disconnected while saving Tabulator work orders.");
         }
         catch (Exception exception)
         {
             Logger.LogError(
                 exception,
-                "An unexpected error occurred while saving work orders.");
+                "An unexpected error occurred while saving Tabulator work orders.");
 
             try
             {
@@ -364,8 +747,10 @@
 
             if (hasUnsavedChanges)
             {
+                YearSelectorRenderKey++;
+
                 await SetGridStatusAsync(
-                    "احفظ التغييرات الحالية قبل الانتقال إلى سنة أخرى.");
+                    "احفظ التغييرات الحالية أو استخدم Undo قبل الانتقال إلى سنة أخرى.");
 
                 StateHasChanged();
                 return;
@@ -382,14 +767,18 @@
 
         try
         {
-            var sheet = await WorkOrderService.LoadSheetAsync(
-                CurrentUserId,
-                workYear);
+            var sheet =
+                await WorkOrderService.LoadSheetAsync(
+                    CurrentUserId,
+                    workYear);
 
             if (sheet is null)
             {
+                YearSelectorRenderKey++;
+
                 await SetGridStatusAsync(
                     "تعذر تحميل سنة العمل المطلوبة.");
+
                 return;
             }
 
@@ -403,6 +792,7 @@
             }
 
             ApplySheet(sheet);
+            YearSelectorRenderKey++;
         }
         catch (JSDisconnectedException)
         {
@@ -415,6 +805,8 @@
                 exception,
                 "An error occurred while loading work-order year {WorkYear}.",
                 workYear);
+
+            YearSelectorRenderKey++;
 
             await SetGridStatusAsync(
                 "حدث خطأ أثناء تحميل سنة العمل المطلوبة.");
@@ -432,30 +824,46 @@
         DepartmentName = sheet.DepartmentName;
         SelectedWorkYear = sheet.WorkYear;
         AvailableWorkYears = sheet.AvailableYears;
-        Rows = MapRows(sheet.WorkOrders, sheet.WorkYear);
+        Rows = MapRows(sheet.WorkOrders);
     }
 
     private async Task SetGridStatusAsync(string message)
     {
-        if (!GridInitialized)
-        {
-            return;
-        }
-
         await JSRuntime.InvokeVoidAsync(
             "tabulatorTest.setStatus",
             TableId,
             message);
     }
 
-    private void MergeRowsAfterSave(
-        IEnumerable<TabulatorWorkOrderRow> savedRows,
-        IReadOnlyCollection<int> movedRowIds)
-    {
-        var movedIds = movedRowIds.ToHashSet();
+    private static TabulatorWorkOrderRow MapSavedRow(
+        WorkOrderSavedRecord record,
+        string clientKey) =>
+        new()
+        {
+            Id = record.Id,
+            ClientKey = clientKey,
+            DisplayOrder = record.DisplayOrder,
+            WorkOrderNumber = record.WorkOrderNumber,
+            WorkTypeCode = record.WorkTypeCode,
+            AssignmentDate =
+                record.AssignmentDate?.ToString(
+                    "dd/MM/yyyy",
+                    CultureInfo.InvariantCulture)
+                ?? string.Empty,
+            Basket = record.Busket,
+            Status = record.Status,
+            Notes = record.Notes ?? string.Empty,
+            RowVersion = Convert.ToBase64String(
+                record.RowVersion)
+        };
 
-        var mergedRows = Rows
-            .Where(row => !movedIds.Contains(row.Id))
+    private static List<TabulatorWorkOrderRow> MergeRowsAfterSave(
+        IEnumerable<TabulatorWorkOrderRow> currentRows,
+        IEnumerable<TabulatorWorkOrderRow> savedRows,
+        IReadOnlySet<int> removedRowIds)
+    {
+        var mergedRows = currentRows
+            .Where(row => !removedRowIds.Contains(row.Id))
             .ToDictionary(row => row.Id);
 
         foreach (var savedRow in savedRows)
@@ -463,66 +871,28 @@
             mergedRows[savedRow.Id] = savedRow;
         }
 
-        Rows = mergedRows.Values
+        return mergedRows.Values
             .OrderBy(row => row.DisplayOrder)
             .ThenBy(row => row.Id)
             .ToList();
     }
 
-    private static string CreateFailureMessage(WorkOrderSaveResult result)
-    {
-        return result.FailureType switch
-        {
-            WorkOrderSaveFailureType.Duplicate =>
-                "تعذر الحفظ: رقم أمر العمل مع نوع العمل مسجل بالفعل.",
-
-            WorkOrderSaveFailureType.Concurrency =>
-                "تعذر الحفظ: تم تعديل هذا الصف من جلسة أخرى. حدّث الصفحة ثم أعد التعديل.",
-
-            WorkOrderSaveFailureType.Scope =>
-                "تعذر الحفظ: هذا الصف خارج نطاق القسم المسموح للمستخدم.",
-
-            WorkOrderSaveFailureType.Validation =>
-                $"تعذر الحفظ: {result.ErrorMessage}",
-
-            _ => "تعذر حفظ التغييرات بسبب خطأ في قاعدة البيانات."
-        };
-    }
-
-    private static TabulatorWorkOrderRow MapSavedRow(
-        WorkOrderSavedRecord record) =>
-        new()
-        {
-            Id = record.Id,
-            WorkYear = record.WorkYear,
-            DisplayOrder = record.DisplayOrder,
-            WorkOrderNumber = record.WorkOrderNumber,
-            WorkTypeCode = record.WorkTypeCode,
-            AssignmentDate = record.AssignmentDate?.ToString(
-                "dd/MM/yyyy",
-                CultureInfo.InvariantCulture) ?? string.Empty,
-            Basket = record.Busket,
-            Status = record.Status,
-            Notes = record.Notes ?? string.Empty,
-            RowVersion = Convert.ToBase64String(record.RowVersion)
-        };
-
     private static List<TabulatorWorkOrderRow> MapRows(
-        IEnumerable<WorkOrderSheetRow> workOrders,
-        int workYear)
+        IEnumerable<WorkOrderSheetRow> workOrders)
     {
         return workOrders
             .Select(workOrder =>
                 new TabulatorWorkOrderRow
                 {
                     Id = workOrder.Id,
-                    WorkYear = workYear,
                     DisplayOrder = workOrder.DisplayOrder,
                     WorkOrderNumber = workOrder.WorkOrderNumber,
                     WorkTypeCode = workOrder.WorkTypeCode,
-                    AssignmentDate = workOrder.AssignmentDate?.ToString(
-                        "dd/MM/yyyy",
-                        CultureInfo.InvariantCulture) ?? string.Empty,
+                    AssignmentDate =
+                        workOrder.AssignmentDate?.ToString(
+                            "dd/MM/yyyy",
+                            CultureInfo.InvariantCulture)
+                        ?? string.Empty,
                     Basket = workOrder.Busket,
                     Status = workOrder.Status,
                     Notes = workOrder.Notes ?? string.Empty,
@@ -530,6 +900,18 @@
                         workOrder.RowVersion)
                 })
             .ToList();
+    }
+
+    private static bool IsCompletelyBlank(
+        TabulatorWorkOrderRow row)
+    {
+        return
+            string.IsNullOrWhiteSpace(row.WorkOrderNumber) &&
+            string.IsNullOrWhiteSpace(row.WorkTypeCode) &&
+            string.IsNullOrWhiteSpace(row.AssignmentDate) &&
+            string.IsNullOrWhiteSpace(row.Basket) &&
+            string.IsNullOrWhiteSpace(row.Status) &&
+            string.IsNullOrWhiteSpace(row.Notes);
     }
 
     private static bool TryParseAssignmentDate(
@@ -597,10 +979,38 @@
         GridInitialized = false;
     }
 
+    private sealed class TabulatorDeletedRow
+    {
+        public int Id { get; set; }
+        public string RowVersion { get; set; } = string.Empty;
+    }
+
+    private sealed class PendingAddedRowMapping
+    {
+        public string ClientKey { get; set; } = string.Empty;
+        public int TemporaryId { get; set; }
+        public WorkOrder WorkOrder { get; set; } = new();
+    }
+
+    private sealed class TabulatorSavedRowMapping
+    {
+        public string ClientKey { get; set; } = string.Empty;
+        public int TemporaryId { get; set; }
+        public int DatabaseId { get; set; }
+    }
+
+    private sealed class TabulatorValidationError
+    {
+        public int RowId { get; set; }
+        public string Field { get; set; } = string.Empty;
+        public string Code { get; set; } = string.Empty;
+        public string Message { get; set; } = string.Empty;
+    }
+
     private sealed class TabulatorWorkOrderRow
     {
         public int Id { get; set; }
-        public int WorkYear { get; set; }
+        public string ClientKey { get; set; } = string.Empty;
         public long DisplayOrder { get; set; }
         public string WorkOrderNumber { get; set; } = string.Empty;
         public string WorkTypeCode { get; set; } = string.Empty;
