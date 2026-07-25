@@ -792,3 +792,28 @@
         box-shadow: none;
     }
 }
+
+/* =========================================================
+   STEP 11C — ONE SCROLLBAR: GRID ONLY
+   The browser document is locked by JavaScript on desktop.
+   Controls remain in normal flow, while Tabulator receives a stable
+   pixel height calculated once from the available viewport space.
+   ========================================================= */
+
+.work-orders-sticky-controls {
+    position: static;
+    top: auto;
+    z-index: auto;
+}
+
+.tabulator-workorders-page .tabulator-card {
+    overscroll-behavior: contain;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .tabulator-workorders-page {
+        min-height: 0;
+        padding-bottom: 14px;
+        overflow: hidden;
+    }
+}

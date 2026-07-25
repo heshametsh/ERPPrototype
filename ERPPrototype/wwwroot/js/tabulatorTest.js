@@ -3,6 +3,77 @@ window.tabulatorTest = {
     states: {},
 
     /*
+     * نعتمد على نوع جهاز الإدخال بدل عرض النافذة.
+     * تصغير نافذة الكمبيوتر لا يحول الصفحة إلى وضع الموبايل،
+     * بينما الهاتف/التابلت يظل له التمرير الطبيعي.
+     */
+    usesDesktopPointer: function () {
+        return window.matchMedia(
+            "(hover: hover) and (pointer: fine)"
+        ).matches;
+    },
+
+    /*
+     * صفحة أوامر العمل تستخدم شريط تمرير واحد فقط: شريط الجدول.
+     * نحسب ارتفاعًا رقميًا ثابتًا من المساحة المتاحة في الشاشة،
+     * بدل height: 100% الذي كان يسبب إعادة رسم محرر الخلية.
+     */
+    calculateViewportTableHeight: function (element) {
+        const minimumHeight = 320;
+        const bottomGap = 14;
+        const viewportHeight =
+            window.visualViewport?.height || window.innerHeight;
+        const elementTop =
+            element.getBoundingClientRect().top;
+
+        return Math.max(
+            minimumHeight,
+            Math.floor(
+                viewportHeight - elementTop - bottomGap
+            )
+        );
+    },
+
+    applyViewportLock: function (state) {
+        if (
+            !state ||
+            !this.usesDesktopPointer()
+        ) {
+            return false;
+        }
+
+        window.scrollTo({
+            top: 0,
+            left: 0,
+            behavior: "auto"
+        });
+
+        state.previousDocumentOverflow =
+            document.documentElement.style.overflow;
+        state.previousBodyOverflow =
+            document.body.style.overflow;
+
+        document.documentElement.style.overflow = "hidden";
+        document.body.style.overflow = "hidden";
+        state.viewportLockApplied = true;
+
+        return true;
+    },
+
+    releaseViewportLock: function (state) {
+        if (!state?.viewportLockApplied) {
+            return;
+        }
+
+        document.documentElement.style.overflow =
+            state.previousDocumentOverflow || "";
+        document.body.style.overflow =
+            state.previousBodyOverflow || "";
+
+        state.viewportLockApplied = false;
+    },
+
+    /*
      * يحول التاريخ إلى الشكل المعتمد داخل الشيت:
      * DD/MM/YYYY
      *
@@ -1671,6 +1742,19 @@ window.tabulatorTest = {
             );
         }
 
+        if (oldState?.resizeHandler) {
+            window.removeEventListener(
+                "resize",
+                oldState.resizeHandler
+            );
+        }
+
+        if (oldState?.resizeTimer) {
+            window.clearTimeout(oldState.resizeTimer);
+        }
+
+        this.releaseViewportLock(oldState);
+
         if (oldTable) {
             oldTable.destroy();
         }
@@ -1763,6 +1847,12 @@ window.tabulatorTest = {
             copyHandler: null,
             pasteHandler: null,
             pointerDownHandler: null,
+            resizeHandler: null,
+            resizeTimer: null,
+
+            viewportLockApplied: false,
+            previousDocumentOverflow: "",
+            previousBodyOverflow: "",
 
             externalFilters: {
                 workOrderNumber: "",
@@ -1775,11 +1865,18 @@ window.tabulatorTest = {
         this.states[elementId] = state;
         this.ensureStructureUi(elementId);
 
+        const viewportLocked =
+            this.applyViewportLock(state);
+
+        const initialTableHeight = viewportLocked
+            ? this.calculateViewportTableHeight(element)
+            : 650;
+
         const table = new Tabulator(element, {
             data: data,
             index: "id",
 
-            height: "650px",
+            height: `${initialTableHeight}px`,
             layout: "fitColumns",
             renderVertical: "virtual",
 
@@ -2001,6 +2098,56 @@ window.tabulatorTest = {
 
         this.tables[elementId] = table;
 
+        /*
+         * تحديث الارتفاع يحدث فقط عند تغيير حجم نافذة المتصفح،
+         * وليس أثناء الكتابة أو التعديل داخل الخلايا.
+         */
+        state.resizeHandler = function () {
+            if (state.resizeTimer) {
+                window.clearTimeout(state.resizeTimer);
+            }
+
+            state.resizeTimer = window.setTimeout(
+                function () {
+                    const shouldLock =
+                        window.tabulatorTest
+                            .usesDesktopPointer();
+
+                    if (shouldLock) {
+                        if (!state.viewportLockApplied) {
+                            window.tabulatorTest
+                                .applyViewportLock(state);
+                        }
+
+                        /*
+                         * منع بقاء أي إزاحة للصفحة حدثت أثناء التصغير
+                         * قبل انتهاء مؤقت إعادة حساب ارتفاع الجدول.
+                         */
+                        window.scrollTo({
+                            top: 0,
+                            left: 0,
+                            behavior: "auto"
+                        });
+
+                        table.setHeight(
+                            `${window.tabulatorTest
+                                .calculateViewportTableHeight(element)}px`
+                        );
+                    } else {
+                        window.tabulatorTest
+                            .releaseViewportLock(state);
+                        table.setHeight("650px");
+                    }
+                },
+                160
+            );
+        };
+
+        window.addEventListener(
+            "resize",
+            state.resizeHandler
+        );
+
         table.on("tableBuilt", function () {
             window.tabulatorFilters.updateAllIcons(
                 window.tabulatorTest,
@@ -2065,6 +2212,50 @@ window.tabulatorTest = {
                 field: cell.getField(),
                 oldValue: cell.getValue()
             };
+
+            /*
+             * محررات رقم أمر العمل والنوع والتاريخ تمنع Enter من
+             * الانتقال أصلًا داخل المحرر المخصص. نطبق نفس السلوك
+             * على محررات Tabulator الجاهزة مثل Basket وStatus وNotes:
+             * يثبت Enter القيمة، ثم نوقف الحدث قبل أن ينفذ Tabulator
+             * تنقلًا إلى الصف التالي.
+             *
+             * نربط المستمع بعد إنشاء المحرر، ولذلك ينفذ مستمع المحرر
+             * الأصلي أولًا لحفظ القيمة، ثم يمنع هذا المستمع التنقل فقط.
+             */
+            window.requestAnimationFrame(function () {
+                const cellElement =
+                    cell.getElement();
+
+                const editor =
+                    cellElement?.querySelector(
+                        "input:not([type='hidden']), textarea, select"
+                    );
+
+                if (
+                    !editor ||
+                    editor.dataset.udsEnterStayBound === "true"
+                ) {
+                    return;
+                }
+
+                editor.dataset.udsEnterStayBound = "true";
+
+                editor.addEventListener(
+                    "keydown",
+                    function (event) {
+                        if (
+                            event.key !== "Enter" ||
+                            event.isComposing
+                        ) {
+                            return;
+                        }
+
+                        event.preventDefault();
+                        event.stopImmediatePropagation();
+                    }
+                );
+            });
         });
 
         table.on("cellEditCancelled", function (cell) {
@@ -6036,6 +6227,19 @@ window.tabulatorTest = {
                 true
             );
         }
+
+        if (state?.resizeHandler) {
+            window.removeEventListener(
+                "resize",
+                state.resizeHandler
+            );
+        }
+
+        if (state?.resizeTimer) {
+            window.clearTimeout(state.resizeTimer);
+        }
+
+        this.releaseViewportLock(state);
 
         if (table) {
             table.destroy();
