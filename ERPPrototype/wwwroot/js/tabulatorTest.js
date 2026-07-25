@@ -2978,7 +2978,9 @@
     },
 
     createDirtySnapshot: function (rowData) {
-        const snapshot = {};
+        const snapshot = {
+            rowVersion: rowData?.rowVersion ?? ""
+        };
 
         for (const field of this.dirtyFields) {
             snapshot[field] =
@@ -4999,7 +5001,9 @@
             status:
                 rowData.status ?? "",
             notes:
-                rowData.notes ?? ""
+                rowData.notes ?? "",
+            rowVersion:
+                rowData.rowVersion ?? ""
         };
     },
 
@@ -5755,8 +5759,15 @@
         return Array.from(
             state.deletedOriginalRowIds
         ).map(function (rowId) {
+            const originalSnapshot =
+                state.originalRows.get(
+                    String(rowId)
+                );
+
             return {
-                id: Number(rowId)
+                id: Number(rowId),
+                rowVersion:
+                    originalSnapshot?.rowVersion ?? ""
             };
         });
     },
@@ -5883,6 +5894,15 @@
             )
         );
 
+        const currentRowVersionByClientKey = new Map(
+            preparedRows.map(
+                row => [
+                    row.clientKey,
+                    row.rowVersion ?? ""
+                ]
+            )
+        );
+
         const temporaryIdByClientKey = new Map();
         const usedIds = new Set(
             preparedRows.map(
@@ -5988,6 +6008,10 @@
                             clientKey,
                             rowData.id
                         );
+                        rowData.rowVersion =
+                            currentRowVersionByClientKey.get(
+                                clientKey
+                            ) ?? "";
                     }
 
                     continue;

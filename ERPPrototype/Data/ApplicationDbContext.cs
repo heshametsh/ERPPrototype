@@ -118,6 +118,9 @@ public class ApplicationDbContext(
             entity.Property(workOrder => workOrder.Notes)
                 .HasMaxLength(1000);
 
+            entity.Property(workOrder => workOrder.RowVersion)
+                .IsRowVersion();
+
             entity.Property(workOrder => workOrder.CreatedBy)
                 .HasMaxLength(450)
                 .IsRequired();

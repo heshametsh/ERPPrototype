@@ -177,6 +177,21 @@ public sealed class WorkOrderService(
             return WorkOrderSaveResult.ValidationFailure(validationError);
         }
 
+        var recordWithoutValidRowVersion = existingChangedRecords
+            .Concat(existingDeletedRecords)
+            .FirstOrDefault(workOrder =>
+                workOrder.RowVersion is null ||
+                workOrder.RowVersion.Length != 8);
+
+        if (recordWithoutValidRowVersion is not null)
+        {
+            return WorkOrderSaveResult.ConcurrencyFailure(
+                "The work-order version is missing or outdated. Refresh the sheet before saving.",
+                recordWithoutValidRowVersion.Id,
+                recordWithoutValidRowVersion.WorkOrderNumber,
+                recordWithoutValidRowVersion.WorkTypeCode);
+        }
+
         await using var dbContext =
             await dbFactory.CreateDbContextAsync(cancellationToken);
 
@@ -337,14 +352,42 @@ public sealed class WorkOrderService(
                 var entitiesToDelete = await dbContext.WorkOrders
                     .Where(workOrder =>
                         workOrder.DepartmentId == departmentId &&
-                        workOrder.WorkYear == workYear &&
                         deletedIds.Contains(workOrder.Id))
                     .ToListAsync(cancellationToken);
 
                 if (entitiesToDelete.Count != deletedIds.Count)
                 {
-                    return WorkOrderSaveResult.ScopeFailure(
-                        "One or more selected work orders do not belong to this department.");
+                    var missingDeletedRecord = existingDeletedRecords
+                        .FirstOrDefault(record =>
+                            entitiesToDelete.All(entity =>
+                                entity.Id != record.Id));
+
+                    return WorkOrderSaveResult.ConcurrencyFailure(
+                        "One or more selected work orders were changed, moved, or deleted after the sheet was loaded.",
+                        missingDeletedRecord?.Id,
+                        missingDeletedRecord?.WorkOrderNumber,
+                        missingDeletedRecord?.WorkTypeCode);
+                }
+
+                var deletedById = existingDeletedRecords
+                    .ToDictionary(workOrder => workOrder.Id);
+
+                foreach (var entity in entitiesToDelete)
+                {
+                    var deletedRecord = deletedById[entity.Id];
+
+                    if (entity.WorkYear != workYear)
+                    {
+                        return WorkOrderSaveResult.ConcurrencyFailure(
+                            "A selected work order moved to another year after the sheet was loaded.",
+                            entity.Id,
+                            entity.WorkOrderNumber,
+                            entity.WorkTypeCode);
+                    }
+
+                    dbContext.Entry(entity)
+                        .Property(workOrder => workOrder.RowVersion)
+                        .OriginalValue = deletedRecord.RowVersion;
                 }
 
                 dbContext.WorkOrders.RemoveRange(entitiesToDelete);
@@ -355,14 +398,21 @@ public sealed class WorkOrderService(
                 var entitiesToUpdate = await dbContext.WorkOrders
                     .Where(workOrder =>
                         workOrder.DepartmentId == departmentId &&
-                        workOrder.WorkYear == workYear &&
                         changedIds.Contains(workOrder.Id))
                     .ToListAsync(cancellationToken);
 
                 if (entitiesToUpdate.Count != changedIds.Count)
                 {
-                    return WorkOrderSaveResult.ScopeFailure(
-                        "One or more modified work orders are no longer available.");
+                    var missingChangedRecord = existingChangedRecords
+                        .FirstOrDefault(record =>
+                            entitiesToUpdate.All(entity =>
+                                entity.Id != record.Id));
+
+                    return WorkOrderSaveResult.ConcurrencyFailure(
+                        "One or more modified work orders were changed, moved, or deleted after the sheet was loaded.",
+                        missingChangedRecord?.Id,
+                        missingChangedRecord?.WorkOrderNumber,
+                        missingChangedRecord?.WorkTypeCode);
                 }
 
                 var changedById = existingChangedRecords
@@ -373,6 +423,20 @@ public sealed class WorkOrderService(
                         changedById[entity.Id].DisplayOrder))
                 {
                     var changedRecord = changedById[entity.Id];
+
+                    if (entity.WorkYear != workYear)
+                    {
+                        return WorkOrderSaveResult.ConcurrencyFailure(
+                            "A modified work order moved to another year after the sheet was loaded.",
+                            entity.Id,
+                            entity.WorkOrderNumber,
+                            entity.WorkTypeCode);
+                    }
+
+                    dbContext.Entry(entity)
+                        .Property(workOrder => workOrder.RowVersion)
+                        .OriginalValue = changedRecord.RowVersion;
+
                     var destinationYear = ResolveTargetWorkYear(
                         entity.WorkYear,
                         changedRecord.AssignmentDate);
@@ -436,8 +500,31 @@ public sealed class WorkOrderService(
 
             return WorkOrderSaveResult.Success();
         }
+        catch (DbUpdateConcurrencyException exception)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+
+            var conflictingWorkOrder = exception.Entries
+                .Select(entry => entry.Entity)
+                .OfType<WorkOrder>()
+                .FirstOrDefault();
+
+            logger.LogWarning(
+                exception,
+                "A work-order concurrency conflict occurred for department {DepartmentId} and year {WorkYear}.",
+                departmentId,
+                workYear);
+
+            return WorkOrderSaveResult.ConcurrencyFailure(
+                "The work order was changed, moved, or deleted by another session after the sheet was loaded.",
+                conflictingWorkOrder?.Id,
+                conflictingWorkOrder?.WorkOrderNumber,
+                conflictingWorkOrder?.WorkTypeCode);
+        }
         catch (DbUpdateException exception)
         {
+            await transaction.RollbackAsync(cancellationToken);
+
             logger.LogError(
                 exception,
                 "A database error occurred while saving work orders for department {DepartmentId} and year {WorkYear}.",
@@ -636,6 +723,7 @@ public enum WorkOrderSaveFailureType
     Validation,
     Duplicate,
     Scope,
+    Concurrency,
     Database
 }
 
@@ -647,7 +735,8 @@ public sealed record WorkOrderSaveResult(
     string? WorkOrderNumber = null,
     string? WorkTypeCode = null,
     int? ExistingWorkYear = null,
-    string? ExistingDepartmentName = null)
+    string? ExistingDepartmentName = null,
+    int? WorkOrderId = null)
 {
     public static WorkOrderSaveResult Success() =>
         new(
@@ -686,6 +775,22 @@ public sealed record WorkOrderSaveResult(
             WorkOrderSaveFailureType.Scope,
             message,
             "scope_error");
+
+    public static WorkOrderSaveResult ConcurrencyFailure(
+        string message,
+        int? workOrderId = null,
+        string? workOrderNumber = null,
+        string? workTypeCode = null) =>
+        new(
+            false,
+            WorkOrderSaveFailureType.Concurrency,
+            message,
+            "concurrency_conflict",
+            workOrderNumber,
+            workTypeCode,
+            null,
+            null,
+            workOrderId);
 
     public static WorkOrderSaveResult DatabaseFailure(
         string message) =>

@@ -408,6 +408,7 @@
                 var workOrder = new WorkOrder
                 {
                     Id = row.Id,
+                    RowVersion = DecodeRowVersion(row.RowVersion),
                     WorkYear = destinationYear,
                     DisplayOrder = row.DisplayOrder,
                     WorkOrderNumber = row.WorkOrderNumber ?? string.Empty,
@@ -441,6 +442,7 @@
                 .Select(row => new WorkOrder
                 {
                     Id = row.Id,
+                    RowVersion = DecodeRowVersion(row.RowVersion),
                     WorkYear = SelectedWorkYear
                 })
                 .ToList();
@@ -517,6 +519,45 @@
                             validationErrors,
                             true);
                     }
+                }
+
+                if (
+                    result.FailureType ==
+                        WorkOrderSaveFailureType.Concurrency)
+                {
+                    var conflictMessage =
+                        "تم تعديل أمر العمل أو نقله أو حذفه من جلسة أخرى بعد فتح الشيت. " +
+                        "لم يتم حفظ تغييراتك. حدّث الصفحة ثم أعد التعديل.";
+
+                    if (result.WorkOrderId is int conflictId)
+                    {
+                        var conflictRow = dirtyRows
+                            .FirstOrDefault(row =>
+                                row.Id == conflictId);
+
+                        if (conflictRow is not null)
+                        {
+                            await JSRuntime.InvokeVoidAsync(
+                                "tabulatorTest.applyExternalValidationErrors",
+                                TableId,
+                                new[]
+                                {
+                                    new TabulatorValidationError
+                                    {
+                                        RowId = conflictRow.Id,
+                                        Field = "workOrderNumber",
+                                        Code = result.ErrorCode,
+                                        Message = conflictMessage
+                                    }
+                                },
+                                true);
+                        }
+                    }
+
+                    await SetGridStatusAsync(
+                        $"فشل الحفظ: {conflictMessage}");
+
+                    return;
                 }
 
                 await SetGridStatusAsync(
@@ -745,7 +786,9 @@
                         ?? string.Empty,
                     Basket = workOrder.Busket,
                     Status = workOrder.Status,
-                    Notes = workOrder.Notes ?? string.Empty
+                    Notes = workOrder.Notes ?? string.Empty,
+                    RowVersion = Convert.ToBase64String(
+                        workOrder.RowVersion)
                 })
             .ToList();
     }
@@ -787,6 +830,23 @@
         return true;
     }
 
+    private static byte[] DecodeRowVersion(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return [];
+        }
+
+        try
+        {
+            return Convert.FromBase64String(value);
+        }
+        catch (FormatException)
+        {
+            return [];
+        }
+    }
+
     public async ValueTask DisposeAsync()
     {
         if (!GridInitialized)
@@ -813,6 +873,7 @@
     private sealed class TabulatorDeletedRow
     {
         public int Id { get; set; }
+        public string RowVersion { get; set; } = string.Empty;
     }
 
     private sealed class PendingAddedRowMapping
@@ -848,5 +909,6 @@
         public string Basket { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
         public string Notes { get; set; } = string.Empty;
+        public string RowVersion { get; set; } = string.Empty;
     }
 }

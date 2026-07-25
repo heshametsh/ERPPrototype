@@ -20,6 +20,8 @@ public sealed class WorkOrder
 
     public string? Notes { get; set; }
 
+    public byte[] RowVersion { get; set; } = [];
+
     public int DepartmentId { get; set; }
 
     public Department Department { get; set; } = null!;
