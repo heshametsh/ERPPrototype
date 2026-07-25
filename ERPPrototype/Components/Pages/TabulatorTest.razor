@@ -1,4 +1,4 @@
-@page "/tabulator-test"
+﻿@page "/tabulator-test"
 @rendermode InteractiveServer
 @implements IAsyncDisposable
 
@@ -24,21 +24,41 @@
 
     <div class="work-orders-sticky-controls">
         <div class="page-header-row">
-            <div>
+            <div class="page-title-block">
                 <h1>Work Orders</h1>
 
-                <div class="page-subtitle">
-                    @if (IsLoading)
+                <div class="page-context-row">
+                    <div class="page-subtitle">
+                        @if (IsLoading)
+                        {
+                            <span>Loading department data...</span>
+                        }
+                        else if (!string.IsNullOrWhiteSpace(DepartmentName))
+                        {
+                            <span>@BranchName — @DepartmentName</span>
+                        }
+                        else
+                        {
+                            <span>Tabulator Prototype</span>
+                        }
+                    </div>
+
+                    @if (!IsLoading && string.IsNullOrWhiteSpace(ErrorMessage))
                     {
-                        <span>Loading department data...</span>
-                    }
-                    else if (!string.IsNullOrWhiteSpace(DepartmentName))
-                    {
-                        <span>@BranchName — @DepartmentName</span>
-                    }
-                    else
-                    {
-                        <span>Tabulator Prototype</span>
+                        <label class="work-year-selector">
+                            <span>Year</span>
+
+                            <select @key="YearSelectorRenderKey"
+                                    class="work-year-select"
+                                    value="@SelectedWorkYear"
+                                    disabled="@(IsSaving || IsYearLoading)"
+                                    @onchange="ChangeWorkYearAsync">
+                                @foreach (var year in AvailableWorkYears)
+                                {
+                                    <option value="@year">@year</option>
+                                }
+                            </select>
+                        </label>
                     }
                 </div>
             </div>
@@ -49,39 +69,44 @@
                     <div class="page-actions-buttons">
                         <button type="button"
                                 class="page-action-button page-action-button-secondary"
+                                disabled="@IsYearLoading"
                                 onclick="window.tabulatorTest.undo('tabulator-test-table')">
                             Undo
                         </button>
 
                         <button type="button"
                                 class="page-action-button page-action-button-secondary"
+                                disabled="@IsYearLoading"
                                 onclick="window.tabulatorTest.redo('tabulator-test-table')">
                             Redo
                         </button>
 
                         <button type="button"
                                 class="page-action-button page-action-button-secondary"
+                                disabled="@IsYearLoading"
                                 onclick="window.tabulatorTest.openInsertDialog('tabulator-test-table')">
                             Insert Rows
                         </button>
 
                         <button type="button"
                                 class="page-action-button page-action-button-secondary"
+                                disabled="@IsYearLoading"
                                 onclick="window.tabulatorTest.deleteSelectedRows('tabulator-test-table')">
                             Delete Rows
                         </button>
 
                         <button type="button"
                                 class="page-action-button page-action-button-primary"
+                                disabled="@IsYearLoading"
                                 onclick="window.tabulatorTest.copyRange('tabulator-test-table')">
                             Copy Selected Cells
                         </button>
 
                         <button type="button"
                                 class="page-action-button page-action-button-primary"
-                                disabled="@IsSaving"
+                                disabled="@(IsSaving || IsYearLoading)"
                                 @onclick="SaveChangesAsync">
-                            @(IsSaving ? "Saving..." : "Save")
+                            @(IsYearLoading ? "Loading..." : IsSaving ? "Saving..." : "Save")
                         </button>
                     </div>
 
@@ -157,11 +182,13 @@
                         بحث أمر العمل
                     </label>
 
-                    <input id="tabulator-work-order-search"
+                    <input @key="SelectedWorkYear"
+                           id="tabulator-work-order-search"
                            class="work-order-search-input"
                            type="search"
                            inputmode="numeric"
                            autocomplete="off"
+                           disabled="@IsYearLoading"
                            placeholder="اكتب رقم أمر العمل..."
                            oninput="window.tabulatorTest.filterByWorkOrder('tabulator-test-table', this.value)" />
                 </div>
@@ -183,13 +210,18 @@
 
     private bool IsLoading = true;
     private bool IsSaving;
+    private bool IsYearLoading;
     private bool GridInitialized;
+
+    private int SelectedWorkYear = DateTime.Now.Year;
+    private int YearSelectorRenderKey;
 
     private string CurrentUserId = string.Empty;
     private string BranchName = string.Empty;
     private string DepartmentName = string.Empty;
     private string ErrorMessage = string.Empty;
 
+    private List<int> AvailableWorkYears = [DateTime.Now.Year];
     private List<TabulatorWorkOrderRow> Rows = [];
 
     protected override async Task OnInitializedAsync()
@@ -215,7 +247,9 @@
             CurrentUserId = userId;
 
             var sheet =
-                await WorkOrderService.LoadSheetAsync(userId);
+                await WorkOrderService.LoadSheetAsync(
+                    userId,
+                    SelectedWorkYear);
 
             if (sheet is null)
             {
@@ -225,10 +259,7 @@
                 return;
             }
 
-            BranchName = sheet.BranchName;
-            DepartmentName = sheet.DepartmentName;
-
-            Rows = MapRows(sheet.WorkOrders);
+            ApplySheet(sheet);
         }
         catch (Exception exception)
         {
@@ -251,6 +282,7 @@
         if (
             GridInitialized ||
             IsLoading ||
+            IsYearLoading ||
             !string.IsNullOrWhiteSpace(ErrorMessage))
         {
             return;
@@ -283,7 +315,10 @@
 
     private async Task SaveChangesAsync()
     {
-        if (IsSaving || string.IsNullOrWhiteSpace(CurrentUserId))
+        if (
+            IsSaving ||
+            IsYearLoading ||
+            string.IsNullOrWhiteSpace(CurrentUserId))
         {
             return;
         }
@@ -346,6 +381,8 @@
 
             var addedRowMappings =
                 new List<PendingAddedRowMapping>();
+            var movedToOtherYearsCount = 0;
+            var destinationYears = new HashSet<int>();
 
             foreach (var row in dirtyRows)
             {
@@ -359,9 +396,19 @@
                     return;
                 }
 
+                var destinationYear =
+                    assignmentDate?.Year ?? SelectedWorkYear;
+
+                if (destinationYear != SelectedWorkYear)
+                {
+                    movedToOtherYearsCount++;
+                    destinationYears.Add(destinationYear);
+                }
+
                 var workOrder = new WorkOrder
                 {
                     Id = row.Id,
+                    WorkYear = destinationYear,
                     DisplayOrder = row.DisplayOrder,
                     WorkOrderNumber = row.WorkOrderNumber ?? string.Empty,
                     WorkTypeCode = row.WorkTypeCode ?? string.Empty,
@@ -393,7 +440,8 @@
                 .Where(row => row.Id > 0)
                 .Select(row => new WorkOrder
                 {
-                    Id = row.Id
+                    Id = row.Id,
+                    WorkYear = SelectedWorkYear
                 })
                 .ToList();
 
@@ -403,6 +451,7 @@
             var result =
                 await WorkOrderService.SaveChangesAsync(
                     CurrentUserId,
+                    SelectedWorkYear,
                     addedWorkOrders,
                     changedWorkOrders,
                     deletedWorkOrders);
@@ -427,9 +476,18 @@
                                 StringComparison.Ordinal))
                         .ToList();
 
+                    var duplicateLocation =
+                        result.ExistingWorkYear is int existingWorkYear
+                            ? string.IsNullOrWhiteSpace(
+                                result.ExistingDepartmentName)
+                                ? $" في سنة {existingWorkYear}"
+                                : $" في قسم {result.ExistingDepartmentName}، سنة {existingWorkYear}"
+                            : string.Empty;
+
                     var duplicateMessage =
                         $"رقم أمر العمل {result.WorkOrderNumber} " +
-                        $"مع النوع {result.WorkTypeCode} مسجل بالفعل.";
+                        $"مع النوع {result.WorkTypeCode} " +
+                        $"مسجل بالفعل{duplicateLocation}.";
 
                     var validationErrors = duplicateRows
                         .SelectMany(row => new[]
@@ -469,7 +527,8 @@
 
             var refreshedSheet =
                 await WorkOrderService.LoadSheetAsync(
-                    CurrentUserId);
+                    CurrentUserId,
+                    SelectedWorkYear);
 
             if (refreshedSheet is null)
             {
@@ -479,6 +538,8 @@
                 return;
             }
 
+            SelectedWorkYear = refreshedSheet.WorkYear;
+            AvailableWorkYears = refreshedSheet.AvailableYears;
             Rows = MapRows(refreshedSheet.WorkOrders);
 
             var savedRowMappings = addedRowMappings
@@ -500,8 +561,21 @@
             var savedCount =
                 dirtyRows.Count + deletedWorkOrders.Count;
 
-            await SetGridStatusAsync(
-                $"تم حفظ {savedCount} صف بنجاح.");
+            if (movedToOtherYearsCount > 0)
+            {
+                var destinationYearsText = string.Join(
+                    "، ",
+                    destinationYears
+                        .OrderByDescending(year => year));
+
+                await SetGridStatusAsync(
+                    $"تم حفظ {savedCount} صف بنجاح، وتم توزيع {movedToOtherYearsCount} صف حسب سنة تاريخ الإسناد إلى: {destinationYearsText}.");
+            }
+            else
+            {
+                await SetGridStatusAsync(
+                    $"تم حفظ {savedCount} صف بنجاح.");
+            }
         }
         catch (JSDisconnectedException)
         {
@@ -538,6 +612,111 @@
             {
             }
         }
+    }
+
+    private async Task ChangeWorkYearAsync(ChangeEventArgs args)
+    {
+        if (
+            IsSaving ||
+            IsYearLoading ||
+            string.IsNullOrWhiteSpace(CurrentUserId) ||
+            !int.TryParse(
+                args.Value?.ToString(),
+                NumberStyles.None,
+                CultureInfo.InvariantCulture,
+                out var requestedYear) ||
+            requestedYear == SelectedWorkYear)
+        {
+            return;
+        }
+
+        if (GridInitialized)
+        {
+            var hasUnsavedChanges =
+                await JSRuntime.InvokeAsync<bool>(
+                    "tabulatorTest.hasUnsavedChanges",
+                    TableId);
+
+            if (hasUnsavedChanges)
+            {
+                YearSelectorRenderKey++;
+
+                await SetGridStatusAsync(
+                    "احفظ التغييرات الحالية أو استخدم Undo قبل الانتقال إلى سنة أخرى.");
+
+                StateHasChanged();
+                return;
+            }
+        }
+
+        await LoadWorkYearAsync(requestedYear);
+    }
+
+    private async Task LoadWorkYearAsync(int workYear)
+    {
+        IsYearLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            var sheet =
+                await WorkOrderService.LoadSheetAsync(
+                    CurrentUserId,
+                    workYear);
+
+            if (sheet is null)
+            {
+                YearSelectorRenderKey++;
+
+                await SetGridStatusAsync(
+                    "تعذر تحميل سنة العمل المطلوبة.");
+
+                return;
+            }
+
+            if (GridInitialized)
+            {
+                await JSRuntime.InvokeVoidAsync(
+                    "tabulatorTest.destroy",
+                    TableId);
+
+                GridInitialized = false;
+            }
+
+            ApplySheet(sheet);
+            YearSelectorRenderKey++;
+        }
+        catch (JSDisconnectedException)
+        {
+            Logger.LogWarning(
+                "The browser disconnected while changing the work-order year.");
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError(
+                exception,
+                "An error occurred while loading work-order year {WorkYear}.",
+                workYear);
+
+            YearSelectorRenderKey++;
+
+            await SetGridStatusAsync(
+                "حدث خطأ أثناء تحميل سنة العمل المطلوبة.");
+        }
+        finally
+        {
+            IsYearLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void ApplySheet(WorkOrderSheetData sheet)
+    {
+        BranchName = sheet.BranchName;
+        DepartmentName = sheet.DepartmentName;
+        SelectedWorkYear = sheet.WorkYear;
+        AvailableWorkYears = sheet.AvailableYears;
+        Rows = MapRows(sheet.WorkOrders);
     }
 
     private async Task SetGridStatusAsync(string message)

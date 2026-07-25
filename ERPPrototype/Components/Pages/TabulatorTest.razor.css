@@ -1,4 +1,4 @@
-.tabulator-workorders-page {
+﻿.tabulator-workorders-page {
     --uds-navy-950: #0b2239;
     --uds-navy-800: #173a58;
     --uds-blue-600: #0b78c7;
@@ -74,6 +74,14 @@
         transform: translateY(1px);
     }
 
+.page-action-button:disabled {
+    opacity: 0.58;
+    cursor: default;
+    transform: none;
+    box-shadow: none;
+}
+
+
 .page-action-button-secondary {
     border: 1px solid #9bafc0;
     background: rgba(255, 255, 255, 0.76);
@@ -111,6 +119,65 @@
     direction: rtl;
     font-size: 0.76rem;
     font-weight: 700;
+}
+
+/* =========================
+   WORK YEAR SELECTOR
+   ========================= */
+
+.page-title-block {
+    min-width: 0;
+}
+
+.page-context-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-top: 7px;
+}
+
+.page-context-row .page-subtitle {
+    margin-top: 0;
+}
+
+.work-year-selector {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    min-height: 30px;
+    padding: 3px 5px 3px 10px;
+    border: 1px solid #b9d1e2;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.86);
+    color: #34566f;
+    font-size: 0.78rem;
+    font-weight: 800;
+}
+
+.work-year-select {
+    height: 24px;
+    min-width: 78px;
+    padding: 0 24px 0 8px;
+    border: 1px solid #94b4ca;
+    border-radius: 6px;
+    background: #ffffff;
+    color: #173047;
+    font: inherit;
+    font-weight: 800;
+    outline: none;
+    cursor: pointer;
+}
+
+.work-year-select:hover:not(:disabled),
+.work-year-select:focus {
+    border-color: var(--uds-blue-600);
+    box-shadow: 0 0 0 2px rgba(11, 120, 199, 0.12);
+}
+
+.work-year-select:disabled {
+    opacity: 0.62;
+    cursor: default;
 }
 
 /* =========================

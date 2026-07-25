@@ -1,4 +1,4 @@
-window.tabulatorTest = {
+﻿window.tabulatorTest = {
     tables: {},
     states: {},
 
@@ -6154,6 +6154,22 @@ window.tabulatorTest = {
             deletedRows:
                 state.deletedOriginalRowIds.size
         };
+    },
+
+    hasUnsavedChanges: async function (elementId) {
+        await this.commitActiveEditor(elementId);
+
+        const state =
+            this.states[elementId];
+
+        if (!state) {
+            return false;
+        }
+
+        return (
+            state.dirtyRowIds.size > 0 ||
+            state.deletedOriginalRowIds.size > 0
+        );
     },
 
     copyRange: function (elementId) {

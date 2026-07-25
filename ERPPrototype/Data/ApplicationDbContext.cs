@@ -133,6 +133,7 @@ public class ApplicationDbContext(
             entity.HasIndex(workOrder => new
             {
                 workOrder.DepartmentId,
+                workOrder.WorkYear,
                 workOrder.DisplayOrder
             });
 

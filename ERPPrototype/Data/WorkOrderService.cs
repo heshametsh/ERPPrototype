@@ -9,11 +9,30 @@ public sealed class WorkOrderService(
     ILogger<WorkOrderService> logger)
 {
     private const long DisplayOrderStep = 1_000_000_000L;
+    private const int MinimumWorkYear = 2000;
+    private const int MaximumWorkYear = 2100;
+
+    public Task<WorkOrderSheetData?> LoadSheetAsync(
+        string userId,
+        CancellationToken cancellationToken = default) =>
+        LoadSheetAsync(
+            userId,
+            DateTime.Now.Year,
+            cancellationToken);
 
     public async Task<WorkOrderSheetData?> LoadSheetAsync(
         string userId,
+        int workYear,
         CancellationToken cancellationToken = default)
     {
+        if (!IsValidWorkYear(workYear))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(workYear),
+                workYear,
+                $"Work year must be between {MinimumWorkYear} and {MaximumWorkYear}.");
+        }
+
         await using var dbContext =
             await dbFactory.CreateDbContextAsync(cancellationToken);
 
@@ -36,10 +55,28 @@ public sealed class WorkOrderService(
             return null;
         }
 
-        var workOrders = await dbContext.WorkOrders
+        var availableYears = await dbContext.WorkOrders
             .AsNoTracking()
             .Where(workOrder =>
                 workOrder.DepartmentId == userScope.DepartmentId)
+            .Select(workOrder => workOrder.WorkYear)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+        availableYears.Add(DateTime.Now.Year);
+        availableYears.Add(workYear);
+
+        availableYears = availableYears
+            .Where(IsValidWorkYear)
+            .Distinct()
+            .OrderByDescending(year => year)
+            .ToList();
+
+        var workOrders = await dbContext.WorkOrders
+            .AsNoTracking()
+            .Where(workOrder =>
+                workOrder.DepartmentId == userScope.DepartmentId &&
+                workOrder.WorkYear == workYear)
             .OrderBy(workOrder => workOrder.DisplayOrder)
             .ThenBy(workOrder => workOrder.Id)
             .ToListAsync(cancellationToken);
@@ -48,16 +85,38 @@ public sealed class WorkOrderService(
             userScope.DepartmentId,
             userScope.BranchName,
             userScope.DepartmentName,
+            workYear,
+            availableYears,
             workOrders);
     }
 
+    public Task<WorkOrderSaveResult> SaveChangesAsync(
+        string userId,
+        IEnumerable<WorkOrder> addedRecords,
+        IEnumerable<WorkOrder> changedRecords,
+        IEnumerable<WorkOrder> deletedRecords,
+        CancellationToken cancellationToken = default) =>
+        SaveChangesAsync(
+            userId,
+            DateTime.Now.Year,
+            addedRecords,
+            changedRecords,
+            deletedRecords,
+            cancellationToken);
+
     public async Task<WorkOrderSaveResult> SaveChangesAsync(
         string userId,
+        int workYear,
         IEnumerable<WorkOrder> addedRecords,
         IEnumerable<WorkOrder> changedRecords,
         IEnumerable<WorkOrder> deletedRecords,
         CancellationToken cancellationToken = default)
     {
+        if (!IsValidWorkYear(workYear))
+        {
+            return WorkOrderSaveResult.ValidationFailure(
+                $"Work year must be between {MinimumWorkYear} and {MaximumWorkYear}.");
+        }
         // Keep every Id == 0 record. Syncfusion may submit several new rows
         // with Id 0 in one batch, so grouping all new rows by Id would lose data.
         var newRecordCandidates = addedRecords
@@ -182,42 +241,103 @@ public sealed class WorkOrderService(
                     .Select(workOrder => new
                     {
                         workOrder.WorkOrderNumber,
-                        workOrder.WorkTypeCode
+                        workOrder.WorkTypeCode,
+                        workOrder.WorkYear,
+                        workOrder.DepartmentId,
+                        DepartmentName = workOrder.Department.DepartmentType.Name
                     })
                     .ToListAsync(cancellationToken);
 
-                var existingKeys = possibleConflicts
-                    .Select(workOrder =>
-                        CreateDuplicateKey(
-                            workOrder.WorkOrderNumber,
-                            workOrder.WorkTypeCode))
-                    .ToHashSet();
+                foreach (var incomingRecord in incomingRecords)
+                {
+                    var incomingKey = CreateDuplicateKey(
+                        incomingRecord.WorkOrderNumber,
+                        incomingRecord.WorkTypeCode);
 
-                var conflictingRecord = incomingRecords
-                    .FirstOrDefault(workOrder =>
-                        existingKeys.Contains(
+                    var existingConflict = possibleConflicts
+                        .FirstOrDefault(workOrder =>
                             CreateDuplicateKey(
                                 workOrder.WorkOrderNumber,
-                                workOrder.WorkTypeCode)));
+                                workOrder.WorkTypeCode) == incomingKey);
 
-                if (conflictingRecord is not null)
-                {
+                    if (existingConflict is null)
+                    {
+                        continue;
+                    }
+
+                    var differentDepartmentName =
+                        existingConflict.DepartmentId == departmentId
+                            ? null
+                            : existingConflict.DepartmentName;
+
                     return WorkOrderSaveResult.DuplicateFailure(
-                        $"Work Order Number '{conflictingRecord.WorkOrderNumber}' " +
-                        $"with Work Type '{conflictingRecord.WorkTypeCode}' " +
-                        "already exists in the company.",
-                        conflictingRecord.WorkOrderNumber,
-                        conflictingRecord.WorkTypeCode);
+                        $"Work Order Number '{incomingRecord.WorkOrderNumber}' " +
+                        $"with Work Type '{incomingRecord.WorkTypeCode}' " +
+                        $"already exists in work year {existingConflict.WorkYear}.",
+                        incomingRecord.WorkOrderNumber,
+                        incomingRecord.WorkTypeCode,
+                        existingConflict.WorkYear,
+                        differentDepartmentName);
                 }
             }
 
             var utcNow = DateTime.UtcNow;
+
+            var destinationYears = newRecords
+                .Select(workOrder =>
+                    ResolveTargetWorkYear(
+                        workYear,
+                        workOrder.AssignmentDate))
+                .Concat(
+                    existingChangedRecords.Select(workOrder =>
+                        ResolveTargetWorkYear(
+                            workYear,
+                            workOrder.AssignmentDate)))
+                .Distinct()
+                .ToList();
+
+            var nextAppendDisplayOrders = destinationYears.Count == 0
+                ? new Dictionary<int, long>()
+                : await dbContext.WorkOrders
+                    .AsNoTracking()
+                    .Where(workOrder =>
+                        workOrder.DepartmentId == departmentId &&
+                        destinationYears.Contains(workOrder.WorkYear))
+                    .GroupBy(workOrder => workOrder.WorkYear)
+                    .Select(group => new
+                    {
+                        WorkYear = group.Key,
+                        MaximumDisplayOrder = group.Max(workOrder =>
+                            workOrder.DisplayOrder)
+                    })
+                    .ToDictionaryAsync(
+                        item => item.WorkYear,
+                        item => item.MaximumDisplayOrder,
+                        cancellationToken);
+
+            foreach (var destinationYear in destinationYears)
+            {
+                nextAppendDisplayOrders.TryAdd(destinationYear, 0L);
+            }
+
+            long TakeNextDisplayOrder(int destinationYear)
+            {
+                var nextDisplayOrder =
+                    nextAppendDisplayOrders[destinationYear] +
+                    DisplayOrderStep;
+
+                nextAppendDisplayOrders[destinationYear] =
+                    nextDisplayOrder;
+
+                return nextDisplayOrder;
+            }
 
             if (deletedIds.Count > 0)
             {
                 var entitiesToDelete = await dbContext.WorkOrders
                     .Where(workOrder =>
                         workOrder.DepartmentId == departmentId &&
+                        workOrder.WorkYear == workYear &&
                         deletedIds.Contains(workOrder.Id))
                     .ToListAsync(cancellationToken);
 
@@ -235,6 +355,7 @@ public sealed class WorkOrderService(
                 var entitiesToUpdate = await dbContext.WorkOrders
                     .Where(workOrder =>
                         workOrder.DepartmentId == departmentId &&
+                        workOrder.WorkYear == workYear &&
                         changedIds.Contains(workOrder.Id))
                     .ToListAsync(cancellationToken);
 
@@ -247,44 +368,58 @@ public sealed class WorkOrderService(
                 var changedById = existingChangedRecords
                     .ToDictionary(workOrder => workOrder.Id);
 
-                foreach (var entity in entitiesToUpdate)
+                foreach (var entity in entitiesToUpdate
+                    .OrderBy(entity =>
+                        changedById[entity.Id].DisplayOrder))
                 {
+                    var changedRecord = changedById[entity.Id];
+                    var destinationYear = ResolveTargetWorkYear(
+                        entity.WorkYear,
+                        changedRecord.AssignmentDate);
+                    var movedToAnotherYear =
+                        destinationYear != entity.WorkYear;
+
                     ApplyEditableFields(
                         entity,
-                        changedById[entity.Id]);
+                        changedRecord);
+
+                    if (movedToAnotherYear)
+                    {
+                        entity.WorkYear = destinationYear;
+                        entity.DisplayOrder =
+                            TakeNextDisplayOrder(destinationYear);
+                    }
 
                     entity.UpdatedAt = utcNow;
                     entity.UpdatedBy = userId;
                 }
             }
 
-            var nextAppendDisplayOrder =
-                await dbContext.WorkOrders
-                    .Where(workOrder =>
-                        workOrder.DepartmentId == departmentId)
-                    .Select(workOrder =>
-                        (long?)workOrder.DisplayOrder)
-                    .MaxAsync(cancellationToken)
-                ?? 0L;
-
             foreach (var newRecord in newRecords)
             {
+                var destinationYear = ResolveTargetWorkYear(
+                    workYear,
+                    newRecord.AssignmentDate);
+
                 newRecord.Id = 0;
                 newRecord.DepartmentId = departmentId;
-                newRecord.WorkYear = DateTime.Now.Year;
+                newRecord.WorkYear = destinationYear;
 
-                // Tabulator supplies the requested position. The temporary
-                // Syncfusion fallback page may still submit DisplayOrder = 0,
-                // so append those rows safely.
-                if (newRecord.DisplayOrder <= 0)
+                // A row without an assignment date stays in the open sheet.
+                // A row whose assignment date belongs to another year is
+                // appended to that year's sheet instead of reusing a position
+                // that came from the currently open sheet.
+                if (
+                    destinationYear != workYear ||
+                    newRecord.DisplayOrder <= 0)
                 {
-                    nextAppendDisplayOrder += DisplayOrderStep;
-                    newRecord.DisplayOrder = nextAppendDisplayOrder;
+                    newRecord.DisplayOrder =
+                        TakeNextDisplayOrder(destinationYear);
                 }
                 else
                 {
-                    nextAppendDisplayOrder = Math.Max(
-                        nextAppendDisplayOrder,
+                    nextAppendDisplayOrders[destinationYear] = Math.Max(
+                        nextAppendDisplayOrders[destinationYear],
                         newRecord.DisplayOrder);
                 }
 
@@ -305,8 +440,9 @@ public sealed class WorkOrderService(
         {
             logger.LogError(
                 exception,
-                "A database error occurred while saving work orders for department {DepartmentId}.",
-                departmentId);
+                "A database error occurred while saving work orders for department {DepartmentId} and year {WorkYear}.",
+                departmentId,
+                workYear);
 
             if (IsUniqueConstraintViolation(exception))
             {
@@ -408,6 +544,14 @@ public sealed class WorkOrderService(
                 return "Select a valid value from the Busket list.";
             }
 
+            if (
+                workOrder.AssignmentDate is not null &&
+                !IsValidWorkYear(
+                    workOrder.AssignmentDate.Value.Year))
+            {
+                return $"Assignment Date year must be between {MinimumWorkYear} and {MaximumWorkYear}.";
+            }
+
             if (workOrder.Status?.Length > 150)
             {
                 return "Status cannot exceed 150 characters.";
@@ -450,6 +594,15 @@ public sealed class WorkOrderService(
                 character <= '9');
     }
 
+    private static int ResolveTargetWorkYear(
+        int fallbackWorkYear,
+        DateTime? assignmentDate) =>
+        assignmentDate?.Year ?? fallbackWorkYear;
+
+    private static bool IsValidWorkYear(int workYear) =>
+        workYear >= MinimumWorkYear &&
+        workYear <= MaximumWorkYear;
+
     private static bool IsUniqueConstraintViolation(
         DbUpdateException exception)
     {
@@ -473,6 +626,8 @@ public sealed record WorkOrderSheetData(
     int DepartmentId,
     string BranchName,
     string DepartmentName,
+    int WorkYear,
+    List<int> AvailableYears,
     List<WorkOrder> WorkOrders);
 
 public enum WorkOrderSaveFailureType
@@ -490,7 +645,9 @@ public sealed record WorkOrderSaveResult(
     string ErrorMessage,
     string ErrorCode = "",
     string? WorkOrderNumber = null,
-    string? WorkTypeCode = null)
+    string? WorkTypeCode = null,
+    int? ExistingWorkYear = null,
+    string? ExistingDepartmentName = null)
 {
     public static WorkOrderSaveResult Success() =>
         new(
@@ -509,14 +666,18 @@ public sealed record WorkOrderSaveResult(
     public static WorkOrderSaveResult DuplicateFailure(
         string message,
         string? workOrderNumber = null,
-        string? workTypeCode = null) =>
+        string? workTypeCode = null,
+        int? existingWorkYear = null,
+        string? existingDepartmentName = null) =>
         new(
             false,
             WorkOrderSaveFailureType.Duplicate,
             message,
             "duplicate_identity",
             workOrderNumber,
-            workTypeCode);
+            workTypeCode,
+            existingWorkYear,
+            existingDepartmentName);
 
     public static WorkOrderSaveResult ScopeFailure(
         string message) =>
