@@ -347,6 +347,8 @@ public sealed class WorkOrderService(
                 return nextDisplayOrder;
             }
 
+            var savedEntities = new List<WorkOrder>();
+
             if (deletedIds.Count > 0)
             {
                 var entitiesToDelete = await dbContext.WorkOrders
@@ -457,6 +459,8 @@ public sealed class WorkOrderService(
                     entity.UpdatedAt = utcNow;
                     entity.UpdatedBy = userId;
                 }
+
+                savedEntities.AddRange(entitiesToUpdate);
             }
 
             foreach (var newRecord in newRecords)
@@ -493,12 +497,21 @@ public sealed class WorkOrderService(
                 newRecord.UpdatedBy = null;
 
                 dbContext.WorkOrders.Add(newRecord);
+                savedEntities.Add(newRecord);
             }
 
             await dbContext.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
 
-            return WorkOrderSaveResult.Success();
+            var savedRecords = savedEntities
+                .Select(MapSavedRecord)
+                .ToList();
+
+            return WorkOrderSaveResult.Success(
+                savedRecords,
+                deletedIds
+                    .OrderBy(id => id)
+                    .ToList());
         }
         catch (DbUpdateConcurrencyException exception)
         {
@@ -541,6 +554,20 @@ public sealed class WorkOrderService(
                 "The changes could not be saved. Check for duplicate, linked, or invalid values.");
         }
     }
+
+    private static WorkOrderSavedRecord MapSavedRecord(
+        WorkOrder workOrder) =>
+        new(
+            workOrder.Id,
+            workOrder.WorkOrderNumber,
+            workOrder.WorkTypeCode,
+            workOrder.WorkYear,
+            workOrder.DisplayOrder,
+            workOrder.AssignmentDate,
+            workOrder.Busket,
+            workOrder.Status,
+            workOrder.Notes,
+            workOrder.RowVersion);
 
     public static bool IsCompletelyBlank(WorkOrder workOrder)
     {
@@ -727,6 +754,18 @@ public enum WorkOrderSaveFailureType
     Database
 }
 
+public sealed record WorkOrderSavedRecord(
+    int Id,
+    string WorkOrderNumber,
+    string WorkTypeCode,
+    int WorkYear,
+    long DisplayOrder,
+    DateTime? AssignmentDate,
+    string Busket,
+    string Status,
+    string? Notes,
+    byte[] RowVersion);
+
 public sealed record WorkOrderSaveResult(
     bool Succeeded,
     WorkOrderSaveFailureType FailureType,
@@ -736,13 +775,19 @@ public sealed record WorkOrderSaveResult(
     string? WorkTypeCode = null,
     int? ExistingWorkYear = null,
     string? ExistingDepartmentName = null,
-    int? WorkOrderId = null)
+    int? WorkOrderId = null,
+    IReadOnlyList<WorkOrderSavedRecord>? SavedRecords = null,
+    IReadOnlyList<int>? DeletedRecordIds = null)
 {
-    public static WorkOrderSaveResult Success() =>
+    public static WorkOrderSaveResult Success(
+        IReadOnlyList<WorkOrderSavedRecord> savedRecords,
+        IReadOnlyList<int> deletedRecordIds) =>
         new(
             true,
             WorkOrderSaveFailureType.None,
-            string.Empty);
+            string.Empty,
+            SavedRecords: savedRecords,
+            DeletedRecordIds: deletedRecordIds);
 
     public static WorkOrderSaveResult ValidationFailure(
         string message) =>

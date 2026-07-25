@@ -6048,6 +6048,382 @@
         return preparedRows;
     },
 
+    /*
+     * يطبق نتيجة الحفظ على الصفوف المتأثرة فقط.
+     * لا يعيد تحميل بيانات الشيت ولا يستبدل آلاف الصفوف السليمة.
+     */
+    applySavedDelta: async function (
+        elementId,
+        savedRows,
+        savedRowMappings,
+        removedRowIds
+    ) {
+        const table =
+            this.tables[elementId];
+
+        const state =
+            this.states[elementId];
+
+        if (!table || !state) {
+            return;
+        }
+
+        savedRows = Array.isArray(savedRows)
+            ? savedRows.map(row =>
+                this.cloneRowData(row))
+            : [];
+
+        savedRowMappings =
+            Array.isArray(savedRowMappings)
+                ? savedRowMappings
+                : [];
+
+        removedRowIds =
+            Array.isArray(removedRowIds)
+                ? removedRowIds
+                : [];
+
+        const oldRows = table
+            .getData()
+            .map(row =>
+                this.cloneRowData(row));
+
+        const savedById = new Map(
+            savedRows.map(row => [
+                String(row.id),
+                row
+            ])
+        );
+
+        const savedByClientKey = new Map(
+            savedRows.map(row => [
+                String(row.clientKey),
+                row
+            ])
+        );
+
+        const mappingByTemporaryId = new Map();
+        const mappedClientKeyByDatabaseId =
+            new Map();
+
+        for (const mapping of savedRowMappings) {
+            const temporaryId =
+                Number(mapping?.temporaryId);
+
+            const databaseId =
+                Number(mapping?.databaseId);
+
+            const clientKey = String(
+                mapping?.clientKey ?? ""
+            ).trim();
+
+            if (
+                Number.isFinite(temporaryId) &&
+                Number.isFinite(databaseId) &&
+                databaseId > 0
+            ) {
+                mappingByTemporaryId.set(
+                    String(temporaryId),
+                    databaseId
+                );
+
+                if (clientKey) {
+                    mappedClientKeyByDatabaseId.set(
+                        String(databaseId),
+                        clientKey
+                    );
+                }
+            }
+        }
+
+        const removedIdSet = new Set(
+            removedRowIds.map(id =>
+                String(id))
+        );
+
+        const includedSavedIds = new Set();
+        const finalRows = [];
+
+        for (const oldRow of oldRows) {
+            const oldIdKey =
+                String(oldRow.id);
+
+            if (removedIdSet.has(oldIdKey)) {
+                continue;
+            }
+
+            const mappedDatabaseId =
+                mappingByTemporaryId.get(oldIdKey);
+
+            let savedRow = null;
+
+            if (mappedDatabaseId !== undefined) {
+                savedRow = savedById.get(
+                    String(mappedDatabaseId)
+                ) ?? null;
+            }
+
+            if (!savedRow) {
+                savedRow =
+                    savedById.get(oldIdKey) ??
+                    savedByClientKey.get(
+                        String(oldRow.clientKey)
+                    ) ??
+                    null;
+            }
+
+            if (savedRow) {
+                const preparedSavedRow =
+                    this.cloneRowData({
+                        ...savedRow,
+                        clientKey:
+                            oldRow.clientKey ||
+                            savedRow.clientKey ||
+                            mappedClientKeyByDatabaseId.get(
+                                String(savedRow.id)
+                            )
+                    });
+
+                finalRows.push(preparedSavedRow);
+                includedSavedIds.add(
+                    String(preparedSavedRow.id)
+                );
+            } else {
+                finalRows.push(oldRow);
+            }
+        }
+
+        for (const savedRow of savedRows) {
+            const savedIdKey =
+                String(savedRow.id);
+
+            if (includedSavedIds.has(savedIdKey)) {
+                continue;
+            }
+
+            finalRows.push(
+                this.cloneRowData({
+                    ...savedRow,
+                    clientKey:
+                        savedRow.clientKey ||
+                        mappedClientKeyByDatabaseId.get(
+                            savedIdKey
+                        )
+                })
+            );
+        }
+
+        finalRows.sort((first, second) => {
+            const orderDifference =
+                Number(first.displayOrder) -
+                Number(second.displayOrder);
+
+            if (orderDifference !== 0) {
+                return orderDifference;
+            }
+
+            return Number(first.id) -
+                Number(second.id);
+        });
+
+        const minimumCurrentId =
+            finalRows.reduce(
+                (minimum, row) => {
+                    const id = Number(row?.id);
+
+                    return Number.isFinite(id)
+                        ? Math.min(minimum, id)
+                        : minimum;
+                },
+                0
+            );
+
+        state.nextTemporaryId =
+            minimumCurrentId <= 0
+                ? minimumCurrentId - 1
+                : -1;
+
+        const rebasedRows =
+            this.rebaseHistoryAfterSave(
+                state,
+                oldRows,
+                finalRows,
+                savedRowMappings
+            );
+
+        const validationRowIds = new Set(
+            Array.from(
+                state.validationErrors.values()
+            ).map(error => error.rowId)
+        );
+
+        state.applyingHistory = true;
+
+        try {
+            const rowIdsToDelete = new Set(
+                removedRowIds.map(id =>
+                    String(id))
+            );
+
+            for (const mapping of savedRowMappings) {
+                const temporaryId =
+                    Number(mapping?.temporaryId);
+
+                const databaseId =
+                    Number(mapping?.databaseId);
+
+                if (
+                    Number.isFinite(temporaryId) &&
+                    Number.isFinite(databaseId) &&
+                    databaseId > 0 &&
+                    savedById.has(String(databaseId))
+                ) {
+                    rowIdsToDelete.add(
+                        String(temporaryId)
+                    );
+                }
+            }
+
+            const rowsToDelete = [];
+
+            for (const rowId of rowIdsToDelete) {
+                const numericId = Number(rowId);
+                const row = table.getRow(
+                    Number.isNaN(numericId)
+                        ? rowId
+                        : numericId
+                );
+
+                if (row) {
+                    rowsToDelete.push(row);
+                }
+            }
+
+            if (rowsToDelete.length > 0) {
+                await table.deleteRow(rowsToDelete);
+            }
+
+            const rowsToUpdate = savedRows
+                .filter(row =>
+                    Boolean(table.getRow(row.id)));
+
+            if (rowsToUpdate.length > 0) {
+                await table.updateData(
+                    rowsToUpdate
+                );
+            }
+
+            const savedIdSet = new Set(
+                savedRows.map(row =>
+                    String(row.id))
+            );
+
+            for (
+                let index = 0;
+                index < rebasedRows.length;
+                index++
+            ) {
+                const rowData =
+                    rebasedRows[index];
+
+                if (
+                    !savedIdSet.has(
+                        String(rowData.id)
+                    ) ||
+                    table.getRow(rowData.id)
+                ) {
+                    continue;
+                }
+
+                let previousRow = null;
+
+                for (
+                    let previousIndex = index - 1;
+                    previousIndex >= 0;
+                    previousIndex--
+                ) {
+                    previousRow = table.getRow(
+                        rebasedRows[previousIndex].id
+                    );
+
+                    if (previousRow) {
+                        break;
+                    }
+                }
+
+                if (previousRow) {
+                    await table.addRow(
+                        rowData,
+                        false,
+                        previousRow
+                    );
+
+                    continue;
+                }
+
+                let nextRow = null;
+
+                for (
+                    let nextIndex = index + 1;
+                    nextIndex < rebasedRows.length;
+                    nextIndex++
+                ) {
+                    nextRow = table.getRow(
+                        rebasedRows[nextIndex].id
+                    );
+
+                    if (nextRow) {
+                        break;
+                    }
+                }
+
+                await table.addRow(
+                    rowData,
+                    true,
+                    nextRow || undefined
+                );
+            }
+
+            state.originalRows = new Map(
+                rebasedRows.map(row => [
+                    String(row.id),
+                    this.createDirtySnapshot(row)
+                ])
+            );
+
+            state.dirtyRowIds.clear();
+            state.deletedOriginalRowIds.clear();
+
+            state.validationErrors.clear();
+            state.validationOrder = [];
+            state.activeValidationIndex = -1;
+
+            state.pendingEdit = null;
+            state.pendingRangeClear = null;
+            state.nextEditMode = null;
+            state.currentEditMode = null;
+            state.currentEditingCell = null;
+            state.activeCell = null;
+
+            window.tabulatorFilters.apply(
+                this,
+                elementId
+            );
+        } finally {
+            state.applyingHistory = false;
+        }
+
+        for (const rowId of validationRowIds) {
+            this.applyValidationStylesToRow(
+                elementId,
+                rowId
+            );
+        }
+
+        this.syncValidationUi(elementId);
+        this.renderStatus(elementId);
+    },
+
     replaceSavedData: async function (
         elementId,
         data,

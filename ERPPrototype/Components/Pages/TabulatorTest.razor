@@ -566,22 +566,9 @@
                 return;
             }
 
-            var refreshedSheet =
-                await WorkOrderService.LoadSheetAsync(
-                    CurrentUserId,
-                    SelectedWorkYear);
-
-            if (refreshedSheet is null)
-            {
-                await SetGridStatusAsync(
-                    "تم الحفظ، لكن تعذر إعادة تحميل الشيت.");
-
-                return;
-            }
-
-            SelectedWorkYear = refreshedSheet.WorkYear;
-            AvailableWorkYears = refreshedSheet.AvailableYears;
-            Rows = MapRows(refreshedSheet.WorkOrders);
+            var savedRecords =
+                result.SavedRecords ??
+                Array.Empty<WorkOrderSavedRecord>();
 
             var savedRowMappings = addedRowMappings
                 .Select(mapping =>
@@ -593,11 +580,73 @@
                     })
                 .ToList();
 
-            await JSRuntime.InvokeVoidAsync(
-                "tabulatorTest.replaceSavedData",
-                TableId,
+            var clientKeyByDatabaseId = dirtyRows
+                .Where(row => row.Id > 0)
+                .GroupBy(row => row.Id)
+                .ToDictionary(
+                    group => group.Key,
+                    group => group.Last().ClientKey);
+
+            foreach (var mapping in savedRowMappings)
+            {
+                if (mapping.DatabaseId > 0)
+                {
+                    clientKeyByDatabaseId[mapping.DatabaseId] =
+                        mapping.ClientKey;
+                }
+            }
+
+            var savedRowsInCurrentYear = savedRecords
+                .Where(record =>
+                    record.WorkYear == SelectedWorkYear)
+                .Select(record =>
+                    MapSavedRow(
+                        record,
+                        clientKeyByDatabaseId.GetValueOrDefault(
+                            record.Id,
+                            $"db:{record.Id}")))
+                .ToList();
+
+            var temporaryIdByDatabaseId = savedRowMappings
+                .Where(mapping => mapping.DatabaseId > 0)
+                .ToDictionary(
+                    mapping => mapping.DatabaseId,
+                    mapping => mapping.TemporaryId);
+
+            var removedRowIds = new HashSet<int>(
+                result.DeletedRecordIds ??
+                Array.Empty<int>());
+
+            foreach (var movedRecord in savedRecords
+                .Where(record =>
+                    record.WorkYear != SelectedWorkYear))
+            {
+                removedRowIds.Add(
+                    temporaryIdByDatabaseId.GetValueOrDefault(
+                        movedRecord.Id,
+                        movedRecord.Id));
+            }
+
+            AvailableWorkYears = AvailableWorkYears
+                .Concat(savedRecords.Select(record =>
+                    record.WorkYear))
+                .Append(DateTime.Now.Year)
+                .Append(SelectedWorkYear)
+                .Distinct()
+                .OrderByDescending(year => year)
+                .ToList();
+
+            Rows = MergeRowsAfterSave(
                 Rows,
-                savedRowMappings);
+                savedRowsInCurrentYear,
+                removedRowIds);
+
+            await JSRuntime.InvokeVoidAsync(
+                "tabulatorTest.applySavedDelta",
+                TableId,
+                savedRowsInCurrentYear,
+                savedRowMappings,
+                removedRowIds.ToList());
 
             var savedCount =
                 dirtyRows.Count + deletedWorkOrders.Count;
@@ -766,6 +815,48 @@
             "tabulatorTest.setStatus",
             TableId,
             message);
+    }
+
+    private static TabulatorWorkOrderRow MapSavedRow(
+        WorkOrderSavedRecord record,
+        string clientKey) =>
+        new()
+        {
+            Id = record.Id,
+            ClientKey = clientKey,
+            DisplayOrder = record.DisplayOrder,
+            WorkOrderNumber = record.WorkOrderNumber,
+            WorkTypeCode = record.WorkTypeCode,
+            AssignmentDate =
+                record.AssignmentDate?.ToString(
+                    "dd/MM/yyyy",
+                    CultureInfo.InvariantCulture)
+                ?? string.Empty,
+            Basket = record.Busket,
+            Status = record.Status,
+            Notes = record.Notes ?? string.Empty,
+            RowVersion = Convert.ToBase64String(
+                record.RowVersion)
+        };
+
+    private static List<TabulatorWorkOrderRow> MergeRowsAfterSave(
+        IEnumerable<TabulatorWorkOrderRow> currentRows,
+        IEnumerable<TabulatorWorkOrderRow> savedRows,
+        IReadOnlySet<int> removedRowIds)
+    {
+        var mergedRows = currentRows
+            .Where(row => !removedRowIds.Contains(row.Id))
+            .ToDictionary(row => row.Id);
+
+        foreach (var savedRow in savedRows)
+        {
+            mergedRows[savedRow.Id] = savedRow;
+        }
+
+        return mergedRows.Values
+            .OrderBy(row => row.DisplayOrder)
+            .ThenBy(row => row.Id)
+            .ToList();
     }
 
     private static List<TabulatorWorkOrderRow> MapRows(
