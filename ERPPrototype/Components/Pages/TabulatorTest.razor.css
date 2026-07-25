@@ -760,3 +760,35 @@
     line-height: 1;
     pointer-events: none;
 }
+
+/* =========================================================
+   STEP 11B — STICKY PAGE CONTROLS WITHOUT RESIZING TABULATOR
+   Keeps the command area visible while document scrolling occurs.
+   The grid keeps its stable fixed height, so cell editing is unaffected.
+   ========================================================= */
+
+.work-orders-sticky-controls {
+    position: sticky;
+    top: 72px;
+    z-index: 100;
+    margin: -24px -30px 12px;
+    padding: 24px 30px 12px;
+    border-bottom: 1px solid rgba(193, 206, 217, 0.78);
+    background: #f4f7fb;
+    box-shadow: 0 8px 18px rgba(15, 42, 70, 0.055);
+}
+
+.work-orders-sticky-controls .work-order-toolbar-row {
+    margin-bottom: 0;
+}
+
+@media (max-width: 800px) {
+    .work-orders-sticky-controls {
+        position: static;
+        margin: 0 0 12px;
+        padding: 0;
+        border-bottom: 0;
+        background: transparent;
+        box-shadow: none;
+    }
+}

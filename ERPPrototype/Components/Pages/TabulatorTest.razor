@@ -22,150 +22,155 @@
 
 <div class="work-orders-page tabulator-workorders-page">
 
-    <div class="page-header-row">
-        <div>
-            <h1>Work Orders</h1>
+    <div class="work-orders-sticky-controls">
+        <div class="page-header-row">
+            <div>
+                <h1>Work Orders</h1>
 
-            <div class="page-subtitle">
-                @if (IsLoading)
-                {
-                    <span>Loading department data...</span>
-                }
-                else if (!string.IsNullOrWhiteSpace(DepartmentName))
-                {
-                    <span>@BranchName — @DepartmentName</span>
-                }
-                else
-                {
-                    <span>Tabulator Prototype</span>
-                }
+                <div class="page-subtitle">
+                    @if (IsLoading)
+                    {
+                        <span>Loading department data...</span>
+                    }
+                    else if (!string.IsNullOrWhiteSpace(DepartmentName))
+                    {
+                        <span>@BranchName — @DepartmentName</span>
+                    }
+                    else
+                    {
+                        <span>Tabulator Prototype</span>
+                    }
+                </div>
             </div>
+
+            @if (!IsLoading && string.IsNullOrWhiteSpace(ErrorMessage))
+            {
+                <div class="page-actions-box">
+                    <div class="page-actions-buttons">
+                        <button type="button"
+                                class="page-action-button page-action-button-secondary"
+                                onclick="window.tabulatorTest.undo('tabulator-test-table')">
+                            Undo
+                        </button>
+
+                        <button type="button"
+                                class="page-action-button page-action-button-secondary"
+                                onclick="window.tabulatorTest.redo('tabulator-test-table')">
+                            Redo
+                        </button>
+
+                        <button type="button"
+                                class="page-action-button page-action-button-secondary"
+                                onclick="window.tabulatorTest.openInsertDialog('tabulator-test-table')">
+                            Insert Rows
+                        </button>
+
+                        <button type="button"
+                                class="page-action-button page-action-button-secondary"
+                                onclick="window.tabulatorTest.deleteSelectedRows('tabulator-test-table')">
+                            Delete Rows
+                        </button>
+
+                        <button type="button"
+                                class="page-action-button page-action-button-primary"
+                                onclick="window.tabulatorTest.copyRange('tabulator-test-table')">
+                            Copy Selected Cells
+                        </button>
+
+                        <button type="button"
+                                class="page-action-button page-action-button-primary"
+                                disabled="@IsSaving"
+                                @onclick="SaveChangesAsync">
+                            @(IsSaving ? "Saving..." : "Save")
+                        </button>
+                    </div>
+
+                    <div class="save-status"
+                         id="tabulator-test-table-status">
+                        Preparing database rows...
+                    </div>
+                </div>
+            }
         </div>
 
-        @if (!IsLoading && string.IsNullOrWhiteSpace(ErrorMessage))
+        @if (IsLoading)
         {
-            <div class="page-actions-box">
-                <div class="page-actions-buttons">
-                    <button type="button"
-                            class="page-action-button page-action-button-secondary"
-                            onclick="window.tabulatorTest.undo('tabulator-test-table')">
-                        Undo
-                    </button>
+            <div class="alert alert-info">
+                Loading work orders from SQL Server...
+            </div>
+        }
+        else if (!string.IsNullOrWhiteSpace(ErrorMessage))
+        {
+            <div class="alert alert-danger">
+                @ErrorMessage
+            </div>
+        }
+        else
+        {
+            <div class="grid-instructions">
+                Select any cell, then use Insert Rows or right-click inside the sheet.
+                Insert or delete rows where needed, then press Save to store the changes in SQL Server.
+            </div>
 
-                    <button type="button"
-                            class="page-action-button page-action-button-secondary"
-                            onclick="window.tabulatorTest.redo('tabulator-test-table')">
-                        Redo
-                    </button>
+            <div class="work-order-toolbar-row">
+                <div class="validation-navigator-slot">
+                    <div class="validation-navigator"
+                         id="tabulator-test-table-validation-panel"
+                         role="status"
+                         aria-live="polite"
+                         hidden>
+                        <div class="validation-navigator-summary">
+                            <span class="validation-navigator-icon"
+                                  aria-hidden="true">!</span>
 
-                    <button type="button"
-                            class="page-action-button page-action-button-secondary"
-                            onclick="window.tabulatorTest.openInsertDialog('tabulator-test-table')">
-                        Insert Rows
-                    </button>
+                            <div class="validation-navigator-copy">
+                                <strong id="tabulator-test-table-validation-title">
+                                    توجد أخطاء تمنع الحفظ
+                                </strong>
 
-                    <button type="button"
-                            class="page-action-button page-action-button-secondary"
-                            onclick="window.tabulatorTest.deleteSelectedRows('tabulator-test-table')">
-                        Delete Rows
-                    </button>
+                                <span id="tabulator-test-table-validation-message">
+                                </span>
+                            </div>
+                        </div>
 
-                    <button type="button"
-                            class="page-action-button page-action-button-primary"
-                            onclick="window.tabulatorTest.copyRange('tabulator-test-table')">
-                        Copy Selected Cells
-                    </button>
+                        <div class="validation-navigator-actions">
+                            <button type="button"
+                                    class="validation-navigator-button"
+                                    id="tabulator-test-table-validation-previous"
+                                    onclick="window.tabulatorTest.previousValidationError('tabulator-test-table')">
+                                السابق
+                            </button>
 
-                    <button type="button"
-                            class="page-action-button page-action-button-primary"
-                            disabled="@IsSaving"
-                            @onclick="SaveChangesAsync">
-                        @(IsSaving ? "Saving..." : "Save")
-                    </button>
+                            <button type="button"
+                                    class="validation-navigator-button"
+                                    id="tabulator-test-table-validation-next"
+                                    onclick="window.tabulatorTest.nextValidationError('tabulator-test-table')">
+                                التالي
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
-                <div class="save-status"
-                     id="tabulator-test-table-status">
-                    Preparing database rows...
+                <div class="work-order-search-box">
+                    <label class="work-order-search-label"
+                           for="tabulator-work-order-search">
+                        بحث أمر العمل
+                    </label>
+
+                    <input id="tabulator-work-order-search"
+                           class="work-order-search-input"
+                           type="search"
+                           inputmode="numeric"
+                           autocomplete="off"
+                           placeholder="اكتب رقم أمر العمل..."
+                           oninput="window.tabulatorTest.filterByWorkOrder('tabulator-test-table', this.value)" />
                 </div>
             </div>
         }
     </div>
 
-    @if (IsLoading)
+    @if (!IsLoading && string.IsNullOrWhiteSpace(ErrorMessage))
     {
-        <div class="alert alert-info">
-            Loading work orders from SQL Server...
-        </div>
-    }
-    else if (!string.IsNullOrWhiteSpace(ErrorMessage))
-    {
-        <div class="alert alert-danger">
-            @ErrorMessage
-        </div>
-    }
-    else
-    {
-        <div class="grid-instructions">
-            Select any cell, then use Insert Rows or right-click inside the sheet.
-            Insert or delete rows where needed, then press Save to store the changes in SQL Server.
-        </div>
-
-        <div class="work-order-toolbar-row">
-            <div class="validation-navigator-slot">
-                <div class="validation-navigator"
-                     id="tabulator-test-table-validation-panel"
-                     role="status"
-                     aria-live="polite"
-                     hidden>
-                    <div class="validation-navigator-summary">
-                        <span class="validation-navigator-icon"
-                              aria-hidden="true">!</span>
-
-                        <div class="validation-navigator-copy">
-                            <strong id="tabulator-test-table-validation-title">
-                                توجد أخطاء تمنع الحفظ
-                            </strong>
-
-                            <span id="tabulator-test-table-validation-message">
-                            </span>
-                        </div>
-                    </div>
-
-                    <div class="validation-navigator-actions">
-                        <button type="button"
-                                class="validation-navigator-button"
-                                id="tabulator-test-table-validation-previous"
-                                onclick="window.tabulatorTest.previousValidationError('tabulator-test-table')">
-                            السابق
-                        </button>
-
-                        <button type="button"
-                                class="validation-navigator-button"
-                                id="tabulator-test-table-validation-next"
-                                onclick="window.tabulatorTest.nextValidationError('tabulator-test-table')">
-                            التالي
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <div class="work-order-search-box">
-                <label class="work-order-search-label"
-                       for="tabulator-work-order-search">
-                    بحث أمر العمل
-                </label>
-
-                <input id="tabulator-work-order-search"
-                       class="work-order-search-input"
-                       type="search"
-                       inputmode="numeric"
-                       autocomplete="off"
-                       placeholder="اكتب رقم أمر العمل..."
-                       oninput="window.tabulatorTest.filterByWorkOrder('tabulator-test-table', this.value)" />
-            </div>
-        </div>
-
         <div class="tabulator-card">
             <div id="tabulator-test-table"></div>
         </div>
