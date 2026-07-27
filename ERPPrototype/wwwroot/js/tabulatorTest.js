@@ -6436,14 +6436,42 @@
                 field: "workOrderNumber"
             };
 
+            const focusRenderedCell =
+                function (remainingAttempts) {
+                    let element = null;
+
+                    try {
+                        element =
+                            cell.getElement();
+                    } catch {
+                        return;
+                    }
+
+                    if (
+                        element &&
+                        typeof element.focus === "function"
+                    ) {
+                        element.focus({
+                            preventScroll: true
+                        });
+
+                        return;
+                    }
+
+                    if (remainingAttempts > 0) {
+                        window.requestAnimationFrame(
+                            function () {
+                                focusRenderedCell(
+                                    remainingAttempts - 1
+                                );
+                            }
+                        );
+                    }
+                };
+
             window.requestAnimationFrame(
                 function () {
-                    const element =
-                        cell.getElement();
-
-                    element?.focus({
-                        preventScroll: true
-                    });
+                    focusRenderedCell(2);
                 }
             );
         };
