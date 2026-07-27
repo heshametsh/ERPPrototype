@@ -15,7 +15,7 @@
 | ID | Priority | Issue | Evidence / impact | Temporary position | Release gate |
 |---|---:|---|---|---|---|
 | GRID-001 | P1 | إرهاق التنقل الرأسي بعد جلسة طويلة | الأداء يتدهور بعد آلاف الحركات؛ تغيير السنة يعيد السرعة | E6C ثابت؛ لا Recovery تلقائي مقبول | يجب حله أو إثبات حدود مقبولة قبل البيع |
-| GRID-002 | P1 | `tabulatorTest.js` = 7,299 سطرًا في E6E ومسؤوليات كثيرة | تعديل Lifecycle أثّر سابقًا على الأسهم والسنة | Refactor تدريجي فقط | مطلوب قبل توسع ميزات الشيت |
+| GRID-002 | P1 | `tabulatorTest.js` = 7,327 سطرًا في E6F ومسؤوليات كثيرة | تعديل Lifecycle أثّر سابقًا على الأسهم والسنة | Refactor تدريجي فقط | مطلوب قبل توسع ميزات الشيت |
 | GRID-003 | P1 | Insert/Delete/structural Undo تستخدم full `setData` | تعيد بناء بيانات الشيت والتحقق | لا نضيف عمليات هيكلية ثقيلة جديدة | تحسين مرحلي بعد فصل الموديولات |
 | GRID-004 | P1 | 10,000 صف غير مختبرة | Client-side loading قد لا يظل مقبولًا | اختبار منفصل قبل قرار معماري | مطلوب قبل تحديد سعة المنتج |
 | TEST-001 | P1 | لا Automated Tests | الاعتماد على الاختبار اليدوي يزيد Regression | Checklist إلزامية الآن | Browser/service tests مطلوبة قبل Pilot |
@@ -43,6 +43,7 @@
 |---|---|---|---|
 | GRID-CLOSED-001 | الضغط المستمر على Enter أصبح ثقيلًا قرب الصف 1,040 | E6D أضاف Enter إلى بوابة التنقل الرأسي المركزية المستخدمة مع الأسهم | المستخدم اختبر الاستمرار بعد نقطة البطء وأكد أن السلوك أصبح سريعًا |
 | GRID-CLOSED-002 | أول كليك يمين بدون تحديد سبب `activeRange.occupies is not a function` | E6E ينشئ نطاق خلية حقيقيًا قبل معالجة Tabulator لأول right-click | المستخدم اختبر سنة بصف واحد وسنة كبيرة وأكد اختفاء الخطأ وعمل القائمة |
+| GRID-CLOSED-003 | عمليات هيكلية/Undo/Redo سببت `element?.focus is not a function` | E6F أضاف bounded focus retry guard مع فحص حقيقي للعنصر | المستخدم اختبر Insert/Delete/Undo/Redo/Copy-Paste/Save ولم يظهر الخطأ أو أي Console error |
 
 ## Closed / Rejected Experiments
 
@@ -69,3 +70,8 @@
 ## Simple Example
 
 `GRID-001` لا يُغلق لأن تغيير السنة يعيد السرعة. تغيير السنة Workaround، مثل إعادة تشغيل جهاز يسخن. الإغلاق الحقيقي يعني أن الجلسة الطويلة تظل سريعة أو أن هناك حلًا آمنًا غير ملحوظ ومثبتًا بالاختبار.
+
+
+## E6F Provisional Performance Reference
+
+القيم المؤقتة لمنع Regression أثناء Refactor: ArrowDown p95 = 107.3ms، ArrowUp p95 = 108.3ms، Enter p95 = 125.2ms. الحدود المؤقتة: 118ms / 119ms / 138ms. هذه ليست أهداف المنتج النهائية ولا تغلق `GRID-001`.

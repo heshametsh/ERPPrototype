@@ -1,0 +1,17 @@
+{
+  "checkpoint": "Step16E6F",
+  "date": "2026-07-27",
+  "codeCommitBeforeDocumentation": "976aad4",
+  "mainGridFile": "ERPPrototype/wwwroot/js/tabulatorTest.js",
+  "mainGridLines": 7327,
+  "mainGridBytes": 204542,
+  "mainGridSha256": "ae0ebdfd2740c3431c1456950ec058e29856f7fd8932f4e4178f273e351d1b2e",
+  "verification": {
+    "cleanRebuild": "PASS (user environment)",
+    "localRun": "PASS (user environment)",
+    "structuralRegression": "PASS (user environment)",
+    "consoleErrors": 0,
+    "performanceReference": "provisional two-run average"
+  },
+  "nextPhase": "Phase 1 - Extract Diagnostics"
+}

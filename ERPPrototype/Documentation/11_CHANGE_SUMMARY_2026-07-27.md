@@ -197,3 +197,33 @@ Not performed:
 - E6E is the current stable runtime checkpoint.
 - Long-session vertical fatigue remains open.
 - The next engineering phase is gradual module extraction, starting with Diagnostics.
+
+
+---
+
+## Runtime Checkpoint Update — E6F and Phase 0 Closure
+
+### Step 12 — Structural focus safety
+
+**What was done:** Added a bounded focus retry guard after structural data rebuilds.
+
+**Why:** A Virtual DOM cell element may not exist immediately after Insert/Delete or Undo/Redo, causing `element?.focus is not a function`.
+
+**Simple example:** The code waits for the button to appear before trying to press it.
+
+**Verification:** User tested Insert/Delete/Undo/Redo/Copy-Paste/Save; Console showed no errors.
+
+### Step 13 — Provisional baseline
+
+**What was done:** Accepted two clean navigation reports and calculated a temporary comparison baseline.
+
+**Why:** The user chose to stop repeated runs; a practical reference is still needed before refactor.
+
+**Limitation:** Different viewport widths mean the result is not a strict median and cannot prove small improvements.
+
+### Current state
+
+- E6F is the current stable checkpoint.
+- Phase 0 is complete.
+- Long-session fatigue remains open.
+- Next: Phase 1 — Extract Diagnostics without touching keyboard or lifecycle.

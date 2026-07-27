@@ -1,7 +1,7 @@
 # 06 — Regression Test Checklist
 
 **Status:** Mandatory after any grid/runtime change  
-**Stable checkpoint:** E6E (E6C foundation)  
+**Stable checkpoint:** E6F (E6C foundation)  
 **Rule:** لا ننتقل للخطوة التالية إذا فشل اختبار أساسي.
 
 ## A. Before Testing
@@ -61,6 +61,7 @@
 - [ ] Cancel deletion leaves rows unchanged.
 - [ ] Undo/Redo insert.
 - [ ] Undo/Redo delete.
+- [ ] بعد Insert/Delete وUndo/Redo لا يظهر `element?.focus is not a function`.
 - [ ] الصف الجديد لا يكرر Temporary Id بطريقة تكسر الحفظ.
 
 ## F. Validation
@@ -146,6 +147,8 @@
 - Enter sustained navigation: PASS.
 - First right-click range guard: PASS.
 - Connected smoke/regression checks reported by the user: PASS.
+- E6F structural focus guard: PASS; no Console errors after Insert/Delete/Undo/Redo/Copy-Paste/Save.
+- Provisional navigation baseline recorded from two clean runs; strict three-run median deferred by user decision.
 - Automated browser tests: غير موجودة حتى الآن.
 
 ## M. Result Record

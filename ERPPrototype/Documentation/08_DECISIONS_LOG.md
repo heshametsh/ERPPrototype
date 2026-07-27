@@ -109,3 +109,22 @@
 - **Decision:** العيب الوظيفي المحدد والقابل لإعادة الإنتاج يُصلح ويُختبر قبل نقل نفس الجزء إلى Module جديد.
 - **Reason:** فصل كود مكسور ينقل المشكلة ويزيد تكلفة التشخيص.
 - **Constraint:** لا يتحول ذلك إلى سلسلة Performance patches غير محدودة؛ الإصلاح يجب أن يكون صغيرًا ومثبت السبب.
+
+
+## DEC-015 — E6F is the current stable checkpoint
+
+- **Date:** 2026-07-27
+- **Status:** Accepted after user testing
+- **Decision:** اعتماد E6F كنقطة الرجوع الحالية قبل بدء Module extraction.
+- **Contains:** E6C foundation، E6D Enter gate، E6E right-click guard، E6F structural focus safety.
+- **Evidence:** Clean/Rebuild PASS، الوظائف الأساسية PASS، Console بلا أخطاء بعد العمليات الهيكلية.
+- **Rollback:** Git tag `E6E-Stable` أو الأساس `E6C-Baseline`.
+
+## DEC-016 — Accept a provisional two-run performance baseline
+
+- **Date:** 2026-07-27
+- **Status:** Accepted by user
+- **Decision:** استخدام متوسط تقريرين نظيفين كمرجع مؤقت بدل مطالبة المستخدم بجولة ثالثة.
+- **Limitation:** عرض نافذة الاختبار اختلف، لذلك المرجع ليس Median صارمًا ولا يستخدم لإثبات تحسين صغير.
+- **Use:** اكتشاف Regression واضح بعد Refactor فقط.
+- **Simple example:** القياس مثل ميزان تقريبي يمنع زيادة كبيرة في الوزن، لكنه ليس ميزان معمل لإثبات فرق جرامات قليلة.

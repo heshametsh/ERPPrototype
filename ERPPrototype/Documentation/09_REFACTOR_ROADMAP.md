@@ -1,6 +1,7 @@
 # 09 — Refactor Roadmap
 
-**Baseline:** E6C  
+**Foundation baseline:** E6C  
+**Current stable checkpoint:** E6F  
 **Goal:** تقليل تأثير تعديل ميزة على غيرها، بدون Rewrite كامل وبدون تغيير سلوك مقصود.
 
 ## Rules for Every Phase
@@ -28,9 +29,13 @@
 
 لا نستطيع إثبات أن Refactor لم يغير السلوك بدون أرقام واختبارات قبل التعديل.
 
-### Exit gate
+### Exit gate — COMPLETED 2026-07-27
 
-كل الوظائف الأساسية PASS ولا Red Console errors.
+- Clean/Rebuild and local run: PASS.
+- Core regression checks: PASS.
+- Console errors after E6F: zero.
+- Provisional two-run performance baseline recorded.
+- Strict three-run median deferred by explicit user decision.
 
 ## Phase 1 — Extract Diagnostics
 
@@ -158,7 +163,7 @@ insert/delete across selection، save، move year، undo/redo، 3,000 rows timin
 
 | Milestone | Meaning |
 |---|---|
-| M0 | E6C frozen and tests recorded |
+| M0 | **Complete:** E6F stable checkpoint, tests and provisional baseline recorded |
 | M1 | Diagnostics separated |
 | M2 | Lifecycle + Resize separated |
 | M3 | Navigation separated |

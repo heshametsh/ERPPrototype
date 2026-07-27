@@ -1,6 +1,6 @@
 # 05 — Work Orders Grid Behaviour
 
-**Status:** Approved description of E6E behavior and acceptance contract  
+**Status:** Approved description of E6F behavior and acceptance contract  
 **Route:** `/work-orders`  
 **Authorized current role:** `Employee`
 
@@ -173,3 +173,10 @@ A grid change is not accepted until all pass:
 
 عند الوقوف على الصف 2,576 ثم تصغير النافذة، حفظ `scrollTop` بالبكسل قد يعيدك إلى 2,583 لأن ارتفاع العرض تغير.  
 E6C يحفظ هوية الصف نفسه، مثل حفظ رقم المنزل بدل حفظ عدد الأمتار التي مشيتها.
+
+
+## E6F Structural Focus Safety
+
+بعد Insert/Delete أو Undo/Redo قد يعيد Tabulator بناء الـVirtual DOM قبل ظهور عنصر الخلية. E6F لا يستدعي `focus()` إلا بعد التأكد أن العنصر موجود ويدعم التركيز، مع عدد محاولات محدود.
+
+**مثال بسيط:** لا يحاول النظام الضغط على زر لم يظهر بعد؛ ينتظر لحظات قصيرة ثم يتوقف بأمان إذا لم يظهر.

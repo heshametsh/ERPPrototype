@@ -1,6 +1,6 @@
 # 03 — Current Implementation
 
-**Status:** Approved description of the E6E stable checkpoint  
+**Status:** Approved description of the E6F stable checkpoint  
 **Review date:** 2026-07-27  
 **Important:** This is a static code review. The review environment did not contain .NET SDK, so compilation and browser execution were not performed here.
 
@@ -15,8 +15,8 @@
 | Database | SQL Server / LocalDB in Development |
 | ORM | EF Core 10.0.9 |
 | Grid | Tabulator 6.5.0 |
-| Grid stable checkpoint | Step 16E6E (built on E6C) |
-| Main grid file | `wwwroot/js/tabulatorTest.js` — 7,299 lines in E6E |
+| Grid stable checkpoint | Step 16E6F (built cumulatively on E6C/E6D/E6E) |
+| Main grid file | `wwwroot/js/tabulatorTest.js` — 7,327 lines in E6F |
 | Work-order page | `Components/Pages/WorkOrders.razor` — 1,023 lines |
 | Work-order service | `Data/WorkOrderService.cs` — 907 lines |
 | Migrations | 29 files |
@@ -138,7 +138,7 @@ Implemented:
 - The result returns saved rows, new database Ids, RowVersions, moved rows, and deleted Ids.
 - The browser applies the saved delta without reloading the full sheet.
 
-## 8. Grid Features in E6E
+## 8. Grid Features in E6F
 
 - Virtual DOM with central buffer 260px.
 - Direct cell editing.
@@ -158,6 +158,7 @@ Implemented:
 - Year switching only after unsaved changes are cleared.
 - Resize keeps the logical first visible row using the E6C anchor restore.
 - First right-click on an unselected sheet initializes a real range before Tabulator handles the event, preventing `activeRange.occupies` errors.
+- Structural focus restoration after Insert/Delete and Undo/Redo uses a bounded retry guard and no longer throws `element?.focus is not a function`.
 
 ## 9. Not Implemented
 
@@ -214,7 +215,7 @@ Not performed here:
 JavaScript is like the receptionist checking a form quickly. The server is the locked records room. Even if someone bypasses the receptionist, the records room must still reject an invalid or unauthorized form.
 
 
-## 12. E6D/E6E Verification Record
+## 12. E6D/E6E/E6F Verification Record
 
 User-tested on 2026-07-27 after Clean/Rebuild and local browser execution:
 
@@ -223,4 +224,21 @@ User-tested on 2026-07-27 after Clean/Rebuild and local browser execution:
 - First right-click on a one-row year and on a large year opened without the previous `activeRange.occupies` exception.
 - Insert/right-click flow and the connected smoke tests were reported as working.
 
+- Insert/Delete/Undo/Redo/Copy-Paste/Save were tested after E6F with no Console errors.
+- `element?.focus is not a function` did not reappear.
+- Two clean long-navigation baseline runs were accepted as a provisional comparison baseline.
+
 This is user-environment evidence, not an automated browser-test suite.
+
+
+## 13. Provisional E6F Performance Baseline
+
+Accepted by the user on 2026-07-27 from two clean runs. This is not a strict three-run median because the viewport widths differed; it is a pragmatic temporary baseline for detecting obvious refactor regressions.
+
+| Movement | Provisional average | Provisional p95 | Temporary refactor ceiling |
+|---|---:|---:|---:|
+| ArrowDown | 59.71 ms | 107.3 ms | 118 ms |
+| ArrowUp | 75.65 ms | 108.3 ms | 119 ms |
+| Enter | 92.77 ms | 125.2 ms | 138 ms |
+
+Both clean reports contained zero JavaScript errors and no layout shifts. Long-session vertical fatigue remains open. Raw reports are stored in `Documentation/Review/Performance/E6F/`.

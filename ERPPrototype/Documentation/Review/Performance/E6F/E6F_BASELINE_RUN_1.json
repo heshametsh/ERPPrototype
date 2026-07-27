@@ -1,0 +1,668 @@
+{
+  "version": "Step16P0-Final-v1",
+  "mode": "baseline",
+  "label": "Performance run 10:54:09 PM",
+  "page": "/work-orders?perf=baseline",
+  "rows": null,
+  "elapsedMs": 556954,
+  "measurementValidity": {
+    "decisionUse": "Use for before/after regression decisions. Run three times and compare the median.",
+    "profilerMeasuredHookTimeMs": 21358.7,
+    "profilerMeasuredHookRatioPercent": 3.8349,
+    "profilerCallbackCount": 43484,
+    "profilerMaxCallbackMs": 21.3,
+    "warning": "Measured hook time is a lower-bound estimate. Browser observer and instrumentation effects cannot be measured perfectly from inside the page."
+  },
+  "environment": {
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36 Edg/150.0.0.0",
+    "language": "en-GB",
+    "logicalProcessors": 4,
+    "approximateDeviceMemoryGb": 16,
+    "screen": {
+      "width": 1920,
+      "height": 1080,
+      "availableWidth": 1920,
+      "availableHeight": 1040,
+      "devicePixelRatio": 1.100000023841858
+    },
+    "viewport": {
+      "width": 1351,
+      "height": 838
+    },
+    "connection": {
+      "effectiveType": "3g",
+      "downlinkMbps": 1.05,
+      "rttMs": 350,
+      "saveData": false
+    },
+    "supportedObservers": {
+      "longTask": true,
+      "eventTiming": true,
+      "longAnimationFrame": true,
+      "layoutShift": true
+    }
+  },
+  "grid": {
+    "firstUsableMsFromInitialize": null,
+    "firstUsableMsFromSessionStart": 0.2,
+    "tableOptions": null,
+    "domStart": null,
+    "domEnd": {
+      "pageElements": 371,
+      "tableRows": 18,
+      "tableCells": 126,
+      "tableRanges": 1,
+      "holderHeight": 413,
+      "scrollHeight": 116883,
+      "scrollTop": 116468.1796875
+    }
+  },
+  "memory": {
+    "start": {
+      "usedJsHeapMb": 106.47,
+      "totalJsHeapMb": 141.62,
+      "jsHeapLimitMb": 4192
+    },
+    "end": {
+      "usedJsHeapMb": 79.37,
+      "totalJsHeapMb": 122.31,
+      "jsHeapLimitMb": 4192
+    },
+    "usedJsHeapDeltaMb": -27.1,
+    "samples": [
+      {
+        "atMs": 0.1,
+        "reason": "session-start",
+        "usedJsHeapMb": 106.47,
+        "totalJsHeapMb": 141.62,
+        "jsHeapLimitMb": 4192,
+        "context": null
+      },
+      {
+        "atMs": 0.2,
+        "reason": "grid-first-usable",
+        "usedJsHeapMb": 106.47,
+        "totalJsHeapMb": 141.62,
+        "jsHeapLimitMb": 4192,
+        "context": null
+      },
+      {
+        "atMs": 30118.3,
+        "reason": "periodic",
+        "usedJsHeapMb": 120.69,
+        "totalJsHeapMb": 156.58,
+        "jsHeapLimitMb": 4192,
+        "context": null
+      },
+      {
+        "atMs": 60083.2,
+        "reason": "periodic",
+        "usedJsHeapMb": 57.94,
+        "totalJsHeapMb": 119.99,
+        "jsHeapLimitMb": 4192,
+        "context": null
+      },
+      {
+        "atMs": 90003.1,
+        "reason": "periodic",
+        "usedJsHeapMb": 63.82,
+        "totalJsHeapMb": 120.52,
+        "jsHeapLimitMb": 4192,
+        "context": null
+      },
+      {
+        "atMs": 120057.5,
+        "reason": "periodic",
+        "usedJsHeapMb": 77.11,
+        "totalJsHeapMb": 121.79,
+        "jsHeapLimitMb": 4192,
+        "context": null
+      },
+      {
+        "atMs": 150002.4,
+        "reason": "periodic",
+        "usedJsHeapMb": 61.56,
+        "totalJsHeapMb": 121.06,
+        "jsHeapLimitMb": 4192,
+        "context": null
+      },
+      {
+        "atMs": 180191.5,
+        "reason": "periodic",
+        "usedJsHeapMb": 72.1,
+        "totalJsHeapMb": 121.81,
+        "jsHeapLimitMb": 4192,
+        "context": null
+      },
+      {
+        "atMs": 210087.1,
+        "reason": "periodic",
+        "usedJsHeapMb": 56.93,
+        "totalJsHeapMb": 121.94,
+        "jsHeapLimitMb": 4192,
+        "context": null
+      },
+      {
+        "atMs": 240052.2,
+        "reason": "periodic",
+        "usedJsHeapMb": 73.94,
+        "totalJsHeapMb": 121.94,
+        "jsHeapLimitMb": 4192,
+        "context": null
+      },
+      {
+        "atMs": 270159.8,
+        "reason": "periodic",
+        "usedJsHeapMb": 58.39,
+        "totalJsHeapMb": 121.94,
+        "jsHeapLimitMb": 4192,
+        "context": null
+      },
+      {
+        "atMs": 300011,
+        "reason": "periodic",
+        "usedJsHeapMb": 56.79,
+        "totalJsHeapMb": 121.94,
+        "jsHeapLimitMb": 4192,
+        "context": null
+      },
+      {
+        "atMs": 330012.4,
+        "reason": "periodic",
+        "usedJsHeapMb": 57.14,
+        "totalJsHeapMb": 122.19,
+        "jsHeapLimitMb": 4192,
+        "context": null
+      },
+      {
+        "atMs": 360011.6,
+        "reason": "periodic",
+        "usedJsHeapMb": 68.36,
+        "totalJsHeapMb": 122.19,
+        "jsHeapLimitMb": 4192,
+        "context": null
+      },
+      {
+        "atMs": 390014.1,
+        "reason": "periodic",
+        "usedJsHeapMb": 58.75,
+        "totalJsHeapMb": 121.94,
+        "jsHeapLimitMb": 4192,
+        "context": null
+      },
+      {
+        "atMs": 420026.8,
+        "reason": "periodic",
+        "usedJsHeapMb": 55.45,
+        "totalJsHeapMb": 121.94,
+        "jsHeapLimitMb": 4192,
+        "context": null
+      },
+      {
+        "atMs": 450003.6,
+        "reason": "periodic",
+        "usedJsHeapMb": 75.71,
+        "totalJsHeapMb": 121.94,
+        "jsHeapLimitMb": 4192,
+        "context": null
+      },
+      {
+        "atMs": 480065.8,
+        "reason": "periodic",
+        "usedJsHeapMb": 62.48,
+        "totalJsHeapMb": 121.94,
+        "jsHeapLimitMb": 4192,
+        "context": null
+      },
+      {
+        "atMs": 510068.1,
+        "reason": "periodic",
+        "usedJsHeapMb": 79.89,
+        "totalJsHeapMb": 122.81,
+        "jsHeapLimitMb": 4192,
+        "context": null
+      },
+      {
+        "atMs": 540047.2,
+        "reason": "periodic",
+        "usedJsHeapMb": 66.89,
+        "totalJsHeapMb": 122.31,
+        "jsHeapLimitMb": 4192,
+        "context": null
+      }
+    ],
+    "note": "This is Chromium JavaScript heap, not total Edge RAM or total device RAM."
+  },
+  "processorAndGpuLimits": {
+    "logicalProcessors": 4,
+    "approximateDeviceMemoryGb": 16,
+    "gpuIdentity": {
+      "available": true,
+      "api": "WebGL2",
+      "vendor": "Google Inc. (Intel)",
+      "renderer": "ANGLE (Intel, Intel(R) HD Graphics 4600 (0x00000412) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "note": "GPU identity only. Browser JavaScript cannot read GPU utilization or VRAM usage."
+    },
+    "note": "A web page cannot read Windows CPU percentage, total browser RAM, GPU percentage, or VRAM usage. Long tasks, frame gaps and JS heap are the in-page pressure indicators."
+  },
+  "longTasks": {
+    "count": 344,
+    "totalMs": 19485,
+    "maxMs": 120
+  },
+  "longAnimationFrames": {
+    "count": 6667,
+    "totalMs": 382827.7,
+    "totalBlockingMs": 34458.2,
+    "maxMs": 136.4,
+    "maxBlockingMs": 80.4,
+    "topScripts": []
+  },
+  "interactions": {
+    "sampled": 2278,
+    "skippedByBaselineSampling": 6764,
+    "summary": [
+      {
+        "name": "keyboard.Enter",
+        "count": 760,
+        "inputToPaint": {
+          "averageMs": 80.17,
+          "p50Ms": 62.4,
+          "p95Ms": 117.8,
+          "maxMs": 196
+        },
+        "frameGap": {
+          "p50Ms": 16.67,
+          "p95Ms": 16.8,
+          "maxMs": 66.74
+        }
+      },
+      {
+        "name": "keyboard.ArrowDown",
+        "count": 758,
+        "inputToPaint": {
+          "averageMs": 56.37,
+          "p50Ms": 57,
+          "p95Ms": 110.5,
+          "maxMs": 118.6
+        },
+        "frameGap": {
+          "p50Ms": 16.64,
+          "p95Ms": 16.77,
+          "maxMs": 66.7
+        }
+      },
+      {
+        "name": "keyboard.ArrowUp",
+        "count": 759,
+        "inputToPaint": {
+          "averageMs": 77.85,
+          "p50Ms": 59.1,
+          "p95Ms": 108.6,
+          "maxMs": 155.1
+        },
+        "frameGap": {
+          "p50Ms": 50,
+          "p95Ms": 66.7,
+          "maxMs": 66.8
+        }
+      },
+      {
+        "name": "pointer.click",
+        "count": 1,
+        "inputToPaint": {
+          "averageMs": 13,
+          "p50Ms": 13,
+          "p95Ms": 13,
+          "maxMs": 13
+        },
+        "frameGap": {
+          "p50Ms": 16.8,
+          "p95Ms": 16.8,
+          "maxMs": 16.8
+        }
+      }
+    ],
+    "deepSamples": []
+  },
+  "scroll": {
+    "events": 8961,
+    "sessions": 3,
+    "distancePx": 349404.54,
+    "maxHandlerMs": 21.2,
+    "byInput": [
+      {
+        "name": "keyboard.down",
+        "events": 2987,
+        "sessions": 1,
+        "distancePx": 116468.1796875,
+        "maxHandlerMs": 21.19999998807907
+      },
+      {
+        "name": "keyboard.up",
+        "events": 2987,
+        "sessions": 1,
+        "distancePx": 116468.1796875,
+        "maxHandlerMs": 4.799999982118607
+      },
+      {
+        "name": "keyboard.none",
+        "events": 2987,
+        "sessions": 1,
+        "distancePx": 116468.1796875,
+        "maxHandlerMs": 14.699999988079071
+      }
+    ]
+  },
+  "byRowBand": [],
+  "operations": [
+    {
+      "name": "keyboard.arrow-up-correction",
+      "count": 5912,
+      "totalMs": 636.7,
+      "averageMs": 0.11,
+      "p50Ms": 0.1,
+      "p95Ms": 0.2,
+      "minMs": 0,
+      "maxMs": 43.2,
+      "lastMs": 0.2
+    },
+    {
+      "name": "keyboard.arrow-up-queue",
+      "count": 3015,
+      "totalMs": 33.1,
+      "averageMs": 0.01,
+      "p50Ms": 0,
+      "p95Ms": 0.1,
+      "minMs": 0,
+      "maxMs": 0.2,
+      "lastMs": 0
+    }
+  ],
+  "tabulatorInternals": [],
+  "eventTiming": [],
+  "layoutShifts": {
+    "count": 0,
+    "totalScore": 0,
+    "withoutRecentInputCount": 0,
+    "withoutRecentInputScore": 0
+  },
+  "domMutations": null,
+  "tableEvents": {
+    "range-added": 1,
+    "range-changed": 17977,
+    "cell-editing": 1
+  },
+  "counters": {
+    "grid.first-usable": 1,
+    "input.editor.input": 1,
+    "input.keyboard..": 17,
+    "input.keyboard.ArrowDown": 3010,
+    "input.keyboard.ArrowUp": 3015,
+    "input.keyboard.Enter": 3016,
+    "input.pointer.click": 1,
+    "input.pointer.mouse": 2,
+    "interaction.editor-input": 1,
+    "interaction.pointerdown": 2,
+    "keyboard.arrow-up-correction.calls": 5912,
+    "keyboard.arrow-up-queue.calls": 3015,
+    "table.cell-editing": 1,
+    "table.range-added": 1,
+    "table.range-changed": 17977
+  },
+  "profilerHooks": [
+    {
+      "name": "profiler.scroll-handler",
+      "count": 8961,
+      "totalMs": 21044.8,
+      "averageMs": 2.35,
+      "p50Ms": null,
+      "p95Ms": null,
+      "minMs": 0,
+      "maxMs": 21.3,
+      "lastMs": 1.5
+    },
+    {
+      "name": "profiler.keydown-handler",
+      "count": 9058,
+      "totalMs": 155.8,
+      "averageMs": 0.02,
+      "p50Ms": null,
+      "p95Ms": null,
+      "minMs": 0,
+      "maxMs": 0.8,
+      "lastMs": 0
+    },
+    {
+      "name": "profiler.wrapper.after.keyboard.arrow-up-correction",
+      "count": 5912,
+      "totalMs": 30,
+      "averageMs": 0.01,
+      "p50Ms": null,
+      "p95Ms": null,
+      "minMs": 0,
+      "maxMs": 0.3,
+      "lastMs": 0
+    },
+    {
+      "name": "profiler.paint-probe-complete",
+      "count": 2278,
+      "totalMs": 28.4,
+      "averageMs": 0.01,
+      "p50Ms": null,
+      "p95Ms": null,
+      "minMs": 0,
+      "maxMs": 0.3,
+      "lastMs": 0.1
+    },
+    {
+      "name": "profiler.loaf-observer",
+      "count": 4992,
+      "totalMs": 24.6,
+      "averageMs": 0,
+      "p50Ms": null,
+      "p95Ms": null,
+      "minMs": 0,
+      "maxMs": 0.2,
+      "lastMs": 0
+    },
+    {
+      "name": "profiler.wrapper.before.keyboard.arrow-up-correction",
+      "count": 5912,
+      "totalMs": 24.1,
+      "averageMs": 0,
+      "p50Ms": null,
+      "p95Ms": null,
+      "minMs": 0,
+      "maxMs": 0.3,
+      "lastMs": 0
+    },
+    {
+      "name": "profiler.wrapper.before.keyboard.arrow-up-queue",
+      "count": 3015,
+      "totalMs": 23.6,
+      "averageMs": 0.01,
+      "p50Ms": null,
+      "p95Ms": null,
+      "minMs": 0,
+      "maxMs": 0.2,
+      "lastMs": 0
+    },
+    {
+      "name": "profiler.wrapper.after.keyboard.arrow-up-queue",
+      "count": 3015,
+      "totalMs": 21.5,
+      "averageMs": 0.01,
+      "p50Ms": null,
+      "p95Ms": null,
+      "minMs": 0,
+      "maxMs": 0.2,
+      "lastMs": 0
+    },
+    {
+      "name": "profiler.longtask-observer",
+      "count": 320,
+      "totalMs": 4.5,
+      "averageMs": 0.01,
+      "p50Ms": null,
+      "p95Ms": null,
+      "minMs": 0,
+      "maxMs": 0.1,
+      "lastMs": 0
+    },
+    {
+      "name": "profiler.memory-sample",
+      "count": 20,
+      "totalMs": 1.4,
+      "averageMs": 0.07,
+      "p50Ms": null,
+      "p95Ms": null,
+      "minMs": 0,
+      "maxMs": 0.2,
+      "lastMs": 0.1
+    },
+    {
+      "name": "profiler.dom-snapshot",
+      "count": 1,
+      "totalMs": 0,
+      "averageMs": 0,
+      "p50Ms": null,
+      "p95Ms": null,
+      "minMs": 0,
+      "maxMs": 0,
+      "lastMs": 0
+    }
+  ],
+  "marks": [],
+  "timeline": [],
+  "errors": [],
+  "navigation": {
+    "type": "reload",
+    "responseEndMs": 75.8,
+    "domInteractiveMs": 546.6,
+    "domContentLoadedMs": 552.6,
+    "loadEventEndMs": 1228.1
+  },
+  "resources": [
+    {
+      "name": "tabulatorTest.if02s1azye.js",
+      "durationMs": 105.8,
+      "transferKb": 200.1,
+      "decodedKb": 199.75
+    },
+    {
+      "name": "blazor.web.f7fxoh55ae.js",
+      "durationMs": 104.4,
+      "transferKb": 0.29,
+      "decodedKb": 195.94
+    },
+    {
+      "name": "tabulator.min.90ykq354de.js",
+      "durationMs": 103.7,
+      "transferKb": 0.29,
+      "decodedKb": 434.93
+    },
+    {
+      "name": "tabulatorPerformance.lpxx97w6yg.js",
+      "durationMs": 100.1,
+      "transferKb": 0.29,
+      "decodedKb": 93.09
+    },
+    {
+      "name": "tabulatorFilters.8r3h1v7um6.js",
+      "durationMs": 99.7,
+      "transferKb": 0.29,
+      "decodedKb": 42.03
+    },
+    {
+      "name": "ERPPrototype.1r5s7da2ig.styles.css",
+      "durationMs": 83.1,
+      "transferKb": 50.48,
+      "decodedKb": 50.15
+    },
+    {
+      "name": "tabulator.min.nlceezzg7c.css",
+      "durationMs": 81.3,
+      "transferKb": 0.29,
+      "decodedKb": 27.83
+    },
+    {
+      "name": "ReconnectModal.abdmv1u4y3.razor.js",
+      "durationMs": 81.3,
+      "transferKb": 0.29,
+      "decodedKb": 2.39
+    },
+    {
+      "name": "bootstrap.min.46ein0sx1k.css",
+      "durationMs": 65.5,
+      "transferKb": 0.29,
+      "decodedKb": 227.35
+    },
+    {
+      "name": "app.j4a9mkjd6w.css",
+      "durationMs": 65.5,
+      "transferKb": 0.29,
+      "decodedKb": 12.41
+    },
+    {
+      "name": "aspnetcore-browser-refresh.js",
+      "durationMs": 65.2,
+      "transferKb": 14.87,
+      "decodedKb": 14.58
+    },
+    {
+      "name": "initializers",
+      "durationMs": 28,
+      "transferKb": 0.29,
+      "decodedKb": 0
+    },
+    {
+      "name": "negotiate?negotiateVersion=1",
+      "durationMs": 11.7,
+      "transferKb": 0.6,
+      "decodedKb": 0.31
+    }
+  ],
+  "performanceBudgets": {
+    "firstUsableGridMs": {
+      "target": 800,
+      "regression": 1750
+    },
+    "arrowInputToPaintP95Ms": {
+      "target": 33,
+      "regression": 100
+    },
+    "cellEditMs": {
+      "target": 30,
+      "regression": 40
+    },
+    "paste10x6Ms": {
+      "target": 120,
+      "regression": 200
+    },
+    "insertOneRowMs": {
+      "target": 100,
+      "regression": 200
+    },
+    "deleteOneRowMs": {
+      "target": 150,
+      "regression": 250
+    },
+    "structuralUndoRedoMs": {
+      "target": 150,
+      "regression": 250
+    },
+    "openValueFilterMs": {
+      "target": 150,
+      "regression": 300
+    },
+    "saveOneRowEndToEndMs": {
+      "target": 500,
+      "regression": 1000
+    },
+    "clientApplyDeltaMs": {
+      "target": 75,
+      "regression": 150
+    }
+  }
+}
