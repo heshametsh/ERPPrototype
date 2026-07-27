@@ -571,6 +571,48 @@
         }
     },
 
+    ensureRangeBeforeRightClick: function (elementId, event) {
+        const table = this.tables[elementId];
+        const element = document.getElementById(elementId);
+
+        if (
+            !table ||
+            !element ||
+            event?.button !== 2 ||
+            table.getRanges().length > 0
+        ) {
+            return;
+        }
+
+        const cellElement =
+            event.target instanceof Element
+                ? event.target.closest(".tabulator-cell")
+                : null;
+
+        if (
+            !cellElement ||
+            !element.contains(cellElement)
+        ) {
+            return;
+        }
+
+        /*
+         * Tabulator 6.5 leaves SelectRange.activeRange as false when
+         * selectableRangeInitializeDefault is disabled. Its first right-click
+         * path calls activeRange.occupies(...) before creating a range, which
+         * throws. Create the real range on the clicked visible cell during the
+         * capture phase, before Tabulator handles the same mousedown event.
+         */
+        for (const row of table.getRows("visible")) {
+            for (const cell of row.getCells()) {
+                if (cell.getElement() === cellElement) {
+                    table.addRange(cell, cell);
+                    return;
+                }
+            }
+        }
+    },
+
     bindHeaderFilterSelectionGuards: function (elementId) {
         const table = this.tables[elementId];
 
@@ -1873,6 +1915,14 @@
             );
         }
 
+        if (oldState?.rightClickRangeGuardHandler) {
+            oldTable?.element?.removeEventListener(
+                "mousedown",
+                oldState.rightClickRangeGuardHandler,
+                true
+            );
+        }
+
         if (oldState?.pointerDownHandler) {
             document.removeEventListener(
                 "pointerdown",
@@ -2035,6 +2085,7 @@
             copyHandler: null,
             pasteHandler: null,
             pointerDownHandler: null,
+            rightClickRangeGuardHandler: null,
             resizeHandler: null,
             resizeTimer: null,
             resizeViewportRestoreFrame: null,
@@ -2320,6 +2371,19 @@
         });
 
         this.tables[elementId] = table;
+
+        state.rightClickRangeGuardHandler = function (event) {
+            window.tabulatorTest.ensureRangeBeforeRightClick(
+                elementId,
+                event
+            );
+        };
+
+        element.addEventListener(
+            "mousedown",
+            state.rightClickRangeGuardHandler,
+            true
+        );
 
         /*
          * تحديث الارتفاع يحدث فقط عند تغيير حجم نافذة المتصفح،
@@ -2767,8 +2831,9 @@
 
             /*
              * Use one central repeat gate for plain vertical range
-             * navigation. ArrowUp and ArrowDown now share the same frame
-             * budget, so neither direction can build a stale key queue.
+             * navigation. ArrowUp, ArrowDown, and Enter all move the active
+             * range vertically, so they share the same frame budget and
+             * cannot build a stale browser key-repeat queue.
              *
              * The viewport correction remains an ArrowUp-only exception
              * because the confirmed Virtual DOM edge defect exists above
@@ -2777,7 +2842,8 @@
             if (
                 (
                     event.key === "ArrowUp" ||
-                    event.key === "ArrowDown"
+                    event.key === "ArrowDown" ||
+                    event.key === "Enter"
                 ) &&
                 !event.shiftKey &&
                 !event.ctrlKey &&
@@ -3533,8 +3599,9 @@
      * can queue up and replay later in either direction.
      *
      * Keep normal taps untouched. For browser-generated repeat events only,
-     * use one shared ArrowUp/ArrowDown gate, allow one vertical navigation
-     * per rendered frame, and discard stale repeats from that frame.
+     * use one shared ArrowUp/ArrowDown/Enter gate, allow one vertical
+     * navigation per rendered frame, and discard stale repeats from that
+     * frame.
      */
     allowVerticalNavigationEvent: function (
         elementId,
@@ -7151,6 +7218,14 @@
             document.removeEventListener(
                 "paste",
                 state.pasteHandler,
+                true
+            );
+        }
+
+        if (state?.rightClickRangeGuardHandler) {
+            element?.removeEventListener(
+                "mousedown",
+                state.rightClickRangeGuardHandler,
                 true
             );
         }
