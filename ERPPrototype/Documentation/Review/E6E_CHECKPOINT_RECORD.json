@@ -1,0 +1,20 @@
+{
+  "checkpoint": "Step16E6E",
+  "foundation": "Step16E6C",
+  "date": "2026-07-27",
+  "runtime_file": "wwwroot/js/tabulatorTest.js",
+  "line_count": 7300,
+  "size_bytes": 203663,
+  "sha256": "bea134cec384ebd554d8985ca996b06fb50a9e427d2992db2304c335c8fd26e9",
+  "included_changes": [
+    "E6D central Enter repeat gate",
+    "E6E first right-click range guard"
+  ],
+  "verification": {
+    "clean_rebuild": "reported PASS by user",
+    "local_runtime": "reported PASS by user",
+    "sustained_enter_navigation": "reported PASS by user",
+    "first_right_click": "reported PASS by user",
+    "automated_browser_tests": "not available"
+  }
+}

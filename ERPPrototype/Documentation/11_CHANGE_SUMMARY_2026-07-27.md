@@ -165,3 +165,35 @@ Not performed:
 - لماذا اتخذنا القرارات؟
 - ماذا نختبر؟
 - ما ترتيب العمل القادم؟
+
+
+---
+
+## Runtime Checkpoint Update — E6D / E6E
+
+### Step 10 — Enter repeat performance guard
+
+**What was done:** Plain Enter navigation was added to the same central vertical frame gate used by ArrowUp and ArrowDown.
+
+**Why:** Holding Enter previously built a browser key-repeat backlog and became slow near row 1,040.
+
+**Simple example:** Enter and the arrow keys now use the same controlled queue instead of Enter creating a separate traffic jam.
+
+**Verification:** User confirmed sustained Enter navigation remained fast and the connected navigation behavior still worked.
+
+### Step 11 — First right-click range guard
+
+**What was done:** When the sheet has no range, the first right-click creates a genuine one-cell range before Tabulator handles the mouse event.
+
+**Why:** Tabulator 6.5 attempted to call `activeRange.occupies` before creating the first range and threw an exception.
+
+**Simple example:** The system now creates the selection first, then opens the right-click menu.
+
+**Verification:** User confirmed the first right-click, context menu, and connected tests work without the previous red Console error.
+
+### Current state
+
+- E6C remains the foundation Git baseline.
+- E6E is the current stable runtime checkpoint.
+- Long-session vertical fatigue remains open.
+- The next engineering phase is gradual module extraction, starting with Diagnostics.

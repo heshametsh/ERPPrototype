@@ -1,6 +1,6 @@
 # 05 — Work Orders Grid Behaviour
 
-**Status:** Approved description of E6C behavior and acceptance contract  
+**Status:** Approved description of E6E behavior and acceptance contract  
 **Route:** `/work-orders`  
 **Authorized current role:** `Employee`
 
@@ -31,14 +31,14 @@ System fields مثل Id وWorkYear وDisplayOrder وRowVersion لا تظهر ل�
 - Double-click or Enter opens normal text edit mode.
 - Direct character typing starts Quick mode.
 - Basket uses list editing.
-- Enter commits the value but stays in the current cell behavior rather than moving automatically to the next row.
+- Enter commits the value inside an active editor without unintended row movement. Outside an editor, plain Enter follows the vertical navigation path.
 - Arabic/Persian digits in identity fields are normalized to English digits.
 - Assignment Date accepts typed dates, ISO date, and supported Excel serial values when pasted.
 
 ## 4. Navigation
 
 - ArrowLeft/Right/Up/Down move the active selection.
-- ArrowUp and ArrowDown share one frame gate to prevent browser key-repeat backlog.
+- ArrowUp, ArrowDown, and plain Enter share one frame gate to prevent browser key-repeat backlog.
 - ArrowUp has one documented direction-specific viewport correction because a hidden-row issue was proven in that direction.
 - Horizontal navigation remains independent.
 - The sheet shortcuts are active only when the grid is active, so they do not interfere with search fields.
@@ -114,7 +114,7 @@ Current implementation:
 
 The final business choice between automatic move and user confirmation remains an open decision before commercial release.
 
-## 11. Resize Behaviour — E6C
+## 11. Resize Behaviour — E6C Foundation
 
 - Desktop uses the grid as the main vertical scroll container.
 - The table height is recalculated after resize.
@@ -124,18 +124,31 @@ The final business choice between automatic move and user confirmation remains a
 
 ## 12. Performance Baseline
 
-E6C includes:
+E6E includes the E6C foundation plus E6D/E6E safeguards. The E6C foundation includes:
 
 - `renderVerticalBuffer: 260px`
 - shared vertical frame gate
 - ArrowUp viewport correction
 - resize logical-row anchor
 
+E6D/E6E add:
+
+- central repeat gating for plain Enter navigation
+- first-right-click range initialization guard
+
 Known unresolved issue:
 
-After sustained repeated vertical navigation, the sheet can become noticeably slower. Changing year and returning recreates the instance and restores speed. Failed automatic recovery experiments are not part of E6C.
+After sustained repeated vertical navigation, the sheet can become noticeably slower. Changing year and returning recreates the instance and restores speed. Failed automatic recovery experiments are not part of E6E.
 
-## 13. Acceptance Tests for Any Grid Change
+
+## 13. First Right-Click Behaviour — E6E
+
+- The sheet may intentionally start with no selected range.
+- On the first right-click over a visible cell, E6E creates a genuine one-cell Tabulator range during the capture phase.
+- Tabulator then handles the same mouse event normally and the row context menu can open.
+- The guard runs only when no range exists, so normal range selection is not replaced.
+
+## 14. Acceptance Tests for Any Grid Change
 
 A grid change is not accepted until all pass:
 
@@ -156,7 +169,7 @@ A grid change is not accepted until all pass:
 - No red Console error.
 - No duplicated event response.
 
-## 14. Simple Example
+## 15. Simple Example
 
 عند الوقوف على الصف 2,576 ثم تصغير النافذة، حفظ `scrollTop` بالبكسل قد يعيدك إلى 2,583 لأن ارتفاع العرض تغير.  
 E6C يحفظ هوية الصف نفسه، مثل حفظ رقم المنزل بدل حفظ عدد الأمتار التي مشيتها.

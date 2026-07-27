@@ -53,11 +53,11 @@
 - **Reason:** تقليل التعقيد؛ بعد Refresh لا نضمن Undo.
 - **Impact:** المستخدم يجب أن يحفظ أو يتراجع قبل تغيير السنة.
 
-## DEC-008 — E6C is the official baseline
+## DEC-008 — E6C is the foundation baseline
 
 - **Date:** 2026-07-27
 - **Status:** Accepted
-- **Decision:** E6C هي نقطة الرجوع الرسمية.
+- **Decision:** E6C هي نقطة الأساس التي بدأ منها التنظيم، وتظل Tag تاريخية للرجوع.
 - **Contains:** central buffer 260px، vertical gate، ArrowUp correction، logical row anchor on resize.
 - **Excludes:** R2/R3 automatic/hidden recovery experiments.
 - **Reason:** آخر نسخة اختبرها المستخدم وعادت فيها الوظائف الأساسية سليمة.
@@ -90,3 +90,22 @@
 - **Status:** Accepted
 - **Decision:** التوثيق والـKnown Issues والاختبارات والقرارات تُحدث مع التنفيذ.
 - **Reason:** المحادثات ليست مصدر معرفة دائم، والمستخدم غير مبرمج ويحتاج شرحًا بسيطًا وأمثلة.
+
+
+## DEC-013 — E6E is the current stable checkpoint
+
+- **Date:** 2026-07-27
+- **Status:** Accepted after user testing
+- **Decision:** اعتماد E6E كنقطة التشغيل المستقرة الحالية، مبنية تراكميًا على E6C.
+- **Contains:** E6C resize/buffer/navigation safeguards، E6D Enter repeat gate، وE6E first-right-click range guard.
+- **Reason:** حلت مشكلتين قابلتين لإعادة الإنتاج بدون إدخال Recovery أو Restart أو تغيير قواعد البيانات.
+- **Rollback:** الرجوع إلى Git tag `E6C-Baseline` عند ظهور Regression غير مقبول.
+- **Simple example:** E6C هي أساس المبنى، وE6E هي آخر طابق تم فحصه واعتماده للاستخدام الحالي.
+
+## DEC-014 — Fix confirmed functional defects before module extraction
+
+- **Date:** 2026-07-27
+- **Status:** Accepted
+- **Decision:** العيب الوظيفي المحدد والقابل لإعادة الإنتاج يُصلح ويُختبر قبل نقل نفس الجزء إلى Module جديد.
+- **Reason:** فصل كود مكسور ينقل المشكلة ويزيد تكلفة التشخيص.
+- **Constraint:** لا يتحول ذلك إلى سلسلة Performance patches غير محدودة؛ الإصلاح يجب أن يكون صغيرًا ومثبت السبب.

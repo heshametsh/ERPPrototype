@@ -1,6 +1,6 @@
 # 03 — Current Implementation
 
-**Status:** Approved description of the E6C codebase  
+**Status:** Approved description of the E6E stable checkpoint  
 **Review date:** 2026-07-27  
 **Important:** This is a static code review. The review environment did not contain .NET SDK, so compilation and browser execution were not performed here.
 
@@ -15,8 +15,8 @@
 | Database | SQL Server / LocalDB in Development |
 | ORM | EF Core 10.0.9 |
 | Grid | Tabulator 6.5.0 |
-| Grid baseline | Step 16E6C |
-| Main grid file | `wwwroot/js/tabulatorTest.js` — 7,224 lines |
+| Grid stable checkpoint | Step 16E6E (built on E6C) |
+| Main grid file | `wwwroot/js/tabulatorTest.js` — 7,299 lines in E6E |
 | Work-order page | `Components/Pages/WorkOrders.razor` — 1,023 lines |
 | Work-order service | `Data/WorkOrderService.cs` — 907 lines |
 | Migrations | 29 files |
@@ -138,13 +138,13 @@ Implemented:
 - The result returns saved rows, new database Ids, RowVersions, moved rows, and deleted Ids.
 - The browser applies the saved delta without reloading the full sheet.
 
-## 8. Grid Features in E6C
+## 8. Grid Features in E6E
 
 - Virtual DOM with central buffer 260px.
 - Direct cell editing.
 - Quick typing mode and text editing mode.
 - Four-arrow navigation.
-- Frame gate shared by ArrowUp and ArrowDown.
+- Frame gate shared by ArrowUp, ArrowDown, and plain Enter navigation.
 - ArrowUp-only viewport correction for a proven direction-specific issue.
 - Range selection.
 - Copy/paste matrix.
@@ -157,6 +157,7 @@ Implemented:
 - Dirty row tracking.
 - Year switching only after unsaved changes are cleared.
 - Resize keeps the logical first visible row using the E6C anchor restore.
+- First right-click on an unselected sheet initializes a real range before Tabulator handles the event, preventing `activeRange.occupies` errors.
 
 ## 9. Not Implemented
 
@@ -211,3 +212,15 @@ Not performed here:
 
 **Why is server validation repeated when JavaScript already validates?**  
 JavaScript is like the receptionist checking a form quickly. The server is the locked records room. Even if someone bypasses the receptionist, the records room must still reject an invalid or unauthorized form.
+
+
+## 12. E6D/E6E Verification Record
+
+User-tested on 2026-07-27 after Clean/Rebuild and local browser execution:
+
+- Sustained Enter navigation remained responsive beyond the previously slow point near row 1,040.
+- Arrow navigation remained functional after Enter navigation.
+- First right-click on a one-row year and on a large year opened without the previous `activeRange.occupies` exception.
+- Insert/right-click flow and the connected smoke tests were reported as working.
+
+This is user-environment evidence, not an automated browser-test suite.

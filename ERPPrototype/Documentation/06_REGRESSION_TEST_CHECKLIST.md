@@ -1,7 +1,7 @@
 # 06 — Regression Test Checklist
 
 **Status:** Mandatory after any grid/runtime change  
-**Baseline:** E6C  
+**Stable checkpoint:** E6E (E6C foundation)  
 **Rule:** لا ننتقل للخطوة التالية إذا فشل اختبار أساسي.
 
 ## A. Before Testing
@@ -33,8 +33,10 @@
 - [ ] ArrowRight يعمل.
 - [ ] الكتابة المباشرة تعدل الخلية.
 - [ ] Double-click يفتح المحرر.
-- [ ] Enter يحفظ القيمة بدون سلوك غير متوقع.
+- [ ] Enter داخل المحرر يحفظ القيمة بدون سلوك غير متوقع.
+- [ ] الضغط المستمر على Enter خارج المحرر يظل سريعًا بعد الصف 1,040 وحتى الصفوف العميقة.
 - [ ] Basket list تعمل.
+- [ ] أول كليك يمين قبل أي كليك شمال يفتح القائمة بدون `activeRange.occupies` error.
 - [ ] لا يوجد Red Console error.
 
 ## D. Selection and Clipboard
@@ -137,7 +139,16 @@
 - [ ] Connection String يأتي من Azure settings.
 - [ ] اختبار من شبكة الشركة وأجهزتها.
 
-## L. Result Record
+## L. Latest Manual Evidence — 2026-07-27
+
+- Clean/Rebuild: PASS حسب اختبار المستخدم.
+- المشروع يعمل محليًا: PASS.
+- Enter sustained navigation: PASS.
+- First right-click range guard: PASS.
+- Connected smoke/regression checks reported by the user: PASS.
+- Automated browser tests: غير موجودة حتى الآن.
+
+## M. Result Record
 
 بعد الاختبار اكتب:
 
