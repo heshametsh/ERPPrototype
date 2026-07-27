@@ -1,0 +1,334 @@
+SUPERSEDED DOCUMENT
+===================
+هذه النسخة محفوظة للتاريخ فقط. أُلغيت كمرجع حالي لأنها تعتمد Power Apps وDataverse، بينما التنفيذ الحالي المعتمد مبني على Blazor وASP.NET Core وSQL Server وTabulator.
+المرجع الحالي: Documentation/01_PROJECT_CONTEXT.md
+
+===========================================================
+UDS ERP - PROJECT CONTEXT
+Version: 2.0
+Status: Approved (Architecture Phase)
+===========================================================
+
+DOCUMENT OWNER
+--------------
+Owner: Hesham Omar
+Architecture Partner: ChatGPT
+Purpose:
+This document is the executive summary and architectural foundation of UDS ERP.
+It explains WHAT the product is, WHY it exists, and HOW architectural decisions
+must be made. It intentionally avoids implementation details.
+
+===========================================================
+PRODUCT VISION
+===========================================================
+
+UDS ERP is a cloud-first, Microsoft-native contractor operations platform built
+specifically for contractors working with Saudi Electricity Company (SEC).
+
+The product is designed to evolve from serving a single contractor into a
+commercial ERP platform capable of serving multiple contractors without major
+architectural redesign.
+
+Power Apps is the presentation layer.
+Dataverse is the operational data platform and source of truth.
+
+===========================================================
+PROJECT OVERVIEW
+===========================================================
+
+This is NOT a Power Apps project.
+
+This is a long-term Software Product.
+
+Power Apps is only one implementation technology inside the Microsoft ecosystem.
+
+The Microsoft ecosystem is a strategic architectural decision, not merely a
+technology choice.
+
+===========================================================
+PROJECT GOAL
+===========================================================
+
+Digitize and optimize contractor operations through a Microsoft-native ERP
+platform.
+
+Replacing Excel is the first milestone—not the final objective.
+
+===========================================================
+PROJECT PHILOSOPHY
+===========================================================
+
+Business before Technology.
+
+Architecture before Coding.
+
+Documentation before Implementation.
+
+Performance is a Feature.
+
+Every feature should reduce user effort.
+
+Documentation should reduce complexity, not create it.
+
+===========================================================
+NON-NEGOTIABLE PRINCIPLES
+===========================================================
+
+- Architecture before implementation.
+- Business requirements drive architecture.
+- Dataverse is the single source of truth.
+- Power Apps is an implementation platform.
+- Microsoft-native whenever possible.
+- No undocumented shortcuts.
+- Every major architectural deviation must be documented.
+- User productivity is always the primary UX objective.
+
+===========================================================
+TECHNOLOGY STRATEGY
+===========================================================
+
+Primary Platform
+
+- Power Apps Canvas
+- Dataverse
+- Power Automate
+- Power BI
+- Microsoft Entra ID
+- Microsoft 365
+- Microsoft Teams (Future)
+
+The Microsoft ecosystem is preferred whenever a supported solution exists.
+
+===========================================================
+TARGET USERS
+===========================================================
+
+- Department Employee
+- Project Manager
+- Regional Manager
+- Company Management
+- Future Contractor Customers
+
+===========================================================
+PRODUCT STRATEGY
+===========================================================
+
+Primary Market
+
+- Saudi Electricity contractors
+
+Future Market
+
+- Construction companies
+- Infrastructure contractors
+- Utility contractors
+- Organizations using Microsoft Power Platform
+
+The product must support future multi-company expansion.
+
+===========================================================
+PROJECT SCOPE (PHASE 1)
+===========================================================
+
+Included
+
+- Authentication
+- User Management
+- Branch Management
+- Department Management
+- Work Orders
+- Editable Grid
+- Filtering
+- Dashboards
+- KPI Engine
+- Reporting
+- Notifications
+- Permissions
+
+Future Modules
+
+- Warehouse
+- Fleet
+- Equipment
+- Purchasing
+- Finance
+- HR
+- AI
+- GIS
+- Mobile Field App
+
+===========================================================
+OUT OF SCOPE (PHASE 1)
+===========================================================
+
+- Payroll
+- Accounting
+- Asset Depreciation
+- CRM
+- Customer Billing
+- Offline Mode
+- Public Customer Portal
+- Vendor Portal
+
+===========================================================
+ARCHITECTURE PRINCIPLES
+===========================================================
+
+- Low Coupling
+- High Cohesion
+- Reusable Components
+- Metadata-driven Design
+- Configuration over Customization
+- Cloud-native Architecture
+- Future Multi-Tenant Support
+- Business Rules separated from UI
+- Future UI replacement without redesigning Business Logic
+
+===========================================================
+UX DESIGN PRINCIPLES
+===========================================================
+
+- Fast before Beautiful
+- Keyboard First
+- Minimal Clicks
+- Minimal Dialogs
+- Inline Editing
+- Users Stay in Context
+- Avoid Modal Windows
+- Excel-like Workflow
+- Automate Repetitive Tasks
+- Never ask the user for information the system already knows
+
+===========================================================
+DATA ENTRY
+===========================================================
+
+The primary experience should resemble Microsoft Excel.
+
+Users must be able to:
+
+- Type continuously.
+- Edit any row at any time.
+- Copy/Paste.
+- Use keyboard navigation.
+- Enter multiple Work Orders quickly.
+
+Minimum Required Fields
+
+- Work Order Number
+- Work Type
+
+===========================================================
+COMPANY STRUCTURE
+===========================================================
+
+Company
+  -> Branch
+      -> Department
+          -> Users
+              -> Work Orders
+
+Each user enters directly into their own workspace.
+
+===========================================================
+WORK ORDER RULES
+===========================================================
+
+Logical uniqueness:
+
+Work Order Number + Work Type
+
+Current Status only.
+
+KPIs are calculated automatically.
+
+===========================================================
+LANGUAGE
+===========================================================
+
+UI Language: English
+
+User Data:
+- English
+- Arabic
+- Mixed Language
+
+Unicode support is mandatory.
+
+===========================================================
+ASSUMPTIONS
+===========================================================
+
+- Microsoft 365 available.
+- Dataverse available.
+- Internet available.
+- Windows PCs.
+- Modern browsers.
+- No Offline Mode in Phase 1.
+
+===========================================================
+CONSTRAINTS
+===========================================================
+
+- Microsoft technologies only.
+- Dataverse mandatory.
+- No external operational database.
+- Authentication through Microsoft Entra ID.
+
+===========================================================
+SUCCESS METRICS
+===========================================================
+
+- Excel usage reaches 0%.
+- Main screens load under 2 seconds.
+- Filtering under 500 ms.
+- Search under 500 ms.
+- Save under 1 second whenever possible.
+- Work Order entry faster than Excel.
+- Minimum Dataverse requests.
+- Most daily operations require no more than three user actions.
+
+===========================================================
+DECISION GOVERNANCE
+===========================================================
+
+Business requirements take precedence.
+
+Architecture governs implementation.
+
+Short-term convenience must never compromise maintainability,
+performance, scalability, or security.
+
+All major architectural decisions and exceptions must be documented.
+
+===========================================================
+COMMUNICATION RULES
+===========================================================
+
+ChatGPT must:
+
+- Proactively suggest improvements.
+- Challenge weak architecture.
+- Explain trade-offs.
+- Ask clarifying questions.
+- Continue questioning until business processes are fully understood.
+- Never wait for the user to ask if an architectural improvement is obvious.
+
+===========================================================
+DOCUMENTATION STRATEGY
+===========================================================
+
+PROJECT_CONTEXT contains only stable, high-level information.
+
+Changing information belongs in dedicated documents:
+
+- ARCHITECTURE
+- DATABASE
+- BUSINESS_RULES
+- UI_UX
+- PERFORMANCE
+- ROADMAP
+- RELEASE_PLAN
+- DECISIONS_LOG
+
+PROJECT_CONTEXT should remain concise enough to be understood within a few minutes.

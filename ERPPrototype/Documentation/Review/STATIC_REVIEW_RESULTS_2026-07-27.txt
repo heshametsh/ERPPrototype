@@ -1,0 +1,32 @@
+ERPPrototype E6C Static Review — 2026-07-27
+============================================
+
+[PASS] E6C source baseline selected
+[PASS] Runtime/source files unchanged from uploaded ZIP: True
+[PASS] Runtime/source file count in manifest: 87
+[PASS] tabulatorTest.js syntax: node --check
+[PASS] tabulatorFilters.js syntax: node --check
+[PASS] tabulatorPerformance.js syntax: node --check
+[PASS] ReconnectModal.razor.js syntax: node --check
+[PASS] JSON files parse
+[PASS] ERPPrototype.csproj XML parses
+[PASS] Target framework found: net10.0
+[PASS] Tabulator library found: 6.5.0
+[PASS] No Syncfusion PackageReference/runtime reference
+[PASS] Required routes found: /, /work-orders, /admin, /Account/Login
+[PASS] E6C Virtual DOM marker found: renderVerticalBufferPx = 260
+[PASS] E6C resize logical viewport restoration fields found
+[PASS] Failed recovery experiment flags absent: instanceRecoveryTest/rangeRecoveryTest
+[PASS] replaceData recovery marker absent in tabulatorTest.js
+[PASS] Historical/conflicting documents moved to Documentation/Archive
+[PASS] User-specific ERPPrototype.csproj.user excluded from deliverable
+
+[NOT RUN] dotnet restore/build — .NET SDK not installed in review environment
+[NOT RUN] EF Core migration execution
+[NOT RUN] SQL integration
+[NOT RUN] Browser regression checklist
+[NOT RUN] Azure App Service / SEC network tests
+[NOT RUN] NuGet vulnerability audit after restore
+
+Conclusion:
+Static structure and JavaScript syntax passed. Runtime behavior is not claimed until the user rebuilds and executes the documented regression tests.

@@ -3,6 +3,17 @@
     states: {},
 
     /*
+     * Central Virtual DOM tuning point.
+     * 260px is roughly 6-7 work-order rows on the current sheet,
+     * keeping enough overscan for smooth keyboard/mouse scrolling while
+     * avoiding the much larger downward DOM window measured previously.
+     * Any future tuning for both ArrowUp and ArrowDown belongs here.
+     */
+    virtualDomSettings: {
+        renderVerticalBufferPx: 260
+    },
+
+    /*
      * نعتمد على نوع جهاز الإدخال بدل عرض النافذة.
      * تصغير نافذة الكمبيوتر لا يحول الصفحة إلى وضع الموبايل،
      * بينما الهاتف/التابلت يظل له التمرير الطبيعي.
@@ -1879,6 +1890,45 @@
 
         if (oldState?.resizeTimer) {
             window.clearTimeout(oldState.resizeTimer);
+            oldState.resizeTimer = null;
+        }
+
+        if (oldState) {
+            oldState.resizePendingViewportPosition = null;
+        }
+
+        if (
+            oldState?.resizeViewportRestoreFrame !== null &&
+            oldState?.resizeViewportRestoreFrame !== undefined
+        ) {
+            window.cancelAnimationFrame(
+                oldState.resizeViewportRestoreFrame
+            );
+            oldState.resizeViewportRestoreFrame = null;
+            oldState.resizeViewportRestoreFramesRemaining = 0;
+            oldState.resizeViewportRestoreGeneration += 1;
+            oldState.resizeViewportPosition = null;
+        }
+
+        if (
+            oldState?.arrowUpCorrectionFrame !== null &&
+            oldState?.arrowUpCorrectionFrame !== undefined
+        ) {
+            window.cancelAnimationFrame(
+                oldState.arrowUpCorrectionFrame
+            );
+            oldState.arrowUpCorrectionFrame = null;
+            oldState.arrowUpCorrectionFramesRemaining = 0;
+        }
+
+        if (
+            oldState?.verticalNavigationFrame !== null &&
+            oldState?.verticalNavigationFrame !== undefined
+        ) {
+            window.cancelAnimationFrame(
+                oldState.verticalNavigationFrame
+            );
+            oldState.verticalNavigationFrame = null;
         }
 
         this.releaseViewportLock(oldState);
@@ -1987,6 +2037,27 @@
             pointerDownHandler: null,
             resizeHandler: null,
             resizeTimer: null,
+            resizeViewportRestoreFrame: null,
+            resizeViewportRestoreFramesRemaining: 0,
+            resizeViewportRestoreGeneration: 0,
+            resizeViewportPosition: null,
+            resizePendingViewportPosition: null,
+
+            /*
+             * ArrowUp viewport correction is single-flight:
+             * at most one requestAnimationFrame chain may exist.
+             * Repeated keys only refresh the remaining settle frames.
+             */
+            arrowUpCorrectionFrame: null,
+            arrowUpCorrectionFramesRemaining: 0,
+
+            /*
+             * Browser key-repeat events can accumulate while Tabulator is
+             * still painting a Virtual DOM boundary. Keep one shared gate
+             * for both vertical directions so ArrowUp and ArrowDown use the
+             * same repeat policy and the same central state.
+             */
+            verticalNavigationFrame: null,
 
             viewportLockApplied: false,
             previousDocumentOverflow: "",
@@ -2023,6 +2094,14 @@
             height: `${initialTableHeight}px`,
             layout: "fitColumns",
             renderVertical: "virtual",
+
+            /*
+             * One central buffer policy for both vertical directions.
+             * This limits the number of off-screen rows retained by the
+             * Virtual DOM instead of adding direction-specific key fixes.
+             */
+            renderVerticalBuffer:
+                this.virtualDomSettings.renderVerticalBufferPx,
 
             /*
              * Render popups under document.body. Their final position
@@ -2247,12 +2326,33 @@
          * وليس أثناء الكتابة أو التعديل داخل الخلايا.
          */
         state.resizeHandler = function () {
+            /*
+             * Capture the logical top-row anchor at the START of a resize
+             * burst. Waiting until the debounce callback runs is too late:
+             * the browser may already have changed the table geometry, which
+             * caused the saved anchor to drift several rows on every resize.
+             */
+            if (!state.resizeTimer) {
+                state.resizePendingViewportPosition =
+                    window.tabulatorTest
+                        .captureTableViewportPosition(table);
+            }
+
             if (state.resizeTimer) {
                 window.clearTimeout(state.resizeTimer);
             }
 
             state.resizeTimer = window.setTimeout(
                 function () {
+                    state.resizeTimer = null;
+
+                    const viewportPosition =
+                        state.resizePendingViewportPosition ??
+                        window.tabulatorTest
+                            .captureTableViewportPosition(table);
+
+                    state.resizePendingViewportPosition = null;
+
                     const shouldLock =
                         window.tabulatorTest
                             .usesDesktopPointer();
@@ -2282,6 +2382,18 @@
                             .releaseViewportLock(state);
                         table.setHeight("650px");
                     }
+
+                    /*
+                     * setHeight can rebuild the Virtual DOM and reset the
+                     * table holder to row 1. Restore the exact table scroll
+                     * position for a few paint frames after the resize.
+                     */
+                    window.tabulatorTest
+                        .scheduleTableViewportPositionRestore(
+                            elementId,
+                            viewportPosition,
+                            12
+                        );
                 },
                 160
             );
@@ -2654,13 +2766,19 @@
             }
 
             /*
-             * Let Tabulator perform its normal range navigation first.
-             * On plain ArrowUp only, verify on the next animation frame
-             * that the new active cell did not remain one row above the
-             * visible Virtual DOM viewport.
+             * Use one central repeat gate for plain vertical range
+             * navigation. ArrowUp and ArrowDown now share the same frame
+             * budget, so neither direction can build a stale key queue.
+             *
+             * The viewport correction remains an ArrowUp-only exception
+             * because the confirmed Virtual DOM edge defect exists above
+             * the viewport, not below it.
              */
             if (
-                event.key === "ArrowUp" &&
+                (
+                    event.key === "ArrowUp" ||
+                    event.key === "ArrowDown"
+                ) &&
                 !event.shiftKey &&
                 !event.ctrlKey &&
                 !event.metaKey &&
@@ -2669,11 +2787,32 @@
                     event.target
                 )
             ) {
-                window.tabulatorTest
-                    .queueArrowUpRangeViewportCorrection(
-                        elementId,
-                        3
-                    );
+                const shouldNavigate =
+                    window.tabulatorTest
+                        .allowVerticalNavigationEvent(
+                            elementId,
+                            event
+                        );
+
+                if (!shouldNavigate) {
+                    /*
+                     * This is a stale browser key-repeat event that arrived
+                     * before the previous vertical navigation produced a
+                     * paint. Stop it in capture phase so it never enters
+                     * Tabulator's queue.
+                     */
+                    event.preventDefault();
+                    event.stopImmediatePropagation();
+                    return;
+                }
+
+                if (event.key === "ArrowUp") {
+                    window.tabulatorTest
+                        .queueArrowUpRangeViewportCorrection(
+                            elementId,
+                            3
+                        );
+                }
             }
 
             /*
@@ -3388,6 +3527,248 @@
      * table by approximately one row. Correct only that confirmed upward
      * edge case without replacing Tabulator range selection.
      */
+    /*
+     * A held vertical arrow generates repeated keydown events independently
+     * of rendering. If Tabulator takes longer than one frame, those events
+     * can queue up and replay later in either direction.
+     *
+     * Keep normal taps untouched. For browser-generated repeat events only,
+     * use one shared ArrowUp/ArrowDown gate, allow one vertical navigation
+     * per rendered frame, and discard stale repeats from that frame.
+     */
+    allowVerticalNavigationEvent: function (
+        elementId,
+        event
+    ) {
+        const state = this.states[elementId];
+
+        if (!state) {
+            return true;
+        }
+
+        if (
+            event?.repeat === true &&
+            state.verticalNavigationFrame !== null
+        ) {
+            return false;
+        }
+
+        if (state.verticalNavigationFrame === null) {
+            state.verticalNavigationFrame =
+                window.requestAnimationFrame(() => {
+                    const currentState =
+                        this.states[elementId];
+
+                    if (currentState) {
+                        currentState.verticalNavigationFrame = null;
+                    }
+                });
+        }
+
+        return true;
+    },
+
+    captureTableViewportPosition: function (table) {
+        const holder = table?.element?.querySelector(
+            ".tabulator-tableholder"
+        );
+
+        if (!holder) {
+            return null;
+        }
+
+        const holderBounds = holder.getBoundingClientRect();
+        let anchorRow = null;
+        let anchorElement = null;
+        let anchorTop = Number.POSITIVE_INFINITY;
+
+        /*
+         * Preserve a logical row anchor instead of raw scrollTop only.
+         * A browser resize can change column widths and row geometry, so
+         * the same pixel offset may point at a different row afterwards.
+         */
+        for (const row of table.getRows("visible")) {
+            const rowElement = row?.getElement?.();
+
+            if (!rowElement || !rowElement.isConnected) {
+                continue;
+            }
+
+            const rowBounds = rowElement.getBoundingClientRect();
+            const intersectsViewport =
+                rowBounds.bottom > holderBounds.top + 1 &&
+                rowBounds.top < holderBounds.bottom - 1;
+
+            if (
+                intersectsViewport &&
+                rowBounds.top < anchorTop
+            ) {
+                anchorRow = row;
+                anchorElement = rowElement;
+                anchorTop = rowBounds.top;
+            }
+        }
+
+        return {
+            anchorRowIndex: anchorRow?.getIndex?.() ?? null,
+            anchorOffsetTop: anchorElement
+                ? anchorElement.getBoundingClientRect().top -
+                holderBounds.top
+                : null,
+            scrollTop: holder.scrollTop,
+            scrollLeft: holder.scrollLeft
+        };
+    },
+
+    scheduleTableViewportPositionRestore: function (
+        elementId,
+        position,
+        frames
+    ) {
+        const state = this.states[elementId];
+        const table = this.tables[elementId];
+
+        if (!state || !table || !position) {
+            return false;
+        }
+
+        if (state.resizeViewportRestoreFrame !== null) {
+            window.cancelAnimationFrame(
+                state.resizeViewportRestoreFrame
+            );
+            state.resizeViewportRestoreFrame = null;
+        }
+
+        state.resizeViewportRestoreGeneration += 1;
+        const restoreGeneration =
+            state.resizeViewportRestoreGeneration;
+
+        state.resizeViewportPosition = {
+            anchorRowIndex:
+                position.anchorRowIndex ?? null,
+            anchorOffsetTop:
+                Number.isFinite(position.anchorOffsetTop)
+                    ? Number(position.anchorOffsetTop)
+                    : null,
+            scrollTop: Math.max(0, Number(position.scrollTop) || 0),
+            scrollLeft: Math.max(0, Number(position.scrollLeft) || 0)
+        };
+        state.resizeViewportRestoreFramesRemaining =
+            Number.isInteger(frames)
+                ? Math.max(1, frames)
+                : 4;
+
+        const restoreOnFrame = () => {
+            const currentState = this.states[elementId];
+            const currentTable = this.tables[elementId];
+            const holder = currentTable?.element?.querySelector(
+                ".tabulator-tableholder"
+            );
+
+            if (
+                !currentState ||
+                currentState.resizeViewportRestoreGeneration !==
+                restoreGeneration
+            ) {
+                return;
+            }
+
+            currentState.resizeViewportRestoreFrame = null;
+
+            const saved =
+                currentState.resizeViewportPosition;
+
+            if (holder && saved) {
+                holder.scrollLeft = saved.scrollLeft;
+
+                const anchorRow =
+                    saved.anchorRowIndex !== null
+                        ? currentTable.getRow(saved.anchorRowIndex)
+                        : null;
+                const anchorElement =
+                    anchorRow?.getElement?.();
+
+                if (
+                    anchorElement?.isConnected &&
+                    Number.isFinite(saved.anchorOffsetTop)
+                ) {
+                    const holderBounds =
+                        holder.getBoundingClientRect();
+                    const currentOffset =
+                        anchorElement.getBoundingClientRect().top -
+                        holderBounds.top;
+                    const offsetDelta =
+                        currentOffset - saved.anchorOffsetTop;
+
+                    if (Math.abs(offsetDelta) > 0.5) {
+                        holder.scrollTop = Math.max(
+                            0,
+                            holder.scrollTop + offsetDelta
+                        );
+                    }
+                } else {
+                    holder.scrollTop = saved.scrollTop;
+                }
+            }
+
+            currentState.resizeViewportRestoreFramesRemaining =
+                Math.max(
+                    0,
+                    currentState.resizeViewportRestoreFramesRemaining - 1
+                );
+
+            if (
+                currentState.resizeViewportRestoreFramesRemaining > 0
+            ) {
+                currentState.resizeViewportRestoreFrame =
+                    window.requestAnimationFrame(restoreOnFrame);
+            } else {
+                currentState.resizeViewportPosition = null;
+            }
+        };
+
+        const beginFrameRestore = () => {
+            const currentState = this.states[elementId];
+
+            if (
+                !currentState ||
+                currentState.resizeViewportRestoreGeneration !==
+                restoreGeneration
+            ) {
+                return;
+            }
+
+            currentState.resizeViewportRestoreFrame =
+                window.requestAnimationFrame(restoreOnFrame);
+        };
+
+        const anchorRowIndex =
+            state.resizeViewportPosition.anchorRowIndex;
+
+        if (
+            anchorRowIndex !== null &&
+            typeof table.scrollToRow === "function"
+        ) {
+            try {
+                Promise.resolve(
+                    table.scrollToRow(
+                        anchorRowIndex,
+                        "top",
+                        false
+                    )
+                )
+                    .catch(() => false)
+                    .finally(beginFrameRestore);
+            } catch {
+                beginFrameRestore();
+            }
+        } else {
+            beginFrameRestore();
+        }
+
+        return true;
+    },
+
     correctArrowUpRangeViewport: function (elementId) {
         const table = this.tables[elementId];
 
@@ -3439,27 +3820,72 @@
         elementId,
         attempts
     ) {
-        const remainingAttempts =
+        const state = this.states[elementId];
+
+        if (!state) {
+            return false;
+        }
+
+        const requestedFrames =
             Number.isInteger(attempts)
-                ? attempts
+                ? Math.max(1, attempts)
                 : 3;
 
-        window.requestAnimationFrame(() => {
-            const corrected =
-                this.correctArrowUpRangeViewport(
-                    elementId
+        /*
+         * Do not create one RAF chain for every repeated ArrowUp key.
+         * Keep one shared chain and let each newer key refresh the quiet
+         * settle window. The callback always reads the latest active range.
+         */
+        state.arrowUpCorrectionFramesRemaining =
+            Math.max(
+                state.arrowUpCorrectionFramesRemaining || 0,
+                requestedFrames
+            );
+
+        if (state.arrowUpCorrectionFrame !== null) {
+            return true;
+        }
+
+        const runCorrectionFrame = () => {
+            const currentState =
+                this.states[elementId];
+
+            if (!currentState) {
+                return;
+            }
+
+            currentState.arrowUpCorrectionFrame = null;
+
+            this.correctArrowUpRangeViewport(
+                elementId
+            );
+
+            currentState.arrowUpCorrectionFramesRemaining =
+                Math.max(
+                    0,
+                    (currentState
+                        .arrowUpCorrectionFramesRemaining || 0) - 1
                 );
 
             if (
-                !corrected &&
-                remainingAttempts > 1
+                currentState
+                    .arrowUpCorrectionFramesRemaining <= 0
             ) {
-                this.queueArrowUpRangeViewportCorrection(
-                    elementId,
-                    remainingAttempts - 1
-                );
+                return;
             }
-        });
+
+            currentState.arrowUpCorrectionFrame =
+                window.requestAnimationFrame(
+                    runCorrectionFrame
+                );
+        };
+
+        state.arrowUpCorrectionFrame =
+            window.requestAnimationFrame(
+                runCorrectionFrame
+            );
+
+        return true;
     },
 
     /*
@@ -6746,6 +7172,45 @@
 
         if (state?.resizeTimer) {
             window.clearTimeout(state.resizeTimer);
+            state.resizeTimer = null;
+        }
+
+        if (state) {
+            state.resizePendingViewportPosition = null;
+        }
+
+        if (
+            state?.resizeViewportRestoreFrame !== null &&
+            state?.resizeViewportRestoreFrame !== undefined
+        ) {
+            window.cancelAnimationFrame(
+                state.resizeViewportRestoreFrame
+            );
+            state.resizeViewportRestoreFrame = null;
+            state.resizeViewportRestoreFramesRemaining = 0;
+            state.resizeViewportRestoreGeneration += 1;
+            state.resizeViewportPosition = null;
+        }
+
+        if (
+            state?.arrowUpCorrectionFrame !== null &&
+            state?.arrowUpCorrectionFrame !== undefined
+        ) {
+            window.cancelAnimationFrame(
+                state.arrowUpCorrectionFrame
+            );
+            state.arrowUpCorrectionFrame = null;
+            state.arrowUpCorrectionFramesRemaining = 0;
+        }
+
+        if (
+            state?.verticalNavigationFrame !== null &&
+            state?.verticalNavigationFrame !== undefined
+        ) {
+            window.cancelAnimationFrame(
+                state.verticalNavigationFrame
+            );
+            state.verticalNavigationFrame = null;
         }
 
         this.releaseViewportLock(state);

@@ -1,0 +1,447 @@
+{
+  "baseline": "Step 16E6C",
+  "generated_at": "2026-07-27",
+  "scope": "Runtime/source files excluding documentation, historical reports, vendor minified assets, and user-specific Visual Studio files.",
+  "runtime_source_unchanged_from_uploaded_zip": true,
+  "missing": [],
+  "added": [],
+  "changed": [],
+  "file_count": 87,
+  "files": [
+    {
+      "path": ".gitignore",
+      "size_bytes": 556,
+      "sha256": "867f51d8dad8743899992fc8ffb5dd1206e9b5dd1ff5d73d256d49f5c2cc076f"
+    },
+    {
+      "path": "Components/Account/IdentityComponentsEndpointRouteBuilderExtensions.cs",
+      "size_bytes": 1036,
+      "sha256": "80244c3226be991c77f17a0aa0245fb9d2dc2af3d4fae5f0e704d8cc283cf4cc"
+    },
+    {
+      "path": "Components/Account/IdentityRedirectManager.cs",
+      "size_bytes": 2163,
+      "sha256": "9e94902534c3573df1256c719d045d39e541157482fe7ba6cdcbfaf7bd183254"
+    },
+    {
+      "path": "Components/Account/IdentityRevalidatingAuthenticationStateProvider.cs",
+      "size_bytes": 2102,
+      "sha256": "e23799a09d72e7fa59bd534f02b30cf0bcf6d3514fcd2cdacbdb3ccbfe510238"
+    },
+    {
+      "path": "Components/Account/Pages/AccessDenied.razor",
+      "size_bytes": 268,
+      "sha256": "8ccd92b794aab58d783c903ab37da8f669c9e89d2e708102ac2a2ae994ddd8a8"
+    },
+    {
+      "path": "Components/Account/Pages/InvalidUser.razor",
+      "size_bytes": 196,
+      "sha256": "ad1435dcbaa78314e84659f6d4b02029786573ea2a7ac1a28c42ef1913f332a2"
+    },
+    {
+      "path": "Components/Account/Pages/Lockout.razor",
+      "size_bytes": 440,
+      "sha256": "5d1653b810de9913265b32a787dce96133db2da5156775c5dcbc1d19bcd5b1d9"
+    },
+    {
+      "path": "Components/Account/Pages/Login.razor",
+      "size_bytes": 7666,
+      "sha256": "6c709339e30fc25e6b8e43d4d981c76ec817ebbb4d18e8b549e1a8a27a5fad4a"
+    },
+    {
+      "path": "Components/Account/Pages/Login.razor.css",
+      "size_bytes": 6776,
+      "sha256": "57918691c36bcd65c03b33c3b1f9a4e9e349eb60815462e652e81e15b4331469"
+    },
+    {
+      "path": "Components/Account/Pages/Manage/ChangePassword.razor",
+      "size_bytes": 6123,
+      "sha256": "f19f1c23530ece8cf527264b45a5c98f16d00c2a9854e0c2d260f07c312f33c8"
+    },
+    {
+      "path": "Components/Account/Pages/Manage/_Imports.razor",
+      "size_bytes": 84,
+      "sha256": "aea74d73b99fda1b92da77fed4400a4ebe8eeb68e8f216420593d7b1768774ca"
+    },
+    {
+      "path": "Components/Account/Pages/_Imports.razor",
+      "size_bytes": 94,
+      "sha256": "cee88a4f94a4e6e892ea6c989ecfd95fe1010203d4d9b0b16326d048a0feec69"
+    },
+    {
+      "path": "Components/Account/Shared/ManageLayout.razor",
+      "size_bytes": 362,
+      "sha256": "9dcdb87f7f85de4bd64ad7fc03bd145e7a847420b879c98c191e837bd217bd62"
+    },
+    {
+      "path": "Components/Account/Shared/ManageNavMenu.razor",
+      "size_bytes": 279,
+      "sha256": "0e9615cab69ec62a2c013495cbae006556b41d864b7e308ad7de934350be469b"
+    },
+    {
+      "path": "Components/Account/Shared/RedirectToAccessDenied.razor",
+      "size_bytes": 218,
+      "sha256": "9db0a05b0e96801f35b3d281a3a60d6dc414f6e62ae8004cc930bca7896670d7"
+    },
+    {
+      "path": "Components/Account/Shared/RedirectToLogin.razor",
+      "size_bytes": 251,
+      "sha256": "c6732201ce84b18f80b3bdd89c093e2af17899024eed7cfbc97b1b009fe1ec36"
+    },
+    {
+      "path": "Components/Account/Shared/StatusMessage.razor",
+      "size_bytes": 842,
+      "sha256": "20002cc5d2529e3085099d09e7949eb455cdfcf1e7ddad782f8552d04d303729"
+    },
+    {
+      "path": "Components/Admin/BranchUserForm.razor",
+      "size_bytes": 7107,
+      "sha256": "5073eb4c3f49c25f707b1c0a9a3602b164f2f1c34802c70e5ca58b3318d883af"
+    },
+    {
+      "path": "Components/Admin/BranchUsersList.razor",
+      "size_bytes": 5846,
+      "sha256": "129f9ba5ecf2fd01a2df566f53b36009428014e0cc0212c66f1424d05fa8aa94"
+    },
+    {
+      "path": "Components/App.razor",
+      "size_bytes": 1029,
+      "sha256": "e1b48d94af6846d3d7759c4dc2378d16d24972d2eae32178a3692fa70809921f"
+    },
+    {
+      "path": "Components/Layout/MainLayout.razor",
+      "size_bytes": 454,
+      "sha256": "fc896ec0a63dc208796158f0115ba5d6758dc394a4ce749d8bd92d838cd9a464"
+    },
+    {
+      "path": "Components/Layout/MainLayout.razor.css",
+      "size_bytes": 1191,
+      "sha256": "c23127eedbbcc7b52aa694c4d1532fe6082943d90abe8f78c086ef1d8065a7e6"
+    },
+    {
+      "path": "Components/Layout/NavMenu.razor",
+      "size_bytes": 4916,
+      "sha256": "43e9edeb459456989b82b0eeaa9e87dd54decd3df828760dd11ab9b6b1b7fd7e"
+    },
+    {
+      "path": "Components/Layout/NavMenu.razor.css",
+      "size_bytes": 7644,
+      "sha256": "c854edb0bdd9772883f0792cf7de7fd97292406ea90812f25263269316f1fe22"
+    },
+    {
+      "path": "Components/Layout/ReconnectModal.razor",
+      "size_bytes": 1362,
+      "sha256": "e1c8308c1ec6656c8f5cd50df3f1879b614e43109ad6b1e23ab26d6f1007c6db"
+    },
+    {
+      "path": "Components/Layout/ReconnectModal.razor.css",
+      "size_bytes": 3873,
+      "sha256": "ba73539337ecff370e1ce8ebb9ebc0992d6ed100080a29f4bcac888f1ce1abd8"
+    },
+    {
+      "path": "Components/Layout/ReconnectModal.razor.js",
+      "size_bytes": 2448,
+      "sha256": "e6efaff747ceb6d105cc4daa1cc18c3979b2f77224fc1686a8baeb9eeea67465"
+    },
+    {
+      "path": "Components/Pages/AdminPanel.razor",
+      "size_bytes": 12905,
+      "sha256": "0eb61bc1ea34903ab482042bbe964e25b598a79cb21ed73926d0c5903345466d"
+    },
+    {
+      "path": "Components/Pages/Error.razor",
+      "size_bytes": 1215,
+      "sha256": "e77473780e53f2ba6d42105b745d3eca7cdbdaec1d407bc46a8ce9338b43eb29"
+    },
+    {
+      "path": "Components/Pages/Home.razor",
+      "size_bytes": 2679,
+      "sha256": "f10c447665b782fe04277f358e3692aa08f965d9f85a6b3bd1c81671398e06f4"
+    },
+    {
+      "path": "Components/Pages/Home.razor.css",
+      "size_bytes": 4310,
+      "sha256": "ef609e9f7bde6a28b1aa6e8ad6871b524bd67137aa8fc58844763fa8f503c91a"
+    },
+    {
+      "path": "Components/Pages/NotFound.razor",
+      "size_bytes": 126,
+      "sha256": "c267b98a248a516f8ca8c79dd8410d9f09d9ad302466e65c6b9b959b5ffc7cbd"
+    },
+    {
+      "path": "Components/Pages/WorkOrders.razor",
+      "size_bytes": 34872,
+      "sha256": "a95933db866cb922fd985e68025eff170483e108338152c4411f97fe43216a05"
+    },
+    {
+      "path": "Components/Pages/WorkOrders.razor.css",
+      "size_bytes": 22852,
+      "sha256": "631853ec276e0f32158b494a8d5c89eb5454784c7211a1607f4d8c3f4f993558"
+    },
+    {
+      "path": "Components/Routes.razor",
+      "size_bytes": 799,
+      "sha256": "b7a7d70675695d6df23a7c948028ffe1554b65cf3f48f432fd46023bec80e6c7"
+    },
+    {
+      "path": "Components/_Imports.razor",
+      "size_bytes": 489,
+      "sha256": "e26ed6c8408cb7a8c2a94efd99469f5d8bb05ea328d224c42529ae81f12a14a2"
+    },
+    {
+      "path": "Data/AppRoles.cs",
+      "size_bytes": 415,
+      "sha256": "044258ad90483aac9df4766c11bfaecdd103e87e0793a3f87d5cc2c176808818"
+    },
+    {
+      "path": "Data/ApplicationDbContext.cs",
+      "size_bytes": 5758,
+      "sha256": "f97477019850abedafa46546861d8b67736d692e95d6cc7421f3f8b9d5f7c115"
+    },
+    {
+      "path": "Data/ApplicationSeeder.cs",
+      "size_bytes": 8493,
+      "sha256": "cbf616e1d732a35bc45fd424d6399888d235458df321d668df4d03fd65a39512"
+    },
+    {
+      "path": "Data/ApplicationUser.cs",
+      "size_bytes": 506,
+      "sha256": "c03bdd03495cd99f22966b13bd7b649a5970b8524dff6663c2bc243dd53ff585"
+    },
+    {
+      "path": "Data/Entities/Branch.cs",
+      "size_bytes": 257,
+      "sha256": "861818c9407e9479257f7ff841c04e1d48a337491f2560538f219381f8a9ea0b"
+    },
+    {
+      "path": "Data/Entities/Department.cs",
+      "size_bytes": 417,
+      "sha256": "5b0f0efa981933c673d1288defab9ee96b7fa22638dca66efd08c005b31ebb69"
+    },
+    {
+      "path": "Data/Entities/DepartmentType.cs",
+      "size_bytes": 272,
+      "sha256": "d9106911581b7904df9b992bd4f2408736db5bbc53b6bca6a5b9893eb4429630"
+    },
+    {
+      "path": "Data/Entities/WorkOrder.cs",
+      "size_bytes": 865,
+      "sha256": "3e68c8a7727230c73c769ea24ea5df68edfebd3139c0eb33eebaab7eb92e7e36"
+    },
+    {
+      "path": "Data/StandardDepartmentTypes.cs",
+      "size_bytes": 608,
+      "sha256": "6f9373f57fcf6bd17573ac313e401583e3c7d4bd37cef141d01d1d4392749860"
+    },
+    {
+      "path": "Data/UserManagementService.cs",
+      "size_bytes": 7724,
+      "sha256": "db11aae2fd0bceaaab13ecc651211d93aecaef23d63831101d3867be8669f2e4"
+    },
+    {
+      "path": "Data/WorkOrderBuskets.cs",
+      "size_bytes": 1757,
+      "sha256": "78d84ab835e2ca87d7be76ab99f173421001785eb2d8d66000cd771598941f88"
+    },
+    {
+      "path": "Data/WorkOrderService.cs",
+      "size_bytes": 31760,
+      "sha256": "43f49669b58a20c859bb6a520031155b51542f95727863fab996dababd39852a"
+    },
+    {
+      "path": "ERPPrototype.csproj",
+      "size_bytes": 936,
+      "sha256": "3ee8c661bc212f768fb6f2adfd889bb8537ce2c69be1b675752cd2141755ecda"
+    },
+    {
+      "path": "Migrations/00000000000000_CreateIdentitySchema.Designer.cs",
+      "size_bytes": 14000,
+      "sha256": "28e848c936bad1c3f8fcc596d6d2ddef255fa46c6f14ed9cceb5692cb1110029"
+    },
+    {
+      "path": "Migrations/00000000000000_CreateIdentitySchema.cs",
+      "size_bytes": 11710,
+      "sha256": "160fd9f2fb7f2121ae4a8f3fbcec7aa2ae571d9f96569831ced24c4d1bc28e0b"
+    },
+    {
+      "path": "Migrations/20260714191342_AddWorkOrderStructure.Designer.cs",
+      "size_bytes": 18359,
+      "sha256": "14197cbe3f4ba52a04ccf2c8df7a28992193038df81034691e8b369b77ee355f"
+    },
+    {
+      "path": "Migrations/20260714191342_AddWorkOrderStructure.cs",
+      "size_bytes": 4731,
+      "sha256": "15c3f5500141fccdc8fe2ccd8a7a73a2d2398249b6c8cf4b99420403895b77a6"
+    },
+    {
+      "path": "Migrations/20260714194315_AddWorkYearToWorkOrders.Designer.cs",
+      "size_bytes": 18462,
+      "sha256": "f6b0d3be54db61e526b10a0027dddb18b2a1cbddd6ec822ebe8875ce868b307f"
+    },
+    {
+      "path": "Migrations/20260714194315_AddWorkYearToWorkOrders.cs",
+      "size_bytes": 1347,
+      "sha256": "58598f0457788d710e89b93dc51e02eb50d39f0a8dc014295a4770a6c40a3cd8"
+    },
+    {
+      "path": "Migrations/20260714200213_AddUserScope.Designer.cs",
+      "size_bytes": 19425,
+      "sha256": "a24cfe76c55ed9f9a55a2e6c0451f600ff3a055008f749dfebe3855805684543"
+    },
+    {
+      "path": "Migrations/20260714200213_AddUserScope.cs",
+      "size_bytes": 2648,
+      "sha256": "03a43b2433c924c48cb17a3b1fb10cd902a3389c873eee38fc662bf4f085d852"
+    },
+    {
+      "path": "Migrations/20260715141838_AddUserManagementFields.Designer.cs",
+      "size_bytes": 19852,
+      "sha256": "cbe3c45bc2eb5898af53ef61f59846c972b7fc5d1d738ad7c819bafa1b98ae32"
+    },
+    {
+      "path": "Migrations/20260715141838_AddUserManagementFields.cs",
+      "size_bytes": 1907,
+      "sha256": "3ff81a41e0c2955e59c8fb8c577c6631a645ce4df950f16172c337a6e4f76215"
+    },
+    {
+      "path": "Migrations/20260715150546_AddStandardDepartmentTypes.Designer.cs",
+      "size_bytes": 21117,
+      "sha256": "a13b2a6517fa70f3c7d186798663f502d3bd7c5c6397133b9af3eb97c999fec5"
+    },
+    {
+      "path": "Migrations/20260715150546_AddStandardDepartmentTypes.cs",
+      "size_bytes": 6252,
+      "sha256": "9fe844cfadd614faf20c07e1bc9bcfc13f5878d20e6822fc56b095edc029d13e"
+    },
+    {
+      "path": "Migrations/20260715183556_AddBusketToWorkOrders.Designer.cs",
+      "size_bytes": 21300,
+      "sha256": "824d75f8bb00a344625ba004c7b36f7da20fadb79acd21b1e7f2c6bd17cd5d23"
+    },
+    {
+      "path": "Migrations/20260715183556_AddBusketToWorkOrders.cs",
+      "size_bytes": 837,
+      "sha256": "0e647b72672505e5d30b6df0fee5b8aa8482f2eadcf7b0ba9450a69b43059a2a"
+    },
+    {
+      "path": "Migrations/20260723163342_AddWorkOrderSoftDelete.Designer.cs",
+      "size_bytes": 21846,
+      "sha256": "d5f74bf7eb9bcc2f9afa2cda4e19e21bb9a96ade4e24b26ccef0f20293a714ba"
+    },
+    {
+      "path": "Migrations/20260723163342_AddWorkOrderSoftDelete.cs",
+      "size_bytes": 1484,
+      "sha256": "aed718c34e34aef186b7c55b8b47f05f7d932e1d6e2529b52866b060a61bb371"
+    },
+    {
+      "path": "Migrations/20260723180000_AddWorkOrderDisplayOrder.Designer.cs",
+      "size_bytes": 20910,
+      "sha256": "ff3d0b2dccb1a590fbc49154d29b0991ec45e813cb1d992114e5e41d0ce9442c"
+    },
+    {
+      "path": "Migrations/20260723180000_AddWorkOrderDisplayOrder.cs",
+      "size_bytes": 1939,
+      "sha256": "ffe942605459e6c178d7705932851d26946f58d6df3b84a7103e3448200f42ee"
+    },
+    {
+      "path": "Migrations/20260724071700_RemoveWorkOrderSoftDelete.Designer.cs",
+      "size_bytes": 21482,
+      "sha256": "d0db865863a760a88efe9678d159ef9decb7fde2568195795ce848022b3f150e"
+    },
+    {
+      "path": "Migrations/20260724071700_RemoveWorkOrderSoftDelete.cs",
+      "size_bytes": 1597,
+      "sha256": "d8c7547e83b88c5c2c351792b07c5d5765daa4c7f95bfbe0de513bc688f6b862"
+    },
+    {
+      "path": "Migrations/20260724074046_EnforceWorkOrderIdentityRules.Designer.cs",
+      "size_bytes": 22036,
+      "sha256": "2aab3faadf1516824ed9b5c1c94e51f4ad32e2e7a7d9c6fbf0593db29fdea6b3"
+    },
+    {
+      "path": "Migrations/20260724074046_EnforceWorkOrderIdentityRules.cs",
+      "size_bytes": 3760,
+      "sha256": "1c8675c6756f5e3d733c4c612946ffe216e035a2f935ae739325a5930a1865d5"
+    },
+    {
+      "path": "Migrations/20260725090000_ScopeWorkOrderDisplayOrderByYear.Designer.cs",
+      "size_bytes": 21540,
+      "sha256": "69900e13e704b263211c37aa2905387fe327cb2d5fd1d78f3b2b742a261b5c7c"
+    },
+    {
+      "path": "Migrations/20260725090000_ScopeWorkOrderDisplayOrderByYear.cs",
+      "size_bytes": 1357,
+      "sha256": "425a2c0da5ca5b0a13494ce61e2e514763d7baf09e6bab4742697afcc62cfc0e"
+    },
+    {
+      "path": "Migrations/20260725103000_AlignWorkOrderYearWithAssignmentDate.Designer.cs",
+      "size_bytes": 21548,
+      "sha256": "4e2f14e14272230e9812bf370313a11203d33f60007de25a6132c26571b0fb3e"
+    },
+    {
+      "path": "Migrations/20260725103000_AlignWorkOrderYearWithAssignmentDate.cs",
+      "size_bytes": 1120,
+      "sha256": "89edfe113ba448ec7d8f9de6cf8d3707f611107bb9d66775c1d8d40651a9d949"
+    },
+    {
+      "path": "Migrations/20260725190000_AddWorkOrderRowVersion.Designer.cs",
+      "size_bytes": 21767,
+      "sha256": "893c28ad4e5a6e767027357873febc0493bb780b042fc268ac148801a7235321"
+    },
+    {
+      "path": "Migrations/20260725190000_AddWorkOrderRowVersion.cs",
+      "size_bytes": 781,
+      "sha256": "c99e6ab20dd5a07875e59c8821b44ec07c153ece0e6f523c6fdf01850c5fa051"
+    },
+    {
+      "path": "Migrations/ApplicationDbContextModelSnapshot.cs",
+      "size_bytes": 21683,
+      "sha256": "42d2730904670e9d06e1a792e9ba3e393411b20062deb50591a294c695f25e31"
+    },
+    {
+      "path": "Program.cs",
+      "size_bytes": 4550,
+      "sha256": "01e832efd85a7d73a4d3726e702f6a5ed068e097a3a92575e50ddb0c025054b4"
+    },
+    {
+      "path": "Properties/launchSettings.json",
+      "size_bytes": 681,
+      "sha256": "76d151bbbcdc5778ae890e3fabb09dfe976e9c777920186ce4dbd2d1a4f9fd69"
+    },
+    {
+      "path": "appsettings.Development.json",
+      "size_bytes": 327,
+      "sha256": "4bce37e80a58f16c87930b9997b469a66da02598a88072a9ea1af41d90d594bf"
+    },
+    {
+      "path": "appsettings.json",
+      "size_bytes": 142,
+      "sha256": "2d8bb40059df22089b94c025be8baad5a869b72d4d755d199c872f03bfe6f225"
+    },
+    {
+      "path": "libman.json",
+      "size_bytes": 431,
+      "sha256": "a5fb3122286717e6e077ddd917698150c153bddafaf9a6f9ca95f0a1248a1916"
+    },
+    {
+      "path": "wwwroot/app.css",
+      "size_bytes": 12712,
+      "sha256": "83b11ca6a47acadc7215e908ab91146c1c5ad89004e29ca3c6281efcb44246a9"
+    },
+    {
+      "path": "wwwroot/js/tabulatorFilters.js",
+      "size_bytes": 43043,
+      "sha256": "bc659d62a6913a3889c3cffbd40020af67934289c593bc26aeadd25ba8a48a4e"
+    },
+    {
+      "path": "wwwroot/js/tabulatorPerformance.js",
+      "size_bytes": 95326,
+      "sha256": "e9cd7282bdd4d0361a6489ba22e9a737ae29a00d6238071ef9e4c8d97d9fd2d7"
+    },
+    {
+      "path": "wwwroot/js/tabulatorTest.js",
+      "size_bytes": 201379,
+      "sha256": "a920e57ba23d489d72767bb0ec61c47f010279547634d3f17090688f1d6a09e5"
+    }
+  ]
+}
