@@ -1983,43 +1983,13 @@
         delete this.states[elementId];
     },
 
-    initialize: function (elementId, data, baskets) {
-        const initializationDiagnostic =
-            window.tabulatorDiagnostics
-                ?.beginGridInitialization?.(
-                    elementId,
-                    Array.isArray(data) ? data.length : 0
-                );
-
-        const element = document.getElementById(elementId);
-
-        if (!element) {
-            console.error("Tabulator element was not found:", elementId);
-            return;
-        }
-
-        if (typeof Tabulator === "undefined") {
-            console.error("Tabulator library is not loaded.");
-            return;
-        }
-
-        this.disposeTableInstance(elementId);
-
-        data = Array.isArray(data) ? data : [];
-        baskets = Array.isArray(baskets) ? baskets : [];
-
-        data = data.map(
-            row =>
-                window.tabulatorTest.cloneRowData(row)
-        );
-
-        const directTypingFields = new Set([
-            "workOrderNumber",
-            "workTypeCode",
-            "assignmentDate",
-            "basket"
-        ]);
-
+    /*
+     * Creates all mutable state owned by one grid instance.
+     * Keeping state construction in one place makes lifecycle changes auditable
+     * without mixing them into Tabulator configuration or event binding.
+     * This extraction intentionally preserves every existing default value.
+     */
+    createGridState: function (data, baskets) {
         const minimumExistingId = data.reduce(
             function (minimum, row) {
                 const id = Number(row?.id);
@@ -2031,7 +2001,7 @@
             0
         );
 
-        const state = {
+        return {
             undoStack: [],
             redoStack: [],
 
@@ -2136,7 +2106,49 @@
                 basketValues: []
             }
         };
+    },
 
+    initialize: function (elementId, data, baskets) {
+        const initializationDiagnostic =
+            window.tabulatorDiagnostics
+                ?.beginGridInitialization?.(
+                    elementId,
+                    Array.isArray(data) ? data.length : 0
+                );
+
+        const element = document.getElementById(elementId);
+
+        if (!element) {
+            console.error("Tabulator element was not found:", elementId);
+            return;
+        }
+
+        if (typeof Tabulator === "undefined") {
+            console.error("Tabulator library is not loaded.");
+            return;
+        }
+
+        this.disposeTableInstance(elementId);
+
+        data = Array.isArray(data) ? data : [];
+        baskets = Array.isArray(baskets) ? baskets : [];
+
+        data = data.map(
+            row =>
+                window.tabulatorTest.cloneRowData(row)
+        );
+
+        const directTypingFields = new Set([
+            "workOrderNumber",
+            "workTypeCode",
+            "assignmentDate",
+            "basket"
+        ]);
+
+        const state = this.createGridState(
+            data,
+            baskets
+        );
         this.states[elementId] = state;
 
         this.rebuildIdentityIndex(
@@ -2189,6 +2201,21 @@
 
             selectableRange: 1,
             selectableRangeInitializeDefault: false,
+
+            /*
+             * Tabulator 6.5 creates a temporary default range whenever a new
+             * mouse selection starts. With Virtual DOM, that temporary range
+             * can point to the first active row while its cell element is not
+             * currently attached to document, which makes the browser log:
+             * "addRange(): The given range isn't in document."
+             *
+             * Disable only Tabulator's automatic native DOM focus for that
+             * temporary range. The real clicked cell is still focused by
+             * Tabulator's normal click path, and programmatic focus after
+             * structural operations remains owned by focusRow.
+             */
+            selectableRangeAutoFocus: false,
+
             selectableRangeColumns: true,
             selectableRangeRows: true,
             selectableRangeClearCells: true,
