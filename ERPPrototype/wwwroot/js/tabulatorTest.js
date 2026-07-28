@@ -1873,8 +1873,12 @@
     },
 
     initialize: function (elementId, data, baskets) {
-        const initializationStartedAt =
-            window.performance?.now?.() ?? Date.now();
+        const initializationDiagnostic =
+            window.tabulatorDiagnostics
+                ?.beginGridInitialization?.(
+                    elementId,
+                    Array.isArray(data) ? data.length : 0
+                );
 
         const element = document.getElementById(elementId);
 
@@ -2491,16 +2495,10 @@
              */
             window.tabulatorTest.renderStatus(elementId);
 
-            window.requestAnimationFrame(() => {
-                const finishedAt =
-                    window.performance?.now?.() ?? Date.now();
-
-                console.info(
-                    `[WorkOrders Performance] Tabulator ready: ` +
-                    `${Math.round(finishedAt - initializationStartedAt)} ms ` +
-                    `for ${data.length.toLocaleString()} rows.`
+            window.tabulatorDiagnostics
+                ?.completeGridInitialization?.(
+                    initializationDiagnostic
                 );
-            });
         });
 
         /*
