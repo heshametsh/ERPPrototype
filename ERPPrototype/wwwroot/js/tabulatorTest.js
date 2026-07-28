@@ -302,6 +302,275 @@
         }
     },
 
+    getStructureRowData: function (record) {
+        return record?.data ?? record ?? null;
+    },
+
+    /*
+     * Structural Insert/Delete keeps the same row values for every
+     * unaffected row. Update the identity lookup only for rows that entered
+     * or left the sheet instead of rebuilding the full 3,000-row index.
+     */
+    applyStructureIdentityDelta: function (
+        elementId,
+        insertedRows,
+        removedRows
+    ) {
+        const state = this.states[elementId];
+        const affectedIdentityKeys = new Set();
+
+        if (!state) {
+            return affectedIdentityKeys;
+        }
+
+        const removeIndexedRow = (
+            rowData,
+            useDataFallback
+        ) => {
+            if (!rowData) {
+                return;
+            }
+
+            const rowKey = String(rowData.id);
+            const indexedKey =
+                state.rowIdentityKeys.get(rowKey);
+            const identityKey =
+                indexedKey ||
+                (useDataFallback
+                    ? this.getIdentityKey(rowData)
+                    : null);
+
+            if (identityKey) {
+                affectedIdentityKeys.add(identityKey);
+
+                const owners =
+                    state.identityRows.get(identityKey);
+
+                if (owners) {
+                    owners.delete(rowKey);
+
+                    if (owners.size === 0) {
+                        state.identityRows.delete(identityKey);
+                    }
+                }
+            }
+
+            state.rowIdentityKeys.delete(rowKey);
+        };
+
+        for (const record of removedRows ?? []) {
+            removeIndexedRow(
+                this.getStructureRowData(record),
+                true
+            );
+        }
+
+        for (const record of insertedRows ?? []) {
+            const rowData =
+                this.getStructureRowData(record);
+
+            if (!rowData) {
+                continue;
+            }
+
+            /* Defensive cleanup if a restored row id is still indexed. */
+            removeIndexedRow(rowData, false);
+
+            const rowKey = String(rowData.id);
+            const identityKey =
+                this.getIdentityKey(rowData);
+
+            if (!identityKey) {
+                continue;
+            }
+
+            affectedIdentityKeys.add(identityKey);
+
+            if (!state.identityRows.has(identityKey)) {
+                state.identityRows.set(
+                    identityKey,
+                    new Set()
+                );
+            }
+
+            state.identityRows
+                .get(identityKey)
+                .add(rowKey);
+
+            state.rowIdentityKeys.set(
+                rowKey,
+                identityKey
+            );
+        }
+
+        return affectedIdentityKeys;
+    },
+
+    clearValidationForRemovedRows: function (
+        elementId,
+        removedRows
+    ) {
+        const state = this.states[elementId];
+
+        if (!state) {
+            return;
+        }
+
+        const removedRowIds = new Set(
+            Array.from(removedRows ?? [])
+                .map(record =>
+                    this.getStructureRowData(record))
+                .filter(Boolean)
+                .map(rowData => String(rowData.id))
+        );
+
+        if (removedRowIds.size === 0) {
+            return;
+        }
+
+        for (const [key, error] of state.validationErrors) {
+            if (removedRowIds.has(String(error.rowId))) {
+                state.validationErrors.delete(key);
+            }
+        }
+
+        for (const rowId of removedRowIds) {
+            state.validationRowIds.delete(rowId);
+        }
+    },
+
+    /*
+     * After a structural change, only new/restored rows require full field
+     * validation. Duplicate markers are recalculated only for identities
+     * whose owner set changed.
+     */
+    reconcileStructureValidation: function (
+        elementId,
+        insertedRows,
+        removedRows,
+        affectedIdentityKeys
+    ) {
+        const table = this.tables[elementId];
+        const state = this.states[elementId];
+
+        if (!table || !state) {
+            return;
+        }
+
+        this.clearValidationForRemovedRows(
+            elementId,
+            removedRows
+        );
+
+        const insertedRowIds = new Map();
+
+        for (const record of insertedRows ?? []) {
+            const rowData =
+                this.getStructureRowData(record);
+
+            if (!rowData) {
+                continue;
+            }
+
+            insertedRowIds.set(
+                String(rowData.id),
+                rowData.id
+            );
+        }
+
+        for (const rowId of insertedRowIds.values()) {
+            const row = table.getRow(rowId);
+
+            if (row) {
+                this.validateRow(
+                    elementId,
+                    row,
+                    { forceRequired: false }
+                );
+            }
+        }
+
+        const duplicateAffectedRowIds = new Set();
+
+        for (const identityKey of affectedIdentityKeys ?? []) {
+            const owners =
+                state.identityRows.get(identityKey);
+
+            if (!owners) {
+                continue;
+            }
+
+            for (const ownerRowId of owners) {
+                duplicateAffectedRowIds.add(
+                    String(ownerRowId)
+                );
+            }
+        }
+
+        for (const rowId of duplicateAffectedRowIds) {
+            this.clearCellValidationError(
+                elementId,
+                rowId,
+                "workOrderNumber",
+                {
+                    code: "duplicate_identity",
+                    deferUi: true
+                }
+            );
+
+            this.clearCellValidationError(
+                elementId,
+                rowId,
+                "workTypeCode",
+                {
+                    code: "duplicate_identity",
+                    deferUi: true
+                }
+            );
+        }
+
+        const duplicateMessage =
+            "رقم أمر العمل ونوعه مكرران داخل الشيت.";
+
+        for (const identityKey of affectedIdentityKeys ?? []) {
+            const owners =
+                state.identityRows.get(identityKey);
+
+            if (!owners || owners.size <= 1) {
+                continue;
+            }
+
+            for (const rowId of owners) {
+                this.setCellValidationError(
+                    elementId,
+                    rowId,
+                    "workOrderNumber",
+                    "duplicate_identity",
+                    duplicateMessage,
+                    { deferUi: true }
+                );
+
+                this.setCellValidationError(
+                    elementId,
+                    rowId,
+                    "workTypeCode",
+                    "duplicate_identity",
+                    duplicateMessage,
+                    { deferUi: true }
+                );
+            }
+        }
+
+        for (const rowId of duplicateAffectedRowIds) {
+            this.applyValidationStylesToRow(
+                elementId,
+                rowId
+            );
+        }
+
+        this.syncValidationUi(elementId);
+    },
+
     refreshValidationRowMarker: function (
         elementId,
         rowId
@@ -3457,6 +3726,73 @@
         this.renderStatus(elementId);
     },
 
+    /*
+     * Keep dirty/deleted sets by delta. Existing edited rows retain their
+     * state across setData; only rows added, restored, removed, or rarely
+     * rebalanced need to be checked again.
+     */
+    applyStructureDirtyDelta: function (
+        elementId,
+        insertedRows,
+        removedRows,
+        additionalDirtyRowIds
+    ) {
+        const state = this.states[elementId];
+
+        if (!state) {
+            return;
+        }
+
+        const rowsToRefresh = new Map();
+
+        for (const record of removedRows ?? []) {
+            const rowData =
+                this.getStructureRowData(record);
+
+            if (!rowData) {
+                continue;
+            }
+
+            const rowKey = String(rowData.id);
+            state.dirtyRowIds.delete(rowKey);
+
+            if (state.originalRows.has(rowKey)) {
+                state.deletedOriginalRowIds.add(rowKey);
+            } else {
+                state.deletedOriginalRowIds.delete(rowKey);
+            }
+        }
+
+        for (const record of insertedRows ?? []) {
+            const rowData =
+                this.getStructureRowData(record);
+
+            if (!rowData) {
+                continue;
+            }
+
+            const rowKey = String(rowData.id);
+            state.deletedOriginalRowIds.delete(rowKey);
+            rowsToRefresh.set(rowKey, rowData.id);
+        }
+
+        for (const rowId of additionalDirtyRowIds ?? []) {
+            rowsToRefresh.set(
+                String(rowId),
+                rowId
+            );
+        }
+
+        if (rowsToRefresh.size > 0) {
+            this.refreshDirtyRows(
+                elementId,
+                rowsToRefresh.values()
+            );
+        } else {
+            this.renderStatus(elementId);
+        }
+    },
+
     renderStatus: function (elementId) {
         const statusElement =
             document.getElementById(
@@ -5764,7 +6100,8 @@
     allocateDisplayOrders: function (
         rows,
         insertIndex,
-        count
+        count,
+        allocationResult = null
     ) {
         const allocate = () => {
             const previousOrder =
@@ -5822,10 +6159,18 @@
         let orders = allocate();
 
         if (orders) {
+            if (allocationResult) {
+                allocationResult.rebalanced = false;
+            }
+
             return orders;
         }
 
         this.rebalanceDisplayOrders(rows);
+
+        if (allocationResult) {
+            allocationResult.rebalanced = true;
+        }
         orders = allocate();
 
         if (!orders) {
@@ -6035,12 +6380,22 @@
                 ? Math.min(...selectedPositions)
                 : Math.max(...selectedPositions) + 1;
 
+        const allocationResult = {
+            rebalanced: false
+        };
+
         const displayOrders =
             this.allocateDisplayOrders(
                 currentData,
                 insertIndex,
-                count
+                count,
+                allocationResult
             );
+
+        const rebalancedRowIds =
+            allocationResult.rebalanced
+                ? currentData.map(row => row.id)
+                : [];
 
         const insertedRows = [];
 
@@ -6073,7 +6428,13 @@
         await this.replaceStructureData(
             elementId,
             currentData,
-            insertedRows[0].data.id
+            insertedRows[0].data.id,
+            {
+                insertedRows: insertedRows,
+                removedRows: [],
+                additionalDirtyRowIds:
+                    rebalancedRowIds
+            }
         );
 
         this.pushStructureTransaction(
@@ -6186,7 +6547,12 @@
         await this.replaceStructureData(
             elementId,
             remainingData,
-            focusRowId
+            focusRowId,
+            {
+                insertedRows: [],
+                removedRows: deletedRows,
+                additionalDirtyRowIds: []
+            }
         );
 
         this.pushStructureTransaction(
@@ -6335,14 +6701,26 @@
         await this.replaceStructureData(
             elementId,
             nextData,
-            focusRowId
+            focusRowId,
+            {
+                insertedRows:
+                    shouldInsert
+                        ? transaction.rows
+                        : [],
+                removedRows:
+                    shouldInsert
+                        ? []
+                        : transaction.rows,
+                additionalDirtyRowIds: []
+            }
         );
     },
 
     replaceStructureData: async function (
         elementId,
         data,
-        focusRowId
+        focusRowId,
+        structureChange = {}
     ) {
         const table =
             this.tables[elementId];
@@ -6354,32 +6732,50 @@
             return;
         }
 
+        const insertedRows = Array.from(
+            structureChange.insertedRows ?? []
+        );
+        const removedRows = Array.from(
+            structureChange.removedRows ?? []
+        );
+        const additionalDirtyRowIds = Array.from(
+            structureChange.additionalDirtyRowIds ?? []
+        );
+
+        let affectedIdentityKeys = new Set();
+
         state.applyingHistory = true;
 
         try {
             await table.setData(data);
 
-            this.rebuildIdentityIndex(
-                elementId,
-                data
-            );
+            affectedIdentityKeys =
+                this.applyStructureIdentityDelta(
+                    elementId,
+                    insertedRows,
+                    removedRows
+                );
 
             window.tabulatorFilters.apply(
                 this,
                 elementId
             );
 
-            this.recalculateStructureState(
-                elementId
+            this.applyStructureDirtyDelta(
+                elementId,
+                insertedRows,
+                removedRows,
+                additionalDirtyRowIds
             );
         } finally {
             state.applyingHistory = false;
         }
 
-        this.validateRows(
+        this.reconcileStructureValidation(
             elementId,
-            table.getRows().map(row => row.getIndex()),
-            { forceRequired: false }
+            insertedRows,
+            removedRows,
+            affectedIdentityKeys
         );
 
         if (
@@ -6391,47 +6787,6 @@
                 focusRowId
             );
         }
-    },
-
-    recalculateStructureState: function (elementId) {
-        const table =
-            this.tables[elementId];
-
-        const state =
-            this.states[elementId];
-
-        if (!table || !state) {
-            return;
-        }
-
-        const currentRows =
-            table.getData();
-
-        const currentIds = new Set(
-            currentRows.map(
-                row =>
-                    String(row.id)
-            )
-        );
-
-        state.deletedOriginalRowIds =
-            new Set(
-                Array.from(
-                    state.originalRows.keys()
-                ).filter(
-                    rowId =>
-                        !currentIds.has(rowId)
-                )
-            );
-
-        state.dirtyRowIds.clear();
-
-        this.refreshDirtyRows(
-            elementId,
-            currentRows.map(
-                row => row.id
-            )
-        );
     },
 
     focusRow: function (
