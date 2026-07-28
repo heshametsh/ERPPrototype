@@ -1872,6 +1872,117 @@
         return input;
     },
 
+    /*
+     * Central owner for one Tabulator instance lifecycle.
+     * Reinitialization and final disposal must use the same cleanup path so
+     * listeners, timers, animation frames, popups and viewport locks cannot
+     * diverge between year switching and final component disposal.
+     */
+    detachLifecycleEventHandlers: function (table, state) {
+        if (!state) {
+            return;
+        }
+
+        const documentHandlers = [
+            ["keydown", state.keyDownHandler],
+            ["copy", state.copyHandler],
+            ["paste", state.pasteHandler],
+            ["pointerdown", state.pointerDownHandler]
+        ];
+
+        documentHandlers.forEach(function ([eventName, handler]) {
+            if (!handler) {
+                return;
+            }
+
+            document.removeEventListener(
+                eventName,
+                handler,
+                true
+            );
+        });
+
+        if (state.rightClickRangeGuardHandler) {
+            table?.element?.removeEventListener(
+                "mousedown",
+                state.rightClickRangeGuardHandler,
+                true
+            );
+        }
+
+        if (state.resizeHandler) {
+            window.removeEventListener(
+                "resize",
+                state.resizeHandler
+            );
+        }
+    },
+
+    cancelLifecycleAsyncWork: function (state) {
+        if (!state) {
+            return;
+        }
+
+        if (state.resizeTimer) {
+            window.clearTimeout(state.resizeTimer);
+            state.resizeTimer = null;
+        }
+
+        state.resizePendingViewportPosition = null;
+
+        if (
+            state.resizeViewportRestoreFrame !== null &&
+            state.resizeViewportRestoreFrame !== undefined
+        ) {
+            window.cancelAnimationFrame(
+                state.resizeViewportRestoreFrame
+            );
+            state.resizeViewportRestoreFrame = null;
+            state.resizeViewportRestoreFramesRemaining = 0;
+            state.resizeViewportRestoreGeneration += 1;
+            state.resizeViewportPosition = null;
+        }
+
+        if (
+            state.arrowUpCorrectionFrame !== null &&
+            state.arrowUpCorrectionFrame !== undefined
+        ) {
+            window.cancelAnimationFrame(
+                state.arrowUpCorrectionFrame
+            );
+            state.arrowUpCorrectionFrame = null;
+            state.arrowUpCorrectionFramesRemaining = 0;
+        }
+
+        if (
+            state.verticalNavigationFrame !== null &&
+            state.verticalNavigationFrame !== undefined
+        ) {
+            window.cancelAnimationFrame(
+                state.verticalNavigationFrame
+            );
+            state.verticalNavigationFrame = null;
+        }
+    },
+
+    disposeTableInstance: function (elementId) {
+        const table = this.tables[elementId];
+        const state = this.states[elementId];
+
+        window.tabulatorFilters?.closeActivePopup?.(elementId);
+
+        this.detachLifecycleEventHandlers(table, state);
+        this.cancelLifecycleAsyncWork(state);
+        this.releaseViewportLock(state);
+
+        if (table) {
+            table.destroy();
+        }
+
+        delete this.tables[elementId];
+        delete this.states[elementId];
+    },
+
     initialize: function (elementId, data, baskets) {
         const initializationDiagnostic =
             window.tabulatorDiagnostics
@@ -1892,107 +2003,7 @@
             return;
         }
 
-        const oldTable = this.tables[elementId];
-        const oldState = this.states[elementId];
-
-        if (oldState?.keyDownHandler) {
-            document.removeEventListener(
-                "keydown",
-                oldState.keyDownHandler,
-                true
-            );
-        }
-
-        if (oldState?.copyHandler) {
-            document.removeEventListener(
-                "copy",
-                oldState.copyHandler,
-                true
-            );
-        }
-
-        if (oldState?.pasteHandler) {
-            document.removeEventListener(
-                "paste",
-                oldState.pasteHandler,
-                true
-            );
-        }
-
-        if (oldState?.rightClickRangeGuardHandler) {
-            oldTable?.element?.removeEventListener(
-                "mousedown",
-                oldState.rightClickRangeGuardHandler,
-                true
-            );
-        }
-
-        if (oldState?.pointerDownHandler) {
-            document.removeEventListener(
-                "pointerdown",
-                oldState.pointerDownHandler,
-                true
-            );
-        }
-
-        if (oldState?.resizeHandler) {
-            window.removeEventListener(
-                "resize",
-                oldState.resizeHandler
-            );
-        }
-
-        if (oldState?.resizeTimer) {
-            window.clearTimeout(oldState.resizeTimer);
-            oldState.resizeTimer = null;
-        }
-
-        if (oldState) {
-            oldState.resizePendingViewportPosition = null;
-        }
-
-        if (
-            oldState?.resizeViewportRestoreFrame !== null &&
-            oldState?.resizeViewportRestoreFrame !== undefined
-        ) {
-            window.cancelAnimationFrame(
-                oldState.resizeViewportRestoreFrame
-            );
-            oldState.resizeViewportRestoreFrame = null;
-            oldState.resizeViewportRestoreFramesRemaining = 0;
-            oldState.resizeViewportRestoreGeneration += 1;
-            oldState.resizeViewportPosition = null;
-        }
-
-        if (
-            oldState?.arrowUpCorrectionFrame !== null &&
-            oldState?.arrowUpCorrectionFrame !== undefined
-        ) {
-            window.cancelAnimationFrame(
-                oldState.arrowUpCorrectionFrame
-            );
-            oldState.arrowUpCorrectionFrame = null;
-            oldState.arrowUpCorrectionFramesRemaining = 0;
-        }
-
-        if (
-            oldState?.verticalNavigationFrame !== null &&
-            oldState?.verticalNavigationFrame !== undefined
-        ) {
-            window.cancelAnimationFrame(
-                oldState.verticalNavigationFrame
-            );
-            oldState.verticalNavigationFrame = null;
-        }
-
-        this.releaseViewportLock(oldState);
-
-        if (oldTable) {
-            oldTable.destroy();
-        }
-
-        delete this.tables[elementId];
-        delete this.states[elementId];
+        this.disposeTableInstance(elementId);
 
         data = Array.isArray(data) ? data : [];
         baskets = Array.isArray(baskets) ? baskets : [];
@@ -7211,116 +7222,6 @@
     },
 
     destroy: function (elementId) {
-        window.tabulatorFilters?.closeActivePopup?.(elementId);
-
-        const table =
-            this.tables[elementId];
-
-        const state =
-            this.states[elementId];
-
-        const element =
-            document.getElementById(
-                elementId
-            );
-
-        if (state?.keyDownHandler) {
-            document.removeEventListener(
-                "keydown",
-                state.keyDownHandler,
-                true
-            );
-        }
-
-        if (state?.copyHandler) {
-            document.removeEventListener(
-                "copy",
-                state.copyHandler,
-                true
-            );
-        }
-
-        if (state?.pasteHandler) {
-            document.removeEventListener(
-                "paste",
-                state.pasteHandler,
-                true
-            );
-        }
-
-        if (state?.rightClickRangeGuardHandler) {
-            element?.removeEventListener(
-                "mousedown",
-                state.rightClickRangeGuardHandler,
-                true
-            );
-        }
-
-        if (state?.pointerDownHandler) {
-            document.removeEventListener(
-                "pointerdown",
-                state.pointerDownHandler,
-                true
-            );
-        }
-
-        if (state?.resizeHandler) {
-            window.removeEventListener(
-                "resize",
-                state.resizeHandler
-            );
-        }
-
-        if (state?.resizeTimer) {
-            window.clearTimeout(state.resizeTimer);
-            state.resizeTimer = null;
-        }
-
-        if (state) {
-            state.resizePendingViewportPosition = null;
-        }
-
-        if (
-            state?.resizeViewportRestoreFrame !== null &&
-            state?.resizeViewportRestoreFrame !== undefined
-        ) {
-            window.cancelAnimationFrame(
-                state.resizeViewportRestoreFrame
-            );
-            state.resizeViewportRestoreFrame = null;
-            state.resizeViewportRestoreFramesRemaining = 0;
-            state.resizeViewportRestoreGeneration += 1;
-            state.resizeViewportPosition = null;
-        }
-
-        if (
-            state?.arrowUpCorrectionFrame !== null &&
-            state?.arrowUpCorrectionFrame !== undefined
-        ) {
-            window.cancelAnimationFrame(
-                state.arrowUpCorrectionFrame
-            );
-            state.arrowUpCorrectionFrame = null;
-            state.arrowUpCorrectionFramesRemaining = 0;
-        }
-
-        if (
-            state?.verticalNavigationFrame !== null &&
-            state?.verticalNavigationFrame !== undefined
-        ) {
-            window.cancelAnimationFrame(
-                state.verticalNavigationFrame
-            );
-            state.verticalNavigationFrame = null;
-        }
-
-        this.releaseViewportLock(state);
-
-        if (table) {
-            table.destroy();
-        }
-
-        delete this.tables[elementId];
-        delete this.states[elementId];
+        this.disposeTableInstance(elementId);
     }
 };
