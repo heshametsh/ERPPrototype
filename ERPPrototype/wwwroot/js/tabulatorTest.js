@@ -2553,6 +2553,12 @@
             selectableRangeClearCells: true,
             selectableRangeClearCellsValue: "",
 
+            /*
+             * Phase 5A keeps Tabulator clipboard configured as a guarded
+             * fallback. Keyboard shortcuts and the toolbar button are now
+             * owned by the shared custom clipboard core. Do not remove this
+             * fallback until Excel round-trip regression testing passes.
+             */
             clipboard: true,
 
             clipboardCopyRowRange: "range",
@@ -3566,9 +3572,12 @@
         };
 
         /*
-         * Ctrl+C يطلق حدث copy من المتصفح.
-         * نضع بيانات النطاق مباشرة في الحافظة حتى يعمل
-         * الاختصار مع أي لغة للوحة المفاتيح.
+         * Phase 5A clipboard ownership:
+         * - document copy/paste events own keyboard shortcuts.
+         * - the toolbar copy button calls the same shared copy core.
+         * - Tabulator clipboard remains enabled temporarily as a guarded
+         *   fallback until Excel round-trip regression tests prove that the
+         *   shared path preserves every existing behaviour.
          */
         state.copyHandler = function (event) {
             if (
@@ -3581,43 +3590,20 @@
                 return;
             }
 
-            const activeRange =
-                window.tabulatorTest.getActiveRange(
-                    table
+            const copied =
+                window.tabulatorTest.copyActiveRange(
+                    elementId,
+                    event.clipboardData
                 );
 
-            if (!activeRange) {
-                return;
-            }
-
-            const clipboardText =
-                window.tabulatorTest.rangeToClipboardText(
-                    activeRange
-                );
-
-            if (clipboardText === null) {
+            if (!copied) {
                 return;
             }
 
             event.preventDefault();
             event.stopImmediatePropagation();
-
-            event.clipboardData.setData(
-                "text/plain",
-                clipboardText
-            );
-
-            window.tabulatorTest.setStatus(
-                elementId,
-                "تم نسخ الخلايا المحددة."
-            );
         };
 
-        /*
-         * Ctrl+V يطلق حدث paste من المتصفح.
-         * نقرأ النص من الحدث نفسه بدل Clipboard API،
-         * فلا نحتاج إذنًا إضافيًا من المتصفح.
-         */
         state.pasteHandler = function (event) {
             if (
                 !state.isActive ||
@@ -3638,37 +3624,20 @@
                 return;
             }
 
-            const clipboardText =
-                event.clipboardData.getData(
-                    "text/plain"
-                );
-
-            const parsedData =
-                window.tabulatorTest.parseClipboardText(
-                    clipboardText
-                );
-
-            if (!parsedData) {
-                window.tabulatorTest.setStatus(
-                    elementId,
-                    "لا توجد بيانات صالحة للصق."
-                );
-
-                return;
-            }
-
+            /*
+             * Once a sheet range is active, this handler is the only owner
+             * of the paste event. Stop it before parsing so an invalid or
+             * empty payload cannot fall through to Tabulator and execute a
+             * second paste path.
+             */
             event.preventDefault();
             event.stopImmediatePropagation();
 
-            window.tabulatorTest.applyRangePaste(
+            window.tabulatorTest.pasteClipboardText(
                 elementId,
-                table,
-                parsedData
-            );
-
-            window.tabulatorTest.setStatus(
-                elementId,
-                "تم لصق البيانات."
+                event.clipboardData.getData(
+                    "text/plain"
+                )
             );
         };
 
@@ -4386,6 +4355,193 @@
             window.requestAnimationFrame(
                 runCorrectionFrame
             );
+
+        return true;
+    },
+
+    /*
+     * Phase 5A: one shared clipboard core for both the keyboard path and the
+     * toolbar button. The existing Tabulator module remains configured only
+     * as a temporary fallback while compatibility is verified.
+     */
+    getActiveRangeClipboardText: function (table) {
+        const activeRange =
+            this.getActiveRange(table);
+
+        return activeRange
+            ? this.rangeToClipboardText(activeRange)
+            : null;
+    },
+
+    writeClipboardText: async function (text) {
+        if (typeof text !== "string") {
+            return false;
+        }
+
+        /*
+         * The toolbar call starts with a real user gesture. Use the
+         * synchronous browser copy command first so restricted office
+         * browsers do not lose that gesture while waiting for a rejected
+         * Clipboard API promise.
+         */
+        if (
+            document?.body &&
+            typeof document.createElement === "function" &&
+            typeof document.execCommand === "function"
+        ) {
+            const textarea =
+                document.createElement("textarea");
+
+            textarea.value = text;
+            textarea.setAttribute("readonly", "");
+            textarea.style.position = "fixed";
+            textarea.style.left = "-10000px";
+            textarea.style.top = "0";
+            textarea.style.opacity = "0";
+
+            const previousFocus =
+                document.activeElement;
+
+            document.body.appendChild(textarea);
+            textarea.focus();
+            textarea.select();
+
+            let copied = false;
+
+            try {
+                copied = document.execCommand("copy");
+            } catch {
+                copied = false;
+            } finally {
+                textarea.remove();
+
+                if (
+                    previousFocus &&
+                    typeof previousFocus.focus === "function"
+                ) {
+                    try {
+                        previousFocus.focus({
+                            preventScroll: true
+                        });
+                    } catch {
+                        previousFocus.focus();
+                    }
+                }
+            }
+
+            if (copied) {
+                return true;
+            }
+        }
+
+        if (
+            window.isSecureContext === true &&
+            typeof window.navigator?.clipboard?.writeText ===
+            "function"
+        ) {
+            try {
+                await window.navigator.clipboard.writeText(text);
+                return true;
+            } catch {
+                return false;
+            }
+        }
+
+        return false;
+    },
+
+    copyActiveRange: function (
+        elementId,
+        clipboardData
+    ) {
+        const table =
+            this.tables[elementId];
+
+        if (!table) {
+            return false;
+        }
+
+        const clipboardText =
+            this.getActiveRangeClipboardText(table);
+
+        if (clipboardText === null) {
+            this.setStatus(
+                elementId,
+                "حدد خلية أو نطاقًا أولًا."
+            );
+
+            return false;
+        }
+
+        if (
+            clipboardData &&
+            typeof clipboardData.setData === "function"
+        ) {
+            clipboardData.setData(
+                "text/plain",
+                clipboardText
+            );
+
+            this.setStatus(
+                elementId,
+                "تم نسخ الخلايا المحددة."
+            );
+
+            return true;
+        }
+
+        return this.writeClipboardText(
+            clipboardText
+        ).then(copied => {
+            this.setStatus(
+                elementId,
+                copied
+                    ? "تم نسخ الخلايا المحددة."
+                    : "تعذر نسخ الخلايا المحددة."
+            );
+
+            return copied;
+        });
+    },
+
+    pasteClipboardText: function (
+        elementId,
+        clipboardText
+    ) {
+        const table =
+            this.tables[elementId];
+
+        if (
+            !table ||
+            !this.getActiveRange(table)
+        ) {
+            return false;
+        }
+
+        const parsedData =
+            this.parseClipboardText(
+                clipboardText
+            );
+
+        if (!parsedData) {
+            this.setStatus(
+                elementId,
+                "لا توجد بيانات صالحة للصق."
+            );
+
+            return false;
+        }
+
+        this.applyRangePaste(
+            elementId,
+            table,
+            parsedData
+        );
+
+        this.setStatus(
+            elementId,
+            "تم لصق البيانات."
+        );
 
         return true;
     },
@@ -8212,14 +8368,9 @@
     },
 
     copyRange: function (elementId) {
-        const table =
-            this.tables[elementId];
-
-        if (table) {
-            table.copyToClipboard(
-                "range"
-            );
-        }
+        return this.copyActiveRange(
+            elementId
+        );
     },
 
     setStatus: function (
