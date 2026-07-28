@@ -307,6 +307,69 @@
     },
 
     /*
+     * Build a quiet row lookup for structural operations. Tabulator's public
+     * getRow API logs a console warning when a row is absent; absence is an
+     * expected state during Undo/Redo and after temporary ids are rebased to
+     * database ids. ClientKey is the stable identity across those id changes.
+     */
+    createStructureRowLookup: function (table) {
+        const rows = table?.getRows?.() ?? [];
+        const byId = new Map();
+        const byClientKey = new Map();
+
+        for (const row of rows) {
+            const rowData = row?.getData?.();
+
+            if (!row || !rowData) {
+                continue;
+            }
+
+            byId.set(
+                String(row.getIndex()),
+                row
+            );
+
+            const clientKey = String(
+                rowData.clientKey ?? ""
+            ).trim();
+
+            if (clientKey) {
+                byClientKey.set(clientKey, row);
+            }
+        }
+
+        return {
+            rows: rows,
+            byId: byId,
+            byClientKey: byClientKey
+        };
+    },
+
+    findStructureRowComponent: function (
+        lookup,
+        rowData
+    ) {
+        if (!lookup || !rowData) {
+            return null;
+        }
+
+        const clientKey = String(
+            rowData.clientKey ?? ""
+        ).trim();
+
+        if (
+            clientKey &&
+            lookup.byClientKey.has(clientKey)
+        ) {
+            return lookup.byClientKey.get(clientKey);
+        }
+
+        return lookup.byId.get(
+            String(rowData.id)
+        ) ?? null;
+    },
+
+    /*
      * Structural Insert/Delete keeps the same row values for every
      * unaffected row. Update the identity lookup only for rows that entered
      * or left the sheet instead of rebuilding the full 3,000-row index.
@@ -6591,20 +6654,27 @@
             return false;
         }
 
+        const lookup =
+            this.createStructureRowLookup(table);
+
         const rowsToDelete = [];
+        const seenRows = new Set();
 
         for (const record of deletedRows) {
             const rowData =
                 this.getStructureRowData(record);
 
-            const row = rowData
-                ? table.getRow(rowData.id)
-                : null;
+            const row =
+                this.findStructureRowComponent(
+                    lookup,
+                    rowData
+                );
 
-            if (!row) {
+            if (!row || seenRows.has(row)) {
                 return false;
             }
 
+            seenRows.add(row);
             rowsToDelete.push(row);
         }
 
@@ -6862,6 +6932,167 @@
         );
     },
 
+    /*
+     * Restore contiguous structural rows without replacing the full sheet.
+     * Structural selections are contiguous in the current grid model. An old
+     * or malformed transaction falls back to the proven full-sheet path.
+     */
+    restoreStructureRowsIncrementally: async function (
+        elementId,
+        restoredRows,
+        focusRowId
+    ) {
+        const table =
+            this.tables[elementId];
+
+        const state =
+            this.states[elementId];
+
+        if (
+            !table ||
+            !state ||
+            !Array.isArray(restoredRows) ||
+            restoredRows.length === 0
+        ) {
+            return false;
+        }
+
+        const orderedRows =
+            Array.from(restoredRows)
+                .filter(record =>
+                    Number.isInteger(record?.index) &&
+                    this.getStructureRowData(record))
+                .sort(
+                    (first, second) =>
+                        first.index - second.index
+                );
+
+        if (orderedRows.length !== restoredRows.length) {
+            return false;
+        }
+
+        const firstIndex =
+            orderedRows[0].index;
+
+        const isContiguous =
+            orderedRows.every(
+                (record, offset) =>
+                    record.index === firstIndex + offset
+            );
+
+        if (!isContiguous) {
+            return false;
+        }
+
+        const lookup =
+            this.createStructureRowLookup(table);
+
+        for (const record of orderedRows) {
+            const rowData =
+                this.getStructureRowData(record);
+
+            if (
+                this.findStructureRowComponent(
+                    lookup,
+                    rowData
+                )
+            ) {
+                return false;
+            }
+        }
+
+        const currentRows = lookup.rows;
+
+        const insertionIndex = Math.min(
+            Math.max(0, firstIndex),
+            currentRows.length
+        );
+
+        const rowData =
+            orderedRows.map(record =>
+                this.cloneRowData(
+                    this.getStructureRowData(record)
+                ));
+
+        this.clearTableRanges(elementId);
+        state.activeCell = null;
+
+        let affectedIdentityKeys = new Set();
+
+        state.applyingHistory = true;
+
+        try {
+            if (currentRows.length === 0) {
+                await table.addData(rowData);
+            } else if (insertionIndex < currentRows.length) {
+                await table.addData(
+                    rowData,
+                    true,
+                    currentRows[insertionIndex]
+                );
+            } else {
+                await table.addData(
+                    rowData,
+                    false,
+                    currentRows[currentRows.length - 1]
+                );
+            }
+
+            affectedIdentityKeys =
+                this.applyStructureIdentityDelta(
+                    elementId,
+                    orderedRows,
+                    []
+                );
+
+            this.applyStructureDirtyDelta(
+                elementId,
+                orderedRows,
+                [],
+                []
+            );
+        } finally {
+            state.applyingHistory = false;
+        }
+
+        this.reconcileStructureValidation(
+            elementId,
+            orderedRows,
+            [],
+            affectedIdentityKeys
+        );
+
+        window.tabulatorFilters
+            .refreshFields(
+                this,
+                elementId,
+                [
+                    "workOrderNumber",
+                    "workTypeCode",
+                    "assignmentDate",
+                    "basket"
+                ]
+            );
+
+        const firstRestoredRow =
+            this.getStructureRowData(orderedRows[0]);
+
+        const nextFocusRowId =
+            focusRowId ?? firstRestoredRow?.id;
+
+        if (
+            nextFocusRowId !== null &&
+            nextFocusRowId !== undefined
+        ) {
+            this.focusRow(
+                elementId,
+                nextFocusRowId
+            );
+        }
+
+        return true;
+    },
+
     applyStructureTransaction: async function (
         elementId,
         transaction,
@@ -6877,21 +7108,6 @@
             return;
         }
 
-        const data =
-            table
-                .getData()
-                .map(
-                    row =>
-                        this.cloneRowData(row)
-                );
-
-        const rowIds = new Set(
-            transaction.rows.map(
-                record =>
-                    String(record.data.id)
-            )
-        );
-
         const shouldInsert =
             (
                 transaction.action === "insert" &&
@@ -6902,20 +7118,150 @@
                 direction === "undo"
             );
 
+        const orderedTransactionRows =
+            Array.from(transaction.rows)
+                .filter(record =>
+                    Number.isInteger(record?.index) &&
+                    this.getStructureRowData(record))
+                .sort(
+                    (first, second) =>
+                        first.index - second.index
+                );
+
+        if (
+            orderedTransactionRows.length !==
+            transaction.rows.length
+        ) {
+            return;
+        }
+
+        if (shouldInsert) {
+            const focusRowId =
+                this.getStructureRowData(
+                    orderedTransactionRows[0]
+                )?.id ?? null;
+
+            const restoredIncrementally =
+                await this
+                    .restoreStructureRowsIncrementally(
+                        elementId,
+                        orderedTransactionRows,
+                        focusRowId
+                    );
+
+            if (restoredIncrementally) {
+                return;
+            }
+        } else {
+            const lookup =
+                this.createStructureRowLookup(table);
+
+            const rowsToRemove = [];
+            const rowsToRemoveSet = new Set();
+
+            for (const record of orderedTransactionRows) {
+                const row =
+                    this.findStructureRowComponent(
+                        lookup,
+                        this.getStructureRowData(record)
+                    );
+
+                if (!row || rowsToRemoveSet.has(row)) {
+                    rowsToRemove.length = 0;
+                    break;
+                }
+
+                rowsToRemove.push(row);
+                rowsToRemoveSet.add(row);
+            }
+
+            if (
+                rowsToRemove.length ===
+                orderedTransactionRows.length
+            ) {
+                const firstIndex =
+                    orderedTransactionRows[0].index;
+
+                const remainingRows =
+                    lookup.rows.filter(row =>
+                        !rowsToRemoveSet.has(row));
+
+                const focusIndex = Math.min(
+                    firstIndex,
+                    remainingRows.length - 1
+                );
+
+                const focusRowId =
+                    focusIndex >= 0
+                        ? remainingRows[focusIndex].getIndex()
+                        : null;
+
+                const removedIncrementally =
+                    await this
+                        .deleteStructureRowsIncrementally(
+                            elementId,
+                            orderedTransactionRows,
+                            focusRowId
+                        );
+
+                if (removedIncrementally) {
+                    return;
+                }
+            }
+        }
+
+        /*
+         * Defensive fallback for an old/non-contiguous transaction or an
+         * unexpected row-state mismatch. This path preserves correctness and
+         * is the only structural-history path that replaces the full sheet.
+         */
+        const data =
+            table
+                .getData()
+                .map(
+                    row =>
+                        this.cloneRowData(row)
+                );
+
+        const transactionIds = new Set();
+        const transactionClientKeys = new Set();
+
+        for (const record of orderedTransactionRows) {
+            const rowData =
+                this.getStructureRowData(record);
+
+            transactionIds.add(String(rowData.id));
+
+            const clientKey = String(
+                rowData.clientKey ?? ""
+            ).trim();
+
+            if (clientKey) {
+                transactionClientKeys.add(clientKey);
+            }
+        }
+
+        const matchesTransactionRow = rowData => {
+            const clientKey = String(
+                rowData?.clientKey ?? ""
+            ).trim();
+
+            if (clientKey) {
+                return transactionClientKeys.has(clientKey);
+            }
+
+            return transactionIds.has(
+                String(rowData?.id)
+            );
+        };
+
         let nextData;
         let focusRowId = null;
 
         if (shouldInsert) {
             nextData = data;
 
-            const orderedRows =
-                Array.from(transaction.rows)
-                    .sort(
-                        (first, second) =>
-                            first.index - second.index
-                    );
-
-            for (const record of orderedRows) {
+            for (const record of orderedTransactionRows) {
                 nextData.splice(
                     Math.min(
                         record.index,
@@ -6923,34 +7269,27 @@
                     ),
                     0,
                     this.cloneRowData(
-                        record.data
+                        this.getStructureRowData(record)
                     )
                 );
             }
 
             focusRowId =
-                orderedRows[0].data.id;
+                this.getStructureRowData(
+                    orderedTransactionRows[0]
+                )?.id ?? null;
         } else {
             const firstIndex =
-                Math.min(
-                    ...transaction.rows.map(
-                        record => record.index
-                    )
-                );
+                orderedTransactionRows[0].index;
 
             nextData =
-                data.filter(
-                    row =>
-                        !rowIds.has(
-                            String(row.id)
-                        )
-                );
+                data.filter(row =>
+                    !matchesTransactionRow(row));
 
-            const focusIndex =
-                Math.min(
-                    firstIndex,
-                    nextData.length - 1
-                );
+            const focusIndex = Math.min(
+                firstIndex,
+                nextData.length - 1
+            );
 
             focusRowId =
                 focusIndex >= 0
@@ -6965,12 +7304,12 @@
             {
                 insertedRows:
                     shouldInsert
-                        ? transaction.rows
+                        ? orderedTransactionRows
                         : [],
                 removedRows:
                     shouldInsert
                         ? []
-                        : transaction.rows,
+                        : orderedTransactionRows,
                 additionalDirtyRowIds: []
             }
         );
