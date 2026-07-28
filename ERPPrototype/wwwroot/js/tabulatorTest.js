@@ -7651,6 +7651,20 @@
         state.applyingHistory = true;
 
         try {
+            /*
+             * Tabulator's public getRow API writes a console warning whenever
+             * the requested row is absent. During save reconciliation, absent
+             * temporary/database rows are expected while their ids are being
+             * replaced. Build one quiet lookup from all current rows instead
+             * of using getRow as an existence probe.
+             */
+            const currentRowsById = new Map(
+                table.getRows().map(row => [
+                    String(row.getIndex()),
+                    row
+                ])
+            );
+
             const rowIdsToDelete = new Set(
                 removedRowIds.map(id =>
                     String(id))
@@ -7678,12 +7692,8 @@
             const rowsToDelete = [];
 
             for (const rowId of rowIdsToDelete) {
-                const numericId = Number(rowId);
-                const row = table.getRow(
-                    Number.isNaN(numericId)
-                        ? rowId
-                        : numericId
-                );
+                const row =
+                    currentRowsById.get(String(rowId));
 
                 if (row) {
                     rowsToDelete.push(row);
@@ -7692,11 +7702,17 @@
 
             if (rowsToDelete.length > 0) {
                 await table.deleteRow(rowsToDelete);
+
+                for (const rowId of rowIdsToDelete) {
+                    currentRowsById.delete(String(rowId));
+                }
             }
 
             const rowsToUpdate = savedRows
                 .filter(row =>
-                    Boolean(table.getRow(row.id)));
+                    currentRowsById.has(
+                        String(row.id)
+                    ));
 
             if (rowsToUpdate.length > 0) {
                 await table.updateData(
@@ -7717,11 +7733,12 @@
                 const rowData =
                     rebasedRows[index];
 
+                const rowId =
+                    String(rowData.id);
+
                 if (
-                    !savedIdSet.has(
-                        String(rowData.id)
-                    ) ||
-                    table.getRow(rowData.id)
+                    !savedIdSet.has(rowId) ||
+                    currentRowsById.has(rowId)
                 ) {
                     continue;
                 }
@@ -7733,9 +7750,12 @@
                     previousIndex >= 0;
                     previousIndex--
                 ) {
-                    previousRow = table.getRow(
-                        rebasedRows[previousIndex].id
-                    );
+                    previousRow =
+                        currentRowsById.get(
+                            String(
+                                rebasedRows[previousIndex].id
+                            )
+                        ) ?? null;
 
                     if (previousRow) {
                         break;
@@ -7743,10 +7763,16 @@
                 }
 
                 if (previousRow) {
-                    await table.addRow(
-                        rowData,
-                        false,
-                        previousRow
+                    const addedRow =
+                        await table.addRow(
+                            rowData,
+                            false,
+                            previousRow
+                        );
+
+                    currentRowsById.set(
+                        rowId,
+                        addedRow
                     );
 
                     continue;
@@ -7759,19 +7785,28 @@
                     nextIndex < rebasedRows.length;
                     nextIndex++
                 ) {
-                    nextRow = table.getRow(
-                        rebasedRows[nextIndex].id
-                    );
+                    nextRow =
+                        currentRowsById.get(
+                            String(
+                                rebasedRows[nextIndex].id
+                            )
+                        ) ?? null;
 
                     if (nextRow) {
                         break;
                     }
                 }
 
-                await table.addRow(
-                    rowData,
-                    true,
-                    nextRow || undefined
+                const addedRow =
+                    await table.addRow(
+                        rowData,
+                        true,
+                        nextRow || undefined
+                    );
+
+                currentRowsById.set(
+                    rowId,
+                    addedRow
                 );
             }
 
