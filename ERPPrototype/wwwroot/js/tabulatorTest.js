@@ -2554,38 +2554,12 @@
             selectableRangeClearCellsValue: "",
 
             /*
-             * Phase 5A keeps Tabulator clipboard configured as a guarded
-             * fallback. Keyboard shortcuts and the toolbar button are now
-             * owned by the shared custom clipboard core. Do not remove this
-             * fallback until Excel round-trip regression testing passes.
+             * Phase 5B gives the custom clipboard core exclusive ownership
+             * of copy and paste. Excel round-trip, empty cells, quoted text,
+             * multiline values, undo/redo and save/refresh were verified in
+             * Phase 5A, so Tabulator's parallel clipboard path is disabled.
              */
-            clipboard: true,
-
-            clipboardCopyRowRange: "range",
-            clipboardPasteParser: function (clipboard) {
-                return window.tabulatorTest.parseClipboardText(
-                    clipboard
-                );
-            },
-
-            /*
-             * كل عملية Paste تمر من هنا حتى نسجلها
-             * كعملية واحدة مهما كان عدد الخلايا.
-             */
-            clipboardPasteAction: function (rowData) {
-                return window.tabulatorTest.applyRangePaste(
-                    elementId,
-                    this.table,
-                    rowData
-                );
-            },
-
-            clipboardCopyStyled: false,
-
-            clipboardCopyConfig: {
-                rowHeaders: false,
-                columnHeaders: false
-            },
+            clipboard: false,
 
             editTriggerEvent: "dblclick",
             editorEmptyValue: undefined,
@@ -3059,20 +3033,6 @@
                     elementId,
                     [field]
                 );
-        });
-
-        table.on("clipboardCopied", function () {
-            window.tabulatorTest.setStatus(
-                elementId,
-                "تم نسخ الخلايا المحددة."
-            );
-        });
-
-        table.on("clipboardPasteError", function () {
-            window.tabulatorTest.setStatus(
-                elementId,
-                "تعذر لصق البيانات المحددة."
-            );
         });
 
         /*
@@ -3572,12 +3532,11 @@
         };
 
         /*
-         * Phase 5A clipboard ownership:
-         * - document copy/paste events own keyboard shortcuts.
+         * Phase 5B clipboard ownership:
+         * - document copy/paste events exclusively own keyboard shortcuts.
          * - the toolbar copy button calls the same shared copy core.
-         * - Tabulator clipboard remains enabled temporarily as a guarded
-         *   fallback until Excel round-trip regression tests prove that the
-         *   shared path preserves every existing behaviour.
+         * - Tabulator's clipboard module is disabled so one user action can
+         *   never enter a second copy or paste path.
          */
         state.copyHandler = function (event) {
             if (
@@ -4360,9 +4319,8 @@
     },
 
     /*
-     * Phase 5A: one shared clipboard core for both the keyboard path and the
-     * toolbar button. The existing Tabulator module remains configured only
-     * as a temporary fallback while compatibility is verified.
+     * Phase 5B: one exclusive clipboard core for keyboard shortcuts and the
+     * toolbar button. Tabulator's parallel clipboard module is disabled.
      */
     getActiveRangeClipboardText: function (table) {
         const activeRange =
