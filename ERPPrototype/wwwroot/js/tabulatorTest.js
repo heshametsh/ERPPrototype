@@ -6292,6 +6292,93 @@
         );
     },
 
+    /*
+     * Common Insert path: add only the new rows to Tabulator instead of
+     * replacing the full sheet. The full replacement path remains only as a
+     * correctness fallback for the rare DisplayOrder rebalance case.
+     */
+    insertStructureRowsIncrementally: async function (
+        elementId,
+        insertedRows,
+        anchorRowId,
+        insertAbove
+    ) {
+        const table =
+            this.tables[elementId];
+
+        const state =
+            this.states[elementId];
+
+        if (
+            !table ||
+            !state ||
+            !Array.isArray(insertedRows) ||
+            insertedRows.length === 0
+        ) {
+            return false;
+        }
+
+        const anchorRow =
+            table.getRow(anchorRowId);
+
+        if (!anchorRow) {
+            return false;
+        }
+
+        const rowData =
+            insertedRows.map(record =>
+                this.cloneRowData(record.data));
+
+        let affectedIdentityKeys = new Set();
+
+        /*
+         * setData used to remove the previous range as a side effect. Clear it
+         * explicitly before the incremental insertion, then focusRow creates
+         * the real range on the first inserted row after Tabulator finishes.
+         */
+        this.clearTableRanges(elementId);
+
+        state.applyingHistory = true;
+
+        try {
+            await table.addData(
+                rowData,
+                Boolean(insertAbove),
+                anchorRow
+            );
+
+            affectedIdentityKeys =
+                this.applyStructureIdentityDelta(
+                    elementId,
+                    insertedRows,
+                    []
+                );
+
+            this.applyStructureDirtyDelta(
+                elementId,
+                insertedRows,
+                [],
+                []
+            );
+        } finally {
+            state.applyingHistory = false;
+        }
+
+        this.reconcileStructureValidation(
+            elementId,
+            insertedRows,
+            [],
+            affectedIdentityKeys
+        );
+
+        this.focusRow(
+            elementId,
+            insertedRows[0].data.id
+        );
+
+        return true;
+    },
+
     insertRows: async function (
         elementId,
         requestedCount,
@@ -6416,26 +6503,54 @@
             });
         }
 
-        currentData.splice(
-            insertIndex,
-            0,
-            ...insertedRows.map(
-                record =>
-                    this.cloneRowData(record.data)
-            )
-        );
+        const anchorRowId =
+            position === "above"
+                ? selectedRows[0].getIndex()
+                : selectedRows[
+                    selectedRows.length - 1
+                ].getIndex();
 
-        await this.replaceStructureData(
-            elementId,
-            currentData,
-            insertedRows[0].data.id,
-            {
-                insertedRows: insertedRows,
-                removedRows: [],
-                additionalDirtyRowIds:
-                    rebalancedRowIds
-            }
-        );
+        let insertedIncrementally = false;
+
+        if (!allocationResult.rebalanced) {
+            insertedIncrementally =
+                await this
+                    .insertStructureRowsIncrementally(
+                        elementId,
+                        insertedRows,
+                        anchorRowId,
+                        position === "above"
+                    );
+        }
+
+        if (!insertedIncrementally) {
+            /*
+             * A DisplayOrder rebalance changes existing rows too, so that
+             * rare case still uses the proven full-sheet path. The same
+             * fallback also protects correctness if the anchor row vanished
+             * before the asynchronous insert started.
+             */
+            currentData.splice(
+                insertIndex,
+                0,
+                ...insertedRows.map(
+                    record =>
+                        this.cloneRowData(record.data)
+                )
+            );
+
+            await this.replaceStructureData(
+                elementId,
+                currentData,
+                insertedRows[0].data.id,
+                {
+                    insertedRows: insertedRows,
+                    removedRows: [],
+                    additionalDirtyRowIds:
+                        rebalancedRowIds
+                }
+            );
+        }
 
         this.pushStructureTransaction(
             elementId,
