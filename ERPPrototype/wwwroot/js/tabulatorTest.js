@@ -6566,6 +6566,112 @@
         );
     },
 
+    /*
+     * Common Delete path: remove only the selected RowComponents from
+     * Tabulator. Identity, dirty/deleted state, validation, filters, and
+     * focus are then reconciled by delta without rebuilding the full sheet.
+     */
+    deleteStructureRowsIncrementally: async function (
+        elementId,
+        deletedRows,
+        focusRowId
+    ) {
+        const table =
+            this.tables[elementId];
+
+        const state =
+            this.states[elementId];
+
+        if (
+            !table ||
+            !state ||
+            !Array.isArray(deletedRows) ||
+            deletedRows.length === 0
+        ) {
+            return false;
+        }
+
+        const rowsToDelete = [];
+
+        for (const record of deletedRows) {
+            const rowData =
+                this.getStructureRowData(record);
+
+            const row = rowData
+                ? table.getRow(rowData.id)
+                : null;
+
+            if (!row) {
+                return false;
+            }
+
+            rowsToDelete.push(row);
+        }
+
+        let affectedIdentityKeys = new Set();
+
+        /*
+         * The selected range can contain cells that are about to leave the
+         * Virtual DOM. Remove it before deleteRow so the next mouse click never
+         * inherits a native range that points to a detached element.
+         */
+        this.clearTableRanges(elementId);
+        state.activeCell = null;
+
+        state.applyingHistory = true;
+
+        try {
+            await table.deleteRow(rowsToDelete);
+
+            affectedIdentityKeys =
+                this.applyStructureIdentityDelta(
+                    elementId,
+                    [],
+                    deletedRows
+                );
+
+            this.applyStructureDirtyDelta(
+                elementId,
+                [],
+                deletedRows,
+                []
+            );
+        } finally {
+            state.applyingHistory = false;
+        }
+
+        this.reconcileStructureValidation(
+            elementId,
+            [],
+            deletedRows,
+            affectedIdentityKeys
+        );
+
+        window.tabulatorFilters
+            .refreshFields(
+                this,
+                elementId,
+                [
+                    "workOrderNumber",
+                    "workTypeCode",
+                    "assignmentDate",
+                    "basket"
+                ]
+            );
+
+        if (
+            focusRowId !== null &&
+            focusRowId !== undefined
+        ) {
+            this.focusRow(
+                elementId,
+                focusRowId
+            );
+        }
+
+        return true;
+    },
+
     deleteSelectedRows: async function (elementId) {
         await this.commitActiveEditor(elementId);
 
@@ -6603,72 +6709,111 @@
             return;
         }
 
-        const currentData =
-            table
-                .getData()
-                .map(
-                    row =>
-                        this.cloneRowData(row)
-                );
+        /*
+         * Keep only lightweight row components for the 3,000-row scan. Clone
+         * data for selected rows only; the old path cloned the whole sheet.
+         */
+        const allRows =
+            table.getRows();
 
-        const selectedIds = new Set(
-            selectedRows.map(
-                row =>
-                    String(row.getIndex())
-            )
-        );
+        const positionsById = new Map();
 
-        const deletedRows = [];
-
-        currentData.forEach(
+        allRows.forEach(
             function (row, index) {
-                if (
-                    selectedIds.has(
-                        String(row.id)
-                    )
-                ) {
-                    deletedRows.push({
-                        index: index,
-                        data:
-                            window.tabulatorTest
-                                .cloneRowData(row)
-                    });
-                }
+                positionsById.set(
+                    String(row.getIndex()),
+                    index
+                );
             }
         );
+
+        const selectedIds = new Set(
+            selectedRows.map(row =>
+                String(row.getIndex()))
+        );
+
+        const deletedRows =
+            selectedRows
+                .map(row => {
+                    const index =
+                        positionsById.get(
+                            String(row.getIndex())
+                        );
+
+                    if (!Number.isInteger(index)) {
+                        return null;
+                    }
+
+                    return {
+                        index: index,
+                        data: this.cloneRowData(
+                            row.getData()
+                        )
+                    };
+                })
+                .filter(Boolean)
+                .sort(
+                    (first, second) =>
+                        first.index - second.index
+                );
 
         if (deletedRows.length === 0) {
             return;
         }
 
-        const remainingData =
-            currentData.filter(
-                row =>
+        const remainingRowIds =
+            allRows
+                .filter(row =>
                     !selectedIds.has(
-                        String(row.id)
-                    )
-            );
+                        String(row.getIndex())
+                    ))
+                .map(row => row.getIndex());
 
         const focusIndex = Math.min(
             deletedRows[0].index,
-            remainingData.length - 1
+            remainingRowIds.length - 1
         );
 
         const focusRowId =
             focusIndex >= 0
-                ? remainingData[focusIndex].id
+                ? remainingRowIds[focusIndex]
                 : null;
 
-        await this.replaceStructureData(
-            elementId,
-            remainingData,
-            focusRowId,
-            {
-                insertedRows: [],
-                removedRows: deletedRows,
-                additionalDirtyRowIds: []
-            }
-        );
+        const deletedIncrementally =
+            await this
+                .deleteStructureRowsIncrementally(
+                    elementId,
+                    deletedRows,
+                    focusRowId
+                );
+
+        if (!deletedIncrementally) {
+            /*
+             * Defensive correctness fallback if a selected RowComponent is no
+             * longer available before deleteRow starts.
+             */
+            const remainingData =
+                allRows
+                    .filter(row =>
+                        !selectedIds.has(
+                            String(row.getIndex())
+                        ))
+                    .map(row =>
+                        this.cloneRowData(
+                            row.getData()
+                        ));
+
+            await this.replaceStructureData(
+                elementId,
+                remainingData,
+                focusRowId,
+                {
+                    insertedRows: [],
+                    removedRows: deletedRows,
+                    additionalDirtyRowIds: []
+                }
+            );
+        }
 
         this.pushStructureTransaction(
             elementId,
