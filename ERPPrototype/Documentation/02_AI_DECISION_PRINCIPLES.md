@@ -1,6 +1,6 @@
 ===========================================================
 AI DECISION PRINCIPLES
-Version: 1.3
+Version: 1.4
 Status: Approved
 ===========================================================
 
@@ -164,6 +164,47 @@ Open row 1500, resize the window, then test all four arrows.
 
 Remaining:
 Selection and clipboard are still inside the large file and will be separated later."
+
+===========================================================
+CODE CHANGE DELIVERY RULE — ESSENTIAL
+===========================================================
+
+AI must choose the delivery method according to the size, risk, and placement difficulty of the change.
+
+Use direct manual-edit instructions when all of the following are true:
+
+- The change is very small and local.
+- It affects one file.
+- It usually changes one or two clearly identifiable lines or values.
+- The location can be found safely using an exact path and search anchor.
+- A copy-and-paste mistake is unlikely to damage unrelated behavior.
+
+For a manual edit, provide:
+
+- The exact file path.
+- The exact text or setting to search for.
+- The old value when useful.
+- The exact replacement.
+- Whether Save + Ctrl+F5 is sufficient or Clean/Rebuild is required.
+
+Use a cumulative ZIP patch when any of the following applies:
+
+- The change affects multiple files.
+- The change is large, sensitive, or difficult to place correctly.
+- Several functions, event handlers, dependencies, or lifecycle paths are involved.
+- Manual copying could easily create syntax errors, omissions, duplication, or regression.
+- Exact replacement files are safer than instructions.
+
+Additional rules:
+
+- Do not create a ZIP patch merely for changing a constant, label, threshold, style value, or one isolated configuration line.
+- Do not provide duplicate TXT copies alongside a ZIP patch.
+- A ZIP patch must contain only the files that need replacement unless a full checkpoint was explicitly requested.
+- For risky changes, include the rollback checkpoint and required regression tests.
+- If delivery safety is genuinely uncertain, prefer the ZIP patch and explain the reason briefly.
+
+Simple example:
+Changing auto-scroll speed constants from 6 and 24 to 8 and 32 in one JavaScript file should be given as a direct manual edit. Adding the auto-scroll module, connecting it to the table lifecycle, and updating script loading across several files should be delivered as a ZIP patch.
 
 ===========================================================
 CHANGE IMPACT RULE

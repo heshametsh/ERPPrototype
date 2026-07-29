@@ -2307,6 +2307,7 @@
         const state = this.states[elementId];
 
         window.tabulatorFilters?.closeActivePopup?.(elementId);
+        window.tabulatorRangeAutoScroll?.detach?.(elementId);
 
         this.detachLifecycleEventHandlers(table, state);
         this.cancelLifecycleAsyncWork(state);
@@ -2834,6 +2835,11 @@
 
             window.tabulatorTest.bindHeaderFilterSelectionGuards(
                 elementId
+            );
+
+            window.tabulatorRangeAutoScroll?.attach?.(
+                elementId,
+                table
             );
 
             /*
