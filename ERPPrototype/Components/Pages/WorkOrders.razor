@@ -1,4 +1,4 @@
-﻿@page "/work-orders"
+@page "/work-orders"
 @rendermode InteractiveServer
 @implements IAsyncDisposable
 
@@ -472,54 +472,93 @@
             {
                 if (
                     result.FailureType ==
-                        WorkOrderSaveFailureType.Duplicate &&
-                    !string.IsNullOrWhiteSpace(result.WorkOrderNumber) &&
-                    !string.IsNullOrWhiteSpace(result.WorkTypeCode))
+                        WorkOrderSaveFailureType.Duplicate)
                 {
-                    var duplicateRows = dirtyRows
-                        .Where(row =>
-                            string.Equals(
-                                row.WorkOrderNumber?.Trim(),
+                    var duplicateConflicts =
+                        result.DuplicateConflicts?.ToList() ?? [];
+
+                    /*
+                     * Compatibility fallback for an older service result that
+                     * contains one duplicate only.
+                     */
+                    if (
+                        duplicateConflicts.Count == 0 &&
+                        !string.IsNullOrWhiteSpace(result.WorkOrderNumber) &&
+                        !string.IsNullOrWhiteSpace(result.WorkTypeCode))
+                    {
+                        duplicateConflicts.Add(
+                            new WorkOrderDuplicateConflict(
                                 result.WorkOrderNumber,
-                                StringComparison.Ordinal) &&
-                            string.Equals(
-                                row.WorkTypeCode?.Trim(),
                                 result.WorkTypeCode,
-                                StringComparison.Ordinal))
-                        .ToList();
+                                result.ExistingWorkYear,
+                                result.ExistingDepartmentName));
+                    }
 
-                    var duplicateLocation =
-                        result.ExistingWorkYear is int existingWorkYear
-                            ? string.IsNullOrWhiteSpace(
-                                result.ExistingDepartmentName)
-                                ? $" في سنة {existingWorkYear}"
-                                : $" في قسم {result.ExistingDepartmentName}، سنة {existingWorkYear}"
-                            : string.Empty;
+                    static string CreateDuplicateKey(
+                        string? workOrderNumber,
+                        string? workTypeCode) =>
+                        string.Concat(
+                            workOrderNumber?.Trim() ?? string.Empty,
+                            "\u001F",
+                            workTypeCode?.Trim() ?? string.Empty);
 
-                    var duplicateMessage =
-                        $"رقم أمر العمل {result.WorkOrderNumber} " +
-                        $"مع النوع {result.WorkTypeCode} " +
-                        $"مسجل بالفعل{duplicateLocation}.";
+                    var conflictsByKey = duplicateConflicts
+                        .GroupBy(conflict =>
+                            CreateDuplicateKey(
+                                conflict.WorkOrderNumber,
+                                conflict.WorkTypeCode))
+                        .ToDictionary(
+                            group => group.Key,
+                            group => group.Last(),
+                            StringComparer.Ordinal);
 
-                    var validationErrors = duplicateRows
-                        .SelectMany(row => new[]
+                    var validationErrors = new List<TabulatorValidationError>();
+
+                    foreach (var row in dirtyRows
+                        .OrderBy(row => row.DisplayOrder))
+                    {
+                        var rowKey = CreateDuplicateKey(
+                            row.WorkOrderNumber,
+                            row.WorkTypeCode);
+
+                        if (!conflictsByKey.TryGetValue(
+                                rowKey,
+                                out var conflict))
                         {
+                            continue;
+                        }
+
+                        var duplicateLocation =
+                            conflict.ExistingWorkYear is int existingWorkYear
+                                ? string.IsNullOrWhiteSpace(
+                                    conflict.ExistingDepartmentName)
+                                    ? $" في سنة {existingWorkYear}"
+                                    : $" في قسم {conflict.ExistingDepartmentName}، سنة {existingWorkYear}"
+                                : " داخل التغييرات الحالية";
+
+                        var duplicateMessage =
+                            $"رقم أمر العمل {conflict.WorkOrderNumber} " +
+                            $"مع النوع {conflict.WorkTypeCode} " +
+                            $"مكرر{duplicateLocation}.";
+
+                        validationErrors.Add(
                             new TabulatorValidationError
                             {
                                 RowId = row.Id,
                                 Field = "workOrderNumber",
                                 Code = result.ErrorCode,
                                 Message = duplicateMessage
-                            },
+                            });
+
+                        validationErrors.Add(
                             new TabulatorValidationError
                             {
                                 RowId = row.Id,
                                 Field = "workTypeCode",
                                 Code = result.ErrorCode,
                                 Message = duplicateMessage
-                            }
-                        })
-                        .ToList();
+                            });
+                    }
 
                     if (validationErrors.Count > 0)
                     {
@@ -529,6 +568,15 @@
                             validationErrors,
                             true);
                     }
+
+                    var duplicateIdentityCount = conflictsByKey.Count;
+
+                    await SetGridStatusAsync(
+                        duplicateIdentityCount == 1
+                            ? "فشل الحفظ: يوجد أمر عمل مكرر. تم تحديد الصف المخالف."
+                            : $"فشل الحفظ: يوجد {duplicateIdentityCount} أوامر عمل مكررة. تم تحديد جميع الصفوف المخالفة بالترتيب.");
+
+                    return;
                 }
 
                 if (

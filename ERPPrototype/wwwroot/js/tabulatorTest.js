@@ -4395,7 +4395,7 @@
         if (
             window.isSecureContext === true &&
             typeof window.navigator?.clipboard?.writeText ===
-            "function"
+                "function"
         ) {
             try {
                 await window.navigator.clipboard.writeText(text);
@@ -6263,6 +6263,48 @@
         };
     },
 
+    /*
+     * M5C1 diagnostics only: record named save-delta stages in the existing
+     * Performance Observatory. When performance mode is off this is a no-op,
+     * so the production save path and data behaviour remain unchanged.
+     */
+    getPerformanceTimestamp: function () {
+        return window.performance &&
+            typeof window.performance.now === "function"
+            ? window.performance.now()
+            : Date.now();
+    },
+
+    recordPerformanceStage: function (
+        elementId,
+        name,
+        startedAt,
+        metadata = null
+    ) {
+        const profiler =
+            window.tabulatorPerformance;
+
+        if (
+            !profiler?.active ||
+            typeof profiler.recordDuration !==
+            "function"
+        ) {
+            return;
+        }
+
+        const duration =
+            this.getPerformanceTimestamp() -
+            startedAt;
+
+        profiler.recordDuration(
+            elementId,
+            name,
+            duration,
+            metadata,
+            false
+        );
+    },
+
     displayOrderStep: 1000000000,
 
     rebalanceDisplayOrders: function (rows) {
@@ -7912,6 +7954,9 @@
             return;
         }
 
+        const prepareInputsStartedAt =
+            this.getPerformanceTimestamp();
+
         savedRows = Array.isArray(savedRows)
             ? savedRows.map(row =>
                 this.cloneRowData(row))
@@ -7927,10 +7972,34 @@
                 ? removedRowIds
                 : [];
 
+        this.recordPerformanceStage(
+            elementId,
+            "save.delta.prepare-inputs",
+            prepareInputsStartedAt,
+            {
+                savedRows: savedRows.length,
+                mappings: savedRowMappings.length,
+                removedRows: removedRowIds.length
+            }
+        );
+
+        const snapshotCurrentStartedAt =
+            this.getPerformanceTimestamp();
+
         const oldRows = table
             .getData()
             .map(row =>
                 this.cloneRowData(row));
+
+        this.recordPerformanceStage(
+            elementId,
+            "save.delta.snapshot-current",
+            snapshotCurrentStartedAt,
+            { rows: oldRows.length }
+        );
+
+        const buildMapsStartedAt =
+            this.getPerformanceTimestamp();
 
         const savedById = new Map(
             savedRows.map(row => [
@@ -7984,6 +8053,23 @@
             removedRowIds.map(id =>
                 String(id))
         );
+
+        this.recordPerformanceStage(
+            elementId,
+            "save.delta.build-maps",
+            buildMapsStartedAt,
+            {
+                savedById: savedById.size,
+                savedByClientKey:
+                    savedByClientKey.size,
+                temporaryMappings:
+                    mappingByTemporaryId.size,
+                removedIds: removedIdSet.size
+            }
+        );
+
+        const composeFinalStartedAt =
+            this.getPerformanceTimestamp();
 
         const includedSavedIds = new Set();
         const finalRows = [];
@@ -8087,6 +8173,21 @@
                 ? minimumCurrentId - 1
                 : -1;
 
+        this.recordPerformanceStage(
+            elementId,
+            "save.delta.compose-final",
+            composeFinalStartedAt,
+            {
+                oldRows: oldRows.length,
+                finalRows: finalRows.length,
+                includedSavedRows:
+                    includedSavedIds.size
+            }
+        );
+
+        const rebaseHistoryStartedAt =
+            this.getPerformanceTimestamp();
+
         const rebasedRows =
             this.rebaseHistoryAfterSave(
                 state,
@@ -8095,10 +8196,33 @@
                 savedRowMappings
             );
 
+        this.recordPerformanceStage(
+            elementId,
+            "save.delta.rebase-history",
+            rebaseHistoryStartedAt,
+            {
+                rows: rebasedRows.length,
+                undoTransactions:
+                    state.undoStack?.length ?? 0,
+                redoTransactions:
+                    state.redoStack?.length ?? 0
+            }
+        );
+
+        const captureValidationStartedAt =
+            this.getPerformanceTimestamp();
+
         const validationRowIds = new Set(
             Array.from(
                 state.validationErrors.values()
             ).map(error => error.rowId)
+        );
+
+        this.recordPerformanceStage(
+            elementId,
+            "save.delta.capture-validation",
+            captureValidationStartedAt,
+            { rows: validationRowIds.size }
         );
 
         state.applyingHistory = true;
@@ -8111,6 +8235,9 @@
              * replaced. Build one quiet lookup from all current rows instead
              * of using getRow as an existence probe.
              */
+            const lookupCurrentStartedAt =
+                this.getPerformanceTimestamp();
+
             const currentRowsById = new Map(
                 table.getRows().map(row => [
                     String(row.getIndex()),
@@ -8118,9 +8245,36 @@
                 ])
             );
 
+            this.recordPerformanceStage(
+                elementId,
+                "save.delta.lookup-current",
+                lookupCurrentStartedAt,
+                { rows: currentRowsById.size }
+            );
+
+            const planMutationsStartedAt =
+                this.getPerformanceTimestamp();
+
+            /*
+             * Saved new rows already exist in the table under a temporary
+             * client-side id. Reconcile those rows in place through their
+             * RowComponent instead of deleting the temporary row and adding
+             * a second row with the database id. This preserves the rendered
+             * row, selection/range ownership and virtual-DOM position while
+             * avoiding two expensive structural refreshes per saved row.
+             */
             const rowIdsToDelete = new Set(
                 removedRowIds.map(id =>
                     String(id))
+            );
+
+            const rekeyPlans = [];
+
+            const rebasedRowsById = new Map(
+                rebasedRows.map(row => [
+                    String(row.id),
+                    row
+                ])
             );
 
             for (const mapping of savedRowMappings) {
@@ -8131,14 +8285,55 @@
                     Number(mapping?.databaseId);
 
                 if (
-                    Number.isFinite(temporaryId) &&
-                    Number.isFinite(databaseId) &&
-                    databaseId > 0 &&
-                    savedById.has(String(databaseId))
+                    !Number.isFinite(temporaryId) ||
+                    !Number.isFinite(databaseId) ||
+                    databaseId <= 0
                 ) {
-                    rowIdsToDelete.add(
-                        String(temporaryId)
-                    );
+                    continue;
+                }
+
+                const temporaryKey =
+                    String(temporaryId);
+
+                const databaseKey =
+                    String(databaseId);
+
+                const temporaryRow =
+                    currentRowsById.get(temporaryKey) ??
+                    null;
+
+                const databaseRow =
+                    currentRowsById.get(databaseKey) ??
+                    null;
+
+                const savedRow =
+                    rebasedRowsById.get(databaseKey) ??
+                    savedById.get(databaseKey) ??
+                    null;
+
+                if (
+                    temporaryRow &&
+                    savedRow &&
+                    (!databaseRow ||
+                        databaseRow === temporaryRow)
+                ) {
+                    rekeyPlans.push({
+                        temporaryKey,
+                        databaseKey,
+                        row: temporaryRow,
+                        data: savedRow
+                    });
+
+                    continue;
+                }
+
+                /*
+                 * Defensive fallback for an unexpected id collision or an
+                 * incomplete server response. The old delete/insert route is
+                 * retained only for that exceptional case.
+                 */
+                if (temporaryRow) {
+                    rowIdsToDelete.add(temporaryKey);
                 }
             }
 
@@ -8153,6 +8348,41 @@
                 }
             }
 
+            const rekeyedDatabaseIds = new Set(
+                rekeyPlans.map(plan =>
+                    plan.databaseKey)
+            );
+
+            const rowsToUpdate = savedRows
+                .filter(row => {
+                    const rowId = String(row.id);
+
+                    return (
+                        !rekeyedDatabaseIds.has(rowId) &&
+                        currentRowsById.has(rowId)
+                    );
+                });
+
+            const savedIdSet = new Set(
+                savedRows.map(row =>
+                    String(row.id))
+            );
+
+            this.recordPerformanceStage(
+                elementId,
+                "save.delta.plan-mutations",
+                planMutationsStartedAt,
+                {
+                    rekeyRows: rekeyPlans.length,
+                    deleteRows: rowsToDelete.length,
+                    updateRows: rowsToUpdate.length,
+                    savedIds: savedIdSet.size
+                }
+            );
+
+            const deleteRowsStartedAt =
+                this.getPerformanceTimestamp();
+
             if (rowsToDelete.length > 0) {
                 await table.deleteRow(rowsToDelete);
 
@@ -8161,11 +8391,47 @@
                 }
             }
 
-            const rowsToUpdate = savedRows
-                .filter(row =>
-                    currentRowsById.has(
-                        String(row.id)
-                    ));
+            this.recordPerformanceStage(
+                elementId,
+                "save.delta.delete-rows",
+                deleteRowsStartedAt,
+                { rows: rowsToDelete.length }
+            );
+
+            const rekeyRowsStartedAt =
+                this.getPerformanceTimestamp();
+
+            let rekeyedRowCount = 0;
+
+            for (const plan of rekeyPlans) {
+                /*
+                 * A row component update targets the existing row directly,
+                 * so changing its index field does not require a getRow probe
+                 * or a structural delete/add cycle.
+                 */
+                await plan.row.update(plan.data);
+
+                currentRowsById.delete(
+                    plan.temporaryKey
+                );
+
+                currentRowsById.set(
+                    plan.databaseKey,
+                    plan.row
+                );
+
+                rekeyedRowCount++;
+            }
+
+            this.recordPerformanceStage(
+                elementId,
+                "save.delta.rekey-rows",
+                rekeyRowsStartedAt,
+                { rows: rekeyedRowCount }
+            );
+
+            const updateRowsStartedAt =
+                this.getPerformanceTimestamp();
 
             if (rowsToUpdate.length > 0) {
                 await table.updateData(
@@ -8173,10 +8439,17 @@
                 );
             }
 
-            const savedIdSet = new Set(
-                savedRows.map(row =>
-                    String(row.id))
+            this.recordPerformanceStage(
+                elementId,
+                "save.delta.update-rows",
+                updateRowsStartedAt,
+                { rows: rowsToUpdate.length }
             );
+
+            const insertRowsStartedAt =
+                this.getPerformanceTimestamp();
+
+            let insertedRowCount = 0;
 
             for (
                 let index = 0;
@@ -8228,6 +8501,8 @@
                         addedRow
                     );
 
+                    insertedRowCount++;
+
                     continue;
                 }
 
@@ -8261,7 +8536,19 @@
                     rowId,
                     addedRow
                 );
+
+                insertedRowCount++;
             }
+
+            this.recordPerformanceStage(
+                elementId,
+                "save.delta.insert-rows",
+                insertRowsStartedAt,
+                { rows: insertedRowCount }
+            );
+
+            const snapshotOriginalsStartedAt =
+                this.getPerformanceTimestamp();
 
             state.originalRows = new Map(
                 rebasedRows.map(row => [
@@ -8270,10 +8557,35 @@
                 ])
             );
 
+            this.recordPerformanceStage(
+                elementId,
+                "save.delta.snapshot-originals",
+                snapshotOriginalsStartedAt,
+                { rows: state.originalRows.size }
+            );
+
+            const rebuildIdentityStartedAt =
+                this.getPerformanceTimestamp();
+
             this.rebuildIdentityIndex(
                 elementId,
                 rebasedRows
             );
+
+            this.recordPerformanceStage(
+                elementId,
+                "save.delta.rebuild-identity",
+                rebuildIdentityStartedAt,
+                {
+                    identityKeys:
+                        state.identityRows.size,
+                    indexedRows:
+                        state.rowIdentityKeys.size
+                }
+            );
+
+            const resetStateStartedAt =
+                this.getPerformanceTimestamp();
 
             state.dirtyRowIds.clear();
             state.deletedOriginalRowIds.clear();
@@ -8290,13 +8602,39 @@
             state.currentEditingCell = null;
             state.activeCell = null;
 
+            this.recordPerformanceStage(
+                elementId,
+                "save.delta.reset-state",
+                resetStateStartedAt,
+                {
+                    validationErrors:
+                        state.validationErrors.size,
+                    dirtyRows:
+                        state.dirtyRowIds.size,
+                    deletedRows:
+                        state.deletedOriginalRowIds.size
+                }
+            );
+
+            const applyFiltersStartedAt =
+                this.getPerformanceTimestamp();
+
             window.tabulatorFilters.apply(
                 this,
                 elementId
             );
+
+            this.recordPerformanceStage(
+                elementId,
+                "save.delta.apply-filters",
+                applyFiltersStartedAt
+            );
         } finally {
             state.applyingHistory = false;
         }
+
+        const restoreValidationStartedAt =
+            this.getPerformanceTimestamp();
 
         for (const rowId of validationRowIds) {
             this.applyValidationStylesToRow(
@@ -8305,8 +8643,24 @@
             );
         }
 
+        this.recordPerformanceStage(
+            elementId,
+            "save.delta.restore-validation",
+            restoreValidationStartedAt,
+            { rows: validationRowIds.size }
+        );
+
+        const renderUiStartedAt =
+            this.getPerformanceTimestamp();
+
         this.syncValidationUi(elementId);
         this.renderStatus(elementId);
+
+        this.recordPerformanceStage(
+            elementId,
+            "save.delta.render-ui",
+            renderUiStartedAt
+        );
     },
 
     hasUnsavedChanges: async function (elementId) {

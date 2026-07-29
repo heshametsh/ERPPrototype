@@ -1,4 +1,4 @@
-﻿using ERPPrototype.Data.Entities;
+using ERPPrototype.Data.Entities;
 using System.Diagnostics;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
@@ -270,23 +270,36 @@ public sealed class WorkOrderService(
                 .Concat(existingChangedRecords)
                 .ToList();
 
-            var duplicateIncomingRecord = incomingRecords
+            /*
+             * Collect every duplicate identity before mutating the database.
+             * The previous implementation returned after the first match,
+             * which forced the user to save repeatedly and made validation
+             * jump backwards between rows.
+             */
+            var duplicateConflictsByKey =
+                new Dictionary<string, WorkOrderDuplicateConflict>(
+                    StringComparer.Ordinal);
+
+            var incomingKeyOrder = incomingRecords
+                .Select(workOrder =>
+                    CreateDuplicateKey(
+                        workOrder.WorkOrderNumber,
+                        workOrder.WorkTypeCode))
+                .ToList();
+
+            foreach (var group in incomingRecords
                 .GroupBy(workOrder =>
                     CreateDuplicateKey(
                         workOrder.WorkOrderNumber,
                         workOrder.WorkTypeCode))
-                .FirstOrDefault(group => group.Count() > 1);
-
-            if (duplicateIncomingRecord is not null)
+                .Where(group => group.Count() > 1))
             {
-                var duplicate = duplicateIncomingRecord.First();
+                var duplicate = group.First();
 
-                return WorkOrderSaveResult.DuplicateFailure(
-                    $"Work Order Number '{duplicate.WorkOrderNumber}' " +
-                    $"with Work Type '{duplicate.WorkTypeCode}' " +
-                    "is duplicated in the current changes.",
-                    duplicate.WorkOrderNumber,
-                    duplicate.WorkTypeCode);
+                duplicateConflictsByKey[group.Key] =
+                    new WorkOrderDuplicateConflict(
+                        duplicate.WorkOrderNumber,
+                        duplicate.WorkTypeCode);
             }
 
             if (incomingRecords.Count > 0)
@@ -334,15 +347,39 @@ public sealed class WorkOrderService(
                             ? null
                             : existingConflict.DepartmentName;
 
-                    return WorkOrderSaveResult.DuplicateFailure(
-                        $"Work Order Number '{incomingRecord.WorkOrderNumber}' " +
-                        $"with Work Type '{incomingRecord.WorkTypeCode}' " +
-                        $"already exists in work year {existingConflict.WorkYear}.",
-                        incomingRecord.WorkOrderNumber,
-                        incomingRecord.WorkTypeCode,
-                        existingConflict.WorkYear,
-                        differentDepartmentName);
+                    /*
+                     * Prefer the database location when the same key is also
+                     * duplicated inside the current batch. That gives the user
+                     * the most useful company-wide location information.
+                     */
+                    duplicateConflictsByKey[incomingKey] =
+                        new WorkOrderDuplicateConflict(
+                            incomingRecord.WorkOrderNumber,
+                            incomingRecord.WorkTypeCode,
+                            existingConflict.WorkYear,
+                            differentDepartmentName);
                 }
+            }
+
+            if (duplicateConflictsByKey.Count > 0)
+            {
+                var orderedConflicts = incomingKeyOrder
+                    .Distinct(StringComparer.Ordinal)
+                    .Where(duplicateConflictsByKey.ContainsKey)
+                    .Select(key => duplicateConflictsByKey[key])
+                    .ToList();
+
+                var firstConflict = orderedConflicts[0];
+
+                return WorkOrderSaveResult.DuplicateFailure(
+                    orderedConflicts.Count == 1
+                        ? "A duplicate work-order identity was found."
+                        : $"{orderedConflicts.Count} duplicate work-order identities were found.",
+                    firstConflict.WorkOrderNumber,
+                    firstConflict.WorkTypeCode,
+                    firstConflict.ExistingWorkYear,
+                    firstConflict.ExistingDepartmentName,
+                    orderedConflicts);
             }
 
             var utcNow = DateTime.UtcNow;
@@ -826,6 +863,12 @@ public sealed record WorkOrderSavedRecord(
     string? Notes,
     byte[] RowVersion);
 
+public sealed record WorkOrderDuplicateConflict(
+    string WorkOrderNumber,
+    string WorkTypeCode,
+    int? ExistingWorkYear = null,
+    string? ExistingDepartmentName = null);
+
 public sealed record WorkOrderSaveResult(
     bool Succeeded,
     WorkOrderSaveFailureType FailureType,
@@ -837,7 +880,8 @@ public sealed record WorkOrderSaveResult(
     string? ExistingDepartmentName = null,
     int? WorkOrderId = null,
     IReadOnlyList<WorkOrderSavedRecord>? SavedRecords = null,
-    IReadOnlyList<int>? DeletedRecordIds = null)
+    IReadOnlyList<int>? DeletedRecordIds = null,
+    IReadOnlyList<WorkOrderDuplicateConflict>? DuplicateConflicts = null)
 {
     public static WorkOrderSaveResult Success(
         IReadOnlyList<WorkOrderSavedRecord> savedRecords,
@@ -862,7 +906,8 @@ public sealed record WorkOrderSaveResult(
         string? workOrderNumber = null,
         string? workTypeCode = null,
         int? existingWorkYear = null,
-        string? existingDepartmentName = null) =>
+        string? existingDepartmentName = null,
+        IReadOnlyList<WorkOrderDuplicateConflict>? duplicateConflicts = null) =>
         new(
             false,
             WorkOrderSaveFailureType.Duplicate,
@@ -871,7 +916,8 @@ public sealed record WorkOrderSaveResult(
             workOrderNumber,
             workTypeCode,
             existingWorkYear,
-            existingDepartmentName);
+            existingDepartmentName,
+            DuplicateConflicts: duplicateConflicts);
 
     public static WorkOrderSaveResult ScopeFailure(
         string message) =>
