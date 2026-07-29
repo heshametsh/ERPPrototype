@@ -1206,8 +1206,9 @@
 
     validateRow: function (elementId, rowOrId, options = {}) {
         const table = this.tables[elementId];
+        const state = this.states[elementId];
 
-        if (!table) {
+        if (!table || !state) {
             return;
         }
 
@@ -1221,9 +1222,13 @@
         }
 
         const rowData = row.getData();
+        const rowKey = String(row.getIndex());
         const isBlank = this.isCompletelyBlankRowData(rowData);
+        const isPersistedRow = state.originalRows.has(rowKey);
         const forceRequired =
-            options.forceRequired === true || !isBlank;
+            options.forceRequired === true ||
+            isPersistedRow ||
+            !isBlank;
 
         for (const field of Object.keys(this.validationFieldOrder)) {
             const result = this.validateCellValue(
@@ -2360,7 +2365,6 @@
              * أثناء مسح نطاق، Tabulator يطلق cellEdited لكل خلية.
              * نجمع هذه التعديلات هنا ثم نسجلها Transaction واحدة.
              */
-            pendingRangeClear: null,
 
             /*
              * نحتفظ بنسخة القيم الأصلية فقط للمقارنة.
@@ -2550,7 +2554,7 @@
 
             selectableRangeColumns: true,
             selectableRangeRows: true,
-            selectableRangeClearCells: true,
+            selectableRangeClearCells: false,
             selectableRangeClearCellsValue: "",
 
             /*
@@ -2982,31 +2986,6 @@
                 return;
             }
 
-            /*
-             * لو التعديل ناتج عن Delete/Backspace لنطاق، لا نسجله
-             * كعملية منفصلة. نحدث العملية المجمعة فقط.
-             */
-            if (state.pendingRangeClear) {
-                const changeKey =
-                    `${String(rowId)}::${field}`;
-
-                const pendingChange =
-                    state.pendingRangeClear
-                        .changesByKey
-                        .get(changeKey);
-
-                if (pendingChange) {
-                    pendingChange.newValue =
-                        newValue;
-
-                    state.pendingRangeClear
-                        .changedFields
-                        .add(field);
-                }
-
-                return;
-            }
-
             window.tabulatorTest.pushTransaction(
                 elementId,
                 {
@@ -3284,9 +3263,13 @@
             }
 
             /*
-             * Tabulator نفسه هو الذي يمسح النطاق. هنا لا نمنع الحدث
-             * ولا نغير الخلايا يدويًا؛ فقط نأخذ Snapshot قبل المسح،
-             * ثم نجمع cellEdited في عملية Undo واحدة بعد انتهاء الحدث.
+             * تشخيص M5D1 أثبت أن Tabulator يحتفظ بالنطاق المنطقي كاملًا
+             * بعد الـScroll، وأن getStructuredCells يعيد الصفوف غير الظاهرة
+             * أيضًا. المشكلة كانت في مسار المسح الداخلي نفسه مع Virtual DOM.
+             *
+             * لذلك يملك المشروع Delete/Backspace حصريًا: نمنع المسار
+             * الداخلي، ونمسح نفس النطاق المنطقي من خلال CellComponents
+             * التي أعادها Tabulator، دون أي نظام تحديد موازٍ.
              */
             if (
                 (event.key === "Delete" ||
@@ -3295,138 +3278,20 @@
                 !event.metaKey &&
                 !event.altKey
             ) {
-                const structuredCells =
-                    activeRange.getStructuredCells();
-
-                const changesByKey =
-                    new Map();
-
-                if (Array.isArray(structuredCells)) {
-                    structuredCells.forEach(
-                        function (rowCells) {
-                            if (!Array.isArray(rowCells)) {
-                                return;
-                            }
-
-                            rowCells.forEach(
-                                function (cell) {
-                                    if (
-                                        !cell ||
-                                        typeof cell.getRow !==
-                                        "function" ||
-                                        typeof cell.getField !==
-                                        "function" ||
-                                        typeof cell.getValue !==
-                                        "function"
-                                    ) {
-                                        return;
-                                    }
-
-                                    const rowId =
-                                        cell
-                                            .getRow()
-                                            .getIndex();
-
-                                    const field =
-                                        cell.getField();
-
-                                    const oldValue =
-                                        cell.getValue();
-
-                                    const changeKey =
-                                        `${String(rowId)}::${field}`;
-
-                                    changesByKey.set(
-                                        changeKey,
-                                        {
-                                            rowId: rowId,
-                                            clientKey:
-                                                cell.getRow().getData().clientKey,
-                                            field: field,
-                                            oldValue: oldValue,
-                                            newValue: oldValue
-                                        }
-                                    );
-                                }
-                            );
-                        }
-                    );
-                }
-
-                if (changesByKey.size > 0) {
-                    const pendingRangeClear = {
-                        changesByKey:
-                            changesByKey,
-
-                        changedFields:
-                            new Set()
-                    };
-
-                    state.pendingRangeClear =
-                        pendingRangeClear;
-
-                    /*
-                     * Tabulator ينفذ المسح بصورة متزامنة لاحقًا في
-                     * نفس keydown. الـtimeout يعمل بعد انتهاء ذلك.
-                     */
-                    window.setTimeout(
-                        function () {
-                            if (
-                                state.pendingRangeClear !==
-                                pendingRangeClear
-                            ) {
-                                return;
-                            }
-
-                            state.pendingRangeClear =
-                                null;
-
-                            const changes =
-                                Array.from(
-                                    pendingRangeClear
-                                        .changesByKey
-                                        .values()
-                                )
-                                    .filter(
-                                        change =>
-                                            !Object.is(
-                                                change.oldValue,
-                                                change.newValue
-                                            )
-                                    );
-
-                            if (changes.length === 0) {
-                                return;
-                            }
-
-                            window.tabulatorTest
-                                .pushTransaction(
-                                    elementId,
-                                    {
-                                        type: "range-clear",
-                                        label: "مسح نطاق",
-                                        changes: changes
-                                    }
-                                );
-
-                            window.tabulatorFilters
-                                .refreshFields(
-                                    window.tabulatorTest,
-                                    elementId,
-                                    Array.from(
-                                        pendingRangeClear
-                                            .changedFields
-                                    )
-                                );
-                        },
-                        0
-                    );
-                }
+                event.preventDefault();
+                event.stopImmediatePropagation();
 
                 /*
-                 * مهم: لا نستخدم preventDefault هنا، حتى يظل
-                 * مسح Tabulator الأصلي هو المسؤول عن التنفيذ.
+                 * منع تكرار العملية عند استمرار الضغط على المفتاح.
                  */
+                if (!event.repeat) {
+                    window.tabulatorTest
+                        .clearActiveRangeContents(
+                            elementId,
+                            activeRange
+                        );
+                }
+
                 return;
             }
 
@@ -3947,6 +3812,156 @@
         }
 
         return ranges[ranges.length - 1];
+    },
+
+    /*
+     * مسح محتوى النطاق المنطقي كاملًا، بما في ذلك الصفوف غير الظاهرة
+     * داخل Virtual DOM. لا ننشئ تحديدًا بديلًا ولا نتعامل مع عناصر DOM؛
+     * نعتمد فقط على النطاق الأصلي الذي يديره Tabulator.
+     */
+    clearActiveRangeContents: function (
+        elementId,
+        activeRange
+    ) {
+        const state =
+            this.states[elementId];
+
+        if (
+            !state ||
+            !activeRange
+        ) {
+            return 0;
+        }
+
+        const structuredCells =
+            activeRange.getStructuredCells();
+
+        if (
+            !Array.isArray(structuredCells) ||
+            structuredCells.length === 0
+        ) {
+            return 0;
+        }
+
+        const changes = [];
+        const changedFields = new Set();
+
+        state.applyingHistory = true;
+
+        try {
+            for (const rowCells of structuredCells) {
+                if (!Array.isArray(rowCells)) {
+                    continue;
+                }
+
+                for (const cell of rowCells) {
+                    if (
+                        !cell ||
+                        typeof cell.getRow !==
+                        "function" ||
+                        typeof cell.getField !==
+                        "function" ||
+                        typeof cell.getValue !==
+                        "function" ||
+                        typeof cell.setValue !==
+                        "function"
+                    ) {
+                        continue;
+                    }
+
+                    const columnDefinition =
+                        cell
+                            .getColumn?.()
+                            ?.getDefinition?.();
+
+                    /*
+                     * لا نمسح أعمدة غير قابلة للتحرير لو دخلت في النطاق
+                     * عن طريق تحديد صف كامل أو عمود كامل.
+                     */
+                    if (
+                        columnDefinition?.editor ===
+                        false
+                    ) {
+                        continue;
+                    }
+
+                    const field =
+                        cell.getField();
+
+                    if (!field) {
+                        continue;
+                    }
+
+                    const oldValue =
+                        cell.getValue();
+
+                    const newValue = "";
+
+                    if (
+                        Object.is(
+                            oldValue,
+                            newValue
+                        )
+                    ) {
+                        continue;
+                    }
+
+                    const row =
+                        cell.getRow();
+
+                    changes.push({
+                        rowId: row.getIndex(),
+                        clientKey:
+                            row.getData().clientKey,
+                        field: field,
+                        oldValue: oldValue,
+                        newValue: newValue
+                    });
+
+                    changedFields.add(field);
+
+                    /*
+                     * نفس أسلوب Paste المستقر: تحديث CellComponent نفسه
+                     * يعمل للصفوف الظاهرة وغير الظاهرة دون إعادة بناء الشيت.
+                     */
+                    cell.setValue(
+                        newValue,
+                        true
+                    );
+                }
+            }
+        } finally {
+            state.applyingHistory = false;
+        }
+
+        if (changes.length === 0) {
+            return 0;
+        }
+
+        /*
+         * عملية مسح نطاق تنشئ مجموعة أخطاء جديدة دفعة واحدة.
+         * ابدأ رسالة الأخطاء من أول صف فعلي بدل الاحتفاظ بمؤشر
+         * تنقل قديم من عملية تحقق سابقة.
+         */
+        state.activeValidationIndex = 0;
+
+        this.pushTransaction(
+            elementId,
+            {
+                type: "range-clear",
+                label: "مسح نطاق",
+                changes: changes
+            }
+        );
+
+        window.tabulatorFilters
+            .refreshFields(
+                this,
+                elementId,
+                Array.from(changedFields)
+            );
+
+        return changes.length;
     },
 
     /*
@@ -8596,7 +8611,6 @@
             state.activeValidationIndex = -1;
 
             state.pendingEdit = null;
-            state.pendingRangeClear = null;
             state.nextEditMode = null;
             state.currentEditMode = null;
             state.currentEditingCell = null;
