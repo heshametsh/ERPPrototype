@@ -110,11 +110,11 @@ Practical example: changing from year 2026 to 2025 disconnects the old sheet thr
 
 ### Phase 8.7 — Save and Dirty-State Review
 
-**R1 implemented; focused regression pending:** `WorkOrders.Save.cs` owns the complete Blazor save workflow, including validation handoff, streamed save-delta reading, request preparation, service call, duplicate/concurrency messages, year movement reconciliation, client result application, and save diagnostics.
+**R1 completed and user-tested:** `WorkOrders.Save.cs` owns the complete Blazor save workflow. No-change Save, one-row Save, year movement, new-row rekey, deletion, and 4,950-row save paths passed after extraction.
 
-`WorkOrders.razor.cs` now owns page loading, year switching, grid initialization, shared mapping, and disposal. R1 moves the exact verified save logic without changing DTO contracts, SQL behaviour, JavaScript calls, business rules, or messages.
+**R2 implemented; focused regression pending:** request preparation now lives in `WorkOrders.SaveRequest.cs`, result/failure interpretation and row reconciliation live in `WorkOrders.SaveResult.cs`, and `WorkOrders.Save.cs` remains the coordinator. No public contract or intended runtime behaviour changes.
 
-**Planned R2:** extract the browser dirty-state and save-result reconciliation functions from `tabulatorTest.js` into one `tabulatorSaveState.js` module while preserving the public `tabulatorTest` API.
+**Planned R3:** review and, only if the boundary remains clear after R2 testing, extract browser dirty-state and save-result reconciliation functions from `tabulatorTest.js` into one `tabulatorSaveState.js` module while preserving the public `tabulatorTest` API.
 
 ### Phase 8.8 — WorkOrderService Split
 
@@ -179,3 +179,10 @@ Use section R in `06_REGRESSION_TEST_CHECKLIST.md`. The required evidence is one
 Use section S in `06_REGRESSION_TEST_CHECKLIST.md`. The key acceptance evidence is that no-change Save, one-row Save, duplicate rejection, year movement, added-row rekey, deletion, large-column Save, refresh persistence, and performance stage names remain identical after the C# extraction.
 
 Practical example: when the employee edits Notes and presses Save, one file now owns the complete journey from “what changed?” through server persistence to the final Arabic success message. Loading a year or leaving the page no longer shares that file.
+
+## Phase 8.7-R2 Focus
+
+Use section T in `06_REGRESSION_TEST_CHECKLIST.md`. Acceptance requires the same no-change, normal edit, duplicate, moved-year, added-row, deletion, and full-column outcomes as R1, with the same Arabic messages and save performance stage names.
+
+Practical example: request preparation must classify a newly inserted row as Added, while result preparation must map its temporary negative Id to the database Id. One step must not silently perform the other step’s responsibility.
+

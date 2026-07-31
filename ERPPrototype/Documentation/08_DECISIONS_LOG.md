@@ -215,3 +215,14 @@
 **Business example:** changing the message shown after moving three work orders to 2027 should require reviewing the save workflow only; it should not require navigating through grid initialization and year-loading code.
 
 **Constraint:** no JavaScript API, service contract, uniqueness rule, authorization rule, transaction, status message, or performance stage may change in this extraction.
+
+## 2026-07-31 — Separate Save Request Preparation from Result Interpretation
+
+**Decision:** keep one `SaveChangesAsync` coordinator, but move browser-delta-to-service-request preparation into `WorkOrders.SaveRequest.cs` and service-result-to-browser-presentation preparation into `WorkOrders.SaveResult.cs`.
+
+**Reason:** after R1 proved the complete save journey still works, the next safest boundary is to separate “what will be saved?” from “what did the server decide and what must the employee see?” This makes duplicate, concurrency, moved-year, and temporary-row logic reviewable without mixing them with stream reading and loading-state cleanup.
+
+**Business example:** changing Notes in one row produces a changed-row request. A duplicate failure produces cell marks and a failure message. These are different decisions and must not be hidden inside one long button method.
+
+**Constraint:** R2 does not change the service contract, global identity rule, year movement, row-version protection, Arabic messages, JavaScript calls, or performance stage names. Browser dirty-state extraction remains a later step after R2 runtime regression.
+

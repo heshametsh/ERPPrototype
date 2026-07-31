@@ -231,3 +231,25 @@ The Work Orders component is now split by workflow ownership:
 This is a partial-class boundary, not a new service or network layer. Dependency injection and all existing calls remain unchanged. The extraction deliberately keeps `WorkOrderService` as the business/persistence boundary and `tabulatorTest` as the current browser API.
 
 Practical example: a duplicate `(WorkOrderNumber + WorkTypeCode)` is still rejected by the service and mapped back to the exact cells by the same code. The only architectural change is that this mapping now lives beside the rest of the save journey.
+
+## Phase 8.7-R2 Save Preparation and Result Boundaries
+
+The Blazor save boundary now has three internal responsibilities while remaining one partial component and one user action:
+
+```text
+Save button / WorkOrders.Save.cs
+        |
+        +--> WorkOrders.SaveRequest.cs
+        |       browser delta -> service request
+        |
+        +--> WorkOrderService
+        |       authorization, rules, transaction, persistence
+        |
+        +--> WorkOrders.SaveResult.cs
+                service result -> validation marks, row reconciliation, status text
+```
+
+These files do not form new network or dependency-injection services. They are review boundaries inside the same component. The service remains the authority for permissions, global uniqueness, concurrency, and database changes.
+
+**Work example:** a duplicate pair is still decided by `WorkOrderService`. `SaveResult` only translates that result into the two red cells and the Arabic message. `SaveRequest` cannot decide that the pair is unique, and the UI coordinator cannot silently save around the service result.
+

@@ -272,3 +272,25 @@ Run from the accepted `Phase8.6-R2-Stable` behaviour after applying R1.
 12. Confirm Console contains no red error and no reference to `WorkOrders.Save` failure.
 
 Acceptance: all business outcomes, messages, browser calls, and measured stage names match the pre-extraction behaviour.
+
+## T. Phase 8.7-R2 — Save Request and Result Separation
+
+Run from the accepted `Phase8.7-R1-Stable` behaviour after applying R2.
+
+1. Press Save without changes. Confirm the same “no changes” message and no service save call.
+2. Edit Notes in one saved order, Save, refresh, and confirm the intended value and row version persist.
+3. Enter a globally duplicated `(WorkOrderNumber + WorkTypeCode)`. Confirm the same two cells are marked and the same Arabic duplicate message appears once.
+4. Enter a unique pair after the duplicate failure and confirm Save succeeds.
+5. Change Assignment Date to another year. Confirm request preparation counts one moved row and result preparation removes it from the current sheet and adds the destination year.
+6. Insert and complete a new row. Save, then edit it again without refresh. Confirm the temporary Id is mapped once and no duplicate visual row remains.
+7. Delete one eligible saved row, Save, refresh, and confirm it remains deleted.
+8. Paste a non-identity column across thousands of rows and Save. Confirm `identityCheckRows: 0`, no unnecessary duplicate query, and no visible full-sheet rewrite.
+9. Undo/Redo the large paste and Save each resulting state once; values and dirty state must remain correct.
+10. Confirm Arabic success, duplicate, concurrency, invalid-date, blank-new-row, and generic failure text are unchanged when those scenarios are available.
+11. Confirm performance operations still include `save.collect-client-delta`, `save.prepare-request`, `save.server-service`, `save.prepare-client-delta`, `save.client-apply-delta`, and `save.active-total`.
+12. Confirm Console contains no red error and the build contains all three files: `WorkOrders.Save.cs`, `WorkOrders.SaveRequest.cs`, and `WorkOrders.SaveResult.cs`.
+
+Acceptance: the employee sees the same outcomes as R1; only internal ownership is clearer.
+
+**Work example:** the new-row test proves both halves: Request creates an Added record; Result replaces the temporary row identity with the saved database identity.
+

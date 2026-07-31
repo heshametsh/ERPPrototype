@@ -339,3 +339,16 @@ A new partial component file, `Components/Pages/WorkOrders.Save.cs`, owns the co
 No business or runtime change is intended. The method and its private save-only helpers are byte-for-byte equivalent after extraction.
 
 Practical example: editing Notes in one order, pasting a full column, moving an order to another year, or adding a temporary row all still follow the same verified workflow. The difference is that developers now find that workflow in one file instead of mixing it with year loading and grid disposal.
+
+## 21. Phase 8.7-R2 — Save Request and Result Boundaries
+
+The verified save journey remains coordinated by `Components/Pages/WorkOrders.Save.cs`, but its business-sensitive preparation and interpretation steps now have separate partial-class owners:
+
+- `WorkOrders.SaveRequest.cs`: converts the dirty/deleted browser delta into added, changed, deleted, and moved-year service inputs. It also owns blank-new-row and assignment-date preparation failures.
+- `WorkOrders.SaveResult.cs`: interprets duplicate/concurrency/service failures, prepares the current-year browser delta, maps temporary rows to database rows, reconciles moved/deleted rows, and creates the final Arabic status text.
+- `WorkOrders.Save.cs`: owns the sequence only—validate, read stream, prepare request, call service, apply interpreted result, record diagnostics.
+
+No service contract, JavaScript API, field-level rule, year-routing rule, message, or performance-stage name is intentionally changed.
+
+Practical example: when the employee pastes Notes into 4,950 orders, request preparation says “4,950 existing rows changed in Notes.” After the service returns, result preparation says “no visible values need rewriting; refresh only the internal row versions and show the success message.” The button workflow coordinates those two facts without rebuilding either one itself.
+

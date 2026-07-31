@@ -146,13 +146,15 @@ const maximumStep = 32;
 - Phase 6.5 — التوثيق والإغلاق: مكتملة.
 - Phase 8.1 إلى Phase 8.5-R2 — فصل الصفحة والتحقق والـClipboard/History والصفوف وتتبع الحقول والحفظ: مكتملة ومختبرة.
 - Phase 8.6-R1 — مالك واحد لدورة حياة الشيت: مكتملة ومختبرة بعد تغيير السنوات والعودة والـResize والتفاعل.
-- Phase 8.6-R2 — مالك واحد لربط تفاعلات الشيت: قيد الاختبار الحالي.
+- Phase 8.6-R2 — مالك واحد لربط تفاعلات الشيت: مكتملة ومختبرة.
+- Phase 8.7-R1 — مالك واحد لرحلة الحفظ في Blazor: مكتملة ومختبرة.
+- Phase 8.7-R2 — فصل تجهيز طلب الحفظ عن تفسير النتيجة: قيد الاختبار الحالي.
 
 ## الخطوة الهندسية التالية
 
-اختبار Phase 8.6-R2 من القسم R في `Documentation/06_REGRESSION_TEST_CHECKLIST.md`.
+اختبار Phase 8.7-R2 من القسم T في `Documentation/06_REGRESSION_TEST_CHECKLIST.md`.
 
-المطلوب بمنطق الشيت: بعد تغيير السنة عدة مرات، يجب أن يظل لكل أمر من المستخدم مسار واحد فقط—سهم واحد، Paste واحد، Undo واحد، قائمة واحدة، وResize واحد. بعد نجاحه نثبت المرحلة ثم ننتقل إلى مراجعة مسار الحفظ والـDirty State.
+المطلوب بمنطق الشيت: تجهيز البيانات يجب أن يحدد هل الصف جديد أو معدل أو محذوف أو منتقل لسنة أخرى. بعد رجوع السيرفر، تفسير النتيجة هو الذي يحدد الصفوف التي تتحدث أو تختفي ورسالة الموظف. النتيجة المرئية يجب أن تظل مطابقة لـPhase 8.7-R1.
 
 لا نضيف إصلاحات كبيرة قبل:
 
@@ -169,3 +171,16 @@ The verified Blazor Save journey now has one file owner: `Components/Pages/WorkO
 Practical example: after pasting Notes into many orders, the same code still validates the sheet, sends only the changed fields, saves them, updates internal row versions, and shows the Arabic result. That complete journey is now separated from opening the page and changing years.
 
 Apply the patch over `Phase8.6-R2-Stable`, build, then run section S of `Documentation/06_REGRESSION_TEST_CHECKLIST.md`. Do not tag the step until runtime testing passes.
+
+## Latest Refactor Step — Phase 8.7-R2
+
+The Save button still follows one journey, but the internal decisions now have clear owners:
+
+- `WorkOrders.SaveRequest.cs` answers: what rows and fields will be sent?
+- `WorkOrders.SaveResult.cs` answers: what did the server decide, what rows reconcile, and what message appears?
+- `WorkOrders.Save.cs` coordinates the order and browser calls.
+
+Practical example: when a new work order is saved, Request classifies it as Added. Result maps its temporary negative Id to the database Id and leaves one visible row.
+
+Apply the patch over `Phase8.7-R1-Stable`, build, then run section T. Do not tag the step until runtime testing passes.
+
