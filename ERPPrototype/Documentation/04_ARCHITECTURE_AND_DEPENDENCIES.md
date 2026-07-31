@@ -21,7 +21,8 @@ UI
 
 Application logic
 - WorkOrderQueryService — read-only sheet queries
-- WorkOrderService — compatibility facade plus save/validation transaction
+- WorkOrderSavePlanBuilder — pure save input normalization and validation
+- WorkOrderService — compatibility facade plus authorized transactional persistence
 - UserManagementService
 
 Data and identity
@@ -131,7 +132,8 @@ Components
 |---|---|
 | Keyboard and viewport behavior | JavaScript grid feature |
 | Fast client validation message | JavaScript |
-| Final field validation | WorkOrderService |
+| Save-input normalization and field validation | WorkOrderSavePlanBuilder |
+| Authorization and transactional save enforcement | WorkOrderService |
 | Permission scope | Server query/service |
 | Uniqueness | Service + Database |
 | Concurrency | Service + RowVersion |
@@ -305,3 +307,47 @@ WorkOrders page
 `WorkOrderQueryService` is read-only and uses `AsNoTracking` projections. It cannot save, decide duplicates, move rows, or open a transaction. `WorkOrderService` retains all mutation authority in R1.
 
 **Work example:** loading 2025 and 2026 is a query concern. Changing Assignment Date so an order moves from 2026 to 2027 is a save concern and therefore remains inside the transactional service.
+
+
+## Phase 8.8-R2A Integration-Test Boundary
+
+The integration suite is a development-only executable and is not a runtime application layer:
+
+```text
+ERPPrototype.IntegrationTests
+        |
+        +--> ProjectReference: ERPPrototype
+        +--> real ApplicationDbContext + SQL Server migrations
+        +--> real WorkOrderService / WorkOrderQueryService
+        +--> random temporary database
+```
+
+The application does not depend on the test project. `ERPPrototype.csproj` removes the test folder from its recursive compile, content, embedded-resource, and none item globs. The test project depends inward on the application, never the reverse.
+
+**Work example:** an Employee from Department A sends a modified row that belongs to Department B. The test calls the service directly, bypassing the browser, and proves the server rejects the request and leaves the database row unchanged.
+
+
+## Phase 8.8-R2 Save-Plan Boundary
+
+The save path now has one pure preparation boundary before database execution:
+
+```text
+Browser save request
+        |
+        +--> WorkOrderSavePlanBuilder
+        |       group new/changed/deleted rows
+        |       normalize changed fields and editable values
+        |       validate field rules and required RowVersion presence
+        |       return plan or early failure
+        |
+        +--> WorkOrderService
+                authorize employee scope
+                global duplicate check + unique index
+                load current rows and enforce RowVersion
+                execute year movement/add/update/delete
+                one transaction + commit/rollback
+```
+
+The builder has no DbContext, SQL query, transaction, logger, or UI dependency. It may reject an invalid request, but it cannot declare a work-order identity globally unique or persist a row.
+
+**Work example:** a Notes-only edit is grouped and normalized by the builder. The service then confirms the employee owns the department and applies the update using the database RowVersion inside the existing transaction.

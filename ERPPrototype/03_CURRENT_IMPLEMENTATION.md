@@ -1,6 +1,6 @@
 # 03 — Current Implementation
 
-**Status:** Phase 8.8-R1 user-tested stable; Phase 8.8-R2 save-plan extraction implemented and awaiting automated 10/10 runtime acceptance  
+**Status:** Phase 8.6-R1 user-tested stable behavior with Phase 8.6-R2 interaction extraction pending focused regression  
 **Review date:** 2026-07-31  
 **Important:** Runtime behavior is based on the current code plus user-generated browser performance reports. This review environment still does not contain .NET SDK, so a local Clean/Rebuild remains required after applying the patch.
 
@@ -18,8 +18,7 @@
 | Current accepted runtime checkpoint | Phase 8.8-R1 user-tested after read-query extraction |
 | Main grid coordinator | `wwwroot/js/tabulatorTest.js` — 2,331 lines after Dirty-State extraction |
 | Work-order markup | `Components/Pages/WorkOrders.razor` — 208 lines |
-| Work-order save service/facade | `Data/WorkOrderService.cs` — about 955 lines after pure save-plan extraction |
-| Work-order save-plan builder | `Data/WorkOrderSavePlanBuilder.cs` — normalization and validation only; no database access |
+| Work-order save service/facade | `Data/WorkOrderService.cs` — unchanged in Phase 8.8-R2A; protected by the new SQL Server integration suite |
 | Work-order read service | `Data/WorkOrderQueryService.cs` — 223 lines |
 | Migrations | 29 files |
 | Runtime code changed in Phase 6.1 | Diagnostics only: `tabulatorPerformance.js` and read-only `tabulatorRangeAutoScroll.snapshot()` |
@@ -38,10 +37,7 @@ WorkOrderService compatibility facade
         |                         |
         | LoadSheetAsync          | SaveChangesAsync
         v                         v
-WorkOrderQueryService       WorkOrderSavePlanBuilder
-        |                         | normalized/validated plan
-        |                         v
-        |                  WorkOrderService save logic
+WorkOrderQueryService       WorkOrderService save logic
         |                         |
         +------------+------------+
                      v
@@ -132,15 +128,15 @@ Database rules:
 
 Current scaling limit:
 
-All rows of the selected year are still transferred to Blazor and JavaScript. This is accepted for the current tested 4,949-row sheet; 10,000 rows remain unverified.
+All rows of the selected year are still transferred to Blazor and JavaScript. This is acceptable for the current 3,000-row prototype only after testing; 10,000 rows remain unverified.
 
 ## 7. Work-Order Saving
 
 Implemented:
 
 - The browser sends dirty rows and deleted rows only.
-- `WorkOrderSavePlanBuilder` normalizes and validates the request before database work.
-- Scope is repeated on the server after the plan succeeds.
+- Server validation is repeated.
+- Scope is repeated on the server.
 - Duplicate checks occur in current changes, SQL query, and Unique Index.
 - Updates and deletes require a valid RowVersion.
 - One transaction covers added, updated, and deleted rows.
@@ -187,8 +183,7 @@ Implemented:
 - ProjectManager operating page.
 - User rename/reset password/activate/deactivate workflows.
 - Admin audit trail.
-- Automated browser tests.
-- A conventional unit-test framework; current pure-plan and SQL integration checks run through the standalone automated runner.
+- Automated unit, integration, or browser tests.
 - Production monitoring and client-side error reporting.
 - Proven 10,000-row strategy.
 - لا يوجد Performance Patch للجلسة الطويلة حاليًا؛ التدهور المقاس مسجل كقيد مراقبة، لكن المستخدم أكد أن سرعة الأسهم وEnter والـWheel مقبولة في الاستخدام الحالي.
@@ -212,7 +207,7 @@ Not performed here:
 - `dotnet restore`
 - `dotnet build`
 - EF migration execution
-- Current R2 SQL integration execution (R2A previously passed 6/6 on the user machine)
+- SQL integration
 - Browser regression tests
 - Azure/network tests
 - NuGet vulnerability scan after restore

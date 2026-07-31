@@ -150,13 +150,14 @@ const maximumStep = 32;
 - Phase 8.7-R1 — مالك واحد لرحلة الحفظ في Blazor: مكتملة ومختبرة.
 - Phase 8.7-R2 — فصل تجهيز طلب الحفظ عن تفسير النتيجة: مكتملة ومختبرة.
 - Phase 8.7-R3 — مالك واحد لحالة Dirty ومصالحة Undo/Redo والحفظ: مكتملة ومختبرة؛ ثلاث فتحات متكررة لـ4,949 صفًا كانت 244ms و208ms و232ms.
-- Phase 8.8-R1 — فصل تنفيذ استعلامات القراءة في `WorkOrderQueryService`: مطبقة وتنتظر الاختبار.
+- Phase 8.8-R1 — فصل تنفيذ استعلامات القراءة في `WorkOrderQueryService`: مكتملة ومختبرة عبر سنوات 5 و2,998 و4,091 و4,949 صفًا.
+- Phase 8.8-R2A — شبكة اختبارات Integration لمسار الحفظ: مطبقة وتنتظر تشغيل 6 اختبارات SQL Server.
 
 ## الخطوة الهندسية التالية
 
-اختبار Phase 8.8-R1 من القسم V في `Documentation/06_REGRESSION_TEST_CHECKLIST.md`.
+تشغيل Phase 8.8-R2A من القسم W في `Documentation/06_REGRESSION_TEST_CHECKLIST.md`.
 
-المطلوب بمنطق الشيت: فتح السنة يجب أن يرجع نفس نطاق الموظف ونفس قائمة السنوات ونفس الصفوف بالترتيب، لكن تنفيذ القراءة أصبح في خدمة مستقلة. الحفظ والتكرار وRowVersion ونقل السنة يجب أن يظلوا مطابقين لـPhase 8.7-Stable.
+المطلوب بمنطق النظام: قبل نقل أي جزء آخر من `WorkOrderService`، يجب إثبات أن السيرفر يمنع التعديل خارج القسم والتكرار العالمي وRowVersion القديم، وينقل السنة، ويحفظ Add/Update/Delete معًا، ويرجع العملية كلها عند فشل قاعدة البيانات.
 
 لا نضيف إصلاحات كبيرة قبل:
 
@@ -194,4 +195,11 @@ Apply the patch over `Phase8.7-R1-Stable`, build, then run section T. Do not tag
 
 Practical example: changing from 2026 to 2025 executes only read queries in Query Service. Editing and saving a 2025 order still enters the existing WorkOrderService transaction.
 
-Apply over `Phase8.7-Stable`, build, then run section V. Do not tag the step until runtime testing passes.
+Phase 8.8-R1 runtime regression passed. The next required gate is the section W integration suite.
+
+
+## Latest Safety Step — Phase 8.8-R2A
+
+`ERPPrototype.IntegrationTests` creates an isolated temporary LocalDB database and calls the real save service directly. It is not compiled into the web application and does not touch the application database.
+
+Run section W. Do not start Phase 8.8-R2 until the final line reports `6/6 passed`.

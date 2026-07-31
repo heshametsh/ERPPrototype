@@ -46,6 +46,7 @@ builder.Services.AddDbContextFactory<ApplicationDbContext>(
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 builder.Services.AddScoped<UserManagementService>();
 builder.Services.AddScoped<WorkOrderQueryService>();
+builder.Services.AddScoped<WorkOrderSavePlanBuilder>();
 builder.Services.AddScoped<WorkOrderService>();
 
 builder.Services.AddIdentityCore<ApplicationUser>(options =>

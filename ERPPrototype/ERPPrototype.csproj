@@ -16,4 +16,12 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="10.0.9" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Keep the standalone integration-test source out of the web project. -->
+    <Compile Remove="ERPPrototype.IntegrationTests/**/*.cs" />
+    <Content Remove="ERPPrototype.IntegrationTests/**/*" />
+    <EmbeddedResource Remove="ERPPrototype.IntegrationTests/**/*" />
+    <None Remove="ERPPrototype.IntegrationTests/**/*" />
+  </ItemGroup>
+
 </Project>

@@ -337,3 +337,68 @@ Run from accepted `Phase8.7-Stable` after applying R1.
 Acceptance: read results and `open.server.*` measurements match Phase 8.7, while every save rule remains unchanged.
 
 **Work example:** opening 2025 reads 2025 rows through Query Service; editing a 2025 Notes cell and saving still uses the existing save transaction.
+
+
+## W. Phase 8.8-R2A — SQL Server Save Integration Safety Net
+
+Run from the ERPPrototype root after applying R2A:
+
+```powershell
+dotnet clean; dotnet build; dotnet run --project .\ERPPrototype.IntegrationTests\ERPPrototype.IntegrationTests.csproj --configuration Release
+```
+
+The runner must create a temporary database whose name begins with `ERPPrototype_IntegrationTests_`; it must not use the application database.
+
+Required PASS scenarios:
+
+1. Employee cannot modify another department.
+2. Global duplicate identity is rejected across departments and years.
+3. Stale RowVersion is rejected.
+4. AssignmentDate routes the work order to the destination year.
+5. Add, update, and delete return a consistent result.
+6. Database failure rolls back the whole save.
+
+Required final output:
+
+```text
+Result: 6/6 passed.
+Phase 8.8-R2A integration safety net: PASS
+```
+
+If any test fails, do not begin Phase 8.8-R2. Re-run the failed test suite with `--keep-database` only when database inspection is needed.
+
+Acceptance: the main application builds, six service/database scenarios pass against real SQL Server semantics, and the temporary database is deleted after the run.
+
+
+## X. Phase 8.8-R2 — Save Plan Extraction Automated Acceptance
+
+Run from the solution folder while the application may remain open in Debug:
+
+```powershell
+dotnet run --project .\ERPPrototype\ERPPrototype.IntegrationTests\ERPPrototype.IntegrationTests.csproj --configuration Release
+```
+
+Required direct save-plan PASS scenarios:
+
+1. Editable fields normalize Arabic/Persian digits and surrounding whitespace.
+2. Completely blank rows are ignored, every distinct `Id == 0` row is preserved, and the latest repeated negative temporary Id wins.
+3. The same persisted Id cannot be changed and deleted in one request.
+4. Existing changed/deleted records without an eight-byte RowVersion are rejected before database execution.
+
+Required SQL Server PASS scenarios remain unchanged:
+
+5. Employee cannot modify another department.
+6. Global duplicate identity is rejected across departments and years.
+7. Stale database RowVersion is rejected.
+8. AssignmentDate routes the work order to the destination year.
+9. Add, update, and delete return one consistent result.
+10. A database failure rolls back the whole save.
+
+Required final output:
+
+```text
+Result: 10/10 passed.
+Phase 8.8-R2 automated save safety net: PASS
+```
+
+Acceptance: the web project builds through the project reference, all ten tests pass against the temporary isolated database, and the database is deleted after the run. No manual browser regression is required for R2 unless an automated test fails or the build reports a runtime-contract change.

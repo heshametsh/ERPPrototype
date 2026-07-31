@@ -1,6 +1,6 @@
 # 09 — Maintainability Refactor Roadmap
 
-**Runtime baseline:** Phase 8.8-R1 accepted after user regression; the Phase 8.8-R2A SQL safety net passed 6/6 before the R2 extraction. Field-level tracking, batch editing, save-result merge, single lifecycle ownership, and single interaction ownership are the current stable behavior.  
+**Runtime baseline:** Phase 8.6-R2 accepted after user regression on 2026-07-31. Field-level tracking, batch editing, save-result merge, single lifecycle ownership, and single interaction ownership are the current stable behavior.  
 **Refactor policy:** incremental extraction, identical runtime behaviour, focused regression after every step, and no rewrite.
 
 ## Refactor Objectives
@@ -120,9 +120,9 @@ Practical example: changing from year 2026 to 2025 disconnects the old sheet thr
 
 **R1 completed and user-tested:** `WorkOrderQueryService` owns read-only employee scope, available-year, and selected-year row queries. Repeated switching across 5, 2,998, 4,091, and 4,949-row years preserved counts, ordering, filters, navigation, Save, and year movement.
 
-**R2A completed and user-tested:** the standalone SQL Server runner passed 6/6 for department scope, global duplicate identity, stale RowVersion, year routing, mixed add/update/delete, and whole-transaction rollback.
+**R2A implemented; runtime suite pending:** a standalone SQL Server integration runner protects six critical save rules before any save code moves. It changes no production behavior.
 
-**R2 implemented; automated acceptance pending:** `WorkOrderSavePlanBuilder` owns input grouping, changed-field normalization, editable-value normalization, field validation, changed/deleted overlap rejection, and required RowVersion presence. `WorkOrderService` still owns authorization, global uniqueness, database RowVersion enforcement, database loading, year movement execution, transaction, persistence, commit, and rollback. The runner now includes four direct plan tests plus the original six SQL scenarios. No further R3/R4 service split is planned before Phase 8.9.
+**R2 planned after R2A PASS:** extract pure input normalization, validation, and save-plan preparation only. Authorization, global uniqueness, RowVersion, database loading, transaction, persistence, commit, and rollback stay together in `WorkOrderService`. No further R3/R4 service split is planned before Phase 8.9.
 
 ### Phase 8.9 — Final Consolidation
 
@@ -211,10 +211,3 @@ Use section W in `06_REGRESSION_TEST_CHECKLIST.md`. This is not a browser regres
 Acceptance requires 6/6 PASS for department scope, global duplicate identity, stale RowVersion, year routing, mixed add/update/delete, and full rollback. Only then may R2 move pure preparation code.
 
 Practical example: R2 must be free to reorganize how changed rows are normalized, but the R2A stale-RowVersion and rollback tests must remain unchanged and pass before and after that extraction.
-
-
-## Phase 8.8-R2 Focus
-
-Run the automated runner from section X in `06_REGRESSION_TEST_CHECKLIST.md`. Acceptance requires 10/10 PASS. The four plan tests prove the extracted pure boundary; the six SQL tests prove that permissions, uniqueness, concurrency, routing, mixed persistence, and rollback remain unchanged.
-
-Practical example: Arabic/Persian identity digits and surrounding whitespace are normalized before a DbContext is created, but whether that identity already exists anywhere in the company is still decided inside the transaction-backed service and the database unique index.
