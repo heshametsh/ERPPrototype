@@ -317,3 +317,23 @@ Run from accepted `Phase8.7-R2-Stable` after applying R3.
 Acceptance: visible values, changed-field scope, Undo/Redo, delete tracking, Save requests, and post-Save zero state match R2. The refactor changes ownership only.
 
 **Work example:** change Notes and Status in one order, then Undo Status only. The sheet must report one unsaved row and Save only Notes; it must not send Status or lose the Notes change.
+
+
+## V. Phase 8.8-R1 — Work Order Read Query Extraction
+
+Run from accepted `Phase8.7-Stable` after applying R1.
+
+1. Build and open the current large year. Confirm branch name, department name, selected year, available-year list, row count, and first/last visible work orders match the stable checkpoint.
+2. Confirm rows remain ordered by `DisplayOrder`, then `Id`; no row jumps or duplicates after opening.
+3. Change to at least two other years, including a very small year when available, then return to the large year. Each selection must produce one sheet initialization and the correct row count.
+4. Confirm the performance report still contains `open.server.create-db-context`, `open.server.scope-query`, `open.server.available-years-query`, `open.server.rows-query`, and `open.server.total`.
+5. Compare three repeated large-year opens with the accepted 4,949-row range (about 208–244 ms in the latest focused test). Investigate only if repeatable opens exceed the 1,750 ms regression limit.
+6. Use search/filter, arrows, Copy/Paste, right-click, and resize after changing year. Read extraction must not disturb browser behavior.
+7. Edit Notes in one existing row and Save. Refresh and confirm persistence; this proves the unchanged `WorkOrderService` facade still reaches the save implementation.
+8. Change Assignment Date to another year and Save when a safe test row is available. Confirm year routing remains transactional and unchanged.
+9. Add and save one row when safe. Confirm duplicate scope and temporary Id mapping remain unchanged.
+10. Confirm Console and server logs contain no DI resolution error for `WorkOrderQueryService`, no red JavaScript error, and no duplicate grid initialization.
+
+Acceptance: read results and `open.server.*` measurements match Phase 8.7, while every save rule remains unchanged.
+
+**Work example:** opening 2025 reads 2025 rows through Query Service; editing a 2025 Notes cell and saving still uses the existing save transaction.

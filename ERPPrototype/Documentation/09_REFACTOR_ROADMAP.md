@@ -114,13 +114,13 @@ Practical example: changing from year 2026 to 2025 disconnects the old sheet thr
 
 **R2 completed and user-tested:** request preparation lives in `WorkOrders.SaveRequest.cs`, result/failure interpretation and row reconciliation live in `WorkOrders.SaveResult.cs`, and `WorkOrders.Save.cs` remains the coordinator. Save, movement, added-row mapping, deletion, and focused performance regression passed.
 
-**R3 implemented; focused regression pending:** `tabulatorDirtyState.js` owns browser original snapshots, dirty row ids, exact changed field keys, deleted saved rows, dirty/deleted Save collection, and accepting/clearing state after Save. The public `tabulatorTest` API and performance stage names remain unchanged.
+**R3 completed and user-tested:** `tabulatorDirtyState.js` owns browser original snapshots, dirty row ids, exact changed field keys, deleted saved rows, dirty/deleted Save collection, and accepting/clearing state after Save. Edit/Undo, small and full-column Paste, structural delete/restore, no-change Save, and post-Save zero-state passed. Three repeated 4,949-row opens were 244 ms, 208 ms, and 232 ms, confirming the earlier 19.2-second reading was an isolated development-session event.
 
 ### Phase 8.8 — WorkOrderService Split
 
-- Separate read/query responsibilities from save/validation responsibilities.
-- Preserve transaction boundaries, uniqueness rules, role scope, and measured
-  query behaviour.
+**R1 implemented; focused regression pending:** `WorkOrderQueryService` owns read-only employee scope, available-year, and selected-year row queries. `WorkOrderService.LoadSheetAsync` remains as a compatibility facade so the page contract does not change in the same patch. Save validation, duplicate checks, transaction boundaries, concurrency, and persistence remain in `WorkOrderService`.
+
+Later Phase 8.8 steps may split save validation and persistence only after R1 runtime regression passes.
 
 ### Phase 8.9 — Final Consolidation
 
@@ -193,3 +193,10 @@ Practical example: request preparation must classify a newly inserted row as Add
 Use section U in `06_REGRESSION_TEST_CHECKLIST.md`. Acceptance requires Dirty State to match visible values through edit, partial Undo, Paste, Redo, insert, delete/restore, moved-year Save, failed duplicate Save, and successful Save.
 
 Practical example: after editing Notes and Status, undoing Status must leave one dirty row with only `notes` in its changed-field list. A successful Save must install the returned row version as the new baseline and clear the unsaved count.
+
+
+## Phase 8.8-R1 Focus
+
+Prove that extracting the read implementation does not change what the employee receives. Open the current year, switch between at least three years, return to the large year, and compare row counts, branch/department labels, year list, row order, and the existing `open.server.*` performance stages. Then save one safe edit to prove the unchanged facade still reaches the save path.
+
+Acceptance: the page continues to call `WorkOrderService.LoadSheetAsync`, but the implementation is delegated once to `WorkOrderQueryService`; each year opens once, rows remain ordered by DisplayOrder then Id, and no save rule or transaction behavior changes.

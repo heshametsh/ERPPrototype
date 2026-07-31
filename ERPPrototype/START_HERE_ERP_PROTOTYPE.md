@@ -149,13 +149,14 @@ const maximumStep = 32;
 - Phase 8.6-R2 — مالك واحد لربط تفاعلات الشيت: مكتملة ومختبرة.
 - Phase 8.7-R1 — مالك واحد لرحلة الحفظ في Blazor: مكتملة ومختبرة.
 - Phase 8.7-R2 — فصل تجهيز طلب الحفظ عن تفسير النتيجة: مكتملة ومختبرة.
-- Phase 8.7-R3 — مالك واحد لحالة الصفوف والحقول غير المحفوظة في المتصفح: قيد الاختبار الحالي.
+- Phase 8.7-R3 — مالك واحد لحالة Dirty ومصالحة Undo/Redo والحفظ: مكتملة ومختبرة؛ ثلاث فتحات متكررة لـ4,949 صفًا كانت 244ms و208ms و232ms.
+- Phase 8.8-R1 — فصل تنفيذ استعلامات القراءة في `WorkOrderQueryService`: مطبقة وتنتظر الاختبار.
 
 ## الخطوة الهندسية التالية
 
-اختبار Phase 8.7-R3 من القسم U في `Documentation/06_REGRESSION_TEST_CHECKLIST.md`.
+اختبار Phase 8.8-R1 من القسم V في `Documentation/06_REGRESSION_TEST_CHECKLIST.md`.
 
-المطلوب بمنطق الشيت: عند تعديل خلية، لصق نطاق، Undo/Redo، إدراج صف أو حذفه، يجب أن توجد جهة واحدة تعرف الصفوف والحقول غير المحفوظة. بعد نجاح الحفظ تقبل نتيجة السيرفر كنسخة أصلية جديدة وتمسح حالة Dirty مرة واحدة، بدون تغيير القيم أو رسائل الحفظ.
+المطلوب بمنطق الشيت: فتح السنة يجب أن يرجع نفس نطاق الموظف ونفس قائمة السنوات ونفس الصفوف بالترتيب، لكن تنفيذ القراءة أصبح في خدمة مستقلة. الحفظ والتكرار وRowVersion ونقل السنة يجب أن يظلوا مطابقين لـPhase 8.7-Stable.
 
 لا نضيف إصلاحات كبيرة قبل:
 
@@ -187,10 +188,10 @@ Apply the patch over `Phase8.7-R1-Stable`, build, then run section T. Do not tag
 
 
 
-## Latest Refactor Step — Phase 8.7-R3
+## Latest Refactor Step — Phase 8.8-R1
 
-`wwwroot/js/tabulatorDirtyState.js` now owns browser change tracking: original snapshots, dirty row ids, changed field keys, deleted saved rows, save-delta row collection, and accepting a successful Save as the new baseline.
+`WorkOrderQueryService` now owns the read-only journey for employee scope, available years, and selected-year work-order rows. The page still calls `WorkOrderService.LoadSheetAsync`; that method delegates to Query Service so the UI contract is unchanged.
 
-Practical example: editing Notes marks only that row and field. Undoing it back to the saved value removes the row from the unsaved count. After Save succeeds, the returned row version becomes the new baseline and the unsaved count returns to zero.
+Practical example: changing from 2026 to 2025 executes only read queries in Query Service. Editing and saving a 2025 order still enters the existing WorkOrderService transaction.
 
-Apply the patch over `Phase8.7-R2-Stable`, build, then run section U. Do not tag the step until runtime testing passes.
+Apply over `Phase8.7-Stable`, build, then run section V. Do not tag the step until runtime testing passes.

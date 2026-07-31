@@ -20,7 +20,8 @@ UI
 - Tabulator JavaScript
 
 Application logic
-- WorkOrderService
+- WorkOrderQueryService — read-only sheet queries
+- WorkOrderService — compatibility facade plus save/validation transaction
 - UserManagementService
 
 Data and identity
@@ -112,7 +113,7 @@ Components
 
 - نقل عمليات الفرع من `AdminPanel.razor` إلى `BranchManagementService`.
 - استكمال `UserManagementService` بدل كتابة إدارة الحسابات داخل Razor.
-- إبقاء WorkOrderService هو مدخل أوامر العمل من UI.
+- إبقاء `WorkOrderService` كواجهة توافق مؤقتة للصفحة، مع نقل تنفيذ القراءة إلى `WorkOrderQueryService` تدريجيًا وعدم تغيير عقد الصفحة والحفظ في نفس الخطوة.
 - عدم وضع قواعد صلاحيات أو uniqueness في JavaScript فقط.
 
 ## 7. Database Boundaries
@@ -282,3 +283,25 @@ Successful Save result
 `tabulatorDirtyState.js` does not decide validation, uniqueness, authorization, year routing, database persistence, Arabic messages, or how Undo/Redo values are applied. It records the resulting data state only.
 
 **Work example:** Clipboard/History may restore 4,950 Notes values, but it does not manually maintain a second unsaved-row list. It applies the values, then Dirty State compares the affected field against the accepted baseline and decides which rows remain unsaved.
+
+
+## Phase 8.8-R1 Read/Write Boundary
+
+The first service split is deliberately asymmetric and keeps the verified UI contract stable:
+
+```text
+WorkOrders page
+      |
+      +--> WorkOrderService.LoadSheetAsync (compatibility facade)
+      |               |
+      |               +--> WorkOrderQueryService
+      |                       employee scope + available years + rows
+      |
+      +--> WorkOrderService.SaveChangesAsync
+                      authorization + validation + uniqueness
+                      transaction + concurrency + persistence
+```
+
+`WorkOrderQueryService` is read-only and uses `AsNoTracking` projections. It cannot save, decide duplicates, move rows, or open a transaction. `WorkOrderService` retains all mutation authority in R1.
+
+**Work example:** loading 2025 and 2026 is a query concern. Changing Assignment Date so an order moves from 2026 to 2027 is a save concern and therefore remains inside the transactional service.

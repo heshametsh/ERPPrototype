@@ -237,3 +237,14 @@
 **Business example:** after changing Notes and then undoing to the stored text, the order must stop appearing as unsaved. After a successful Save, the server row version—not the pre-save browser version—must become the new comparison baseline.
 
 **Constraint:** R3 does not change field definitions, validation, uniqueness, year routing, service calls, database writes, Arabic messages, Undo/Redo algorithms, or performance-stage names. It does not add autosave or persistence for Undo history across refresh.
+
+
+## 2026-07-31 — Split Read Queries Before Save Mutations
+
+**Decision:** Phase 8.8-R1 moves the implementation of `LoadSheetAsync` to a scoped `WorkOrderQueryService`, while retaining forwarding overloads on `WorkOrderService` for compatibility.
+
+**Reason:** the read path has a clean, read-only boundary—employee scope, available years, and selected-year projection—and does not need the mutation transaction. Extracting it first reduces the 1,395-line service without mixing the change with global uniqueness, RowVersion, deletes, or database writes.
+
+**Business example:** opening another year should only read the employee's department and return rows in sheet order. It must not instantiate save rules or alter any work order.
+
+**Constraint:** R1 preserves query filters, projection, ordering, performance stage names, and the existing page call. No save method, validation rule, transaction boundary, uniqueness scope, or database schema is changed.

@@ -15,10 +15,11 @@
 | Database | SQL Server / LocalDB in Development |
 | ORM | EF Core 10.0.9 |
 | Grid | Tabulator 6.5.0 |
-| Grid stable checkpoint | `Phase8.6-R1-Stable` after repeated year-switch, navigation, wheel, clipboard, structure, and save regression |
-| Main grid coordinator | `wwwroot/js/tabulatorTest.js` — 2,627 lines after Phase 8.6-R2 extraction |
-| Work-order page | `Components/Pages/WorkOrders.razor` — 1,071 lines |
-| Work-order service | `Data/WorkOrderService.cs` — 953 lines |
+| Current stable checkpoint | `Phase8.7-Stable` after lifecycle, interaction, save-boundary, and Dirty-State regression |
+| Main grid coordinator | `wwwroot/js/tabulatorTest.js` — 2,331 lines after Dirty-State extraction |
+| Work-order markup | `Components/Pages/WorkOrders.razor` — 208 lines |
+| Work-order save service/facade | `Data/WorkOrderService.cs` — 1,230 lines after Phase 8.8-R1 |
+| Work-order read service | `Data/WorkOrderQueryService.cs` — 223 lines |
 | Migrations | 29 files |
 | Runtime code changed in Phase 6.1 | Diagnostics only: `tabulatorPerformance.js` and read-only `tabulatorRangeAutoScroll.snapshot()` |
 
@@ -29,13 +30,18 @@ Browser / Tabulator
         |
         | JavaScript Interop
         v
-WorkOrders.razor
+WorkOrders component
         |
         v
-WorkOrderService
-        |
-        v
-ApplicationDbContext / EF Core
+WorkOrderService compatibility facade
+        |                         |
+        | LoadSheetAsync          | SaveChangesAsync
+        v                         v
+WorkOrderQueryService       WorkOrderService save logic
+        |                         |
+        +------------+------------+
+                     v
+          ApplicationDbContext / EF Core
         |
         v
 SQL Server
@@ -110,7 +116,7 @@ Database rules:
 
 ## 6. Work-Order Loading
 
-`WorkOrderService.LoadSheetAsync`:
+`WorkOrderQueryService.LoadSheetAsync` (reached through the unchanged `WorkOrderService.LoadSheetAsync` facade):
 
 - Validates the year range 2000–2100.
 - Confirms that the user is active, has changed the temporary password, has role Employee, and has a department.
@@ -368,3 +374,16 @@ The module now owns original snapshots, `dirtyRowIds`, `changedFieldsByRow`, `de
 `tabulatorLifecycle.js` still owns when a grid instance is created or destroyed, but asks Dirty State to construct the change-tracking portion of that instance. `tabulatorTest.js` still coordinates streamed Save and applies server row mutations, but asks Dirty State to replace the comparison baseline and clear unsaved sets.
 
 Practical example: changing Notes marks one row with `changedFields = ["notes"]`. Undoing back to the stored text removes that row from Dirty State. Saving successfully replaces the old row version with the server row version and clears the unsaved count.
+
+
+## 23. Phase 8.8-R1 — Read Query Service
+
+Implemented in the current patch:
+
+- `Data/WorkOrderQueryService.cs` owns the read-only employee scope query, available-year query, and selected-year row projection.
+- `Program.cs` registers the new scoped query service.
+- The existing `WorkOrderService.LoadSheetAsync` overloads remain available and delegate to the query service, so `WorkOrders.razor` and its code-behind do not change in R1.
+- Existing performance stage names remain `open.server.create-db-context`, `open.server.scope-query`, `open.server.available-years-query`, `open.server.rows-query`, and `open.server.total`.
+- `WorkOrderService.SaveChangesAsync`, global uniqueness checks, authorization for mutation, transactions, RowVersion concurrency, field-level validation, and result mapping remain unchanged.
+
+Practical example: when an employee opens 2026, the query service verifies the employee scope and returns only that department/year ordered by DisplayOrder then Id. Pressing Save still enters the original save implementation and transaction.
