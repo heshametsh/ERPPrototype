@@ -1,7 +1,7 @@
 # 06 — Regression Test Checklist
 
-**Status:** Mandatory after any grid/runtime change  
-**Stable checkpoint:** `M5D4R3-Stable-Range-UX` (E6C foundation)  
+**Status:** Mandatory after any grid/runtime change
+**Stable checkpoint:** `M5D4R3-Stable-Range-UX` (E6C foundation)
 **Rule:** لا ننتقل للخطوة التالية إذا فشل اختبار أساسي.
 
 ## A. Before Testing
@@ -188,7 +188,7 @@ Decision: Accept / Roll back / Investigate
 
 ## Simple Example
 
-بعد تعديل Resize لا يكفي أن نجرب التصغير فقط.  
+بعد تعديل Resize لا يكفي أن نجرب التصغير فقط.
 لأن Resize يشترك مع Lifecycle والتحديد، نختبر أيضًا الأسهم وتغيير السنة. مثل تغيير باب السيارة: يجب التأكد أن الزجاج والقفل ما زالا يعملان، وليس أن الباب يغلق فقط.
 
 
@@ -344,7 +344,7 @@ Acceptance: read results and `open.server.*` measurements match Phase 8.7, while
 Run from the ERPPrototype root after applying R2A:
 
 ```powershell
-dotnet clean; dotnet build; dotnet run --project .\ERPPrototype.IntegrationTests\ERPPrototype.IntegrationTests.csproj --configuration Release
+dotnet run --project .\ERPPrototype.IntegrationTests\ERPPrototype.IntegrationTests.csproj --configuration Release
 ```
 
 The runner must create a temporary database whose name begins with `ERPPrototype_IntegrationTests_`; it must not use the application database.
@@ -402,3 +402,36 @@ Phase 8.8-R2 automated save safety net: PASS
 ```
 
 Acceptance: the web project builds through the project reference, all ten tests pass against the temporary isolated database, and the database is deleted after the run. No manual browser regression is required for R2 unless an automated test fails or the build reports a runtime-contract change.
+
+
+## Y. Phase 8.9 — Automated Final Closure
+
+Phase 8.9 changes documentation and engineering tools only. From the project folder run:
+
+```powershell
+.\Tools\Invoke-Phase8Closure.ps1
+```
+
+From the solution folder, where the project is inside `ERPPrototype`, run:
+
+```powershell
+.\ERPPrototype\Tools\Invoke-Phase8Closure.ps1
+```
+
+The workflow must:
+
+1. Remove local build output and obsolete duplicate root files.
+2. Build the test project in Release, which also builds the web project.
+3. Check all project-owned JavaScript files with `node --check` when Node.js is installed.
+4. Run the 10 direct/SQL save tests against a temporary isolated database.
+5. Confirm Git does not track generated or machine-local files when a `.git` folder is available.
+6. Create a clean source ZIP excluding `bin`, `obj`, `.vs`, binaries, publish output, local settings, and nested ZIP files.
+
+Required final output:
+
+```text
+Phase 8.9 automated verification: PASS
+Phase 8.9 closure workflow: PASS
+```
+
+No new manual grid regression is required because Phase 8.9 changes no production C#, Razor, JavaScript, migration, database rule, or UI behavior. If any production file is modified while resolving a failure, rerun the focused checklist for that owner before closure.

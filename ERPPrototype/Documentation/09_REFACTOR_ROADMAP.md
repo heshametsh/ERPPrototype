@@ -1,6 +1,6 @@
 # 09 — Maintainability Refactor Roadmap
 
-**Runtime baseline:** Phase 8.8-R1 accepted after user regression; the Phase 8.8-R2A SQL safety net passed 6/6 before the R2 extraction. Field-level tracking, batch editing, save-result merge, single lifecycle ownership, and single interaction ownership are the current stable behavior.  
+**Runtime baseline:** Phase 8.8-R2 accepted after the automated runner passed 10/10. Field-level tracking, batch editing, save-result merge, lifecycle ownership, interaction ownership, read-query separation, and save-plan separation are stable.
 **Refactor policy:** incremental extraction, identical runtime behaviour, focused regression after every step, and no rewrite.
 
 ## Refactor Objectives
@@ -122,14 +122,22 @@ Practical example: changing from year 2026 to 2025 disconnects the old sheet thr
 
 **R2A completed and user-tested:** the standalone SQL Server runner passed 6/6 for department scope, global duplicate identity, stale RowVersion, year routing, mixed add/update/delete, and whole-transaction rollback.
 
-**R2 implemented; automated acceptance pending:** `WorkOrderSavePlanBuilder` owns input grouping, changed-field normalization, editable-value normalization, field validation, changed/deleted overlap rejection, and required RowVersion presence. `WorkOrderService` still owns authorization, global uniqueness, database RowVersion enforcement, database loading, year movement execution, transaction, persistence, commit, and rollback. The runner now includes four direct plan tests plus the original six SQL scenarios. No further R3/R4 service split is planned before Phase 8.9.
+**R2 completed and automated acceptance passed 10/10:** `WorkOrderSavePlanBuilder` owns input grouping, changed-field normalization, editable-value normalization, field validation, changed/deleted overlap rejection, and required RowVersion presence. `WorkOrderService` still owns authorization, global uniqueness, database RowVersion enforcement, database loading, year movement execution, transaction, persistence, commit, and rollback. The runner now includes four direct plan tests plus the original six SQL scenarios. No further R3/R4 service split is planned before Phase 8.9.
 
-### Phase 8.9 — Final Consolidation
+### Phase 8.9 — Final Consolidation — CURRENT CLOSURE STEP
 
-- Remove obsolete comments and dead experimental paths proven unused.
-- Run the full Work Orders regression checklist.
-- Compare key performance scenarios with the verified Phase 7 baseline.
-- Create the stable Git checkpoint only after all tests pass.
+- Remove generated build output, machine-local files, duplicate root documentation, and obsolete patch README files from deliverable archives.
+- Keep historical engineering evidence inside `Documentation` rather than as competing root files.
+- Run one Release build plus the 10 automated save tests.
+- Check project-owned JavaScript syntax when Node.js is available.
+- Create a source-only archive that excludes `bin`, `obj`, `.vs`, binaries, publish output, and nested ZIP files.
+- Do not perform another WorkOrderService split. After PASS, close Phase 8 and return to product features.
+
+Phase 8.9 intentionally changes no production behavior, so prior accepted browser/performance evidence remains valid. A new manual grid tour is required only if the automated build/tests fail or a production file is changed during closure.
+
+## Refactor Stop Rule After Phase 8
+
+After Phase 8.9 passes, maintainability refactoring stops. New extraction work is allowed only when a feature or measured defect demonstrates a concrete ownership, testability, or performance problem. The next planned work is permissions/account management, Import/Export, warehouse, and invoices.
 
 ## Rules for Every Refactor Patch
 

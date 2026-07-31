@@ -1,7 +1,7 @@
 # 03 — Current Implementation
 
-**Status:** Phase 8.8-R1 user-tested stable; Phase 8.8-R2 save-plan extraction implemented and awaiting automated 10/10 runtime acceptance  
-**Review date:** 2026-07-31  
+**Status:** Phase 8.8-R2 accepted after 10/10 automated tests; Phase 8.9 closure tooling prepared with no production behavior change
+**Review date:** 2026-07-31
 **Important:** Runtime behavior is based on the current code plus user-generated browser performance reports. This review environment still does not contain .NET SDK, so a local Clean/Rebuild remains required after applying the patch.
 
 ## 1. Snapshot
@@ -15,7 +15,7 @@
 | Database | SQL Server / LocalDB in Development |
 | ORM | EF Core 10.0.9 |
 | Grid | Tabulator 6.5.0 |
-| Current accepted runtime checkpoint | Phase 8.8-R1 user-tested after read-query extraction |
+| Current accepted runtime checkpoint | Phase 8.8-R2 accepted after 10/10 automated save tests |
 | Main grid coordinator | `wwwroot/js/tabulatorTest.js` — 2,331 lines after Dirty-State extraction |
 | Work-order markup | `Components/Pages/WorkOrders.razor` — 208 lines |
 | Work-order save service/facade | `Data/WorkOrderService.cs` — about 955 lines after pure save-plan extraction |
@@ -228,7 +228,7 @@ Not performed here:
 
 ## 12. Simple Example
 
-**Why is server validation repeated when JavaScript already validates?**  
+**Why is server validation repeated when JavaScript already validates?**
 JavaScript is like the receptionist checking a form quickly. The server is the locked records room. Even if someone bypasses the receptionist, the records room must still reject an invalid or unauthorized form.
 
 
@@ -406,4 +406,26 @@ Implemented in the current patch:
 
 Practical example: the rollback test sends normal updates plus a new row, then forces one SQL constraint failure. The test passes only when no update and no added row remains in the database.
 
-Runtime status: implementation complete; all six scenarios must pass before Phase 8.8-R2 begins.
+Runtime status: accepted on the developer machine with 6/6 PASS before the R2 extraction.
+
+
+## 25. Phase 8.8-R2 — Save Plan Builder
+
+- `Data/WorkOrderSavePlanBuilder.cs` owns deterministic input grouping, digit/text normalization, editable-field validation, changed/deleted overlap rejection, and required RowVersion presence.
+- `WorkOrderService` still owns authorization, global duplicate checks, database RowVersion enforcement, loading entities, year routing execution, add/update/delete persistence, one transaction, commit, rollback, and database error mapping.
+- The automated runner contains four direct plan tests plus the original six SQL Server scenarios.
+- The user confirmed the final result `10/10 passed`; no browser regression was required because R2 changed no page, JavaScript, query shape, migration, or visible behavior.
+
+Practical example: the builder can reject a saved row missing RowVersion before opening a DbContext, while the service remains the only place that verifies the actual database RowVersion and commits the transaction.
+
+
+## 26. Phase 8.9 — Final Closure Candidate
+
+Phase 8.9 changes documentation and engineering tools only. It adds:
+
+- `Tools/Invoke-Phase8Verification.ps1` for Release build, optional JavaScript syntax checks, and the 10 automated save tests.
+- `Tools/Remove-LocalBuildArtifacts.ps1` for local `bin/obj/.vs` and machine-file cleanup.
+- `Tools/New-CleanProjectArchive.ps1` for a source-only ZIP that excludes build output and binaries.
+- `Tools/Invoke-Phase8Closure.ps1` to run cleanup, verification, and clean archive creation in one command.
+
+No production C#, Razor, JavaScript, migration, database rule, or UI behavior changes in Phase 8.9. Acceptance requires the closure script to report PASS.

@@ -1,10 +1,10 @@
-# START HERE — ERP Prototype (Current Stable Checkpoint)
+# START HERE — ERP Prototype
 
-**الحالة:** مرجع البدء الحالي  
-**آخر تحديث:** 2026-07-31  
-**الأساس الهندسي:** Step 16E6C  
-**نقطة الكود المستقرة الحالية:** Phase 8.6-R1 Stable؛ Phase 8.6-R2 قيد الاختبار  
-**جاهزية الإنتاج:** غير جاهز لعميل حقيقي حتى اجتياز اختبارات الأمان والأداء والنشر والتجربة داخل شبكة الشركة
+**الحالة:** مرجع البدء الحالي
+**آخر تحديث:** 2026-07-31
+**نقطة الكود المقبولة:** `Phase 8.8-Stable`
+**الخطوة الحالية:** `Phase 8.9` إغلاق وتنظيف آلي بدون تغيير سلوك المنتج
+**جاهزية الإنتاج:** غير جاهز لعميل حقيقي قبل استكمال الصلاحيات والتشغيل والأمان والنسخ الاحتياطي واختبارات الشبكة
 
 ## اقرأ بالترتيب
 
@@ -12,194 +12,103 @@
 2. `Documentation/01_PROJECT_CONTEXT.md`
 3. `Documentation/03_CURRENT_IMPLEMENTATION.md`
 4. `Documentation/05_WORK_ORDERS_GRID_BEHAVIOUR.md`
-5. `Documentation/06_REGRESSION_TEST_CHECKLIST.md`
-6. `Documentation/07_KNOWN_ISSUES_AND_TECHNICAL_DEBT.md`
-7. `Documentation/09_REFACTOR_ROADMAP.md`
-8. `Documentation/14_CHANGE_SUMMARY_2026-07-29_PHASE6_CLOSURE.md`
+5. `Documentation/07_KNOWN_ISSUES_AND_TECHNICAL_DEBT.md`
+6. `Documentation/10_RELEASE_READINESS_PLAN.md`
 
 ## ما هو المشروع؟
 
-نظام ويب لمتابعة عمليات شركات المقاولات التي تعمل مع الشركة السعودية للكهرباء أو جهات مشابهة.
-النظام لا يستبدل SAP أو UDS؛ الموظف ينفذ العمل الرسمي هناك، ثم يحدث بيانات المتابعة داخل نظامنا حتى تستطيع الشركة متابعة أوامر العمل والتأخير والإنتاجية والمراحل المالية من مكان واحد بدل ملفات Excel المتفرقة.
+نظام ويب لمتابعة أعمال شركات المقاولات المتعاملة مع الشركة السعودية للكهرباء أو جهات مشابهة. النظام لا يستبدل الأنظمة الرسمية؛ بل يجمع المتابعة الداخلية لأوامر العمل والمراحل والتأخير والإنتاجية بدل ملفات Excel المتفرقة.
 
 ## التقنية الموجودة فعليًا
 
-- Blazor Web App بنمط Interactive Server
-- ASP.NET Core Identity
-- Entity Framework Core
-- SQL Server محليًا وAzure SQL عند النشر
-- Azure App Service
-- Tabulator 6.5.0 لشيت أوامر العمل
-- Modular Monolith تدريجي داخل مشروع واحد قابل للنشر
+- Blazor Web App بنمط Interactive Server.
+- ASP.NET Core Identity.
+- Entity Framework Core 10 وSQL Server/LocalDB/Azure SQL.
+- Tabulator 6.5 لشيت أوامر العمل.
+- Modular Monolith تدريجي داخل مشروع واحد.
 
-لا توجد Syncfusion في التنفيذ الحالي لشيت أوامر العمل.
-وثائق Power Apps/Dataverse القديمة مؤرشفة ولا تمثل الاتجاه الحالي.
+لا توجد Syncfusion في تنفيذ شيت أوامر العمل الحالي، وخطة Power Apps القديمة ليست الاتجاه الحالي.
 
-## القرار التشغيلي للعملاء
+## أهم قواعد أوامر العمل
 
-في الإصدارات التجارية الأولى:
+- الزوج `WorkOrderNumber + WorkTypeCode` فريد عالميًا عبر الشركة وكل السنوات.
+- فهرس القراءة يعتمد على `DepartmentId + WorkYear + DisplayOrder`.
+- موظف القسم يعدّل داخل قسمه فقط.
+- `RowVersion` يمنع الكتابة فوق تعديل أحدث.
+- الحفظ يدعم الإضافة والتعديل والحذف ونقل السنة داخل Transaction واحدة.
+- حذف أمر مرتبط بموديول آخر سيُمنع عند تنفيذ تلك الموديولات.
 
-- كل شركة عميلة لها نسخة تطبيق مستقلة.
-- كل شركة لها قاعدة بيانات مستقلة.
-- الإعدادات والمستخدمون والأسرار والنسخ الاحتياطية مستقلة.
-- نفس مصدر الكود يستخدم لكل العملاء.
-- لا نبني Shared-Database Multi-Tenancy الآن.
-- لا نستخدم Microservices أو ABP Framework في البروتوتايب الحالي.
+## ما الذي يعمل الآن؟
 
-## أهم أولوية
+- تسجيل الدخول دون تسجيل عام.
+- حساب Admin واحد وأدوار `ProjectManager` و`BranchManager` و`Employee`.
+- إنشاء الفروع والأقسام الأربعة الثابتة.
+- شيت أوامر العمل لموظف القسم حسب السنة.
+- التعديل المباشر، البحث، الفلاتر، Copy/Paste، إدراج وحذف الصفوف، Undo/Redo، والحفظ التفاضلي.
+- منع التكرار العالمي، اكتشاف تعارض الجلسات، ونقل الأمر للسنة المطابقة لتاريخ الإسناد.
+- فصل وحدات JavaScript الكبيرة إلى مالكي Validation وHistory وStructure وLifecycle وInteractions وDirty State.
+- فصل قراءة السيرفر في `WorkOrderQueryService`.
+- فصل التطبيع والتحقق وتجهيز الحفظ في `WorkOrderSavePlanBuilder`.
+- 10 اختبارات آلية لمسار الحفظ على قاعدة SQL Server مؤقتة ومعزولة.
 
-شاشة أوامر العمل يجب أن تكون قريبة جدًا من Excel:
+## ما الذي لم يكتمل كمنتج؟
 
-- تعديل مباشر داخل الخلية.
-- تنقل بالكيبورد.
-- تحديد نطاقات خلايا.
-- Copy/Paste مع Excel.
-- إدراج وحذف صفوف.
-- مسح محتوى الخلايا بزر Delete/Backspace بدون حذف الصفوف.
-- Undo/Redo داخل الجلسة.
-- بحث وفلاتر.
-- أداء مقبول مع آلاف الصفوف.
+- صفحات وصلاحيات التشغيل الكاملة لـBranchManager وProjectManager.
+- إدارة حسابات الفرع وإعادة تعيين كلمة المرور.
+- Excel Import/Export.
+- المستودع والفواتير والمراحل المالية.
+- Dashboard والتقارير النهائية.
+- Audit Log وClient error reporting والنسخ الاحتياطي ومراجعة إعدادات Production.
+- اختبارات متصفح آلية للرحلات الرئيسية واختبار 10,000 صف وشبكة الشركة.
 
-## ما الذي يعمل حاليًا؟
+## حالة التنظيم
 
-- تسجيل الدخول بدون تسجيل عام.
-- Admin واحد.
-- أسماء الأدوار التقنية الحالية: `Admin` و`ProjectManager` و`BranchManager` و`Employee`. اسم العرض الوظيفي لـ`Employee` هو **Department Employee / موظف القسم**، ولا نعيد تسمية الـRole التقني الآن.
-- إنشاء فروع وأقسامها الأربعة الثابتة.
-- شيت أوامر العمل لموظف القسم داخل نطاقه فقط.
-- سنوات عمل منفصلة.
-- تعديل، بحث، فلاتر، نسخ ولصق، إدراج وحذف صفوف، Undo/Redo وحفظ Delta.
-- فحص كل حالات التكرار العالمية للزوج `WorkOrderNumber + WorkTypeCode` عبر السنوات والأقسام، وإظهارها مرتبة حسب صف الشيت.
-- RowVersion لاكتشاف تعارض التعديل بين جلستين.
-- حفظ هوية الصفوف الجديدة في مكانها بعد الحفظ بدل حذفها وإعادة إدراجها.
-- مسح كامل نطاق الخلايا المحدد، حتى عندما يمتد عبر صفوف خرجت من الجزء الظاهر بسبب Virtual DOM.
-- رسائل التحقق تبدأ من أول صف متأثر وتتحرك بالترتيب.
-- Auto-scroll أثناء سحب تحديد الخلايا عند حافتي الشيت، ويعمل عند بدء التحديد من الصف الأول أو من منتصف الشيت.
+- Phase 8.1–8.7: فصل الصفحة، التحقق، History، Structure، Lifecycle، Interactions، رحلة الحفظ، وDirty State — مكتملة ومختبرة.
+- Phase 8.8-R1: فصل استعلامات القراءة — مكتملة ومختبرة.
+- Phase 8.8-R2A: شبكة أمان SQL Server — مكتملة ونجحت 6/6.
+- Phase 8.8-R2: فصل Save Plan — مكتملة ونجحت الشبكة الموسعة 10/10.
+- لا توجد R3 أو R4 إضافية لـ`WorkOrderService` الآن. أي Refactor جديد يحتاج مشكلة فعلية مثبتة.
 
-## نقطة الاستقرار الحالية — M5D4R3
+## إغلاق Phase 8.9
 
-النقطة الحالية مبنية على:
+من داخل مجلد المشروع شغّل أمرًا واحدًا:
 
-- E6C كأساس سلوك التنقل والـVirtual DOM وتثبيت موضع الشيت.
-- M1 إلى M4 لفصل التشخيص ودورة الحياة والتتبع الهيكلي والإدراج والحذف التدريجي.
-- M5A وM5B لتوحيد ملكية Copy/Paste.
-- M5C2 لحفظ هوية الصفوف الجديدة في مكانها.
-- M5C3 لاكتشاف كل التكرارات عبر السنوات والأقسام.
-- M5D2 لمسح النطاق المنطقي الكامل بزر Delete/Backspace.
-- M5D3 لترتيب التحقق من أول صف متأثر.
-- M5D4R1 لإصلاح Auto-scroll عند بدء التحديد من الصف الأول.
-- ضبط السرعة النهائي في `tabulatorRangeAutoScroll.js`:
-
-```javascript
-const minimumStep = 8;
-const maximumStep = 32;
+```powershell
+.\Tools\Invoke-Phase8Closure.ps1
 ```
 
-تم اختبار السلوك يدويًا واعتماده بواسطة المستخدم.
+الأمر يقوم بالآتي:
 
-## ما الذي لا يعمل كمنتج كامل بعد؟
+1. يحذف نواتج البناء وملفات الجهاز المحلية.
+2. يبني التطبيق ومشروع الاختبارات بوضع Release.
+3. يفحص Syntax لملفات JavaScript إذا كان Node.js متاحًا.
+4. يشغّل اختبارات الحفظ العشرة على قاعدة مؤقتة.
+5. ينشئ ZIP مصدر نظيفًا يستبعد `bin/obj/.vs` والبinaries.
 
-- شاشة تشغيل Branch Manager غير مكتملة.
-- ProjectManager ما زال محدود الوظائف.
-- إدارة أسماء المستخدمين وإعادة تعيين كلمات المرور غير مكتملة بالكامل.
-- Excel Import/Export غير منفذين.
-- Dashboard غير منفذ.
-- Warehouse والفواتير غير منفذين.
-- لا توجد Automated Tests كافية.
-- القياسات أثبتت تدهورًا تدريجيًا في التنقل بعد ضغط مستمر طويل، لكن المستخدم أكد أن السرعة العملية الحالية للأسهم وEnter والـWheel مقبولة؛ لذلك لا يوجد Performance Patch حاليًا، ويعاد فتح الموضوع عند اختبار 10,000 صف أو ظهور شكوى استخدام فعلية.
-- أداء حذف صفوف محفوظة أثناء مصالحة الحفظ يحتاج تحسينًا منفصلًا لاحقًا.
-- اختبار 10,000 صف، شبكة الشركة، Azure، وإعادة الاتصال ما زال مطلوبًا.
+النتيجة المطلوبة:
 
-## قاعدة تسليم تعديلات الكود
+```text
+Phase 8.9 automated verification: PASS
+Phase 8.9 closure workflow: PASS
+```
 
-- التعديل البسيط والواضح ومنخفض المخاطر في ملف واحد، مثل تغيير قيمة أو سطر أو سطرين، يقدم كتعليمات مباشرة: اسم الملف، مكان التعديل، والنص البديل.
-- لا يتم إنشاء ZIP لتعديل تافه إلا إذا كان مكانه ملتبسًا أو تأثيره حساسًا.
-- التعديل الكبير أو الحساس أو متعدد الملفات يقدم كـ ZIP Patch تراكمي يحتوي فقط على الملفات المطلوب استبدالها.
-- لا يتم إرسال نسخة TXT مكررة مع الـZIP.
-- لا يوضع `ERPPrototype.csproj.user` أو أي ملف `*.user` داخل ZIP Patch أو حزمة تسليم مستقبلية؛ هذه إعدادات محلية للجهاز فقط.
-- يجب تحديد هل يكفي `Save + Ctrl+F5` أم يلزم `Clean/Rebuild`.
+لأن Phase 8.9 لا تغيّر كود التشغيل، لا توجد جولة شيت يدوية جديدة عند نجاح الأمر.
 
-**مثال:** تغيير سرعة Auto-scroll من قيمتين في ملف واحد تعديل يدوي. إنشاء موديول Auto-scroll وربطه بدورة حياة الشيت تعديل ZIP متعدد الملفات.
+## ما بعد Phase 8
 
-## طريقة العمل بعد كل خطوة
+الترتيب المقترح للميزات:
 
-يجب شرح:
+1. صلاحيات وتجربة BranchManager وProjectManager.
+2. إدارة حسابات الفرع.
+3. Excel Import/Export.
+4. المستودع وربط المواد بأوامر العمل.
+5. الفواتير والمراحل المالية.
+6. Dashboard والتقارير بعد وجود بيانات فعلية من الموديولات.
 
-1. ماذا تم؟
-2. لماذا؟
-3. مثال بسيط.
-4. ماذا نختبر الآن؟
-5. ماذا تبقى؟
+## قاعدة تسليم الملفات
 
-## حالة المراحل
-
-- Phase 0 — Engineering foundation: مكتملة.
-- Phase 1 — Diagnostics separation: مكتملة.
-- Phase 2 — Lifecycle and state separation: مكتملة.
-- Phase 3 — Scoped validation and tracking: مكتملة.
-- Phase 4 — Incremental structural operations: مكتملة.
-- Phase 5 — Clipboard, save reconciliation, duplicates, range clear, and drag auto-scroll: مكتملة وظيفيًا.
-- Phase 6.0 — Baseline للجلسة الطويلة: مكتملة؛ أثبتت القياسات أن الأسهم وحدها تنتج تدهورًا تدريجيًا، دون دليل حالي على Memory Leak مباشر.
-- Phase 6.1 — Lifecycle/Resource Audit: مكتملة؛ لم يظهر تراكم مستمر في الـTimers أو Observers أو المالكين المعروفين.
-- Phase 6.2/6.3 — عزل وإصلاح التنقل: مؤجلان بقرار المنتج لأن الأداء العملي الحالي مقبول، ولا نضيف Patch بلا مشكلة مؤثرة.
-- Phase 6.4 — Search Debounce: مؤجل؛ البحث الحالي سريع ولم تظهر شكوى أو قياس يبرر إضافة Timer ومنطق جديد.
-- Phase 6.5 — التوثيق والإغلاق: مكتملة.
-- Phase 8.1 إلى Phase 8.5-R2 — فصل الصفحة والتحقق والـClipboard/History والصفوف وتتبع الحقول والحفظ: مكتملة ومختبرة.
-- Phase 8.6-R1 — مالك واحد لدورة حياة الشيت: مكتملة ومختبرة بعد تغيير السنوات والعودة والـResize والتفاعل.
-- Phase 8.6-R2 — مالك واحد لربط تفاعلات الشيت: مكتملة ومختبرة.
-- Phase 8.7-R1 — مالك واحد لرحلة الحفظ في Blazor: مكتملة ومختبرة.
-- Phase 8.7-R2 — فصل تجهيز طلب الحفظ عن تفسير النتيجة: مكتملة ومختبرة.
-- Phase 8.7-R3 — مالك واحد لحالة Dirty ومصالحة Undo/Redo والحفظ: مكتملة ومختبرة؛ ثلاث فتحات متكررة لـ4,949 صفًا كانت 244ms و208ms و232ms.
-- Phase 8.8-R1 — فصل تنفيذ استعلامات القراءة في `WorkOrderQueryService`: مكتملة ومختبرة عبر سنوات 5 و2,998 و4,091 و4,949 صفًا.
-- Phase 8.8-R2A — شبكة اختبارات Integration لمسار الحفظ: مطبقة وتنتظر تشغيل 6 اختبارات SQL Server.
-
-## الخطوة الهندسية التالية
-
-تشغيل Phase 8.8-R2A من القسم W في `Documentation/06_REGRESSION_TEST_CHECKLIST.md`.
-
-المطلوب بمنطق النظام: قبل نقل أي جزء آخر من `WorkOrderService`، يجب إثبات أن السيرفر يمنع التعديل خارج القسم والتكرار العالمي وRowVersion القديم، وينقل السنة، ويحفظ Add/Update/Delete معًا، ويرجع العملية كلها عند فشل قاعدة البيانات.
-
-لا نضيف إصلاحات كبيرة قبل:
-
-1. تثبيت نقطة Git الحالية.
-2. تشغيل Regression Checklist الخاص بالمرحلة.
-3. قياس المشكلة قبل تعديلها.
-4. إبقاء كل مسؤولية جديدة في ملف مستقل عندما يكون ذلك عمليًا.
-
-
-## Latest Refactor Step — Phase 8.7-R1
-
-The verified Blazor Save journey now has one file owner: `Components/Pages/WorkOrders.Save.cs`. Nothing in the employee workflow is intentionally different.
-
-Practical example: after pasting Notes into many orders, the same code still validates the sheet, sends only the changed fields, saves them, updates internal row versions, and shows the Arabic result. That complete journey is now separated from opening the page and changing years.
-
-Apply the patch over `Phase8.6-R2-Stable`, build, then run section S of `Documentation/06_REGRESSION_TEST_CHECKLIST.md`. Do not tag the step until runtime testing passes.
-
-## Latest Refactor Step — Phase 8.7-R2
-
-The Save button still follows one journey, but the internal decisions now have clear owners:
-
-- `WorkOrders.SaveRequest.cs` answers: what rows and fields will be sent?
-- `WorkOrders.SaveResult.cs` answers: what did the server decide, what rows reconcile, and what message appears?
-- `WorkOrders.Save.cs` coordinates the order and browser calls.
-
-Practical example: when a new work order is saved, Request classifies it as Added. Result maps its temporary negative Id to the database Id and leaves one visible row.
-
-Apply the patch over `Phase8.7-R1-Stable`, build, then run section T. Do not tag the step until runtime testing passes.
-
-
-
-## Latest Refactor Step — Phase 8.8-R1
-
-`WorkOrderQueryService` now owns the read-only journey for employee scope, available years, and selected-year work-order rows. The page still calls `WorkOrderService.LoadSheetAsync`; that method delegates to Query Service so the UI contract is unchanged.
-
-Practical example: changing from 2026 to 2025 executes only read queries in Query Service. Editing and saving a 2025 order still enters the existing WorkOrderService transaction.
-
-Phase 8.8-R1 runtime regression passed. The next required gate is the section W integration suite.
-
-
-## Latest Safety Step — Phase 8.8-R2A
-
-`ERPPrototype.IntegrationTests` creates an isolated temporary LocalDB database and calls the real save service directly. It is not compiled into the web application and does not touch the application database.
-
-Run section W. Do not start Phase 8.8-R2 until the final line reports `6/6 passed`.
+- تعديل بسيط في ملف واحد: تعليمات مباشرة.
+- تعديل كبير أو حساس: ZIP Patch.
+- نقطة مراجعة كبيرة: يجوز تسليم نسخة مصدر كاملة نظيفة.
+- لا تُرسل ملفات `bin` أو `obj` أو `.vs` أو `*.user` أو ملفات تنفيذ ومكتبات مبنية.
+- استخدم `Tools/New-CleanProjectArchive.ps1` عند تجهيز المشروع للرفع.

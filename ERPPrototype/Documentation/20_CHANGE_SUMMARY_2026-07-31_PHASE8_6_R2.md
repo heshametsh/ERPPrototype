@@ -1,7 +1,7 @@
 # 20 — Change Summary: Phase 8.6-R2 Grid Interaction Ownership
 
-**الحالة:** Candidate — pending focused user regression  
-**التاريخ:** 2026-07-31  
+**الحالة:** Accepted — focused user regression passed
+**التاريخ:** 2026-07-31
 **الأساس:** Phase 8.6-R1 user-tested stable
 
 ## المشكلة بمنطق الشيت

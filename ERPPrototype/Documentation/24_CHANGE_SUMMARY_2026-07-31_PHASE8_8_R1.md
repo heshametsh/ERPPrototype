@@ -1,6 +1,6 @@
 # Phase 8.8-R1 — Work Order Read Query Extraction
 
-**Status:** Implemented; focused build/runtime regression pending.
+**Status:** Accepted after focused build/runtime regression.
 
 ## Why this step exists
 

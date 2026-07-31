@@ -1,54 +1,33 @@
-# Phase 8.5-R2 — Save Result Merge
+# ERPPrototype
 
-**Apply over:** Phase 8.5-R1 (`ERPPrototype_Phase8_R5_R1_Large_Batch_ReplaceData.zip`)
+نظام Blazor لمتابعة أوامر العمل بأسلوب قريب من Excel، مبني باستخدام ASP.NET Core Identity وEF Core وSQL Server وTabulator.
 
-## What was happening in the sheet
+## نقطة الاستقرار الحالية
 
-After a full-column Paste, the values were already visible. When Save succeeded, the client received 4,952 saved rows and sent all of them through the visible grid update path again. That second full refresh fatigued vertical navigation until changing year recreated the grid.
+- `Phase 8.8-Stable`: فصل قراءة أوامر العمل وتجهيز خطة الحفظ، مع إبقاء الصلاحيات والتكرار العالمي وRowVersion والـTransaction كوحدة ذرية داخل `WorkOrderService`.
+- شبكة الحفظ الآلية: 10 اختبارات تشمل التطبيع والتحقق والنطاق والتكرار والتزامن ونقل السنة والإضافة والتعديل والحذف والـRollback.
+- `Phase 8.9`: إغلاق وتنظيف نهائي فقط؛ لا يغيّر قواعد العمل أو الواجهة أو قاعدة البيانات.
 
-## What changes
+## التحقق الآلي
 
-The Save result is compared with the data already present in each row:
-
-- Technical values not represented as sheet columns, such as the concurrency version, are merged silently into row data.
-- A sheet column is refreshed only when the server returned a genuinely different value.
-- Sheet fields are discovered from Tabulator columns, including hidden columns, so future custom columns do not require hard-coded names.
-
-## Practical example
-
-An employee pastes Notes into 4,952 work orders and presses Save.
-
-Before R2, the grid refreshed all 4,952 complete rows after the database accepted them.
-
-After R2, if Notes already match the server result, the screen is not repainted. Only the internal version stamp is refreshed. The duplicate identity rule remains off because Work Order Number and Work Type were not edited.
-
-## Apply
-
-Copy the files over the current project, then run:
+من داخل مجلد المشروع:
 
 ```powershell
-dotnet clean; dotnet build
+.\Tools\Invoke-Phase8Verification.ps1
 ```
 
-## Test
+أو لتنظيف الملفات المحلية، تشغيل التحقق، ثم إنشاء ZIP مصدر نظيف في خطوة واحدة:
 
-1. Refresh the page.
-2. Paste one full non-identity column across about 4,952 rows.
-3. Save once.
-4. Test ArrowDown and ArrowUp immediately without changing year.
-5. Download the performance report.
-6. Confirm `identityCheckRows: 0`.
-7. Check `save.delta.plan-mutations` and `save.delta.update-rows`:
-   - `updateRows` / `rows` should be near zero when the server did not change sheet values.
-   - `technicalFieldWrites` should show the internal values merged without repainting.
-8. Refresh and confirm the data persisted.
+```powershell
+.\Tools\Invoke-Phase8Closure.ps1
+```
 
-## Rollback
+## إنشاء ZIP نظيف مستقبلًا
 
-Restore `wwwroot/js/tabulatorTest.js` and the documentation files from the Phase 8.5-R1 project copy. Do not Commit or Tag before the runtime test passes.
+```powershell
+.\Tools\New-CleanProjectArchive.ps1
+```
 
-## Verification performed here
+الأداة تستبعد `bin` و`obj` و`.vs` وملفات الجهاز والبناء، ولذلك لا يزيد حجم التسليم بسبب المكتبات الناتجة عن التشغيل.
 
-- JavaScript syntax check passed for all project-owned JS files.
-- Patch file paths and ZIP integrity were checked.
-- .NET build and browser execution were not available in this environment.
+ابدأ من `START_HERE_ERP_PROTOTYPE.md` ثم `Documentation/00_DOCUMENTATION_INDEX.md`.
