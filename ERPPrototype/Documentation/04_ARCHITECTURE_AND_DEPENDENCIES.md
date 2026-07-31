@@ -218,3 +218,16 @@ tabulatorTest.initialize
 
 **Work example:** the interaction module is the reception desk that receives one user command and routes it to the correct department. It does not decide duplicate rules or save logic, and it must not create a second route for a future custom column.
 
+
+
+## Phase 8.7-R1 Save Boundary
+
+The Work Orders component is now split by workflow ownership:
+
+- `WorkOrders.razor`: markup and bindings.
+- `WorkOrders.razor.cs`: page lifecycle, initial/year loading, grid initialization, shared row mapping, and disposal.
+- `WorkOrders.Save.cs`: the complete Blazor save orchestration and save-only DTO/helper types.
+
+This is a partial-class boundary, not a new service or network layer. Dependency injection and all existing calls remain unchanged. The extraction deliberately keeps `WorkOrderService` as the business/persistence boundary and `tabulatorTest` as the current browser API.
+
+Practical example: a duplicate `(WorkOrderNumber + WorkTypeCode)` is still rejected by the service and mapped back to the exact cells by the same code. The only architectural change is that this mapping now lives beside the rest of the save journey.

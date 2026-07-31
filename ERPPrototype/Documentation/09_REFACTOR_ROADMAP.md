@@ -1,6 +1,6 @@
 # 09 — Maintainability Refactor Roadmap
 
-**Runtime baseline:** Phase 8.6-R1 accepted after user regression on 2026-07-31. Field-level tracking, batch editing, save-result merge, and single grid lifecycle ownership are the current stable behavior.  
+**Runtime baseline:** Phase 8.6-R2 accepted after user regression on 2026-07-31. Field-level tracking, batch editing, save-result merge, single lifecycle ownership, and single interaction ownership are the current stable behavior.  
 **Refactor policy:** incremental extraction, identical runtime behaviour, focused regression after every step, and no rewrite.
 
 ## Refactor Objectives
@@ -102,7 +102,7 @@ Structural result:
 
 **R1 completed and user-tested:** `tabulatorLifecycle.js` owns one grid instance from state creation through disposal. Repeated year switching kept one initialization per opened sheet, stable navigation, and no duplicate action.
 
-**R2 pending focused regression:** `tabulatorInteractions.js` now owns the binding of resize, right-click guard, cell edit/selection events, active-sheet pointer tracking, keyboard commands, and document Copy/Paste.
+**R2 completed and user-tested:** `tabulatorInteractions.js` owns the binding of resize, right-click guard, cell edit/selection events, active-sheet pointer tracking, keyboard commands, and document Copy/Paste. Repeated year switching and the complete interaction regression passed without duplicate commands or JavaScript errors.
 
 `tabulatorTest.js` remains the coordinator and retains the actual algorithms. R2 changes ownership location only; it does not change shortcut or grid behavior.
 
@@ -110,9 +110,11 @@ Practical example: changing from year 2026 to 2025 disconnects the old sheet thr
 
 ### Phase 8.7 — Save and Dirty-State Review
 
-- Review save-delta creation, streamed interop, deleted rows, rekey reconciliation,
-  and history rebasing.
-- Keep server DTO contracts and persistence behaviour unchanged during extraction.
+**R1 implemented; focused regression pending:** `WorkOrders.Save.cs` owns the complete Blazor save workflow, including validation handoff, streamed save-delta reading, request preparation, service call, duplicate/concurrency messages, year movement reconciliation, client result application, and save diagnostics.
+
+`WorkOrders.razor.cs` now owns page loading, year switching, grid initialization, shared mapping, and disposal. R1 moves the exact verified save logic without changing DTO contracts, SQL behaviour, JavaScript calls, business rules, or messages.
+
+**Planned R2:** extract the browser dirty-state and save-result reconciliation functions from `tabulatorTest.js` into one `tabulatorSaveState.js` module while preserving the public `tabulatorTest` API.
 
 ### Phase 8.8 — WorkOrderService Split
 
@@ -170,3 +172,10 @@ Section Q passed in user testing. Six grid initializations matched six opened sh
 ## Current Focused Regression for Phase 8.6-R2
 
 Use section R in `06_REGRESSION_TEST_CHECKLIST.md`. The required evidence is one action per key/pointer/clipboard event before and after repeated year switches, preserved quick/text edit modes, deep-row Resize stability, and no `tabulatorInteractions` or red Console error.
+
+
+## Phase 8.7-R1 Focus
+
+Use section S in `06_REGRESSION_TEST_CHECKLIST.md`. The key acceptance evidence is that no-change Save, one-row Save, duplicate rejection, year movement, added-row rekey, deletion, large-column Save, refresh persistence, and performance stage names remain identical after the C# extraction.
+
+Practical example: when the employee edits Notes and presses Save, one file now owns the complete journey from “what changed?” through server persistence to the final Arabic success message. Loading a year or leaving the page no longer shares that file.

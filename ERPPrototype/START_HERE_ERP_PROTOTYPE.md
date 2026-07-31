@@ -160,3 +160,12 @@ const maximumStep = 32;
 2. تشغيل Regression Checklist الخاص بالمرحلة.
 3. قياس المشكلة قبل تعديلها.
 4. إبقاء كل مسؤولية جديدة في ملف مستقل عندما يكون ذلك عمليًا.
+
+
+## Latest Refactor Step — Phase 8.7-R1
+
+The verified Blazor Save journey now has one file owner: `Components/Pages/WorkOrders.Save.cs`. Nothing in the employee workflow is intentionally different.
+
+Practical example: after pasting Notes into many orders, the same code still validates the sheet, sends only the changed fields, saves them, updates internal row versions, and shows the Arabic result. That complete journey is now separated from opening the page and changing years.
+
+Apply the patch over `Phase8.6-R2-Stable`, build, then run section S of `Documentation/06_REGRESSION_TEST_CHECKLIST.md`. Do not tag the step until runtime testing passes.

@@ -57,3 +57,5 @@
 - سبب القرار في Decisions Log.
 - ملخص كل مرحلة في Change Summary الخاص بتاريخها.
 
+
+- `21_CHANGE_SUMMARY_2026-07-31_PHASE8_7_R1.md` — Blazor save workflow extraction and focused regression.

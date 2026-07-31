@@ -320,3 +320,22 @@ The existing interaction algorithms were moved without intentional logic changes
 
 Practical example: after changing from year 2026 to 2025, the new sheet binds one interaction set. One Arrow press moves one cell, one Paste runs once, and one resize restores one viewport anchor. Future user-created input columns can enter the same generic printable-key path instead of adding another document listener.
 
+
+
+## 20. Phase 8.7-R1 — Blazor Save Workflow Ownership
+
+A new partial component file, `Components/Pages/WorkOrders.Save.cs`, owns the complete save workflow that previously occupied most of `WorkOrders.razor.cs`:
+
+- pre-save browser validation;
+- streamed dirty/deleted-row delta reading;
+- new, changed, deleted, and moved-year request preparation;
+- `WorkOrderService.SaveChangesAsync` orchestration;
+- duplicate and concurrency error mapping;
+- temporary-row to database-row mapping;
+- current-year row merge and browser delta application;
+- Arabic success/failure status;
+- save performance stages and exception diagnostics.
+
+No business or runtime change is intended. The method and its private save-only helpers are byte-for-byte equivalent after extraction.
+
+Practical example: editing Notes in one order, pasting a full column, moving an order to another year, or adding a temporary row all still follow the same verified workflow. The difference is that developers now find that workflow in one file instead of mixing it with year loading and grid disposal.

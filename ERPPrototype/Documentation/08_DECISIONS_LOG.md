@@ -204,3 +204,14 @@
 - **Example:** a custom “Estimated Value” input column uses the existing direct-typing, selection, Copy/Paste, Undo, and dirty-field pipeline. It does not install a new keydown handler.
 - **Constraint:** R2 is extraction only; no shortcut, navigation, resize, clipboard, context-menu, or edit behavior is intentionally changed.
 
+
+
+## 2026-07-31 — Give the Blazor Save Workflow One File Owner
+
+**Decision:** move `SaveChangesAsync`, the save stream limit, save-only mapping helpers, and save-only DTOs from `WorkOrders.razor.cs` to `WorkOrders.Save.cs` without altering their content.
+
+**Reason:** the verified save workflow is large and business-sensitive. Keeping it mixed with page loading, year switching, and disposal makes future changes harder to review and increases the chance of accidentally changing unrelated behaviour.
+
+**Business example:** changing the message shown after moving three work orders to 2027 should require reviewing the save workflow only; it should not require navigating through grid initialization and year-loading code.
+
+**Constraint:** no JavaScript API, service contract, uniqueness rule, authorization rule, transaction, status message, or performance stage may change in this extraction.

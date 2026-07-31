@@ -252,3 +252,23 @@ Decision: Accept / Roll back / Investigate
 
 **Work example:** after switching years three times, pressing Ctrl+V must paste one range and create one Undo step—not three hidden pastes.
 
+
+
+## S. Phase 8.7-R1 — Blazor Save Workflow Extraction
+
+Run from the accepted `Phase8.6-R2-Stable` behaviour after applying R1.
+
+1. Open a year and press Save without editing. Confirm the sheet reports that there are no changes.
+2. Edit Notes in one existing work order, Save, refresh, and confirm only the intended value persisted.
+3. Change `(WorkOrderNumber + WorkTypeCode)` to an existing global pair. Confirm Save is rejected and the conflicting cells are selected.
+4. Change the same pair to a unique value. Confirm Save succeeds and persists after refresh.
+5. Change Assignment Date to another year. Confirm the row leaves the current sheet and appears in the destination year after Save.
+6. Insert a new row, complete its required values, Save, then edit it again without refresh. Confirm it now behaves as a saved database row.
+7. Delete an eligible existing row, Save, refresh, and confirm it remains deleted.
+8. Paste a large non-identity column, Save, and confirm `identityCheckRows: 0` and no global duplicate query.
+9. Confirm Save success/failure Arabic messages are unchanged and only one message is produced.
+10. Confirm performance operations still include `save.stream-reference`, `save.stream-open`, `save.stream-deserialize`, `save.server-service`, `save.client-apply-delta`, and `save.active-total`.
+11. Change year after a successful Save and verify Copy/Paste, arrows, and right-click still work once.
+12. Confirm Console contains no red error and no reference to `WorkOrders.Save` failure.
+
+Acceptance: all business outcomes, messages, browser calls, and measured stage names match the pre-extraction behaviour.
