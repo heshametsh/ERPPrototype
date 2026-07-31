@@ -1,8 +1,8 @@
 # 03 — Current Implementation
 
-**Status:** Approved description of the E6F stable checkpoint  
-**Review date:** 2026-07-27  
-**Important:** This is a static code review. The review environment did not contain .NET SDK, so compilation and browser execution were not performed here.
+**Status:** Approved description of `M5D4R3-Stable-Range-UX` plus Phase 6 diagnostic tooling and closure decision  
+**Review date:** 2026-07-29  
+**Important:** Runtime behavior is based on the current code plus user-generated browser performance reports. This review environment still does not contain .NET SDK, so a local Clean/Rebuild remains required after applying the patch.
 
 ## 1. Snapshot
 
@@ -15,12 +15,12 @@
 | Database | SQL Server / LocalDB in Development |
 | ORM | EF Core 10.0.9 |
 | Grid | Tabulator 6.5.0 |
-| Grid stable checkpoint | Step 16E6F (built cumulatively on E6C/E6D/E6E) |
-| Main grid file | `wwwroot/js/tabulatorTest.js` — 7,327 lines in E6F |
-| Work-order page | `Components/Pages/WorkOrders.razor` — 1,023 lines |
-| Work-order service | `Data/WorkOrderService.cs` — 907 lines |
+| Grid stable checkpoint | `M5D4R3-Stable-Range-UX` (built cumulatively on E6C through Phase 5) |
+| Main grid file | `wwwroot/js/tabulatorTest.js` — 8,725 lines in M5D4R3 |
+| Work-order page | `Components/Pages/WorkOrders.razor` — 1,071 lines |
+| Work-order service | `Data/WorkOrderService.cs` — 953 lines |
 | Migrations | 29 files |
-| Runtime code changed by this documentation review | None |
+| Runtime code changed in Phase 6.1 | Diagnostics only: `tabulatorPerformance.js` and read-only `tabulatorRangeAutoScroll.snapshot()` |
 
 ## 2. Runtime Flow
 
@@ -74,7 +74,7 @@ Operational risk:
 | `BranchManager` | Account can be created; no completed read-only work-order screen or branch account management |
 | `Employee` | Loads and modifies work orders for the assigned department only |
 
-The product terminology and current code terminology are not yet aligned.
+`ProjectManager` is the final product and code name. `Employee` is the current technical Identity role; the product-facing label is Department Employee / موظف القسم. No Identity-role rename is planned inside Phase 6.
 
 ## 5. Work-Order Data Model
 
@@ -138,7 +138,7 @@ Implemented:
 - The result returns saved rows, new database Ids, RowVersions, moved rows, and deleted Ids.
 - The browser applies the saved delta without reloading the full sheet.
 
-## 8. Grid Features in E6F
+## 8. Grid Features in M5D4R3
 
 - Virtual DOM with central buffer 260px.
 - Direct cell editing.
@@ -159,6 +159,12 @@ Implemented:
 - Resize keeps the logical first visible row using the E6C anchor restore.
 - First right-click on an unselected sheet initializes a real range before Tabulator handles the event, preventing `activeRange.occupies` errors.
 - Structural focus restoration after Insert/Delete and Undo/Redo uses a bounded retry guard and no longer throws `element?.focus is not a function`.
+- Copy/Paste has one owner path; Tabulator's parallel clipboard path is disabled.
+- New-row database identity is reconciled inside the existing row using `clientKey` instead of delete/reinsert.
+- Duplicate save validation returns all global conflicts for `WorkOrderNumber + WorkTypeCode` across years and departments.
+- Delete/Backspace clears the full logical selected range, including rows outside the visible Virtual DOM window, without deleting rows.
+- Validation messages start from the first affected row.
+- Drag selection auto-scroll is isolated in `tabulatorRangeAutoScroll.js`; Tabulator remains the sole range owner.
 
 ## 9. Not Implemented
 
@@ -168,13 +174,13 @@ Implemented:
 - Warehouse.
 - Invoice module.
 - BranchManager operating page.
-- Projects Director operating page.
+- ProjectManager operating page.
 - User rename/reset password/activate/deactivate workflows.
 - Admin audit trail.
 - Automated unit, integration, or browser tests.
 - Production monitoring and client-side error reporting.
 - Proven 10,000-row strategy.
-- Final solution to long-session vertical-navigation fatigue.
+- لا يوجد Performance Patch للجلسة الطويلة حاليًا؛ التدهور المقاس مسجل كقيد مراقبة، لكن المستخدم أكد أن سرعة الأسهم وEnter والـWheel مقبولة في الاستخدام الحالي.
 
 ## 10. Static Review Performed
 
@@ -200,14 +206,14 @@ Not performed here:
 - Azure/network tests
 - NuGet vulnerability scan after restore
 
-## 11. Important Code Mismatches
+## 11. Important Current Gaps
 
-1. Product role names differ from code role names.
-2. Product expectation for BranchManager is not implemented.
-3. Current database uniqueness is company-wide; business scope needs final confirmation.
-4. Current year movement is automatic; product preference may require confirmation.
-5. Admin branch logic bypasses a service layer.
-6. Historical review said `.csproj.user` was removed, but the uploaded ZIP still contained it; it was excluded from the documented deliverable.
+1. BranchManager operating workflow is not implemented.
+2. ProjectManager operating workflow is not implemented fully.
+3. Current year movement is automatic; product preference may require confirmation.
+4. Admin branch logic bypasses a service layer.
+5. `Employee` remains the technical Identity role while Department Employee / موظف القسم is the product-facing label.
+6. `ERPPrototype.csproj.user` appeared in the full uploaded ZIP despite `*.user` being ignored by Git; future delivery ZIPs must exclude it explicitly.
 
 ## 12. Simple Example
 
@@ -215,7 +221,7 @@ Not performed here:
 JavaScript is like the receptionist checking a form quickly. The server is the locked records room. Even if someone bypasses the receptionist, the records room must still reject an invalid or unauthorized form.
 
 
-## 12. E6D/E6E/E6F Verification Record
+## 13. Historical E6D/E6E/E6F Verification Record
 
 User-tested on 2026-07-27 after Clean/Rebuild and local browser execution:
 
@@ -231,7 +237,7 @@ User-tested on 2026-07-27 after Clean/Rebuild and local browser execution:
 This is user-environment evidence, not an automated browser-test suite.
 
 
-## 13. Provisional E6F Performance Baseline
+## 14. Historical Provisional E6F Performance Baseline
 
 Accepted by the user on 2026-07-27 from two clean runs. This is not a strict three-run median because the viewport widths differed; it is a pragmatic temporary baseline for detecting obvious refactor regressions.
 
@@ -241,4 +247,44 @@ Accepted by the user on 2026-07-27 from two clean runs. This is not a strict thr
 | ArrowUp | 75.65 ms | 108.3 ms | 119 ms |
 | Enter | 92.77 ms | 125.2 ms | 138 ms |
 
-Both clean reports contained zero JavaScript errors and no layout shifts. Long-session vertical fatigue remains open. Raw reports are stored in `Documentation/Review/Performance/E6F/`.
+Both clean reports contained zero JavaScript errors and no layout shifts. The historical fatigue evidence remains useful for future scale testing, but it is not a blocker for the current prototype after the Phase 6 product decision. Raw reports are stored in `Documentation/Review/Performance/E6F/`.
+
+
+## 15. Phase 6.0 Current Long-session Evidence
+
+User-generated reports on 2026-07-29 confirmed that arrows alone reproduce gradual fatigue:
+
+| State | ArrowDown average / p95 | ArrowUp average / p95 |
+|---|---:|---:|
+| COLD | 33.7ms / 53.3ms | 34.8ms / 56.7ms |
+| FATIGUED | 60.4ms / 101.4ms | 57.4ms / 101.7ms |
+
+The JavaScript heap rose and fell with garbage collection rather than growing continuously. Phase 6.1 added a dedicated `perf=lifecycle` mode to correlate 30-second performance windows with active listeners, timers, animation frames, observers, and known grid lifecycle owners.
+
+## 16. Phase 6.1 Audit Result and Product Decision
+
+The 2026-07-29 lifecycle report ran for about 19 minutes. Known owners remained stable: one grid instance, one performance attachment, one range auto-scroll instance, four observers, and roughly five to seven active timers. The large listener-registration count rose while new Tabulator cells were created, then plateaued; the counter is an upper-bound registration balance and does not prove that all registrations remained live. No continuous timer, observer, or known-owner accumulation was demonstrated.
+
+The user confirmed that practical navigation speed is currently acceptable for Arrow keys, Enter, and mouse wheel. Therefore:
+
+- No navigation recovery, rewrite, or performance fix is added now.
+- Phase 6.2 isolation and Phase 6.3 targeted fix are deferred until a real usage problem, 10,000-row test, or regression reopens them.
+- Search debounce is deferred because current search is fast and no measured problem justifies adding delayed behavior and timer logic.
+- Phase 6 closes after the final regression checklist and a new Git tag.
+
+
+## 17. Phase 8.5 — Field-Level Changes and Generic Batch Editing
+
+Implemented in the current patch:
+
+- Dirty state records the changed field keys per row.
+- Paste, range clear, Undo, and Redo apply large cell changes as one blocked-redraw batch.
+- After the batch, dirty tracking, validation dependencies, and filter refresh run once for the affected rows/fields.
+- The browser save delta includes `changedFields` for every modified existing row.
+- `WorkOrderService` normalizes, validates, and updates only the declared changed core fields.
+- Global identity validation runs only for new rows or rows whose identity fields changed.
+- Core field keys and server dependency sets are centralized in `WorkOrderFieldRegistry`.
+
+Practical example: changing Notes in 4,952 rows still saves 4,952 values, but it does not rewrite the other columns or execute the global Work Order Number + Work Type duplicate query.
+
+Not implemented yet: user-created custom columns, their database storage, layout ownership, permissions, and filter-definition UI. Phase 8.5 is the foundation that allows those fields to register by stable key later.

@@ -272,5 +272,20 @@ window.tabulatorRangeAutoScroll = (() => {
         return true;
     }
 
-    return { attach, detach };
+    function snapshot(elementId) {
+        const selected = elementId
+            ? [[elementId, instances.get(elementId)]]
+            : Array.from(instances.entries());
+        const active = selected.filter(([, state]) => Boolean(state));
+
+        return {
+            instances: instances.size,
+            selectedInstances: active.length,
+            registeredListeners: active.length * 4,
+            activeAnimationFrames: active.filter(([, state]) => state.frame !== null).length,
+            draggingInstances: active.filter(([, state]) => state.dragging).length
+        };
+    }
+
+    return { attach, detach, snapshot };
 })();

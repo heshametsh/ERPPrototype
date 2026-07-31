@@ -1,7 +1,7 @@
 # 06 — Regression Test Checklist
 
 **Status:** Mandatory after any grid/runtime change  
-**Stable checkpoint:** E6F (E6C foundation)  
+**Stable checkpoint:** `M5D4R3-Stable-Range-UX` (E6C foundation)  
 **Rule:** لا ننتقل للخطوة التالية إذا فشل اختبار أساسي.
 
 ## A. Before Testing
@@ -121,6 +121,8 @@
 - [ ] اختبر ArrowUp للعودة.
 - [ ] اترك الصفحة مفتوحة ثم أعد الاختبار.
 - [ ] راقب Memory وLong Tasks.
+- [ ] Lifecycle audit mode opens عبر `/work-orders?perf=lifecycle` بدون تغيير سلوك الشيت.
+- [ ] تقرير Lifecycle يحتوي `timeSeries30s` و`lifecycleAudit` ولا يحتوي JavaScript errors.
 
 ### 10,000 rows
 
@@ -151,7 +153,24 @@
 - Provisional navigation baseline recorded from two clean runs; strict three-run median deferred by user decision.
 - Automated browser tests: غير موجودة حتى الآن.
 
-## M. Result Record
+## M. Phase 6 Closure Regression — Required Before New Tag
+
+- [ ] `Clean Solution` و`Rebuild Solution` ينجحان.
+- [ ] تحميل شيت حوالي 3,000 صف ينجح وعدد الصفوف صحيح.
+- [ ] الأسهم الأربعة وEnter والـWheel يعملون بسرعة مقبولة عمليًا.
+- [ ] تحديد نطاق وCopy/Paste وDelete/Backspace وUndo/Redo تعمل.
+- [ ] Insert Above/Below وDelete Selected Rows تعمل.
+- [ ] حفظ صف جديد وتعديل وحذف، ثم Refresh، يعطي بيانات صحيحة بدون صف مكرر.
+- [ ] التكرار العالمي يظهر عبر سنة أخرى.
+- [ ] تغيير السنة وResize لا يكسران التحديد أو الأسهم.
+- [ ] البحث والفلاتر يعملان بالسلوك الحالي بدون Debounce.
+- [ ] Auto-scroll أثناء سحب التحديد يعمل من الصف الأول ومن منتصف الشيت.
+- [ ] Console بدون أخطاء حمراء.
+- [ ] `/work-orders?perf=lifecycle` يفتح فقط عند الحاجة التشخيصية ولا يغير الوضع الطبيعي `/work-orders`.
+
+إذا نجحت كل البنود، يمكن إنشاء Tag إغلاق Phase 6. إذا فشل بند، لا ننشئ Tag ونصلح العيب المحدد فقط.
+
+## N. Result Record
 
 بعد الاختبار اكتب:
 
@@ -171,3 +190,29 @@ Decision: Accept / Roll back / Investigate
 
 بعد تعديل Resize لا يكفي أن نجرب التصغير فقط.  
 لأن Resize يشترك مع Lifecycle والتحديد، نختبر أيضًا الأسهم وتغيير السنة. مثل تغيير باب السيارة: يجب التأكد أن الزجاج والقفل ما زالا يعملان، وليس أن الباب يغلق فقط.
+
+
+## O. Phase 8.5 — Field-Level and Batch Regression
+
+- [ ] Paste one full non-identity column across about 4,952 rows; the sheet remains responsive after completion.
+- [ ] Save that paste; `identityCheckRows` is `0` and `save.server.duplicate-query` does not run.
+- [ ] Refresh and confirm only the pasted column changed.
+- [ ] Undo and Redo the full-column paste once each; values and dirty count are correct.
+- [ ] Clear a full selected column, then Undo and Redo.
+- [ ] Edit Work Order Number or Work Type in one row; identity validation runs and a real duplicate is blocked.
+- [ ] Edit Assignment Date into another year; only then does the row move to that year after save.
+- [ ] Edit Notes only; Work Order Number, Work Type, date, basket, status, order, and row identity remain unchanged after refresh.
+- [ ] Insert a new row; all required new-row rules still run.
+- [ ] Confirm no `tabulatorFieldChanges` load error or unexpected Console error.
+
+## P. Phase 8.5-R2 — Save Result and Navigation
+
+- [ ] Paste one full non-identity column across about 4,952 rows.
+- [ ] Save once.
+- [ ] Test ArrowDown and ArrowUp immediately after Save without changing year.
+- [ ] `identityCheckRows` remains `0` when identity fields were not changed.
+- [ ] `save.delta.update-rows.rows` is near zero when the visible server values equal the values already shown in the sheet.
+- [ ] `technicalFieldWrites` is greater than zero when server version stamps are refreshed.
+- [ ] Refresh the page and confirm the pasted values persisted.
+- [ ] Change year and return only to compare performance; it must no longer be required to recover navigation.
+- [ ] Edit one sheet value that the server normalizes, if such a scenario exists, and confirm only that sheet value refreshes.

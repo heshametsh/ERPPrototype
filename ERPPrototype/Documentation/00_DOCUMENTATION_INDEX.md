@@ -1,7 +1,7 @@
 # 00 — Documentation Index
 
 **الحالة:** Approved  
-**آخر تحديث:** 2026-07-29  
+**آخر تحديث:** 2026-07-31  
 **الهدف:** تحديد الوثيقة الصحيحة بسرعة بدل الاعتماد على المحادثات أو النسخ القديمة.
 
 ## المصدر المعتمد
@@ -32,6 +32,9 @@
 | `10_RELEASE_READINESS_PLAN.md` | بوابات Prototype/Pilot/Commercial | متى يصبح صالحًا للتجربة أو البيع؟ |
 | `11_CHANGE_SUMMARY_2026-07-27.md` | إنشاء أساس التوثيق الهندسي | ماذا فعلت مراجعة E6C؟ |
 | `12_CHANGE_SUMMARY_2026-07-29.md` | إغلاق Phase 5 وتثبيت M5D4R3 | ما الذي تغير في الحفظ والتكرارات والتحديد وDelete وAuto-scroll؟ |
+| `13_CHANGE_SUMMARY_2026-07-29_PHASE6_1.md` | Baseline الجلسة الطويلة وLifecycle Audit | ما نتيجة Phase 6.0 وما أداة قياس Phase 6.1؟ |
+| `14_CHANGE_SUMMARY_2026-07-29_PHASE6_CLOSURE.md` | قرار إغلاق Phase 6 بدون Performance Patch | لماذا قُبل الأداء الحالي ولماذا أُجل Search Debounce؟ |
+| `15_CHANGE_SUMMARY_2026-07-29_PHASE7A_CLIPBOARD_HISTORY.md` | تحسين مرشح لسرعة Paste وUndo/Redo | ما التعديل محدود المخاطر المطلوب اختباره قبل اعتماده؟ |
 
 ## المجلدات المساعدة
 
@@ -48,3 +51,10 @@
 - المشكلة في Known Issues.
 - سبب القرار في Decisions Log.
 - ملخص كل مرحلة في Change Summary الخاص بتاريخها.
+
+
+| `16_CHANGE_SUMMARY_2026-07-31_PHASE8_5.md` | Field-level change tracking and generic batch editing | ماذا تغير في Phase 8.5 وكيف نختبره؟ |
+
+| `17_CHANGE_SUMMARY_2026-07-31_PHASE8_5_R1.md` | تصحيح طريقة تطبيق التعديلات الجماعية الكبيرة | لماذا نجح المنطق وفشل الأداء في R5، وما التصحيح المطلوب اختباره؟ |
+
+| `18_CHANGE_SUMMARY_2026-07-31_PHASE8_5_R2.md` | منع إعادة تحديث آلاف الصفوف المرئية بعد الحفظ | لماذا كان تغيير السنة يعيد السرعة، وما الذي يتغير في نتيجة الحفظ؟ |

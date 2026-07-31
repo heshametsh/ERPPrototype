@@ -163,3 +163,15 @@ Components
 
 الملف الحالي يشبه لوحة كهرباء واحدة فيها مفاتيح الإنارة والتكييف والمضخة بلا تقسيم واضح.  
 التقسيم المطلوب لا يعني بناء مبنى جديد؛ يعني وضع كل دائرة في قاطع معروف، مع لوحة رئيسية صغيرة مشتركة. عند إصلاح التكييف لا تنطفئ الإنارة.
+
+
+## 12. Field Registry and Rule Dependencies — Phase 8.5
+
+The grid no longer spreads field-specific decisions across paste, history, dirty tracking, validation, and save code.
+
+- `tabulatorFieldChanges.js` is the generic browser engine for field definitions, changed-field sets, rule dependencies, and batch application.
+- `tabulatorValidation.js` registers the current core field definitions and validation dependencies.
+- `WorkOrderFieldRegistry.cs` is the server contract for current persisted core fields and rule dependency sets.
+- A feature asks whether a rule is affected by the changed field keys; it does not hard-code unrelated column checks inside each operation.
+
+Future custom fields must use a stable field id and register metadata such as type, label, visibility, width, filter type, and validators. Renaming the visible column must not change the stable id. Custom-field persistence is a later feature and must not be implemented as a database migration for every user-added column.

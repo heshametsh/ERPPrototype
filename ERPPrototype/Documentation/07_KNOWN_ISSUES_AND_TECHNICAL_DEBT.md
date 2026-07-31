@@ -14,15 +14,15 @@
 
 | ID | Priority | Issue | Evidence / impact | Temporary position | Release gate |
 |---|---:|---|---|---|---|
-| GRID-001 | P1 | إرهاق التنقل الرأسي بعد جلسة طويلة | الأداء يتدهور بعد آلاف الحركات؛ تغيير السنة يعيد السرعة | E6C ثابت؛ لا Recovery تلقائي مقبول | يجب حله أو إثبات حدود مقبولة قبل البيع |
-| GRID-002 | P1 | `tabulatorTest.js` = 7,327 سطرًا في E6F ومسؤوليات كثيرة | تعديل Lifecycle أثّر سابقًا على الأسهم والسنة | Refactor تدريجي فقط | مطلوب قبل توسع ميزات الشيت |
+| GRID-001 | P2 | تدهور تدريجي في التنقل بعد ضغط مستمر طويل | Phase 6.0 أثبتت ارتفاع أزمنة الأسهم، وPhase 6.1 لم تثبت تراكمًا مستمرًا في Timers/Observers/known owners؛ المستخدم أكد أن السرعة العملية الحالية للأسهم وEnter والـWheel مقبولة | لا Performance Patch ولا Recovery الآن؛ نراقب فقط | يعاد فتحه عند اختبار 10,000 صف، ظهور شكوى فعلية، أو Regression واضح |
+| GRID-002 | P1 | `tabulatorTest.js` يقارب 8,725 سطرًا في M5D4R3 ومسؤوليات كثيرة | تعديلات Lifecycle/Selection أثرت سابقًا على الأسهم والسنة | Refactor تدريجي فقط، ولا Rewrite | مطلوب قبل توسع ميزات الشيت |
 | GRID-003 | P1 | Insert/Delete/structural Undo تستخدم full `setData` | تعيد بناء بيانات الشيت والتحقق | لا نضيف عمليات هيكلية ثقيلة جديدة | تحسين مرحلي بعد فصل الموديولات |
 | GRID-004 | P1 | 10,000 صف غير مختبرة | Client-side loading قد لا يظل مقبولًا | اختبار منفصل قبل قرار معماري | مطلوب قبل تحديد سعة المنتج |
+| GRID-005 | P3 | Search Debounce غير منفذ | البحث الحالي يعمل مع كل تغيير في النص، لكن لا توجد شكوى أو قياس يثبت عبئًا مؤثرًا مع بيانات البروتوتايب الحالية | إبقاء السلوك المباشر لتجنب Timer وتعقيد غير مطلوب | يعاد تقييمه عند بيانات أكبر أو بطء بحث مثبت |
 | TEST-001 | P1 | لا Automated Tests | الاعتماد على الاختبار اليدوي يزيد Regression | Checklist إلزامية الآن | Browser/service tests مطلوبة قبل Pilot |
 | AUTH-001 | P1 | BranchManager workflow غير مكتمل | الحساب موجود لكن لا شاشة read-only أو إدارة فرع | لا نقدمه كميزة منتهية | مطلوب قبل Pilot للدور |
-| AUTH-002 | P1 | Project role اسمًا ووظيفة غير محسوم | `ProjectManager` في الكود مقابل Projects Director في المنتج | لا Migration بدون قرار | مطلوب قبل قاعدة عميل |
+| AUTH-002 | P1 | Workflow وصلاحيات العرض الشامل لـ`ProjectManager` غير مكتملة | الاسم النهائي محسوم ومتطابق في المنتج والكود، لكن شاشة التشغيل ما زالت محدودة | لا نقدمه كميزة منتهية | مطلوب قبل Pilot للدور |
 | AUTH-003 | P1 | Rename/reset password/activate/deactivate غير مكتملة | الحسابات ثابتة لكن تغيير الأشخاص غير مدعوم | Admin ينشئ الحساب فقط حاليًا | مطلوب قبل Pilot |
-| DATA-001 | P1 | Scope uniqueness يحتاج تأكيد | DB الحالي company-wide؛ قرارات سابقة قد تُفهم per department | لا نغير index بالتخمين | مطلوب قبل بيانات حقيقية |
 | DATA-002 | P1 | نقل سنة Assignment Date يحتاج تأكيد | الكود ينقل تلقائيًا؛ قد يكون المطلوب اقتراحًا | توثيق السلوك الحالي | مطلوب قبل اعتماد Workflow |
 | OPS-001 | P1 | Seeder/DB initialization داخل startup | بعد 3 محاولات يفشل بدء التطبيق وقد يظهر 500.30 | اجمع Azure logs | يجب حسمه قبل استقرار Azure |
 | ADMIN-001 | P2 | `AdminPanel.razor` يستخدم DbContext مباشرة | صعوبة الاختبار وغياب audit/use-case boundary | لا نوسع الصفحة قبل Service | Refactor قبل ميزات إدارة إضافية |
@@ -44,6 +44,7 @@
 | GRID-CLOSED-001 | الضغط المستمر على Enter أصبح ثقيلًا قرب الصف 1,040 | E6D أضاف Enter إلى بوابة التنقل الرأسي المركزية المستخدمة مع الأسهم | المستخدم اختبر الاستمرار بعد نقطة البطء وأكد أن السلوك أصبح سريعًا |
 | GRID-CLOSED-002 | أول كليك يمين بدون تحديد سبب `activeRange.occupies is not a function` | E6E ينشئ نطاق خلية حقيقيًا قبل معالجة Tabulator لأول right-click | المستخدم اختبر سنة بصف واحد وسنة كبيرة وأكد اختفاء الخطأ وعمل القائمة |
 | GRID-CLOSED-003 | عمليات هيكلية/Undo/Redo سببت `element?.focus is not a function` | E6F أضاف bounded focus retry guard مع فحص حقيقي للعنصر | المستخدم اختبر Insert/Delete/Undo/Redo/Copy-Paste/Save ولم يظهر الخطأ أو أي Console error |
+| DATA-CLOSED-001 | Scope قاعدة التكرار كان موثقًا كأنه غير محسوم | تم اعتماد التفرد العالمي عبر الشركة وكل السنوات للزوج `WorkOrderNumber + WorkTypeCode`، وهو مطابق للـUnique Index الحالي | قرار المنتج المؤكد والكود الحالي وM5D4R3 متطابقة |
 
 ## Closed / Rejected Experiments
 
@@ -69,9 +70,34 @@
 
 ## Simple Example
 
-`GRID-001` لا يُغلق لأن تغيير السنة يعيد السرعة. تغيير السنة Workaround، مثل إعادة تشغيل جهاز يسخن. الإغلاق الحقيقي يعني أن الجلسة الطويلة تظل سريعة أو أن هناك حلًا آمنًا غير ملحوظ ومثبتًا بالاختبار.
+`GRID-001` أصبح قيد مراقبة P2 وليس مشكلة نصلحها الآن. القياس سجّل التدهور، لكن قرار المنتج يعتمد أيضًا على الاستخدام الفعلي: طالما السرعة الحالية مقبولة ولا توجد شكوى تشغيلية، لا نضيف Patch مخاطره أكبر من فائدته. يعاد فتحه عند بيانات أكبر أو مشكلة فعلية.
 
 
-## E6F Provisional Performance Reference
+## Phase 6.0 Long-session Reference — 2026-07-29
 
-القيم المؤقتة لمنع Regression أثناء Refactor: ArrowDown p95 = 107.3ms، ArrowUp p95 = 108.3ms، Enter p95 = 125.2ms. الحدود المؤقتة: 118ms / 119ms / 138ms. هذه ليست أهداف المنتج النهائية ولا تغلق `GRID-001`.
+- COLD: ArrowDown average ≈ 33.7ms / p95 ≈ 53.3ms، وArrowUp average ≈ 34.8ms / p95 ≈ 56.7ms.
+- بعد جلسة أسهم طويلة: ArrowDown average ≈ 60.4ms / p95 ≈ 101.4ms، وArrowUp average ≈ 57.4ms / p95 ≈ 101.7ms.
+- الذاكرة لم تُظهر نموًا مستمرًا؛ ظهرت دورات ارتفاع وانخفاض مع Garbage Collection.
+- Phase 6.1 لم تُظهر تراكمًا مستمرًا في الـTimers أو Observers أو المالكين المعروفين. تسجيلات Listeners ارتفعت أثناء إنشاء خلايا Tabulator الجديدة ثم استقرت، والعداد يمثل حدًا أعلى للتسجيلات وليس إثباتًا أن جميعها نشطة.
+- بقرار المستخدم، الأداء العملي الحالي مقبول ولا نضيف إصلاحًا الآن؛ يحتفظ بهذه الأرقام كمرجع لاختبار 10,000 صف أو أي Regression مستقبلي.
+
+
+## Phase 8.5 Verification Note — 2026-07-31
+
+The confirmed 18-second duplicate-query regression was fixed by scoping identity checks. Phase 8.5 further replaces row-only dirty tracking with changed-field tracking and introduces generic batch application for large cell operations. This remains **pending runtime verification** until the Phase 8.5 checklist passes on the user's machine. User-created columns remain planned, not implemented.
+
+
+## Phase 8.5-R1 Performance Correction — 2026-07-31
+
+- Field-level tracking is retained because it correctly prevented unrelated identity validation and eliminated the `cellEdited` event storm.
+- The first large-batch `updateData` strategy is rejected because full-column Paste increased to about 1.01 seconds and Undo to about 1.17 seconds.
+- R1 uses the documented Tabulator `replaceData` path only for 500+ changed cells; small edits keep the targeted update path.
+- This item remains open until the user repeats the 4,952-cell Paste/Save/Undo test.
+
+## Phase 8.5-R2 Post-Save Navigation Finding — 2026-07-31
+
+- The R1 full-column Paste path improved from about 1.01 seconds to about 0.74 seconds, but navigation still became heavy after the large Save.
+- Switching year away and back recreated the grid and restored ArrowDown p95 to about 72.9 ms with zero Long Tasks in the final measurement window.
+- The report showed `save.delta.update-rows` repainting 4,952 rows and taking about 1.12 seconds even though the user-visible pasted values were already present.
+- R2 keeps field-level tracking and changes Save reconciliation so hidden server values are merged without repainting rows; only genuinely different sheet values are sent through the grid update path.
+- This remains open until navigation is tested immediately after Save without changing year.

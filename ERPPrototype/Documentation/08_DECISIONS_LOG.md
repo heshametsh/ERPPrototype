@@ -92,10 +92,10 @@
 - **Reason:** المحادثات ليست مصدر معرفة دائم، والمستخدم غير مبرمج ويحتاج شرحًا بسيطًا وأمثلة.
 
 
-## DEC-013 — E6E is the current stable checkpoint
+## DEC-013 — E6E historical stable checkpoint
 
 - **Date:** 2026-07-27
-- **Status:** Accepted after user testing
+- **Status:** Superseded by DEC-015, then DEC-017
 - **Decision:** اعتماد E6E كنقطة التشغيل المستقرة الحالية، مبنية تراكميًا على E6C.
 - **Contains:** E6C resize/buffer/navigation safeguards، E6D Enter repeat gate، وE6E first-right-click range guard.
 - **Reason:** حلت مشكلتين قابلتين لإعادة الإنتاج بدون إدخال Recovery أو Restart أو تغيير قواعد البيانات.
@@ -111,10 +111,10 @@
 - **Constraint:** لا يتحول ذلك إلى سلسلة Performance patches غير محدودة؛ الإصلاح يجب أن يكون صغيرًا ومثبت السبب.
 
 
-## DEC-015 — E6F is the current stable checkpoint
+## DEC-015 — E6F historical stable checkpoint
 
 - **Date:** 2026-07-27
-- **Status:** Accepted after user testing
+- **Status:** Superseded by DEC-017
 - **Decision:** اعتماد E6F كنقطة الرجوع الحالية قبل بدء Module extraction.
 - **Contains:** E6C foundation، E6D Enter gate، E6E right-click guard، E6F structural focus safety.
 - **Evidence:** Clean/Rebuild PASS، الوظائف الأساسية PASS، Console بلا أخطاء بعد العمليات الهيكلية.
@@ -128,3 +128,59 @@
 - **Limitation:** عرض نافذة الاختبار اختلف، لذلك المرجع ليس Median صارمًا ولا يستخدم لإثبات تحسين صغير.
 - **Use:** اكتشاف Regression واضح بعد Refactor فقط.
 - **Simple example:** القياس مثل ميزان تقريبي يمنع زيادة كبيرة في الوزن، لكنه ليس ميزان معمل لإثبات فرق جرامات قليلة.
+
+
+## DEC-017 — M5D4R3 is the current stable checkpoint
+
+- **Date:** 2026-07-29
+- **Status:** Accepted after user testing
+- **Decision:** اعتماد `M5D4R3-Stable-Range-UX` كنقطة العمل والرجوع الحالية، مع بقاء E6C كأساس تاريخي للسلوك.
+- **Contains:** Phase 5 clipboard ownership، in-place save reconciliation، global duplicate reporting، logical range clear، ordered validation، وdrag Auto-scroll بسرعة 8/32.
+- **Rollback:** `M5D3-Stable-Range-Clear-And-Validation` إذا ظهر Regression خاص بالـAuto-scroll.
+
+## DEC-018 — Final role and uniqueness terminology
+
+- **Date:** 2026-07-29
+- **Status:** Accepted
+- **Decision:** `ProjectManager` هو الاسم النهائي. `Employee` هو اسم الـIdentity role التقني وDepartment Employee / موظف القسم هو اسم العرض. التفرد عالمي عبر الشركة وكل السنوات للزوج `WorkOrderNumber + WorkTypeCode`.
+- **Impact:** لا Role migration أثناء Phase 6، ولا إعادة فتح Scope التفرد بدون متطلب أعمال جديد موثق.
+
+## DEC-019 — Diagnose gradual fatigue with time windows and lifecycle resources
+
+- **Date:** 2026-07-29
+- **Status:** Accepted
+- **Decision:** Phase 6.1 تقيس الأداء تلقائيًا في نوافذ 30 ثانية مع Listeners/Timers/RAF/Observers، بدل الاعتماد على علامة يدوية للحظة البطء.
+- **Reason:** القياسات أثبتت أن التدهور تدريجي، وليس حدثًا مفاجئًا.
+- **Constraint:** وضع Lifecycle تشخيصي فقط؛ أي تحسن نهائي يُثبت مجددًا في Baseline.
+
+## DEC-020 — Accept current navigation performance without a runtime fix
+
+- **Date:** 2026-07-29
+- **Status:** Accepted by user
+- **Decision:** إغلاق مسار تحسين الأسهم وEnter والـWheel حاليًا بدون Recovery أو Rewrite أو Targeted Patch، لأن المستخدم أكد أن السرعة العملية الحالية مقبولة.
+- **Evidence:** Phase 6.0 أثبتت تدهورًا تدريجيًا، وPhase 6.1 لم تثبت تراكمًا مستمرًا في Timers أو Observers أو known lifecycle owners.
+- **Reason:** القياس وحده لا يبرر تعديلًا عالي المخاطر عندما لا توجد مشكلة استخدام مؤثرة.
+- **Reopen when:** اختبار 10,000 صف، شكوى فعلية، أو Regression مقارنة بالـBaseline.
+
+## DEC-021 — Defer search debounce until a measured need exists
+
+- **Date:** 2026-07-29
+- **Status:** Accepted by user
+- **Decision:** عدم إضافة Debounce للبحث الآن.
+- **Reason:** البحث الحالي سريع مع بيانات البروتوتايب، وإضافة Debounce ستضيف تأخيرًا مقصودًا وTimer ومسار اختبار جديد دون فائدة مثبتة.
+- **Reopen when:** البحث يصبح بطيئًا مع بيانات أكبر أو القياس يثبت تشغيل فلترة مكلفًا مع كل حرف.
+
+
+## DEC-022 — Track changed fields and run only dependent rules
+
+- **Date:** 2026-07-31
+- **Decision:** Existing-row changes are tracked by stable field keys. Batch operations apply values together, and validation/save logic acts only on affected fields and rule dependencies.
+- **Reason:** Editing one column across thousands of rows must not make the system revalidate or rewrite unrelated columns.
+- **Example:** Pasting estimated value does not execute the global Work Order Number + Work Type duplicate rule. Editing either identity field does.
+- **Future impact:** User-created columns must register stable metadata and use the same generic change pipeline. Core business fields remain strongly typed and indexed.
+
+## DEC-023 — Explain project logic before code details
+
+- **Date:** 2026-07-31
+- **Decision:** Explanations must begin with the Work Orders business situation, the before/after behaviour, the exact user test, and remaining work. Internal code details are secondary.
+- **Reason:** The user is directing product logic and testing but is not a programmer.

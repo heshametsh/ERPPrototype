@@ -147,6 +147,21 @@ Rules:
 - For a file patch, state the exact file path, whether the patch is cumulative, and how to roll back.
 - For a multi-phase plan, summarize completed phases and remaining phases after each phase.
 - Use examples tied to the ERP project whenever possible.
+- Explain the business logic before describing code structure.
+- Prefer examples from the Work Orders sheet: editing one column, pasting thousands of values, saving, filtering, inserting rows, deleting rows, and switching years.
+- For every important technical change, state the user-visible situation before and after the change.
+- Do not explain internal implementation details unless they change a decision, risk, or test.
+
+Required business-first example:
+
+"Before:
+Pasting the estimated value into 4,952 rows made the system treat every complete row as changed and recheck unrelated rules.
+
+After:
+The system records that only the estimated-value field changed, validates only rules linked to that field, and saves only that field for those rows.
+
+Test:
+Paste one column, save, and confirm that work-order identity validation does not run unless the number or type was changed."
 
 Required response example:
 

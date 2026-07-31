@@ -15,16 +15,19 @@ public sealed class WorkOrderService(
 
     public Task<WorkOrderSheetData?> LoadSheetAsync(
         string userId,
-        CancellationToken cancellationToken = default) =>
+        CancellationToken cancellationToken = default,
+        ICollection<WorkOrderServicePerformanceStage>? performanceStages = null) =>
         LoadSheetAsync(
             userId,
             DateTime.Now.Year,
-            cancellationToken);
+            cancellationToken,
+            performanceStages);
 
     public async Task<WorkOrderSheetData?> LoadSheetAsync(
         string userId,
         int workYear,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        ICollection<WorkOrderServicePerformanceStage>? performanceStages = null)
     {
         if (!IsValidWorkYear(workYear))
         {
@@ -35,11 +38,19 @@ public sealed class WorkOrderService(
         }
 
         var totalStopwatch = Stopwatch.StartNew();
+        var totalStartedAt = Stopwatch.GetTimestamp();
+        var dbContextStartedAt = Stopwatch.GetTimestamp();
 
         await using var dbContext =
             await dbFactory.CreateDbContextAsync(cancellationToken);
 
+        RecordPerformanceStage(
+            performanceStages,
+            "open.server.create-db-context",
+            dbContextStartedAt);
+
         var scopeStopwatch = Stopwatch.StartNew();
+        var scopeStartedAt = Stopwatch.GetTimestamp();
 
         var userScope = await (
             from user in dbContext.Users.AsNoTracking()
@@ -63,12 +74,33 @@ public sealed class WorkOrderService(
 
         scopeStopwatch.Stop();
 
+        RecordPerformanceStage(
+            performanceStages,
+            "open.server.scope-query",
+            scopeStartedAt,
+            new
+            {
+                FoundScope = userScope is not null
+            });
+
         if (userScope is null)
         {
+            RecordPerformanceStage(
+                performanceStages,
+                "open.server.total",
+                totalStartedAt,
+                new
+                {
+                    Outcome = "missing-scope",
+                    WorkYear = workYear,
+                    Rows = 0
+                });
+
             return null;
         }
 
         var yearsStopwatch = Stopwatch.StartNew();
+        var yearsStartedAt = Stopwatch.GetTimestamp();
 
         var availableYears = await dbContext.WorkOrders
             .AsNoTracking()
@@ -80,6 +112,16 @@ public sealed class WorkOrderService(
 
         yearsStopwatch.Stop();
 
+        RecordPerformanceStage(
+            performanceStages,
+            "open.server.available-years-query",
+            yearsStartedAt,
+            new
+            {
+                DepartmentId = userScope.DepartmentId,
+                DatabaseYearCount = availableYears.Count
+            });
+
         availableYears.Add(DateTime.Now.Year);
         availableYears.Add(workYear);
 
@@ -90,6 +132,7 @@ public sealed class WorkOrderService(
             .ToList();
 
         var rowsStopwatch = Stopwatch.StartNew();
+        var rowsStartedAt = Stopwatch.GetTimestamp();
 
         var workOrders = await dbContext.WorkOrders
             .AsNoTracking()
@@ -111,7 +154,32 @@ public sealed class WorkOrderService(
             .ToListAsync(cancellationToken);
 
         rowsStopwatch.Stop();
+
+        RecordPerformanceStage(
+            performanceStages,
+            "open.server.rows-query",
+            rowsStartedAt,
+            new
+            {
+                DepartmentId = userScope.DepartmentId,
+                WorkYear = workYear,
+                Rows = workOrders.Count
+            });
+
         totalStopwatch.Stop();
+
+        RecordPerformanceStage(
+            performanceStages,
+            "open.server.total",
+            totalStartedAt,
+            new
+            {
+                Outcome = "success",
+                DepartmentId = userScope.DepartmentId,
+                WorkYear = workYear,
+                Rows = workOrders.Count,
+                AvailableYears = availableYears.Count
+            });
 
         logger.LogInformation(
             "Loaded {WorkOrderCount} work orders for department {DepartmentId}, year {WorkYear}. " +
@@ -138,32 +206,67 @@ public sealed class WorkOrderService(
         IEnumerable<WorkOrder> addedRecords,
         IEnumerable<WorkOrder> changedRecords,
         IEnumerable<WorkOrder> deletedRecords,
-        CancellationToken cancellationToken = default) =>
+        CancellationToken cancellationToken = default,
+        ICollection<WorkOrderServicePerformanceStage>? performanceStages = null) =>
         SaveChangesAsync(
             userId,
             DateTime.Now.Year,
             addedRecords,
-            changedRecords,
+            changedRecords.Select(WorkOrderChangeSet.AllFields),
             deletedRecords,
-            cancellationToken);
+            cancellationToken,
+            performanceStages);
 
-    public async Task<WorkOrderSaveResult> SaveChangesAsync(
+    public Task<WorkOrderSaveResult> SaveChangesAsync(
         string userId,
         int workYear,
         IEnumerable<WorkOrder> addedRecords,
         IEnumerable<WorkOrder> changedRecords,
         IEnumerable<WorkOrder> deletedRecords,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        ICollection<WorkOrderServicePerformanceStage>? performanceStages = null) =>
+        SaveChangesAsync(
+            userId,
+            workYear,
+            addedRecords,
+            changedRecords.Select(WorkOrderChangeSet.AllFields),
+            deletedRecords,
+            cancellationToken,
+            performanceStages);
+
+    public async Task<WorkOrderSaveResult> SaveChangesAsync(
+        string userId,
+        int workYear,
+        IEnumerable<WorkOrder> addedRecords,
+        IEnumerable<WorkOrderChangeSet> changedRecords,
+        IEnumerable<WorkOrder> deletedRecords,
+        CancellationToken cancellationToken = default,
+        ICollection<WorkOrderServicePerformanceStage>? performanceStages = null)
     {
+        var serviceStartedAt = Stopwatch.GetTimestamp();
+
         if (!IsValidWorkYear(workYear))
         {
             return WorkOrderSaveResult.ValidationFailure(
                 $"Work year must be between {MinimumWorkYear} and {MaximumWorkYear}.");
         }
+        var inputPreparationStartedAt = Stopwatch.GetTimestamp();
+
+        var normalizedChangedRecords = changedRecords
+            .Select(change => new WorkOrderChangeSet(
+                change.Record,
+                WorkOrderFieldRegistry.NormalizeChangedFields(
+                    change.ChangedFields,
+                    defaultToAll: true)))
+            .ToList();
+
         // Keep every Id == 0 record. Several newly inserted rows can share Id 0
         // before saving, so grouping all new rows by Id would lose data.
         var newRecordCandidates = addedRecords
-            .Concat(changedRecords.Where(workOrder => workOrder.Id <= 0))
+            .Concat(
+                normalizedChangedRecords
+                    .Where(change => change.Record.Id <= 0)
+                    .Select(change => change.Record))
             .Where(workOrder => !IsCompletelyBlank(workOrder))
             .ToList();
 
@@ -176,10 +279,14 @@ public sealed class WorkOrderService(
                     .Select(group => group.Last()))
             .ToList();
 
-        var existingChangedRecords = changedRecords
-            .Where(workOrder => workOrder.Id > 0)
-            .GroupBy(workOrder => workOrder.Id)
+        var existingChangedRecords = normalizedChangedRecords
+            .Where(change => change.Record.Id > 0)
+            .GroupBy(change => change.Record.Id)
             .Select(group => group.Last())
+            .ToList();
+
+        var existingChangedWorkOrders = existingChangedRecords
+            .Select(change => change.Record)
             .ToList();
 
         var existingDeletedRecords = deletedRecords
@@ -189,7 +296,7 @@ public sealed class WorkOrderService(
             .ToList();
 
         var changedIds = existingChangedRecords
-            .Select(workOrder => workOrder.Id)
+            .Select(change => change.Record.Id)
             .ToHashSet();
 
         var deletedIds = existingDeletedRecords
@@ -204,23 +311,28 @@ public sealed class WorkOrderService(
 
         foreach (var workOrder in newRecords)
         {
-            NormalizeEditableFields(workOrder);
+            NormalizeEditableFields(
+                workOrder,
+                WorkOrderFieldRegistry.EditableFields);
         }
 
-        foreach (var workOrder in existingChangedRecords)
+        foreach (var change in existingChangedRecords)
         {
-            NormalizeEditableFields(workOrder);
+            NormalizeEditableFields(
+                change.Record,
+                change.ChangedFields);
         }
 
-        var validationError = ValidateRecords(
-            newRecords.Concat(existingChangedRecords));
+        var validationError =
+            ValidateNewRecords(newRecords) ??
+            ValidateChangedRecords(existingChangedRecords);
 
         if (!string.IsNullOrWhiteSpace(validationError))
         {
             return WorkOrderSaveResult.ValidationFailure(validationError);
         }
 
-        var recordWithoutValidRowVersion = existingChangedRecords
+        var recordWithoutValidRowVersion = existingChangedWorkOrders
             .Concat(existingDeletedRecords)
             .FirstOrDefault(workOrder =>
                 workOrder.RowVersion is null ||
@@ -235,8 +347,28 @@ public sealed class WorkOrderService(
                 recordWithoutValidRowVersion.WorkTypeCode);
         }
 
+        RecordPerformanceStage(
+            performanceStages,
+            "save.server.input-prepare",
+            inputPreparationStartedAt,
+            new
+            {
+                AddedRows = newRecords.Count,
+                ChangedRows = existingChangedRecords.Count,
+                DeletedRows = existingDeletedRecords.Count
+            });
+
+        var createDbContextStartedAt = Stopwatch.GetTimestamp();
+
         await using var dbContext =
             await dbFactory.CreateDbContextAsync(cancellationToken);
+
+        RecordPerformanceStage(
+            performanceStages,
+            "save.server.create-db-context",
+            createDbContextStartedAt);
+
+        var authorizeStartedAt = Stopwatch.GetTimestamp();
 
         var authorizedDepartmentId = await (
             from user in dbContext.Users.AsNoTracking()
@@ -253,6 +385,11 @@ public sealed class WorkOrderService(
             select user.DepartmentId)
             .SingleOrDefaultAsync(cancellationToken);
 
+        RecordPerformanceStage(
+            performanceStages,
+            "save.server.authorize",
+            authorizeStartedAt);
+
         if (authorizedDepartmentId is null)
         {
             return WorkOrderSaveResult.ScopeFailure(
@@ -261,33 +398,70 @@ public sealed class WorkOrderService(
 
         var departmentId = authorizedDepartmentId.Value;
 
+        var beginTransactionStartedAt = Stopwatch.GetTimestamp();
+
         await using var transaction =
             await dbContext.Database.BeginTransactionAsync(cancellationToken);
 
+        RecordPerformanceStage(
+            performanceStages,
+            "save.server.begin-transaction",
+            beginTransactionStartedAt);
+
         try
         {
-            var incomingRecords = newRecords
-                .Concat(existingChangedRecords)
+            var duplicateScopeStartedAt = Stopwatch.GetTimestamp();
+
+            /*
+             * The client tells the service which fields changed. A global
+             * identity lookup is therefore needed only for new rows or rows
+             * whose identity fields changed. Editing another field must not
+             * make the database re-check thousands of unchanged identities.
+             */
+            var identityCheckRecords = newRecords
+                .Concat(
+                    existingChangedRecords
+                        .Where(change => WorkOrderFieldRegistry.Affects(
+                            change.ChangedFields,
+                            WorkOrderFieldRegistry.IdentityFields))
+                        .Select(change => change.Record))
                 .ToList();
+
+            var identityChangedIds = identityCheckRecords
+                .Where(workOrder => workOrder.Id > 0)
+                .Select(workOrder => workOrder.Id)
+                .ToHashSet();
+
+            RecordPerformanceStage(
+                performanceStages,
+                "save.server.duplicate-scope",
+                duplicateScopeStartedAt,
+                new
+                {
+                    IncomingRows = newRecords.Count + existingChangedRecords.Count,
+                    IdentityCheckRows = identityCheckRecords.Count,
+                    IdentityChangedRows = identityChangedIds.Count,
+                    NewRows = newRecords.Count
+                });
+
+            var duplicateInMemoryStartedAt = Stopwatch.GetTimestamp();
 
             /*
              * Collect every duplicate identity before mutating the database.
-             * The previous implementation returned after the first match,
-             * which forced the user to save repeatedly and made validation
-             * jump backwards between rows.
+             * Only rows in the identity rule scope participate here.
              */
             var duplicateConflictsByKey =
                 new Dictionary<string, WorkOrderDuplicateConflict>(
                     StringComparer.Ordinal);
 
-            var incomingKeyOrder = incomingRecords
+            var incomingKeyOrder = identityCheckRecords
                 .Select(workOrder =>
                     CreateDuplicateKey(
                         workOrder.WorkOrderNumber,
                         workOrder.WorkTypeCode))
                 .ToList();
 
-            foreach (var group in incomingRecords
+            foreach (var group in identityCheckRecords
                 .GroupBy(workOrder =>
                     CreateDuplicateKey(
                         workOrder.WorkOrderNumber,
@@ -302,18 +476,30 @@ public sealed class WorkOrderService(
                         duplicate.WorkTypeCode);
             }
 
-            if (incomingRecords.Count > 0)
+            RecordPerformanceStage(
+                performanceStages,
+                "save.server.duplicate-inmemory",
+                duplicateInMemoryStartedAt,
+                new
+                {
+                    IncomingRows = identityCheckRecords.Count,
+                    BatchDuplicateKeys = duplicateConflictsByKey.Count
+                });
+
+            if (identityCheckRecords.Count > 0)
             {
-                var incomingNumbers = incomingRecords
+                var incomingNumbers = identityCheckRecords
                     .Select(workOrder => workOrder.WorkOrderNumber)
                     .Distinct()
                     .ToList();
+
+                var duplicateQueryStartedAt = Stopwatch.GetTimestamp();
 
                 var possibleConflicts = await dbContext.WorkOrders
                     .AsNoTracking()
                     .Where(workOrder =>
                         incomingNumbers.Contains(workOrder.WorkOrderNumber) &&
-                        !changedIds.Contains(workOrder.Id) &&
+                        !identityChangedIds.Contains(workOrder.Id) &&
                         !deletedIds.Contains(workOrder.Id))
                     .Select(workOrder => new
                     {
@@ -325,7 +511,19 @@ public sealed class WorkOrderService(
                     })
                     .ToListAsync(cancellationToken);
 
-                foreach (var incomingRecord in incomingRecords)
+                RecordPerformanceStage(
+                    performanceStages,
+                    "save.server.duplicate-query",
+                    duplicateQueryStartedAt,
+                    new
+                    {
+                        IncomingNumbers = incomingNumbers.Count,
+                        PossibleConflicts = possibleConflicts.Count
+                    });
+
+                var duplicateEvaluationStartedAt = Stopwatch.GetTimestamp();
+
+                foreach (var incomingRecord in identityCheckRecords)
                 {
                     var incomingKey = CreateDuplicateKey(
                         incomingRecord.WorkOrderNumber,
@@ -347,11 +545,6 @@ public sealed class WorkOrderService(
                             ? null
                             : existingConflict.DepartmentName;
 
-                    /*
-                     * Prefer the database location when the same key is also
-                     * duplicated inside the current batch. That gives the user
-                     * the most useful company-wide location information.
-                     */
                     duplicateConflictsByKey[incomingKey] =
                         new WorkOrderDuplicateConflict(
                             incomingRecord.WorkOrderNumber,
@@ -359,6 +552,16 @@ public sealed class WorkOrderService(
                             existingConflict.WorkYear,
                             differentDepartmentName);
                 }
+
+                RecordPerformanceStage(
+                    performanceStages,
+                    "save.server.duplicate-evaluate",
+                    duplicateEvaluationStartedAt,
+                    new
+                    {
+                        IncomingRows = identityCheckRecords.Count,
+                        ConflictKeys = duplicateConflictsByKey.Count
+                    });
             }
 
             if (duplicateConflictsByKey.Count > 0)
@@ -390,12 +593,18 @@ public sealed class WorkOrderService(
                         workYear,
                         workOrder.AssignmentDate))
                 .Concat(
-                    existingChangedRecords.Select(workOrder =>
-                        ResolveTargetWorkYear(
-                            workYear,
-                            workOrder.AssignmentDate)))
+                    existingChangedRecords
+                        .Where(change => WorkOrderFieldRegistry.Affects(
+                            change.ChangedFields,
+                            WorkOrderFieldRegistry.WorkYearRoutingFields))
+                        .Select(change =>
+                            ResolveTargetWorkYear(
+                                workYear,
+                                change.Record.AssignmentDate)))
                 .Distinct()
                 .ToList();
+
+            var displayOrderQueryStartedAt = Stopwatch.GetTimestamp();
 
             var nextAppendDisplayOrders = destinationYears.Count == 0
                 ? new Dictionary<int, long>()
@@ -415,6 +624,15 @@ public sealed class WorkOrderService(
                         item => item.WorkYear,
                         item => item.MaximumDisplayOrder,
                         cancellationToken);
+
+            RecordPerformanceStage(
+                performanceStages,
+                "save.server.display-order-query",
+                displayOrderQueryStartedAt,
+                new
+                {
+                    DestinationYears = destinationYears.Count
+                });
 
             foreach (var destinationYear in destinationYears)
             {
@@ -437,11 +655,25 @@ public sealed class WorkOrderService(
 
             if (deletedIds.Count > 0)
             {
+                var loadDeletesStartedAt = Stopwatch.GetTimestamp();
+
                 var entitiesToDelete = await dbContext.WorkOrders
                     .Where(workOrder =>
                         workOrder.DepartmentId == departmentId &&
                         deletedIds.Contains(workOrder.Id))
                     .ToListAsync(cancellationToken);
+
+                RecordPerformanceStage(
+                    performanceStages,
+                    "save.server.load-deletes",
+                    loadDeletesStartedAt,
+                    new
+                    {
+                        RequestedRows = deletedIds.Count,
+                        LoadedRows = entitiesToDelete.Count
+                    });
+
+                var prepareDeletesStartedAt = Stopwatch.GetTimestamp();
 
                 if (entitiesToDelete.Count != deletedIds.Count)
                 {
@@ -479,38 +711,63 @@ public sealed class WorkOrderService(
                 }
 
                 dbContext.WorkOrders.RemoveRange(entitiesToDelete);
+
+                RecordPerformanceStage(
+                    performanceStages,
+                    "save.server.prepare-deletes",
+                    prepareDeletesStartedAt,
+                    new
+                    {
+                        Rows = entitiesToDelete.Count
+                    });
             }
 
             if (changedIds.Count > 0)
             {
+                var loadUpdatesStartedAt = Stopwatch.GetTimestamp();
+
                 var entitiesToUpdate = await dbContext.WorkOrders
                     .Where(workOrder =>
                         workOrder.DepartmentId == departmentId &&
                         changedIds.Contains(workOrder.Id))
                     .ToListAsync(cancellationToken);
 
+                RecordPerformanceStage(
+                    performanceStages,
+                    "save.server.load-updates",
+                    loadUpdatesStartedAt,
+                    new
+                    {
+                        RequestedRows = changedIds.Count,
+                        LoadedRows = entitiesToUpdate.Count
+                    });
+
+                var prepareUpdatesStartedAt = Stopwatch.GetTimestamp();
+
                 if (entitiesToUpdate.Count != changedIds.Count)
                 {
                     var missingChangedRecord = existingChangedRecords
-                        .FirstOrDefault(record =>
+                        .FirstOrDefault(change =>
                             entitiesToUpdate.All(entity =>
-                                entity.Id != record.Id));
+                                entity.Id != change.Record.Id));
+                    var missingWorkOrder = missingChangedRecord?.Record;
 
                     return WorkOrderSaveResult.ConcurrencyFailure(
                         "One or more modified work orders were changed, moved, or deleted after the sheet was loaded.",
-                        missingChangedRecord?.Id,
-                        missingChangedRecord?.WorkOrderNumber,
-                        missingChangedRecord?.WorkTypeCode);
+                        missingWorkOrder?.Id,
+                        missingWorkOrder?.WorkOrderNumber,
+                        missingWorkOrder?.WorkTypeCode);
                 }
 
                 var changedById = existingChangedRecords
-                    .ToDictionary(workOrder => workOrder.Id);
+                    .ToDictionary(change => change.Record.Id);
 
                 foreach (var entity in entitiesToUpdate
                     .OrderBy(entity =>
-                        changedById[entity.Id].DisplayOrder))
+                        changedById[entity.Id].Record.DisplayOrder))
                 {
-                    var changedRecord = changedById[entity.Id];
+                    var change = changedById[entity.Id];
+                    var changedRecord = change.Record;
 
                     if (entity.WorkYear != workYear)
                     {
@@ -525,17 +782,26 @@ public sealed class WorkOrderService(
                         .Property(workOrder => workOrder.RowVersion)
                         .OriginalValue = changedRecord.RowVersion;
 
-                    var destinationYear = ResolveTargetWorkYear(
-                        entity.WorkYear,
-                        changedRecord.AssignmentDate);
-                    var movedToAnotherYear =
-                        destinationYear != entity.WorkYear;
+                    var movesToAnotherYear =
+                        WorkOrderFieldRegistry.Affects(
+                            change.ChangedFields,
+                            WorkOrderFieldRegistry.WorkYearRoutingFields) &&
+                        ResolveTargetWorkYear(
+                            entity.WorkYear,
+                            changedRecord.AssignmentDate) != entity.WorkYear;
+
+                    var destinationYear = movesToAnotherYear
+                        ? ResolveTargetWorkYear(
+                            entity.WorkYear,
+                            changedRecord.AssignmentDate)
+                        : entity.WorkYear;
 
                     ApplyEditableFields(
                         entity,
-                        changedRecord);
+                        changedRecord,
+                        change.ChangedFields);
 
-                    if (movedToAnotherYear)
+                    if (movesToAnotherYear)
                     {
                         entity.WorkYear = destinationYear;
                         entity.DisplayOrder =
@@ -547,7 +813,18 @@ public sealed class WorkOrderService(
                 }
 
                 savedEntities.AddRange(entitiesToUpdate);
+
+                RecordPerformanceStage(
+                    performanceStages,
+                    "save.server.prepare-updates",
+                    prepareUpdatesStartedAt,
+                    new
+                    {
+                        Rows = entitiesToUpdate.Count
+                    });
             }
+
+            var prepareAddsStartedAt = Stopwatch.GetTimestamp();
 
             foreach (var newRecord in newRecords)
             {
@@ -586,18 +863,74 @@ public sealed class WorkOrderService(
                 savedEntities.Add(newRecord);
             }
 
+            RecordPerformanceStage(
+                performanceStages,
+                "save.server.prepare-adds",
+                prepareAddsStartedAt,
+                new
+                {
+                    Rows = newRecords.Count
+                });
+
+            var saveChangesStartedAt = Stopwatch.GetTimestamp();
+
             await dbContext.SaveChangesAsync(cancellationToken);
+
+            RecordPerformanceStage(
+                performanceStages,
+                "save.server.save-changes",
+                saveChangesStartedAt,
+                new
+                {
+                    AddedRows = newRecords.Count,
+                    ChangedRows = existingChangedRecords.Count,
+                    DeletedRows = existingDeletedRecords.Count
+                });
+
+            var commitStartedAt = Stopwatch.GetTimestamp();
+
             await transaction.CommitAsync(cancellationToken);
+
+            RecordPerformanceStage(
+                performanceStages,
+                "save.server.commit",
+                commitStartedAt);
+
+            var mapResultStartedAt = Stopwatch.GetTimestamp();
 
             var savedRecords = savedEntities
                 .Select(MapSavedRecord)
                 .ToList();
 
+            var deletedRecordIds = deletedIds
+                .OrderBy(id => id)
+                .ToList();
+
+            RecordPerformanceStage(
+                performanceStages,
+                "save.server.map-result",
+                mapResultStartedAt,
+                new
+                {
+                    SavedRows = savedRecords.Count,
+                    DeletedRows = deletedRecordIds.Count
+                });
+
+            RecordPerformanceStage(
+                performanceStages,
+                "save.server.total",
+                serviceStartedAt,
+                new
+                {
+                    Outcome = "succeeded",
+                    AddedRows = newRecords.Count,
+                    ChangedRows = existingChangedRecords.Count,
+                    DeletedRows = existingDeletedRecords.Count
+                });
+
             return WorkOrderSaveResult.Success(
                 savedRecords,
-                deletedIds
-                    .OrderBy(id => id)
-                    .ToList());
+                deletedRecordIds);
         }
         catch (DbUpdateConcurrencyException exception)
         {
@@ -641,6 +974,20 @@ public sealed class WorkOrderService(
         }
     }
 
+    private static void RecordPerformanceStage(
+        ICollection<WorkOrderServicePerformanceStage>? stages,
+        string name,
+        long startedAt,
+        object? metadata = null)
+    {
+        stages?.Add(
+            new WorkOrderServicePerformanceStage(
+                name,
+                Stopwatch.GetElapsedTime(startedAt)
+                    .TotalMilliseconds,
+                metadata));
+    }
+
     private static WorkOrderSavedRecord MapSavedRecord(
         WorkOrder workOrder) =>
         new(
@@ -668,47 +1015,126 @@ public sealed class WorkOrderService(
 
     private static void ApplyEditableFields(
         WorkOrder target,
-        WorkOrder source)
+        WorkOrder source,
+        IReadOnlySet<string> changedFields)
     {
-        target.WorkOrderNumber = source.WorkOrderNumber;
-        target.WorkTypeCode = source.WorkTypeCode;
+        if (changedFields.Contains(WorkOrderFieldRegistry.WorkOrderNumber))
+        {
+            target.WorkOrderNumber = source.WorkOrderNumber;
+        }
 
-        if (source.DisplayOrder > 0)
+        if (changedFields.Contains(WorkOrderFieldRegistry.WorkTypeCode))
+        {
+            target.WorkTypeCode = source.WorkTypeCode;
+        }
+
+        if (
+            changedFields.Contains(WorkOrderFieldRegistry.DisplayOrder) &&
+            source.DisplayOrder > 0)
         {
             target.DisplayOrder = source.DisplayOrder;
         }
 
-        target.AssignmentDate = source.AssignmentDate;
-        target.Busket = source.Busket;
-        target.Status = source.Status;
-        target.Notes = source.Notes;
+        if (changedFields.Contains(WorkOrderFieldRegistry.AssignmentDate))
+        {
+            target.AssignmentDate = source.AssignmentDate;
+        }
+
+        if (changedFields.Contains(WorkOrderFieldRegistry.Basket))
+        {
+            target.Busket = source.Busket;
+        }
+
+        if (changedFields.Contains(WorkOrderFieldRegistry.Status))
+        {
+            target.Status = source.Status;
+        }
+
+        if (changedFields.Contains(WorkOrderFieldRegistry.Notes))
+        {
+            target.Notes = source.Notes;
+        }
     }
 
-    private static void NormalizeEditableFields(WorkOrder workOrder)
+    private static void NormalizeEditableFields(
+        WorkOrder workOrder,
+        IReadOnlySet<string> fields)
     {
-        workOrder.WorkOrderNumber =
-            NormalizeIdentityDigits(
-                workOrder.WorkOrderNumber?.Trim() ?? string.Empty);
+        if (fields.Contains(WorkOrderFieldRegistry.WorkOrderNumber))
+        {
+            workOrder.WorkOrderNumber =
+                NormalizeIdentityDigits(
+                    workOrder.WorkOrderNumber?.Trim() ?? string.Empty);
+        }
 
-        workOrder.WorkTypeCode =
-            NormalizeIdentityDigits(
-                workOrder.WorkTypeCode?.Trim() ?? string.Empty);
+        if (fields.Contains(WorkOrderFieldRegistry.WorkTypeCode))
+        {
+            workOrder.WorkTypeCode =
+                NormalizeIdentityDigits(
+                    workOrder.WorkTypeCode?.Trim() ?? string.Empty);
+        }
 
-        workOrder.Busket =
-            workOrder.Busket?.Trim() ?? string.Empty;
+        if (fields.Contains(WorkOrderFieldRegistry.Basket))
+        {
+            workOrder.Busket =
+                workOrder.Busket?.Trim() ?? string.Empty;
+        }
 
-        workOrder.Status =
-            workOrder.Status?.Trim() ?? string.Empty;
+        if (fields.Contains(WorkOrderFieldRegistry.Status))
+        {
+            workOrder.Status =
+                workOrder.Status?.Trim() ?? string.Empty;
+        }
 
-        workOrder.Notes = string.IsNullOrWhiteSpace(workOrder.Notes)
-            ? null
-            : workOrder.Notes.Trim();
+        if (fields.Contains(WorkOrderFieldRegistry.Notes))
+        {
+            workOrder.Notes = string.IsNullOrWhiteSpace(workOrder.Notes)
+                ? null
+                : workOrder.Notes.Trim();
+        }
     }
 
-    private static string? ValidateRecords(
+    private static string? ValidateNewRecords(
         IEnumerable<WorkOrder> workOrders)
     {
         foreach (var workOrder in workOrders)
+        {
+            var validationError = ValidateFields(
+                workOrder,
+                WorkOrderFieldRegistry.EditableFields);
+
+            if (!string.IsNullOrWhiteSpace(validationError))
+            {
+                return validationError;
+            }
+        }
+
+        return null;
+    }
+
+    private static string? ValidateChangedRecords(
+        IEnumerable<WorkOrderChangeSet> changes)
+    {
+        foreach (var change in changes)
+        {
+            var validationError = ValidateFields(
+                change.Record,
+                change.ChangedFields);
+
+            if (!string.IsNullOrWhiteSpace(validationError))
+            {
+                return validationError;
+            }
+        }
+
+        return null;
+    }
+
+    private static string? ValidateFields(
+        WorkOrder workOrder,
+        IReadOnlySet<string> fields)
+    {
+        if (fields.Contains(WorkOrderFieldRegistry.WorkOrderNumber))
         {
             if (string.IsNullOrWhiteSpace(workOrder.WorkOrderNumber))
             {
@@ -721,7 +1147,10 @@ public sealed class WorkOrderService(
             {
                 return "Work Order Number must contain exactly 9 digits.";
             }
+        }
 
+        if (fields.Contains(WorkOrderFieldRegistry.WorkTypeCode))
+        {
             if (string.IsNullOrWhiteSpace(workOrder.WorkTypeCode))
             {
                 return "Work Type is required.";
@@ -733,7 +1162,10 @@ public sealed class WorkOrderService(
             {
                 return "Work Type must contain exactly 3 digits.";
             }
+        }
 
+        if (fields.Contains(WorkOrderFieldRegistry.Basket))
+        {
             if (string.IsNullOrWhiteSpace(workOrder.Busket))
             {
                 return "Busket is required.";
@@ -743,24 +1175,29 @@ public sealed class WorkOrderService(
             {
                 return "Select a valid value from the Busket list.";
             }
+        }
 
-            if (
-                workOrder.AssignmentDate is not null &&
-                !IsValidWorkYear(
-                    workOrder.AssignmentDate.Value.Year))
-            {
-                return $"Assignment Date year must be between {MinimumWorkYear} and {MaximumWorkYear}.";
-            }
+        if (
+            fields.Contains(WorkOrderFieldRegistry.AssignmentDate) &&
+            workOrder.AssignmentDate is not null &&
+            !IsValidWorkYear(
+                workOrder.AssignmentDate.Value.Year))
+        {
+            return $"Assignment Date year must be between {MinimumWorkYear} and {MaximumWorkYear}.";
+        }
 
-            if (workOrder.Status?.Length > 150)
-            {
-                return "Status cannot exceed 150 characters.";
-            }
+        if (
+            fields.Contains(WorkOrderFieldRegistry.Status) &&
+            workOrder.Status?.Length > 150)
+        {
+            return "Status cannot exceed 150 characters.";
+        }
 
-            if (workOrder.Notes?.Length > 1000)
-            {
-                return "Notes cannot exceed 1000 characters.";
-            }
+        if (
+            fields.Contains(WorkOrderFieldRegistry.Notes) &&
+            workOrder.Notes?.Length > 1000)
+        {
+            return "Notes cannot exceed 1000 characters.";
         }
 
         return null;
@@ -868,6 +1305,11 @@ public sealed record WorkOrderDuplicateConflict(
     string WorkTypeCode,
     int? ExistingWorkYear = null,
     string? ExistingDepartmentName = null);
+
+public sealed record WorkOrderServicePerformanceStage(
+    string Name,
+    double DurationMs,
+    object? Metadata = null);
 
 public sealed record WorkOrderSaveResult(
     bool Succeeded,

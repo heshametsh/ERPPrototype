@@ -1,6 +1,6 @@
 # 05 — Work Orders Grid Behaviour
 
-**Status:** Approved description of E6F behavior and acceptance contract  
+**Status:** Approved description of `M5D4R3-Stable-Range-UX` behavior and acceptance contract  
 **Route:** `/work-orders`  
 **Authorized current role:** `Employee`
 
@@ -122,23 +122,30 @@ The final business choice between automatic move and user confirmation remains a
 - It restores the same row after Tabulator redraw settles.
 - It does not rely only on pixel `scrollTop`, because the same pixel can represent a different row after resizing.
 
-## 12. Performance Baseline
+## 12. Performance Foundation and Current Issue
 
-E6E includes the E6C foundation plus E6D/E6E safeguards. The E6C foundation includes:
+M5D4R3 retains the E6C foundation plus all later safeguards. The E6C foundation includes:
 
 - `renderVerticalBuffer: 260px`
 - shared vertical frame gate
 - ArrowUp viewport correction
 - resize logical-row anchor
 
-E6D/E6E add:
+Later checkpoints add:
 
 - central repeat gating for plain Enter navigation
 - first-right-click range initialization guard
+- bounded structural focus restoration
+- incremental structural operations
+- unified Copy/Paste ownership
+- in-place saved identity reconciliation
+- full global duplicate reporting
+- logical range clear outside the visible Virtual DOM
+- drag-selection Auto-scroll owned by a separate helper
 
 Known unresolved issue:
 
-After sustained repeated vertical navigation, the sheet can become noticeably slower. Changing year and returning recreates the instance and restores speed. Failed automatic recovery experiments are not part of E6E.
+Phase 6.0 proved that ArrowUp/ArrowDown alone cause gradual long-session degradation. Changing year and returning recreates the instance and restores speed, but this is diagnostic evidence only and not an accepted Recovery. Failed automatic recovery experiments remain excluded.
 
 
 ## 13. First Right-Click Behaviour — E6E
@@ -180,3 +187,23 @@ E6C يحفظ هوية الصف نفسه، مثل حفظ رقم المنزل بد
 بعد Insert/Delete أو Undo/Redo قد يعيد Tabulator بناء الـVirtual DOM قبل ظهور عنصر الخلية. E6F لا يستدعي `focus()` إلا بعد التأكد أن العنصر موجود ويدعم التركيز، مع عدد محاولات محدود.
 
 **مثال بسيط:** لا يحاول النظام الضغط على زر لم يظهر بعد؛ ينتظر لحظات قصيرة ثم يتوقف بأمان إذا لم يظهر.
+
+
+## 16. M5D4R3 Range and Auto-scroll Contract
+
+- Delete/Backspace clears cell values only; row count does not change.
+- The full logical range is cleared even when some selected rows are outside the visible Virtual DOM.
+- Auto-scroll moves the viewport near the top/bottom edge during mouse drag.
+- Tabulator remains the only owner of the selected range.
+- Auto-scroll speed is fixed at `minimumStep = 8` and `maximumStep = 32`.
+
+
+## 17. Bulk Field-Change Contract — Phase 8.5
+
+- A large Paste, range clear, Undo, or Redo is one user transaction.
+- The values are applied while repeated redraw and per-cell project processing are suspended.
+- After all values are applied, dirty tracking runs once using the affected row and field keys.
+- Only validators and cross-field rules that depend on those keys run.
+- Saving an existing row updates only its changed fields. New rows still validate and save all required fields.
+
+Example: pasting a second Notes column into 4,952 rows changes 4,952 values, but the identity rule does not run because neither Work Order Number nor Work Type changed. Changing Work Type in one row does run the identity rule for that row.

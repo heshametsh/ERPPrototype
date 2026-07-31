@@ -1,186 +1,159 @@
-# 09 — Refactor Roadmap
+# 09 — Maintainability Refactor Roadmap
 
-**Foundation baseline:** E6C  
-**Current stable checkpoint:** E6F  
-**Goal:** تقليل تأثير تعديل ميزة على غيرها، بدون Rewrite كامل وبدون تغيير سلوك مقصود.
+**Runtime baseline:** Phase 7B4-R5 bulk delete/Undo/Redo fixes with Phase 7B5-D1 open-journey diagnostics.  
+**Refactor policy:** incremental extraction, identical runtime behaviour, focused regression after every step, and no rewrite.
 
-## Rules for Every Phase
+## Refactor Objectives
 
-1. Git checkpoint قبل التعديل.
-2. ملف/مسؤولية واحدة قدر الإمكان.
-3. لا Feature جديدة داخل Refactor.
-4. لا Performance claim بدون قياس.
-5. Build + Regression checklist.
-6. Rollback فورًا عند كسر ميزة.
-7. تحديث Current Implementation وKnown Issues وDecisions عند الحاجة.
-8. شرح بسيط للمستخدم مع مثال بعد كل خطوة.
+1. Keep the Work Orders page easy to review and change.
+2. Give every file one clear responsibility.
+3. Reduce duplicated structural, history, validation, and save logic.
+4. Keep one owner for shared grid state and lifecycle.
+5. Preserve the verified Excel-like behaviour and performance improvements.
+6. Make future permissions, import/export, warehouse, and invoice work safer.
 
-## Phase 0 — Freeze and Characterize
+## Phase 8.1 — Razor / C# Code-Behind Split — COMPLETED
 
-### Work
+- `WorkOrders.razor` owns markup, bindings, and browser actions.
+- `WorkOrders.razor.cs` owns component lifecycle, loading, saving, year switching,
+  mapping, DTOs, and disposal.
+- No business rule, SQL, JavaScript, permission, or user-interface behaviour was
+  intentionally changed.
 
-- تثبيت E6C في Git tag/commit.
-- تسجيل hashes.
-- تشغيل Regression Checklist كاملة.
-- تسجيل أداء 3,000 صف.
-- حفظ تقرير baseline.
+Structural result:
 
-### Why
+- `WorkOrders.razor`: about 208 lines instead of about 1,456.
+- `WorkOrders.razor.cs`: about 1,260 lines of C# component logic.
 
-لا نستطيع إثبات أن Refactor لم يغير السلوك بدون أرقام واختبارات قبل التعديل.
+## Phase 8.2 — Validation JavaScript Module — COMPLETED
 
-### Exit gate — COMPLETED 2026-07-27
+`tabulatorValidation.js` owns:
 
-- Clean/Rebuild and local run: PASS.
-- Core regression checks: PASS.
-- Console errors after E6F: zero.
-- Provisional two-run performance baseline recorded.
-- Strict three-run median deferred by explicit user decision.
+- Work-order number, work-type, and assignment-date normalization.
+- Blank-row and identity-key validation helpers.
+- Duplicate indexes and row/cell validation errors.
+- Error navigation and pre-save validation.
+- Server validation mapping and custom editors.
 
-## Phase 1 — Extract Diagnostics
+Structural result:
 
-### Work
+- `tabulatorTest.js`: about 7,368 lines instead of about 9,462.
+- `tabulatorValidation.js`: about 2,139 lines.
 
-- نقل performance observation/reporting خارج Grid core.
-- الحفاظ على query flags الحالية.
-- لا لمس keyboard أو lifecycle.
+## Phase 8.3 — Clipboard and History Module — COMPLETED
 
-### Risk
+`tabulatorClipboardHistory.js` owns:
 
-منخفض نسبيًا.
+- Range copy and browser clipboard writing.
+- Clipboard parsing, target construction, paste, and range clear.
+- Cell-edit and filter transactions.
+- Undo/Redo orchestration for cells, filters, and structural transactions.
+- Transaction focus restoration and the public `copyRange` facade.
 
-### Tests
+Structural result:
 
-فتح الصفحة في Off/Baseline/Deep والتأكد أن الشيت نفسه لم يتغير.
+- `tabulatorTest.js`: about 5,836 lines.
+- `tabulatorClipboardHistory.js`: about 1,545 lines.
+- The existing public API and performance operation names remain unchanged.
 
-## Phase 2 — Centralize Lifecycle Cleanup
+## Phase 8.4 — Structural Rows Module — COMPLETED
 
-### Work
+`tabulatorStructure.js` owns:
 
-- دالة واحدة لإنشاء state الأساسي.
-- دالة واحدة لتنظيف listeners/timers/RAF.
-- دالة واحدة لتدمير Tabulator.
-- تستخدمها initialize وdestroy وتغيير السنة.
+- Row context-menu and insert-dialog UI.
+- Display-order allocation and rebalance.
+- Blank-row construction and selected-row resolution.
+- Incremental and bulk insert/delete paths.
+- The verified replace-data paths for large delete, Undo, and Redo.
+- Structural transaction creation, restoration, and application.
+- Bulk-operation pointer locking and browser yielding.
 
-### Risk
+`tabulatorTest.js` remains the central owner of:
 
-متوسط/مرتفع لأن lifecycle يمس كل المميزات.
+- Table/state instances and lifecycle.
+- Grid initialization, navigation, viewport handling, and teardown.
+- Shared row identity cloning and performance-stage helpers.
+- Dirty tracking, save delta, streamed save, and save reconciliation.
+- Public state/status calls used by Razor and the extracted modules.
 
-### Tests
+Structural result:
 
-الأسهم، السنة عدة مرات، resize، copy/paste، no duplicate events.
+- `tabulatorTest.js`: about 3,526 lines instead of about 5,836.
+- `tabulatorStructure.js`: about 2,323 lines.
+- `tabulatorValidation.js`: remains about 2,139 lines.
+- `tabulatorClipboardHistory.js`: remains about 1,545 lines.
+- `tabulatorStructure.js` loads before Clipboard/History so structural Undo/Redo
+  delegates to a registered implementation without circular ownership.
 
-## Phase 3 — Extract Resize and Viewport
+## Phase 8.5 — Field-Level Changes and Generic Batch Editing — R2 PENDING USER TEST
 
-### Work
+- Add `tabulatorFieldChanges.js` as the generic field metadata and batch-change engine.
+- Record changed field keys per dirty row.
+- Apply Paste, range clear, Undo, and Redo with redraw blocked and one post-processing pass.
+- Validate only fields and rules affected by the change.
+- Send changed field keys to Blazor and update only those fields in `WorkOrderService`.
+- Keep all-fields validation for new rows.
+- Centralize current server field keys in `WorkOrderFieldRegistry.cs`.
+- Prepare the contract for future user-created columns without implementing their storage/UI yet.
 
-- نقل logical row anchor restore.
-- مالك واحد لـresize listener/timer/RAF.
-- interface صغير مع Lifecycle.
+## Planned Following Phases
 
-### Tests
+### Phase 8.6 — Grid Lifecycle and Interaction Review
 
-صف 1,500/2,500، تصغير/تكبير متكرر، كل الأسهم، السنة.
+- Review initialization, event ownership, navigation, viewport restoration, and teardown.
+- Extract only where the boundary is clear and does not create circular ownership.
+- Keep one lifecycle owner for listeners, timers, frames, and Tabulator instances.
 
-## Phase 4 — Extract Navigation
+### Phase 8.7 — Save and Dirty-State Review
 
-### Work
+- Review save-delta creation, streamed interop, deleted rows, rekey reconciliation,
+  and history rebasing.
+- Keep server DTO contracts and persistence behaviour unchanged during extraction.
 
-- vertical frame gate.
-- ArrowUp correction.
-- horizontal navigation.
-- active-cell tracking.
+### Phase 8.8 — WorkOrderService Split
 
-### Rule
+- Separate read/query responsibilities from save/validation responsibilities.
+- Preserve transaction boundaries, uniqueness rules, role scope, and measured
+  query behaviour.
 
-المسار الرأسي مشترك، والاختلاف الاتجاهي يبقى فقط للدليل المثبت.
+### Phase 8.9 — Final Consolidation
 
-### Tests
+- Remove obsolete comments and dead experimental paths proven unused.
+- Run the full Work Orders regression checklist.
+- Compare key performance scenarios with the verified Phase 7 baseline.
+- Create the stable Git checkpoint only after all tests pass.
 
-long ArrowDown/ArrowUp، quick edit، Enter، editors، no stuck keys.
+## Rules for Every Refactor Patch
 
-## Phase 5 — Extract Validation and Dirty Tracking
+1. One responsibility boundary per patch.
+2. No business-rule or user-interface change unless separately approved.
+3. No new framework and no rewrite.
+4. Preserve existing public calls until final consolidation.
+5. Run syntax/build checks plus focused regression before continuing.
+6. Roll back immediately if behaviour differs and isolate the cause.
 
-### Work
+## Current Focused Regression for Phase 8.4
 
-- validation index.
-- affected-row validation.
-- duplicate identity index.
-- dirty/deleted state.
-- validation navigator.
+1. Load the current-year sheet and change year once.
+2. Open the row context menu from a cell and close it normally.
+3. Insert one row above and below the current selection.
+4. Insert a large block such as 1,000 rows, then Undo and Redo.
+5. Delete a small selection, then Undo and Redo.
+6. Delete at least 500 rows to activate the bulk replace-data path, then Undo and
+   Redo.
+7. Confirm row positions and values are restored after Undo.
+8. Save a safe structural change, refresh, and confirm persistence.
+9. Confirm Copy/Paste and validation still work after structural operations.
+10. Confirm no `tabulatorStructure` load/registration error or unexpected
+    JavaScript error appears in the console.
 
-### Tests
 
-كل أنواع الخطأ، duplicate، save/no-save، moved year.
+## Current Focused Regression for Phase 8.5
 
-## Phase 6 — Extract Clipboard and History
+Use section O in `06_REGRESSION_TEST_CHECKLIST.md`. Do not continue refactoring or create a Git tag until full-column Paste, Save, Undo/Redo, identity-change rejection, and refresh verification pass.
 
-### Work
+## Phase 8.5-R2 Focus
 
-- matrix copy/paste.
-- range clear.
-- cell transactions.
-- Undo/Redo ownership.
+Keep the business result of field-level tracking, but stop treating every saved row as a visible row refresh. When the employee saves a full Notes column, the screen already contains those Notes values. Save should merge the internal server version silently and refresh a visible cell only when the server actually changed its displayed value.
 
-### Tests
-
-paste كبير، undo once، redo، Arabic/date normalization، filter interaction.
-
-## Phase 7 — Extract Structural Rows
-
-### Work
-
-- insert/delete/structural undo.
-- بعدها فقط تحسين `setData` إلى incremental operations إذا أثبت القياس الحاجة.
-
-### Risk
-
-مرتفع لأن DisplayOrder والـTemporary Ids والحفظ مترابطة.
-
-### Tests
-
-insert/delete across selection، save، move year، undo/redo، 3,000 rows timing.
-
-## Phase 8 — Host and Adapter Cleanup
-
-### Work
-
-- Blazor يستدعي `workOrdersGridHost` فقط.
-- direct Tabulator calls تتركز في Adapter قدر الإمكان.
-- الاسم القديم `tabulatorTest` يمكن إبقاؤه alias مؤقتًا لتقليل المخاطرة.
-
-## Phase 9 — Return to Fatigue Root Cause
-
-بعد استقرار الحدود:
-
-- قياس أي Module يتدهور.
-- اختبار Table instance recreation كمُميّز تشخيصي فقط.
-- تحديد هل السبب renderer internals أو event/state accumulation.
-- مقارنة upgrade/test of Tabulator in isolated branch if justified.
-- قبول حل فقط إذا غير ملحوظ ويحافظ على البيانات والتحديد والتاريخ.
-
-## Suggested Milestones
-
-| Milestone | Meaning |
-|---|---|
-| M0 | **Complete:** E6F stable checkpoint, tests and provisional baseline recorded |
-| M1 | Diagnostics separated |
-| M2 | Lifecycle + Resize separated |
-| M3 | Navigation separated |
-| M4 | Validation/Clipboard/History separated |
-| M5 | Structural operations separated and measured |
-| M6 | Fatigue fix proven |
-| M7 | 10k strategy decided |
-
-## What We Do Not Optimize Yet
-
-- Warehouse/invoice modules.
-- Advanced dashboards.
-- Microservices.
-- Large design-system rewrite.
-- Automatic renderer recovery before root-cause isolation.
-- Renaming every legacy symbol in the same change.
-
-## Simple Example
-
-سنفك الملف الكبير مثل نقل محتويات مخزن: ننقل رفًا واحدًا، نعد القطع، ونتأكد أن العمل مستمر، ثم ننتقل للرف التالي. لا نفرغ المخزن كله في الشارع ثم نحاول ترتيب كل شيء مرة واحدة.
+Acceptance: after a 4,952-row Paste and Save, arrows remain usable without changing year, and `save.delta.update-rows` should report near-zero rows when the server returned no different sheet values.

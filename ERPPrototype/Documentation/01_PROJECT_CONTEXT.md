@@ -110,7 +110,7 @@ Company deployment
 ### Product roles المطلوبة
 
 - Admin: حساب واحد فقط، يرى ويدير كل شيء.
-- Projects Director: يرى كل الفروع والأقسام، Read-only لأوامر العمل.
+- ProjectManager: يرى كل الفروع والأقسام، Read-only لأوامر العمل.
 - Branch Manager: يرى فرعه Read-only، ويدير الحسابات الثابتة داخل فرعه.
 - Department Employee: يعدل أوامر العمل في قسمه فقط.
 
@@ -121,7 +121,7 @@ Company deployment
 - `BranchManager`
 - `Employee`
 
-هناك فجوة تسمية ووظائف بين Product Roles والكود الحالي. لا نغير أسماء الأدوار أو قاعدة البيانات قبل قرار Migration واختبارات صلاحيات واضحة.
+`ProjectManager` هو الاسم النهائي المعتمد في المنتج والكود. `Employee` هو اسم الـRole التقني الحالي، بينما **Department Employee / موظف القسم** هو اسم العرض الوظيفي. لا نعيد تسمية `Employee` في قاعدة الهوية ضمن مرحلة الأداء الحالية.
 
 ## 8. Work Order Identity and Year
 
@@ -133,14 +133,12 @@ Company deployment
   `WorkOrderNumber + WorkTypeCode` على مستوى قاعدة الشركة.
 - عند حفظ Assignment Date بسنة مختلفة، الكود الحالي ينقل الصف تلقائيًا إلى سنة التاريخ.
 
-### Open business confirmation before commercial release
+### Confirmed and open business rules
 
-يجب تثبيت القرار النهائي وتوثيقه بوضوح في نقطتين:
+- قاعدة التفرد مؤكدة ونهائية على مستوى الشركة وكل السنوات للزوج `WorkOrderNumber + WorkTypeCode`، ومتطابقة مع الـUnique Index الحالي.
+- ما زال سلوك اختلاف سنة `AssignmentDate` يحتاج قرار UX نهائيًا: النقل التلقائي الحالي أم عرض اقتراح للمستخدم قبل النقل.
 
-1. هل uniqueness على مستوى الشركة أم القسم؟
-2. هل نقل السنة تلقائي أم يعرض اقتراحًا للمستخدم؟
-
-لا يجوز تغيير الكود في هاتين النقطتين بناءً على افتراض.
+لا يجوز تغيير سلوك السنة بناءً على افتراض.
 
 ## 9. UX Principles
 

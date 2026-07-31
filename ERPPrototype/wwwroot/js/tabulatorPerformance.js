@@ -1,4 +1,4 @@
-﻿/*
+/*
  * UDS Work Orders Performance Observatory
  * Version: Step16P0-Final-v1
  *
@@ -17,7 +17,7 @@
 (function () {
     "use strict";
 
-    const VERSION = "Step16P0-Final-v1";
+    const VERSION = "Step16P0-Phase6.1-Lifecycle-Audit-v1";
     const DEFAULT_TABLE_ID = "tabulator-test-table";
     const ROW_BAND_SIZE = 250;
     const MAX_TIMELINE = 1200;
@@ -31,6 +31,20 @@
     const RECENT_INPUT_MS = 500;
     const DEFAULT_DEEP_SECONDS = 90;
     const MAX_DEEP_SECONDS = 180;
+    const TIME_BUCKET_MS = 30000;
+    const MAX_TIME_BUCKETS = 240;
+    const MAX_OPERATION_SAMPLES = 600;
+
+    const OPERATION_CONSOLE_NAMES = new Set([
+        "clipboard.copy",
+        "clipboard.paste.total",
+        "range.clear",
+        "structure.insert",
+        "structure.delete",
+        "history.undo",
+        "history.redo",
+        "save.end-to-end"
+    ]);
 
     const parameters = new URLSearchParams(window.location.search);
 
@@ -43,6 +57,10 @@
 
         if (value === "deep" || value === "diagnostic" || value === "1") {
             return "deep";
+        }
+
+        if (value === "lifecycle" || value === "audit") {
+            return "lifecycle";
         }
 
         return "off";
@@ -175,6 +193,571 @@
         };
     }
 
+    function incrementCount(map, key, amount) {
+        if (!map || !key) {
+            return;
+        }
+
+        const next = (map.get(key) || 0) + (amount ?? 1);
+
+        if (next <= 0) {
+            map.delete(key);
+        } else {
+            map.set(key, next);
+        }
+    }
+
+    function serializeCountMap(map) {
+        return Object.fromEntries(
+            Array.from(map.entries())
+                .sort((first, second) =>
+                    second[1] - first[1] ||
+                    String(first[0]).localeCompare(String(second[0]))
+                )
+        );
+    }
+
+    function createTimeBucket(index) {
+        return {
+            index,
+            startMs: index * TIME_BUCKET_MS,
+            endMs: (index + 1) * TIME_BUCKET_MS,
+            inputs: new Map(),
+            interactions: new Map(),
+            scroll: {
+                events: 0,
+                distancePx: 0,
+                byInput: new Map()
+            },
+            longTasks: {
+                count: 0,
+                totalMs: 0,
+                maxMs: 0
+            },
+            longAnimationFrames: {
+                count: 0,
+                totalMs: 0,
+                totalBlockingMs: 0,
+                maxMs: 0,
+                maxBlockingMs: 0
+            },
+            tableEvents: new Map(),
+            memory: null,
+            lifecycle: null
+        };
+    }
+
+    function describeEventTarget(target) {
+        if (target === window) {
+            return "window";
+        }
+
+        if (target === document) {
+            return "document";
+        }
+
+        if (target instanceof Element) {
+            const tag = String(target.tagName || "element").toLowerCase();
+
+            if (target.id) {
+                return `${tag}#${target.id}`;
+            }
+
+            const classes = Array.from(target.classList || [])
+                .filter(Boolean)
+                .slice(0, 2);
+
+            return classes.length > 0
+                ? `${tag}.${classes.join(".")}`
+                : tag;
+        }
+
+        return target?.constructor?.name || "unknown-target";
+    }
+
+    function createLifecycleTracker() {
+        const tracker = {
+            installed: false,
+            originals: null,
+            listenerRegistry: new WeakMap(),
+            listeners: {
+                active: 0,
+                peak: 0,
+                added: 0,
+                removed: 0,
+                duplicateAdds: 0,
+                onceRegistrations: 0,
+                signalRegistrations: 0,
+                byEvent: new Map(),
+                byTarget: new Map()
+            },
+            timers: {
+                active: new Map(),
+                activeRaf: new Map(),
+                peakTimers: 0,
+                peakRaf: 0,
+                created: 0,
+                completed: 0,
+                cleared: 0,
+                rafCreated: 0,
+                rafCompleted: 0,
+                rafCancelled: 0,
+                stringHandlers: 0
+            },
+            observerRecords: new WeakMap(),
+            observers: {
+                constructed: 0,
+                active: 0,
+                peak: 0,
+                disconnected: 0,
+                byType: new Map(),
+                instrumentationErrors: []
+            },
+
+            updateListenerPeak: function () {
+                this.listeners.peak = Math.max(
+                    this.listeners.peak,
+                    this.listeners.active
+                );
+            },
+
+            updateObserverPeak: function () {
+                this.observers.peak = Math.max(
+                    this.observers.peak,
+                    this.observers.active
+                );
+            },
+
+            updateTimerPeaks: function () {
+                this.timers.peakTimers = Math.max(
+                    this.timers.peakTimers,
+                    this.timers.active.size
+                );
+                this.timers.peakRaf = Math.max(
+                    this.timers.peakRaf,
+                    this.timers.activeRaf.size
+                );
+            },
+
+            noteListenerAdded: function (target, type, listener, options) {
+                if (
+                    !listener ||
+                    (typeof listener !== "function" && typeof listener !== "object")
+                ) {
+                    return;
+                }
+
+                const capture =
+                    typeof options === "boolean"
+                        ? options
+                        : Boolean(options?.capture);
+                const key = `${String(type)}::${capture ? 1 : 0}`;
+                let targetMap = this.listenerRegistry.get(target);
+
+                if (!targetMap) {
+                    targetMap = new Map();
+                    this.listenerRegistry.set(target, targetMap);
+                }
+
+                let listeners = targetMap.get(key);
+
+                if (!listeners) {
+                    listeners = new WeakMap();
+                    targetMap.set(key, listeners);
+                }
+
+                if (listeners.has(listener)) {
+                    this.listeners.duplicateAdds++;
+                    return;
+                }
+
+                const targetLabel = describeEventTarget(target);
+                listeners.set(listener, { targetLabel, type: String(type) });
+                this.listeners.active++;
+                this.listeners.added++;
+                incrementCount(this.listeners.byEvent, String(type), 1);
+                incrementCount(this.listeners.byTarget, targetLabel, 1);
+
+                if (typeof options === "object" && options?.once === true) {
+                    this.listeners.onceRegistrations++;
+                }
+
+                if (typeof options === "object" && options?.signal) {
+                    this.listeners.signalRegistrations++;
+                }
+
+                this.updateListenerPeak();
+            },
+
+            noteListenerRemoved: function (target, type, listener, options) {
+                if (
+                    !listener ||
+                    (typeof listener !== "function" && typeof listener !== "object")
+                ) {
+                    return;
+                }
+
+                const capture =
+                    typeof options === "boolean"
+                        ? options
+                        : Boolean(options?.capture);
+                const key = `${String(type)}::${capture ? 1 : 0}`;
+                const targetMap = this.listenerRegistry.get(target);
+                const listeners = targetMap?.get(key);
+                const metadata = listeners?.get(listener);
+
+                if (!metadata) {
+                    return;
+                }
+
+                listeners.delete(listener);
+                this.listeners.active = Math.max(0, this.listeners.active - 1);
+                this.listeners.removed++;
+                incrementCount(this.listeners.byEvent, metadata.type, -1);
+                incrementCount(this.listeners.byTarget, metadata.targetLabel, -1);
+            },
+
+            noteTimerCreated: function (id, kind, delay) {
+                this.timers.active.set(id, {
+                    kind,
+                    delayMs: Number.isFinite(Number(delay)) ? Number(delay) : null
+                });
+                this.timers.created++;
+                this.updateTimerPeaks();
+            },
+
+            noteTimerResolved: function (id, reason) {
+                if (!this.timers.active.has(id)) {
+                    return;
+                }
+
+                this.timers.active.delete(id);
+
+                if (reason === "completed") {
+                    this.timers.completed++;
+                } else {
+                    this.timers.cleared++;
+                }
+            },
+
+            noteRafCreated: function (id) {
+                this.timers.activeRaf.set(id, true);
+                this.timers.rafCreated++;
+                this.updateTimerPeaks();
+            },
+
+            noteRafResolved: function (id, reason) {
+                if (!this.timers.activeRaf.has(id)) {
+                    return;
+                }
+
+                this.timers.activeRaf.delete(id);
+
+                if (reason === "completed") {
+                    this.timers.rafCompleted++;
+                } else {
+                    this.timers.rafCancelled++;
+                }
+            },
+
+            registerObserver: function (instance, type) {
+                const metadata = {
+                    type,
+                    active: false,
+                    observedTargets: new WeakSet(),
+                    targetCount: 0
+                };
+                this.observerRecords.set(instance, metadata);
+                this.observers.constructed++;
+
+                const markActive = () => {
+                    if (metadata.active) {
+                        return;
+                    }
+
+                    metadata.active = true;
+                    this.observers.active++;
+                    incrementCount(this.observers.byType, type, 1);
+                    this.updateObserverPeak();
+                };
+
+                const markInactive = () => {
+                    if (!metadata.active) {
+                        return;
+                    }
+
+                    metadata.active = false;
+                    metadata.observedTargets = new WeakSet();
+                    metadata.targetCount = 0;
+                    this.observers.active = Math.max(0, this.observers.active - 1);
+                    this.observers.disconnected++;
+                    incrementCount(this.observers.byType, type, -1);
+                };
+
+                try {
+                    if (typeof instance.observe === "function") {
+                        const originalObserve = instance.observe.bind(instance);
+                        instance.observe = (...args) => {
+                            const result = originalObserve(...args);
+                            const target = args[0];
+
+                            if (
+                                type !== "PerformanceObserver" &&
+                                target &&
+                                (typeof target === "object" || typeof target === "function") &&
+                                !metadata.observedTargets.has(target)
+                            ) {
+                                metadata.observedTargets.add(target);
+                                metadata.targetCount++;
+                            }
+
+                            markActive();
+                            return result;
+                        };
+                    }
+
+                    if (typeof instance.unobserve === "function") {
+                        const originalUnobserve = instance.unobserve.bind(instance);
+                        instance.unobserve = target => {
+                            const result = originalUnobserve(target);
+
+                            if (target && metadata.observedTargets.has(target)) {
+                                metadata.observedTargets.delete(target);
+                                metadata.targetCount = Math.max(0, metadata.targetCount - 1);
+
+                                if (metadata.targetCount === 0) {
+                                    markInactive();
+                                }
+                            }
+
+                            return result;
+                        };
+                    }
+
+                    if (typeof instance.disconnect === "function") {
+                        const originalDisconnect = instance.disconnect.bind(instance);
+                        instance.disconnect = (...args) => {
+                            const result = originalDisconnect(...args);
+                            markInactive();
+                            return result;
+                        };
+                    }
+                } catch (error) {
+                    this.observers.instrumentationErrors.push({
+                        type,
+                        message: error?.message || String(error)
+                    });
+                }
+            },
+
+            wrapObserverConstructor: function (name) {
+                const Original = window[name];
+
+                if (typeof Original !== "function") {
+                    return null;
+                }
+
+                const owner = this;
+                const Wrapped = new Proxy(Original, {
+                    construct(target, args) {
+                        const instance = Reflect.construct(target, args, target);
+                        owner.registerObserver(instance, name);
+                        return instance;
+                    }
+                });
+
+                window[name] = Wrapped;
+                return Original;
+            },
+
+            install: function () {
+                if (this.installed) {
+                    return;
+                }
+
+                const owner = this;
+                this.originals = {
+                    addEventListener: EventTarget.prototype.addEventListener,
+                    removeEventListener: EventTarget.prototype.removeEventListener,
+                    setTimeout: window.setTimeout,
+                    clearTimeout: window.clearTimeout,
+                    setInterval: window.setInterval,
+                    clearInterval: window.clearInterval,
+                    requestAnimationFrame: window.requestAnimationFrame,
+                    cancelAnimationFrame: window.cancelAnimationFrame,
+                    observers: {}
+                };
+
+                EventTarget.prototype.addEventListener = function (type, listener, options) {
+                    const result = owner.originals.addEventListener.call(
+                        this,
+                        type,
+                        listener,
+                        options
+                    );
+                    owner.noteListenerAdded(this, type, listener, options);
+                    return result;
+                };
+
+                EventTarget.prototype.removeEventListener = function (type, listener, options) {
+                    const result = owner.originals.removeEventListener.call(
+                        this,
+                        type,
+                        listener,
+                        options
+                    );
+                    owner.noteListenerRemoved(this, type, listener, options);
+                    return result;
+                };
+
+                window.setTimeout = function (handler, delay, ...args) {
+                    let id = null;
+                    const wrapped = typeof handler === "function"
+                        ? function (...callbackArgs) {
+                            owner.noteTimerResolved(id, "completed");
+                            return handler.apply(this, callbackArgs);
+                        }
+                        : handler;
+
+                    if (typeof handler !== "function") {
+                        owner.timers.stringHandlers++;
+                    }
+
+                    id = owner.originals.setTimeout.call(window, wrapped, delay, ...args);
+                    owner.noteTimerCreated(id, "timeout", delay);
+                    return id;
+                };
+
+                window.clearTimeout = function (id) {
+                    owner.noteTimerResolved(id, "cleared");
+                    return owner.originals.clearTimeout.call(window, id);
+                };
+
+                window.setInterval = function (handler, delay, ...args) {
+                    const id = owner.originals.setInterval.call(
+                        window,
+                        handler,
+                        delay,
+                        ...args
+                    );
+                    owner.noteTimerCreated(id, "interval", delay);
+                    return id;
+                };
+
+                window.clearInterval = function (id) {
+                    owner.noteTimerResolved(id, "cleared");
+                    return owner.originals.clearInterval.call(window, id);
+                };
+
+                window.requestAnimationFrame = function (callback) {
+                    let id = null;
+                    id = owner.originals.requestAnimationFrame.call(
+                        window,
+                        timestamp => {
+                            owner.noteRafResolved(id, "completed");
+                            callback(timestamp);
+                        }
+                    );
+                    owner.noteRafCreated(id);
+                    return id;
+                };
+
+                window.cancelAnimationFrame = function (id) {
+                    owner.noteRafResolved(id, "cancelled");
+                    return owner.originals.cancelAnimationFrame.call(window, id);
+                };
+
+                for (const name of [
+                    "MutationObserver",
+                    "ResizeObserver",
+                    "IntersectionObserver",
+                    "PerformanceObserver"
+                ]) {
+                    const original = this.wrapObserverConstructor(name);
+
+                    if (original) {
+                        this.originals.observers[name] = original;
+                    }
+                }
+
+                this.installed = true;
+            },
+
+            restore: function () {
+                if (!this.installed || !this.originals) {
+                    return;
+                }
+
+                EventTarget.prototype.addEventListener = this.originals.addEventListener;
+                EventTarget.prototype.removeEventListener = this.originals.removeEventListener;
+                window.setTimeout = this.originals.setTimeout;
+                window.clearTimeout = this.originals.clearTimeout;
+                window.setInterval = this.originals.setInterval;
+                window.clearInterval = this.originals.clearInterval;
+                window.requestAnimationFrame = this.originals.requestAnimationFrame;
+                window.cancelAnimationFrame = this.originals.cancelAnimationFrame;
+
+                for (const [name, Original] of Object.entries(this.originals.observers)) {
+                    window[name] = Original;
+                }
+
+                this.installed = false;
+            },
+
+            snapshot: function () {
+                const timersByKind = new Map();
+
+                for (const metadata of this.timers.active.values()) {
+                    incrementCount(timersByKind, metadata.kind, 1);
+                }
+
+                return {
+                    installed: this.installed,
+                    listeners: {
+                        activeRegistrationBalance: this.listeners.active,
+                        peakRegistrationBalance: this.listeners.peak,
+                        added: this.listeners.added,
+                        explicitlyRemoved: this.listeners.removed,
+                        duplicateAddsIgnored: this.listeners.duplicateAdds,
+                        onceRegistrations: this.listeners.onceRegistrations,
+                        signalRegistrations: this.listeners.signalRegistrations,
+                        byEvent: serializeCountMap(this.listeners.byEvent),
+                        byTarget: serializeCountMap(this.listeners.byTarget),
+                        note: "Listener balance is addEventListener minus explicit removeEventListener. Browser auto-removal for once/signal can make this an upper-bound estimate."
+                    },
+                    timers: {
+                        active: this.timers.active.size,
+                        activeByKind: serializeCountMap(timersByKind),
+                        peakActive: this.timers.peakTimers,
+                        created: this.timers.created,
+                        completed: this.timers.completed,
+                        cleared: this.timers.cleared,
+                        stringHandlers: this.timers.stringHandlers
+                    },
+                    animationFrames: {
+                        active: this.timers.activeRaf.size,
+                        peakActive: this.timers.peakRaf,
+                        created: this.timers.rafCreated,
+                        completed: this.timers.rafCompleted,
+                        cancelled: this.timers.rafCancelled
+                    },
+                    observers: {
+                        constructed: this.observers.constructed,
+                        active: this.observers.active,
+                        peakActive: this.observers.peak,
+                        disconnected: this.observers.disconnected,
+                        activeByType: serializeCountMap(this.observers.byType),
+                        instrumentationErrors: this.observers.instrumentationErrors
+                    }
+                };
+            }
+        };
+
+        return tracker;
+    }
+
+    const lifecycleTracker = createLifecycleTracker();
+
     const api = {
         version: VERSION,
         mode: resolveMode(parameters.get("perf")),
@@ -190,6 +773,7 @@
         memoryTimer: null,
         attachTimer: null,
         markNumber: 0,
+        lifecycleTracker: lifecycleTracker,
 
         now: function () {
             return window.performance?.now?.() ?? Date.now();
@@ -361,7 +945,9 @@
                 internalDurations: new Map(),
                 bands: new Map(),
                 timeline: [],
+                operationSamples: [],
                 interactions: [],
+                timeBuckets: new Map(),
                 marks: [],
                 errors: [],
                 lastInput: {
@@ -426,10 +1012,24 @@
                 tableOptions: null,
                 resources: null,
                 navigation: null,
-                gpuIdentity: null
+                gpuIdentity: null,
+                lifecycle: {
+                    start: null,
+                    end: null,
+                    samples: []
+                }
             };
 
             this.sessions.set(elementId, session);
+
+            if (this.mode === "lifecycle") {
+                const sample = this.recordLifecycleSample(
+                    elementId,
+                    "session-start"
+                );
+                session.lifecycle.start = sample?.snapshot || null;
+            }
+
             this.recordMemorySample(elementId, "session-start");
             return session;
         },
@@ -440,6 +1040,159 @@
             }
 
             return this.sessions.get(elementId) || this.createSession(elementId);
+        },
+
+        ensureTimeBucket: function (session, absoluteAt) {
+            if (!session) {
+                return null;
+            }
+
+            const timestamp = Number.isFinite(absoluteAt)
+                ? absoluteAt
+                : this.now();
+            const elapsedMs = Math.max(0, timestamp - session.startedAt);
+            const index = Math.floor(elapsedMs / TIME_BUCKET_MS);
+            let bucket = session.timeBuckets.get(index);
+
+            if (!bucket) {
+                bucket = createTimeBucket(index);
+                session.timeBuckets.set(index, bucket);
+
+                while (session.timeBuckets.size > MAX_TIME_BUCKETS) {
+                    const oldest = Math.min(...session.timeBuckets.keys());
+                    session.timeBuckets.delete(oldest);
+                }
+            }
+
+            return bucket;
+        },
+
+        captureKnownLifecycleState: function (elementId) {
+            const state = window.tabulatorTest?.states?.[elementId] || null;
+            const attachment = this.attachments.get(elementId) || null;
+            const activePopups = window.tabulatorFilters?.activePopups;
+            const popupEntries = activePopups instanceof Map
+                ? Array.from(activePopups.values())
+                : [];
+
+            return {
+                grid: {
+                    tableInstances: Object.keys(window.tabulatorTest?.tables || {}).length,
+                    stateInstances: Object.keys(window.tabulatorTest?.states || {}).length,
+                    registeredDocumentHandlers: state
+                        ? [
+                            state.keyDownHandler,
+                            state.copyHandler,
+                            state.pasteHandler,
+                            state.pointerDownHandler
+                        ].filter(Boolean).length
+                        : 0,
+                    registeredWindowHandlers: state?.resizeHandler ? 1 : 0,
+                    registeredElementHandlers: state?.rightClickRangeGuardHandler ? 1 : 0,
+                    activeTimeouts: state?.resizeTimer ? 1 : 0,
+                    activeAnimationFrames: state
+                        ? [
+                            state.resizeViewportRestoreFrame,
+                            state.arrowUpCorrectionFrame,
+                            state.verticalNavigationFrame
+                        ].filter(value => value !== null && value !== undefined).length
+                        : 0
+                },
+                performanceObservatory: {
+                    attachments: this.attachments.size,
+                    domHandlers: attachment?.domHandlers?.length || 0,
+                    tableHandlers: attachment?.tableHandlers?.length || 0,
+                    attachmentMutationObservers: attachment?.mutationObserver ? 1 : 0,
+                    attachmentTimeouts: attachment?.scrollIdleTimer !== null &&
+                        attachment?.scrollIdleTimer !== undefined
+                        ? 1
+                        : 0,
+                    attachmentAnimationFrames: attachment?.contextRaf !== null &&
+                        attachment?.contextRaf !== undefined
+                        ? 1
+                        : 0,
+                    performanceObservers: this.observers.length,
+                    globalHandlers: this.globalHandlers.length,
+                    memoryTimer: this.memoryTimer !== null ? 1 : 0,
+                    deepStopTimer: this.deepStopTimer !== null ? 1 : 0,
+                    attachTimer: this.attachTimer !== null ? 1 : 0
+                },
+                filters: {
+                    activePopups: popupEntries.length,
+                    activePopupObservers: popupEntries.filter(item => item?.observer).length
+                },
+                rangeAutoScroll:
+                    window.tabulatorRangeAutoScroll?.snapshot?.(elementId) || null
+            };
+        },
+
+        captureLifecycleSnapshot: function (elementId) {
+            return {
+                trackedResources: this.lifecycleTracker.snapshot(),
+                knownOwners: this.captureKnownLifecycleState(elementId)
+            };
+        },
+
+        recordLifecycleSample: function (elementId, reason) {
+            if (this.mode !== "lifecycle") {
+                return null;
+            }
+
+            const session = this.ensureSession(elementId);
+
+            if (!session) {
+                return null;
+            }
+
+            const sample = {
+                atMs: round(this.now() - session.startedAt),
+                reason: reason || "periodic",
+                snapshot: this.captureLifecycleSnapshot(elementId)
+            };
+            pushBounded(session.lifecycle.samples, sample, MAX_MEMORY_SAMPLES);
+            const bucket = this.ensureTimeBucket(session, this.now());
+
+            if (bucket) {
+                bucket.lifecycle = sample.snapshot;
+            }
+
+            return sample;
+        },
+
+        serializeTimeBuckets: function (session) {
+            return Array.from(session.timeBuckets.values())
+                .sort((first, second) => first.index - second.index)
+                .map(bucket => ({
+                    window: {
+                        index: bucket.index,
+                        startMs: bucket.startMs,
+                        endMs: bucket.endMs
+                    },
+                    inputs: serializeCountMap(bucket.inputs),
+                    interactions: this.serializeInteractionMetrics(bucket.interactions),
+                    scroll: {
+                        events: bucket.scroll.events,
+                        distancePx: round(bucket.scroll.distancePx),
+                        byInput: Array.from(bucket.scroll.byInput.entries()).map(
+                            ([name, value]) => ({ name, ...value })
+                        )
+                    },
+                    longTasks: {
+                        count: bucket.longTasks.count,
+                        totalMs: round(bucket.longTasks.totalMs),
+                        maxMs: round(bucket.longTasks.maxMs)
+                    },
+                    longAnimationFrames: {
+                        count: bucket.longAnimationFrames.count,
+                        totalMs: round(bucket.longAnimationFrames.totalMs),
+                        totalBlockingMs: round(bucket.longAnimationFrames.totalBlockingMs),
+                        maxMs: round(bucket.longAnimationFrames.maxMs),
+                        maxBlockingMs: round(bucket.longAnimationFrames.maxBlockingMs)
+                    },
+                    tableEvents: Object.fromEntries(bucket.tableEvents),
+                    memory: bucket.memory,
+                    lifecycle: bucket.lifecycle
+                }));
         },
 
         reset: function (elementId, label) {
@@ -477,7 +1230,9 @@
             this.setPanelStatus(
                 this.mode === "deep"
                     ? `Recording deep test for ${this.getDeepSeconds()}s`
-                    : "Recording baseline"
+                    : this.mode === "lifecycle"
+                        ? "Recording lifecycle audit"
+                        : "Recording baseline"
             );
             return session;
         },
@@ -493,6 +1248,11 @@
             this.mode = selectedMode;
             this.enabled = true;
             this.active = true;
+
+            if (this.mode === "lifecycle") {
+                this.lifecycleTracker.install();
+            }
+
             const id = elementId || DEFAULT_TABLE_ID;
             const session = this.createSession(id, label);
             this.wrapApplicationMethods();
@@ -522,6 +1282,7 @@
             this.stopPerformanceObservers();
             this.detachGlobalHandlers();
             this.restoreWrappers();
+            this.lifecycleTracker.restore();
             this.setPanelStatus("Capture stopped — Download remains available");
         },
 
@@ -598,19 +1359,30 @@
             }
 
             const startedAt = this.now();
+            const memorySample = {
+                atMs: round(this.now() - session.startedAt),
+                reason: reason || "manual",
+                ...this.readMemorySnapshot(),
+                context:
+                    this.mode === "deep"
+                        ? this.currentContext(elementId)
+                        : null
+            };
             pushBounded(
                 session.memory.samples,
-                {
-                    atMs: round(this.now() - session.startedAt),
-                    reason: reason || "manual",
-                    ...this.readMemorySnapshot(),
-                    context:
-                        this.mode === "deep"
-                            ? this.currentContext(elementId)
-                            : null
-                },
+                memorySample,
                 MAX_MEMORY_SAMPLES
             );
+            const bucket = this.ensureTimeBucket(session, this.now());
+
+            if (bucket) {
+                bucket.memory = memorySample;
+            }
+
+            if (this.mode === "lifecycle" && reason !== "session-start") {
+                this.recordLifecycleSample(elementId, reason || "periodic");
+            }
+
             this.trackProfilerWork(session, "profiler.memory-sample", startedAt);
         },
 
@@ -662,6 +1434,52 @@
                 : session.durations;
             addDuration(targetMap, name, durationMs, true);
 
+            const normalizedMetadata = metadata
+                ? { ...metadata }
+                : null;
+
+            if (normalizedMetadata) {
+                delete normalizedMetadata.alwaysTimeline;
+                delete normalizedMetadata.captureSample;
+                delete normalizedMetadata.consoleSummary;
+            }
+
+            const shouldCaptureOperation =
+                internal !== true &&
+                (
+                    metadata?.captureSample === true ||
+                    String(name || "").startsWith("clipboard.") ||
+                    String(name || "").startsWith("range.") ||
+                    String(name || "").startsWith("history.") ||
+                    String(name || "").startsWith("structure.") ||
+                    String(name || "").startsWith("save.")
+                );
+
+            if (shouldCaptureOperation) {
+                const sample = {
+                    atMs: round(this.now() - session.startedAt),
+                    name: name,
+                    durationMs: round(durationMs),
+                    metadata: normalizedMetadata
+                };
+
+                pushBounded(
+                    session.operationSamples,
+                    sample,
+                    MAX_OPERATION_SAMPLES
+                );
+
+                if (
+                    metadata?.consoleSummary === true ||
+                    OPERATION_CONSOLE_NAMES.has(name)
+                ) {
+                    console.info(
+                        `[UDS Operation] ${name}: ${round(durationMs)} ms`,
+                        normalizedMetadata || {}
+                    );
+                }
+            }
+
             const threshold = this.mode === "deep" ? 8 : 30;
 
             if (durationMs >= threshold || metadata?.alwaysTimeline === true) {
@@ -669,7 +1487,7 @@
                     type: internal ? "internal-duration" : "operation-duration",
                     name: name,
                     durationMs: round(durationMs),
-                    metadata: metadata || null,
+                    metadata: normalizedMetadata,
                     context:
                         this.mode === "deep"
                             ? this.currentContext(elementId)
@@ -869,47 +1687,267 @@
                 return;
             }
 
+            const readRangeShape = range => {
+                let rows = 0;
+                let columns = 0;
+
+                try {
+                    const rangeRows = range?.getRows?.();
+                    const rangeColumns = range?.getColumns?.();
+                    rows = Array.isArray(rangeRows) ? rangeRows.length : 0;
+                    columns = Array.isArray(rangeColumns)
+                        ? rangeColumns.length
+                        : 0;
+                } catch {
+                    rows = 0;
+                    columns = 0;
+                }
+
+                return {
+                    rows,
+                    columns,
+                    cells: rows * columns
+                };
+            };
+
+            const readActiveRangeShape = elementId => {
+                const table = target.tables?.[elementId];
+                const range = target.getActiveRange?.(table);
+                return readRangeShape(range);
+            };
+
+            const readTransaction = (elementId, stackName) => {
+                const state = target.states?.[elementId];
+                const stack = state?.[stackName];
+                const transaction = Array.isArray(stack) && stack.length > 0
+                    ? stack[stack.length - 1]
+                    : null;
+
+                return {
+                    transactionKind: transaction?.kind || "cells",
+                    transactionType: transaction?.type || null,
+                    transactionAction: transaction?.action || null,
+                    label: transaction?.label || null,
+                    rows: Array.isArray(transaction?.rows)
+                        ? transaction.rows.length
+                        : 0,
+                    cells: Array.isArray(transaction?.changes)
+                        ? transaction.changes.length
+                        : 0
+                };
+            };
+
+            const commonSample = metadata => ({
+                ...(metadata || {}),
+                captureSample: true,
+                alwaysTimeline: true
+            });
+
             const definitions = [
-                ["validateRows", "validation.rows"],
-                ["refreshIdentityDuplicateErrors", "validation.duplicates"],
-                ["refreshDirtyRows", "dirty.refresh"],
-                ["validateBeforeSave", "save.validate"],
-                ["insertRows", "structure.insert"],
-                ["deleteSelectedRows", "structure.delete"],
-                ["applyStructureTransaction", "structure.apply-history"],
-                ["replaceStructureData", "structure.replace-all"],
-                ["recalculateStructureState", "structure.recalculate"],
-                ["undo", "history.undo"],
-                ["redo", "history.redo"],
-                ["pushTransaction", "history.push"],
-                ["pushStructureTransaction", "history.push-structure"],
-                ["applyRangePaste", "clipboard.paste"],
-                ["copyRange", "clipboard.copy"],
-                ["filterByWorkOrder", "filters.search"],
-                ["getDirtyRows", "save.collect-dirty"],
-                ["getDeletedRows", "save.collect-deleted"],
-                ["applySavedDelta", "save.apply-delta"],
-                ["correctArrowUpRangeViewport", "keyboard.arrow-up-correction"],
-                ["queueArrowUpRangeViewportCorrection", "keyboard.arrow-up-queue"]
+                { method: "validateRows", name: "validation.rows" },
+                { method: "refreshIdentityDuplicateErrors", name: "validation.duplicates" },
+                { method: "refreshDirtyRows", name: "dirty.refresh" },
+                { method: "validateBeforeSave", name: "save.validate" },
+                {
+                    method: "copyActiveRange",
+                    name: "clipboard.copy",
+                    before: args => ({
+                        ...readActiveRangeShape(args?.[0] || DEFAULT_TABLE_ID)
+                    }),
+                    metadata: (_args, value, before) =>
+                        commonSample({
+                            ...before,
+                            copied: value === true || Boolean(value)
+                        })
+                },
+                {
+                    method: "pasteClipboardText",
+                    name: "clipboard.paste.total",
+                    before: args => {
+                        const text = typeof args?.[1] === "string"
+                            ? args[1]
+                            : "";
+                        return {
+                            ...readActiveRangeShape(args?.[0] || DEFAULT_TABLE_ID),
+                            clipboardCharacters: text.length,
+                            clipboardLines: text
+                                ? text.split(/\r\n|\n|\r/).length
+                                : 0
+                        };
+                    },
+                    metadata: (_args, value, before) =>
+                        commonSample({
+                            ...before,
+                            accepted: Boolean(value),
+                            consoleSummary: true
+                        })
+                },
+                {
+                    method: "applyRangePaste",
+                    name: "clipboard.paste.apply",
+                    before: args => {
+                        const source = Array.isArray(args?.[2])
+                            ? args[2]
+                            : [];
+                        return {
+                            ...readActiveRangeShape(args?.[0] || DEFAULT_TABLE_ID),
+                            sourceRows: source.length,
+                            sourceColumns: source.reduce(
+                                (maximum, row) =>
+                                    Math.max(
+                                        maximum,
+                                        Array.isArray(row) ? row.length : 0
+                                    ),
+                                0
+                            )
+                        };
+                    },
+                    metadata: (_args, value, before) =>
+                        commonSample({
+                            ...before,
+                            affectedRows: Array.isArray(value) ? value.length : null
+                        })
+                },
+                {
+                    method: "clearActiveRangeContents",
+                    name: "range.clear",
+                    before: args => readRangeShape(args?.[1]),
+                    metadata: (_args, value, before) =>
+                        commonSample({
+                            ...before,
+                            changedCells: Number(value) || 0,
+                            consoleSummary: true
+                        })
+                },
+                { method: "runCellMutationBatch", name: "cells.batch" },
+                {
+                    method: "applyFieldChangesBatch",
+                    name: "fields.batch-apply",
+                    before: args => ({
+                        requestedCells: Array.isArray(args?.[1])
+                            ? args[1].length
+                            : 0
+                    }),
+                    metadata: (_args, value, before) =>
+                        commonSample({
+                            ...before,
+                            appliedCells: Array.isArray(value)
+                                ? value.length
+                                : 0,
+                            consoleSummary: true
+                        })
+                },
+                {
+                    method: "insertRows",
+                    name: "structure.insert",
+                    before: args => ({
+                        requestedRows: Number(args?.[1]) || 0,
+                        position: args?.[2] || null
+                    }),
+                    metadata: (_args, _value, before) =>
+                        commonSample({ ...before, consoleSummary: true })
+                },
+                {
+                    method: "deleteSelectedRows",
+                    name: "structure.delete",
+                    before: args => {
+                        const range = readActiveRangeShape(
+                            args?.[0] || DEFAULT_TABLE_ID
+                        );
+                        return { selectedRows: range.rows };
+                    },
+                    metadata: (_args, _value, before) =>
+                        commonSample({ ...before, consoleSummary: true })
+                },
+                {
+                    method: "deleteRowsWithSingleRedraw",
+                    name: "structure.delete-redraw",
+                    before: args => ({
+                        rows: Array.isArray(args?.[1]) ? args[1].length : 0,
+                        stage: args?.[2] || null
+                    }),
+                    metadata: (_args, _value, before) => commonSample(before)
+                },
+                {
+                    method: "restoreStructureRowsIncrementally",
+                    name: "structure.restore",
+                    before: args => ({
+                        rows: Array.isArray(args?.[1]) ? args[1].length : 0
+                    }),
+                    metadata: (_args, value, before) =>
+                        commonSample({ ...before, restored: Boolean(value) })
+                },
+                {
+                    method: "applyStructureTransaction",
+                    name: "structure.apply-history",
+                    before: args => ({
+                        direction: args?.[2] || null,
+                        transactionAction: args?.[1]?.action || null,
+                        rows: Array.isArray(args?.[1]?.rows)
+                            ? args[1].rows.length
+                            : 0
+                    }),
+                    metadata: (_args, _value, before) => commonSample(before)
+                },
+                { method: "replaceStructureData", name: "structure.replace-all" },
+                { method: "recalculateStructureState", name: "structure.recalculate" },
+                {
+                    method: "undo",
+                    name: "history.undo",
+                    before: args =>
+                        readTransaction(
+                            args?.[0] || DEFAULT_TABLE_ID,
+                            "undoStack"
+                        ),
+                    metadata: (_args, _value, before) =>
+                        commonSample({ ...before, consoleSummary: true })
+                },
+                {
+                    method: "redo",
+                    name: "history.redo",
+                    before: args =>
+                        readTransaction(
+                            args?.[0] || DEFAULT_TABLE_ID,
+                            "redoStack"
+                        ),
+                    metadata: (_args, _value, before) =>
+                        commonSample({ ...before, consoleSummary: true })
+                },
+                {
+                    method: "applyTransactionValues",
+                    name: "history.apply-values",
+                    before: args => ({
+                        valueKey: args?.[2] || null,
+                        cells: Array.isArray(args?.[1]?.changes)
+                            ? args[1].changes.length
+                            : 0,
+                        transactionType: args?.[1]?.type || null
+                    }),
+                    metadata: (_args, _value, before) => commonSample(before)
+                },
+                { method: "pushTransaction", name: "history.push" },
+                { method: "pushStructureTransaction", name: "history.push-structure" },
+                { method: "filterByWorkOrder", name: "filters.search" },
+                { method: "getDirtyRows", name: "save.collect-dirty" },
+                { method: "getDeletedRows", name: "save.collect-deleted" },
+                {
+                    method: "applySavedDelta",
+                    name: "save.apply-delta",
+                    before: args => ({
+                        savedRows: Array.isArray(args?.[1]) ? args[1].length : 0,
+                        mappings: Array.isArray(args?.[2]) ? args[2].length : 0
+                    }),
+                    metadata: (_args, _value, before) => commonSample(before)
+                },
+                { method: "correctArrowUpRangeViewport", name: "keyboard.arrow-up-correction" },
+                { method: "queueArrowUpRangeViewportCorrection", name: "keyboard.arrow-up-queue" }
             ];
 
-            for (const [methodName, metricName] of definitions) {
-                this.wrapMethod(target, methodName, {
-                    name: metricName,
-                    metadata: args => {
-                        if (this.mode !== "deep") {
-                            return null;
-                        }
-
-                        const value = args?.[1];
-                        return {
-                            argumentSize: Array.isArray(value)
-                                ? value.length
-                                : value instanceof Set || value instanceof Map
-                                    ? value.size
-                                    : null
-                        };
-                    }
+            for (const definition of definitions) {
+                this.wrapMethod(target, definition.method, {
+                    name: definition.name,
+                    before: definition.before,
+                    metadata: definition.metadata
                 });
             }
 
@@ -1200,6 +2238,15 @@
                 at: this.now()
             };
             this.increment(elementId, `input.${session.lastInput.type}.${session.lastInput.detail}`);
+            const bucket = this.ensureTimeBucket(session, session.lastInput.at);
+
+            if (bucket) {
+                incrementCount(
+                    bucket.inputs,
+                    `${session.lastInput.type}.${session.lastInput.detail}`,
+                    1
+                );
+            }
         },
 
         shouldMeasureInteraction: function (attachment, key) {
@@ -1278,6 +2325,22 @@
             );
             metric.frameGapSamples = metric.frameGapSamples || [];
             metric.frameGapSamples.push(item.frameGapMs);
+            const timeBucket = this.ensureTimeBucket(session, this.now());
+
+            if (timeBucket) {
+                const bucketMetric = addDuration(
+                    timeBucket.interactions,
+                    item.name,
+                    item.inputToPaintMs,
+                    true
+                );
+                bucketMetric.frameGapSamples = bucketMetric.frameGapSamples || [];
+                bucketMetric.frameGapSamples.push(item.frameGapMs);
+
+                if (bucketMetric.frameGapSamples.length > MAX_SAMPLES_PER_METRIC) {
+                    bucketMetric.frameGapSamples.shift();
+                }
+            }
 
             if (metric.frameGapSamples.length > MAX_SAMPLES_PER_METRIC) {
                 metric.frameGapSamples.shift();
@@ -1507,6 +2570,21 @@
                 session.scroll.distancePx += Math.abs(delta);
                 bucket.events++;
                 bucket.distancePx += Math.abs(delta);
+                const timeBucket = this.ensureTimeBucket(session, now);
+
+                if (timeBucket) {
+                    timeBucket.scroll.events++;
+                    timeBucket.scroll.distancePx += Math.abs(delta);
+                    let timeInputBucket = timeBucket.scroll.byInput.get(key);
+
+                    if (!timeInputBucket) {
+                        timeInputBucket = createScrollInputBucket();
+                        timeBucket.scroll.byInput.set(key, timeInputBucket);
+                    }
+
+                    timeInputBucket.events++;
+                    timeInputBucket.distancePx += Math.abs(delta);
+                }
 
                 if (attachment.scrollSession === null) {
                     attachment.scrollSession = {
@@ -1580,6 +2658,12 @@
                     name,
                     (session.tableEvents.get(name) || 0) + 1
                 );
+                const timeBucket = this.ensureTimeBucket(session, this.now());
+
+                if (timeBucket) {
+                    incrementCount(timeBucket.tableEvents, name, 1);
+                }
+
                 this.increment(elementId, `table.${name}`);
             };
 
@@ -1857,6 +2941,17 @@
                             session.longTasks.maxMs,
                             entry.duration
                         );
+                        const timeBucket = this.ensureTimeBucket(session, entry.startTime);
+
+                        if (timeBucket) {
+                            timeBucket.longTasks.count++;
+                            timeBucket.longTasks.totalMs += entry.duration;
+                            timeBucket.longTasks.maxMs = Math.max(
+                                timeBucket.longTasks.maxMs,
+                                entry.duration
+                            );
+                        }
+
                         const band = this.currentContext(session.elementId)?.band || "unknown";
                         const bucket = this.ensureBand(session, band);
                         bucket.longTaskCount++;
@@ -1897,6 +2992,19 @@
                             target.maxBlockingMs,
                             entry.blockingDuration || 0
                         );
+                        const timeBucket = this.ensureTimeBucket(session, entry.startTime);
+
+                        if (timeBucket) {
+                            const loaf = timeBucket.longAnimationFrames;
+                            loaf.count++;
+                            loaf.totalMs += entry.duration || 0;
+                            loaf.totalBlockingMs += entry.blockingDuration || 0;
+                            loaf.maxMs = Math.max(loaf.maxMs, entry.duration || 0);
+                            loaf.maxBlockingMs = Math.max(
+                                loaf.maxBlockingMs,
+                                entry.blockingDuration || 0
+                            );
+                        }
 
                         if (this.mode === "deep") {
                             for (const script of entry.scripts || []) {
@@ -2169,6 +3277,14 @@
                 return session;
             }
 
+            if (this.mode === "lifecycle") {
+                const sample = this.recordLifecycleSample(
+                    elementId,
+                    "session-end"
+                );
+                session.lifecycle.end = sample?.snapshot || null;
+            }
+
             session.memory.end = this.readMemorySnapshot();
             session.dom.end = this.captureDomSnapshot(elementId);
             session.navigation = this.captureNavigationTiming();
@@ -2277,7 +3393,9 @@
                     decisionUse:
                         session.mode === "baseline"
                             ? "Use for before/after regression decisions. Run three times and compare the median."
-                            : "Use for diagnosis and row-band correlation. Confirm final gains again in baseline mode.",
+                            : session.mode === "lifecycle"
+                                ? "Use for lifecycle/resource accumulation diagnosis and time-window trends. Confirm final performance gains again in baseline mode."
+                                : "Use for diagnosis and row-band correlation. Confirm final gains again in baseline mode.",
                     profilerMeasuredHookTimeMs: round(session.profiler.measuredHookTimeMs),
                     profilerMeasuredHookRatioPercent: measuredOverheadRatio,
                     profilerCallbackCount: session.profiler.callbackCount,
@@ -2324,6 +3442,10 @@
                     summary: this.serializeInteractionMetrics(session.interactionMetrics),
                     deepSamples: session.mode === "deep" ? session.interactions : []
                 },
+                timeSeries30s: this.serializeTimeBuckets(session),
+                lifecycleAudit: session.mode === "lifecycle"
+                    ? session.lifecycle
+                    : null,
                 scroll: {
                     events: session.scroll.events,
                     sessions: session.scroll.sessions,
@@ -2337,6 +3459,7 @@
                     ? this.serializeBands(session.bands)
                     : [],
                 operations: serializeDurationMap(session.durations),
+                operationSamples: session.operationSamples,
                 tabulatorInternals: session.mode === "deep"
                     ? serializeDurationMap(session.internalDurations)
                     : [],
@@ -2493,8 +3616,10 @@
             console.log([
                 "UDS Performance Observatory:",
                 "Normal:   /work-orders",
-                "Baseline: /work-orders?perf=baseline",
-                "Deep:     /work-orders?perf=deep",
+                "Baseline:  /work-orders?perf=baseline",
+                "Bulk ops:  baseline mode now records operationSamples with sizes",
+                "Lifecycle: /work-orders?perf=lifecycle",
+                "Deep:      /work-orders?perf=deep",
                 "tabulatorPerformance.reset('tabulator-test-table')",
                 "tabulatorPerformance.mark('tabulator-test-table', 'label')",
                 "tabulatorPerformance.downloadReport('tabulator-test-table')",
