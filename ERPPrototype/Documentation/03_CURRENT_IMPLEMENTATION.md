@@ -1,7 +1,7 @@
 # 03 — Current Implementation
 
-**Status:** Approved description of `M5D4R3-Stable-Range-UX` plus Phase 6 diagnostic tooling and closure decision  
-**Review date:** 2026-07-29  
+**Status:** Phase 8.5-R2 user-tested stable behavior with Phase 8.6-R1 lifecycle extraction pending focused regression  
+**Review date:** 2026-07-31  
 **Important:** Runtime behavior is based on the current code plus user-generated browser performance reports. This review environment still does not contain .NET SDK, so a local Clean/Rebuild remains required after applying the patch.
 
 ## 1. Snapshot
@@ -15,8 +15,8 @@
 | Database | SQL Server / LocalDB in Development |
 | ORM | EF Core 10.0.9 |
 | Grid | Tabulator 6.5.0 |
-| Grid stable checkpoint | `M5D4R3-Stable-Range-UX` (built cumulatively on E6C through Phase 5) |
-| Main grid file | `wwwroot/js/tabulatorTest.js` — 8,725 lines in M5D4R3 |
+| Grid stable checkpoint | `Phase8.5-Stable` candidate after user regression; Phase 8.6-R1 is not tagged until lifecycle tests pass |
+| Main grid coordinator | `wwwroot/js/tabulatorTest.js` — about 3,339 lines after Phase 8.6-R1 extraction |
 | Work-order page | `Components/Pages/WorkOrders.razor` — 1,071 lines |
 | Work-order service | `Data/WorkOrderService.cs` — 953 lines |
 | Migrations | 29 files |
@@ -288,3 +288,19 @@ Implemented in the current patch:
 Practical example: changing Notes in 4,952 rows still saves 4,952 values, but it does not rewrite the other columns or execute the global Work Order Number + Work Type duplicate query.
 
 Not implemented yet: user-created custom columns, their database storage, layout ownership, permissions, and filter-definition UI. Phase 8.5 is the foundation that allows those fields to register by stable key later.
+
+
+## 18. Phase 8.6-R1 — Lifecycle Ownership Extraction
+
+A new `wwwroot/js/tabulatorLifecycle.js` module owns nine lifecycle members that previously lived at the top and bottom of `tabulatorTest.js`:
+
+- pointer/device detection;
+- table-height calculation and page-scroll lock;
+- grid-state creation;
+- listener cleanup;
+- timer/animation cancellation;
+- old table disposal and final destroy.
+
+No business rule, column behavior, navigation algorithm, save path, filter behavior, or Tabulator configuration was intentionally changed.
+
+Practical result: when the employee changes year or leaves the Work Orders page, the same cleanup route disconnects the old sheet before another instance is created.

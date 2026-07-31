@@ -175,3 +175,19 @@ The grid no longer spreads field-specific decisions across paste, history, dirty
 - A feature asks whether a rule is affected by the changed field keys; it does not hard-code unrelated column checks inside each operation.
 
 Future custom fields must use a stable field id and register metadata such as type, label, visibility, width, filter type, and validators. Renaming the visible column must not change the stable id. Custom-field persistence is a later feature and must not be implemented as a database migration for every user-added column.
+
+
+## 13. Current Lifecycle Boundary — Phase 8.6-R1
+
+`tabulatorLifecycle.js` is the single current owner of lifecycle resources for one Work Orders grid instance:
+
+- creates the mutable grid-session state;
+- applies and releases the desktop page-scroll lock;
+- removes document/window listeners owned by the grid;
+- cancels resize and navigation animation work;
+- closes filter popups and detaches range auto-scroll;
+- destroys the old Tabulator instance and removes its state.
+
+`tabulatorTest.js` remains the coordinator that builds the Tabulator configuration and binds feature behavior. This patch does not move navigation algorithms or change runtime behavior.
+
+**Work example:** changing the selected year is like closing one Excel workbook before opening another. The old workbook must stop receiving keyboard and copy/paste commands; otherwise one key press could reach both the old and new sheet.

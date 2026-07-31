@@ -216,3 +216,20 @@ Decision: Accept / Roll back / Investigate
 - [ ] Refresh the page and confirm the pasted values persisted.
 - [ ] Change year and return only to compare performance; it must no longer be required to recover navigation.
 - [ ] Edit one sheet value that the server normalizes, if such a scenario exists, and confirm only that sheet value refreshes.
+
+
+## Q. Phase 8.6-R1 — Grid Lifecycle Ownership
+
+- [ ] Open the current year and confirm the row count and first interaction are normal.
+- [ ] Change to another year and return to the original year at least five times.
+- [ ] After every switch, one Arrow key press moves one cell only; Copy/Paste and right-click execute once only.
+- [ ] Unsaved changes still block year switching.
+- [ ] Open a filter popup, change year after closing/saving as required, and confirm no old popup remains.
+- [ ] Go to a deep row, resize the browser, and confirm the viewport does not jump to row 1.
+- [ ] Leave `/work-orders` for another page and return; the sheet opens once and no old keyboard action remains.
+- [ ] The desktop page has one scrollbar for the table and normal page scrolling returns after leaving the sheet.
+- [ ] Range drag auto-scroll still works after several year switches.
+- [ ] Console contains no `tabulatorLifecycle` registration/load error and no red JavaScript error.
+- [ ] Optional lifecycle audit: listener/timer/RAF/observer owners return to one active grid after each switch instead of increasing continuously.
+
+**Work example:** after switching years five times, pressing Delete must clear the selected range once—not send the command to five hidden sheets.

@@ -1,6 +1,6 @@
 # 09 — Maintainability Refactor Roadmap
 
-**Runtime baseline:** Phase 7B4-R5 bulk delete/Undo/Redo fixes with Phase 7B5-D1 open-journey diagnostics.  
+**Runtime baseline:** Phase 8.5-R2 accepted after user regression on 2026-07-31. Field-level tracking, large batch editing, duplicate-query scoping, and save-result merge are the current stable behavior.  
 **Refactor policy:** incremental extraction, identical runtime behaviour, focused regression after every step, and no rewrite.
 
 ## Refactor Objectives
@@ -85,7 +85,7 @@ Structural result:
 - `tabulatorStructure.js` loads before Clipboard/History so structural Undo/Redo
   delegates to a registered implementation without circular ownership.
 
-## Phase 8.5 — Field-Level Changes and Generic Batch Editing — R2 PENDING USER TEST
+## Phase 8.5 — Field-Level Changes and Generic Batch Editing — COMPLETED
 
 - Add `tabulatorFieldChanges.js` as the generic field metadata and batch-change engine.
 - Record changed field keys per dirty row.
@@ -98,11 +98,19 @@ Structural result:
 
 ## Planned Following Phases
 
-### Phase 8.6 — Grid Lifecycle and Interaction Review
+### Phase 8.6 — Grid Lifecycle and Interaction Review — R1 PENDING USER TEST
 
-- Review initialization, event ownership, navigation, viewport restoration, and teardown.
-- Extract only where the boundary is clear and does not create circular ownership.
-- Keep one lifecycle owner for listeners, timers, frames, and Tabulator instances.
+`tabulatorLifecycle.js` now owns one grid instance from creation state through disposal:
+
+- Desktop-pointer detection and page viewport locking.
+- Grid-session state construction.
+- Document/window listener cleanup.
+- Resize timer and animation-frame cancellation.
+- Tabulator instance disposal and the public `destroy` call.
+
+`tabulatorTest.js` still owns grid initialization and behavior coordination in R1. Navigation and viewport-restoration algorithms remain in core until a later focused extraction proves a safe boundary.
+
+Practical example: changing from year 2026 to 2025 first disconnects the old sheet's keyboard, copy, paste, pointer, resize, auto-scroll, and popup resources, then creates exactly one new sheet instance.
 
 ### Phase 8.7 — Save and Dirty-State Review
 
@@ -157,3 +165,8 @@ Use section O in `06_REGRESSION_TEST_CHECKLIST.md`. Do not continue refactoring 
 Keep the business result of field-level tracking, but stop treating every saved row as a visible row refresh. When the employee saves a full Notes column, the screen already contains those Notes values. Save should merge the internal server version silently and refresh a visible cell only when the server actually changed its displayed value.
 
 Acceptance: after a 4,952-row Paste and Save, arrows remain usable without changing year, and `save.delta.update-rows` should report near-zero rows when the server returned no different sheet values.
+
+
+## Current Focused Regression for Phase 8.6-R1
+
+Use section Q in `06_REGRESSION_TEST_CHECKLIST.md`. The required evidence is repeated year switching, page leave/return, resize at a deep row, and Console/lifecycle audit confirmation that one active grid owner remains. Do not continue to interaction extraction if any duplicate action, lost selection, page-scroll lock, or red Console error appears.

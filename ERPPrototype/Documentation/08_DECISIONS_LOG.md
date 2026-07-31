@@ -184,3 +184,13 @@
 - **Date:** 2026-07-31
 - **Decision:** Explanations must begin with the Work Orders business situation, the before/after behaviour, the exact user test, and remaining work. Internal code details are secondary.
 - **Reason:** The user is directing product logic and testing but is not a programmer.
+
+
+## DEC-024 — One lifecycle owner for each Work Orders grid instance
+
+- **Date:** 2026-07-31
+- **Status:** Accepted for focused regression
+- **Decision:** `tabulatorLifecycle.js` owns state creation, lifecycle listeners, async cancellation, viewport lock, instance disposal, and final destroy. `tabulatorTest.js` coordinates initialization but must call the lifecycle owner for both year reinitialization and component disposal.
+- **Reason:** the old and new year sheets must never receive the same keyboard, copy, paste, resize, or pointer action.
+- **Example:** when the employee moves from 2026 to 2025, we disconnect the 2026 sheet before opening 2025, just as a machine is isolated before another control panel is connected.
+- **Constraint:** R1 is extraction only. Navigation and resize algorithms are not changed until the lifecycle regression passes.
