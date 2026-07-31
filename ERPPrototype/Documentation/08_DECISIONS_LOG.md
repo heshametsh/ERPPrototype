@@ -226,3 +226,14 @@
 
 **Constraint:** R2 does not change the service contract, global identity rule, year movement, row-version protection, Arabic messages, JavaScript calls, or performance stage names. Browser dirty-state extraction remains a later step after R2 runtime regression.
 
+
+
+## 2026-07-31 — Give Browser Dirty State One Module Owner
+
+**Decision:** extract original row snapshots, dirty row ids, changed field keys, deleted saved-row ids, dirty/deleted Save collection, and post-Save baseline acceptance into `tabulatorDirtyState.js` while preserving the existing public `tabulatorTest` method names.
+
+**Reason:** the same unsaved-state collections were being read or mutated from initialization, field edits, structural operations, Undo/Redo, Save streaming, and Save reconciliation. A single owner makes it reviewable whether the screen, Save request, and unsaved count describe the same data.
+
+**Business example:** after changing Notes and then undoing to the stored text, the order must stop appearing as unsaved. After a successful Save, the server row version—not the pre-save browser version—must become the new comparison baseline.
+
+**Constraint:** R3 does not change field definitions, validation, uniqueness, year routing, service calls, database writes, Arabic messages, Undo/Redo algorithms, or performance-stage names. It does not add autosave or persistence for Undo history across refresh.

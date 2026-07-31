@@ -352,3 +352,19 @@ No service contract, JavaScript API, field-level rule, year-routing rule, messag
 
 Practical example: when the employee pastes Notes into 4,950 orders, request preparation says “4,950 existing rows changed in Notes.” After the service returns, result preparation says “no visible values need rewriting; refresh only the internal row versions and show the success message.” The button workflow coordinates those two facts without rebuilding either one itself.
 
+
+
+## 22. Phase 8.7-R3 — Browser Dirty-State Ownership
+
+A new module, `wwwroot/js/tabulatorDirtyState.js`, owns the browser-side answer to four questions:
+
+- Which saved rows differ from the last accepted server baseline?
+- Which exact field keys differ in each row?
+- Which previously saved rows were removed and must be deleted?
+- After a successful Save, what rows and row versions become the new baseline?
+
+The module now owns original snapshots, `dirtyRowIds`, `changedFieldsByRow`, `deletedOriginalRowIds`, dirty/deleted row collection, structural dirty reconciliation, and clearing/accepting state after Save. The public `tabulatorTest` method names remain available, so Blazor, Clipboard/History, Field Changes, Structure, Validation, and performance instrumentation keep the same calls.
+
+`tabulatorLifecycle.js` still owns when a grid instance is created or destroyed, but asks Dirty State to construct the change-tracking portion of that instance. `tabulatorTest.js` still coordinates streamed Save and applies server row mutations, but asks Dirty State to replace the comparison baseline and clear unsaved sets.
+
+Practical example: changing Notes marks one row with `changedFields = ["notes"]`. Undoing back to the stored text removes that row from Dirty State. Saving successfully replaces the old row version with the server row version and clears the unsaved count.

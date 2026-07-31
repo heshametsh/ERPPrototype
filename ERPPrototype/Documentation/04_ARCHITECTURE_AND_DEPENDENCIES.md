@@ -253,3 +253,32 @@ These files do not form new network or dependency-injection services. They are r
 
 **Work example:** a duplicate pair is still decided by `WorkOrderService`. `SaveResult` only translates that result into the two red cells and the Arabic message. `SaveRequest` cannot decide that the pair is unique, and the UI coordinator cannot silently save around the service result.
 
+
+
+## Phase 8.7-R3 Dirty-State Boundary
+
+Browser change ownership is now explicit:
+
+```text
+Field edit / Paste / Undo / Redo / Insert / Delete
+        |
+        +--> tabulatorFieldChanges / ClipboardHistory / Structure
+                    |
+                    +--> tabulatorDirtyState.js
+                            compare with saved baseline
+                            track row + exact changed fields
+                            track deleted saved rows
+                            expose dirty/deleted Save delta
+
+Successful Save result
+        |
+        +--> tabulatorTest.applySavedDelta
+                    |
+                    +--> tabulatorDirtyState.js
+                            accept server rows as new baseline
+                            clear dirty/deleted sets
+```
+
+`tabulatorDirtyState.js` does not decide validation, uniqueness, authorization, year routing, database persistence, Arabic messages, or how Undo/Redo values are applied. It records the resulting data state only.
+
+**Work example:** Clipboard/History may restore 4,950 Notes values, but it does not manually maintain a second unsaved-row list. It applies the values, then Dirty State compares the affected field against the accepted baseline and decides which rows remain unsaved.

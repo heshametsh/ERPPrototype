@@ -221,7 +221,8 @@
                         : -1,
 
                 activeCell: null,
-                deletedOriginalRowIds: new Set(),
+
+                ...window.tabulatorTest.createDirtyState(data),
 
                 applyingHistory: false,
                 pendingEdit: null,
@@ -239,22 +240,6 @@
                  * نجمع هذه التعديلات هنا ثم نسجلها Transaction واحدة.
                  */
 
-                /*
-                 * نحتفظ بنسخة القيم الأصلية فقط للمقارنة.
-                 * لا نلون الصفوف ولا نغير شكل الشيت.
-                 */
-                originalRows: new Map(
-                    data.map(function (row) {
-                        return [
-                            String(row.id),
-                            window.tabulatorTest
-                                .createDirtySnapshot(row)
-                        ];
-                    })
-                ),
-
-                dirtyRowIds: new Set(),
-                changedFieldsByRow: new Map(),
                 lastStatusMessage: "",
 
                 validationErrors: new Map(),

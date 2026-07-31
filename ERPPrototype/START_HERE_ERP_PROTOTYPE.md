@@ -148,13 +148,14 @@ const maximumStep = 32;
 - Phase 8.6-R1 — مالك واحد لدورة حياة الشيت: مكتملة ومختبرة بعد تغيير السنوات والعودة والـResize والتفاعل.
 - Phase 8.6-R2 — مالك واحد لربط تفاعلات الشيت: مكتملة ومختبرة.
 - Phase 8.7-R1 — مالك واحد لرحلة الحفظ في Blazor: مكتملة ومختبرة.
-- Phase 8.7-R2 — فصل تجهيز طلب الحفظ عن تفسير النتيجة: قيد الاختبار الحالي.
+- Phase 8.7-R2 — فصل تجهيز طلب الحفظ عن تفسير النتيجة: مكتملة ومختبرة.
+- Phase 8.7-R3 — مالك واحد لحالة الصفوف والحقول غير المحفوظة في المتصفح: قيد الاختبار الحالي.
 
 ## الخطوة الهندسية التالية
 
-اختبار Phase 8.7-R2 من القسم T في `Documentation/06_REGRESSION_TEST_CHECKLIST.md`.
+اختبار Phase 8.7-R3 من القسم U في `Documentation/06_REGRESSION_TEST_CHECKLIST.md`.
 
-المطلوب بمنطق الشيت: تجهيز البيانات يجب أن يحدد هل الصف جديد أو معدل أو محذوف أو منتقل لسنة أخرى. بعد رجوع السيرفر، تفسير النتيجة هو الذي يحدد الصفوف التي تتحدث أو تختفي ورسالة الموظف. النتيجة المرئية يجب أن تظل مطابقة لـPhase 8.7-R1.
+المطلوب بمنطق الشيت: عند تعديل خلية، لصق نطاق، Undo/Redo، إدراج صف أو حذفه، يجب أن توجد جهة واحدة تعرف الصفوف والحقول غير المحفوظة. بعد نجاح الحفظ تقبل نتيجة السيرفر كنسخة أصلية جديدة وتمسح حالة Dirty مرة واحدة، بدون تغيير القيم أو رسائل الحفظ.
 
 لا نضيف إصلاحات كبيرة قبل:
 
@@ -184,3 +185,12 @@ Practical example: when a new work order is saved, Request classifies it as Adde
 
 Apply the patch over `Phase8.7-R1-Stable`, build, then run section T. Do not tag the step until runtime testing passes.
 
+
+
+## Latest Refactor Step — Phase 8.7-R3
+
+`wwwroot/js/tabulatorDirtyState.js` now owns browser change tracking: original snapshots, dirty row ids, changed field keys, deleted saved rows, save-delta row collection, and accepting a successful Save as the new baseline.
+
+Practical example: editing Notes marks only that row and field. Undoing it back to the saved value removes the row from the unsaved count. After Save succeeds, the returned row version becomes the new baseline and the unsaved count returns to zero.
+
+Apply the patch over `Phase8.7-R2-Stable`, build, then run section U. Do not tag the step until runtime testing passes.

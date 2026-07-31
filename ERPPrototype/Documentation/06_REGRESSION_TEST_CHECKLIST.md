@@ -294,3 +294,26 @@ Acceptance: the employee sees the same outcomes as R1; only internal ownership i
 
 **Work example:** the new-row test proves both halves: Request creates an Added record; Result replaces the temporary row identity with the saved database identity.
 
+
+
+## U. Phase 8.7-R3 — Browser Dirty-State Module Extraction
+
+Run from accepted `Phase8.7-R2-Stable` after applying R3.
+
+1. Open the current year and confirm the status starts with zero unsaved rows.
+2. Edit Notes in one saved order. Confirm the unsaved count becomes one; Save and refresh confirm persistence and the count returns to zero.
+3. Edit Notes, then Undo back to the exact saved value before Save. Confirm the unsaved count returns to zero and Save reports no changes.
+4. Edit two different fields in one row. Confirm Save sends that row once with both changed field keys. Undo only one field and confirm the other field remains unsaved.
+5. Paste a small range, Undo, and Redo. Confirm the unsaved row count and saved result match the visible values after each step.
+6. Paste a full non-identity column, Save, and confirm `identityCheckRows: 0`, no duplicate query, and the unsaved count becomes zero without changing year.
+7. Insert a new row. Confirm it is dirty even before an original database snapshot exists. Save it, edit it again without refresh, then Save again.
+8. Delete one eligible saved row, Undo the deletion, then delete and Save it. Confirm the deleted-row state does not survive the Undo and clears after successful Save.
+9. Change Assignment Date to another year and Save. Confirm the removed current-year row is not left in the unsaved count.
+10. Trigger a real duplicate pair when available. Confirm failed Save keeps the row dirty and preserves both validation marks; correcting and saving clears Dirty State.
+11. Confirm performance operations retain `dirty.refresh`, `save.collect-dirty`, `save.collect-deleted`, `save.delta.snapshot-originals`, and `save.delta.reset-state`.
+12. Change year and return. Confirm the new sheet starts with a fresh baseline and no dirty rows from the previous year.
+13. Confirm Console has no red error or `tabulatorDirtyState` registration/load error.
+
+Acceptance: visible values, changed-field scope, Undo/Redo, delete tracking, Save requests, and post-Save zero state match R2. The refactor changes ownership only.
+
+**Work example:** change Notes and Status in one order, then Undo Status only. The sheet must report one unsaved row and Save only Notes; it must not send Status or lose the Notes change.

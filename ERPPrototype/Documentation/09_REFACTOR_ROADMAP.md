@@ -112,9 +112,9 @@ Practical example: changing from year 2026 to 2025 disconnects the old sheet thr
 
 **R1 completed and user-tested:** `WorkOrders.Save.cs` owns the complete Blazor save workflow. No-change Save, one-row Save, year movement, new-row rekey, deletion, and 4,950-row save paths passed after extraction.
 
-**R2 implemented; focused regression pending:** request preparation now lives in `WorkOrders.SaveRequest.cs`, result/failure interpretation and row reconciliation live in `WorkOrders.SaveResult.cs`, and `WorkOrders.Save.cs` remains the coordinator. No public contract or intended runtime behaviour changes.
+**R2 completed and user-tested:** request preparation lives in `WorkOrders.SaveRequest.cs`, result/failure interpretation and row reconciliation live in `WorkOrders.SaveResult.cs`, and `WorkOrders.Save.cs` remains the coordinator. Save, movement, added-row mapping, deletion, and focused performance regression passed.
 
-**Planned R3:** review and, only if the boundary remains clear after R2 testing, extract browser dirty-state and save-result reconciliation functions from `tabulatorTest.js` into one `tabulatorSaveState.js` module while preserving the public `tabulatorTest` API.
+**R3 implemented; focused regression pending:** `tabulatorDirtyState.js` owns browser original snapshots, dirty row ids, exact changed field keys, deleted saved rows, dirty/deleted Save collection, and accepting/clearing state after Save. The public `tabulatorTest` API and performance stage names remain unchanged.
 
 ### Phase 8.8 — WorkOrderService Split
 
@@ -186,3 +186,10 @@ Use section T in `06_REGRESSION_TEST_CHECKLIST.md`. Acceptance requires the same
 
 Practical example: request preparation must classify a newly inserted row as Added, while result preparation must map its temporary negative Id to the database Id. One step must not silently perform the other step’s responsibility.
 
+
+
+## Phase 8.7-R3 Focus
+
+Use section U in `06_REGRESSION_TEST_CHECKLIST.md`. Acceptance requires Dirty State to match visible values through edit, partial Undo, Paste, Redo, insert, delete/restore, moved-year Save, failed duplicate Save, and successful Save.
+
+Practical example: after editing Notes and Status, undoing Status must leave one dirty row with only `notes` in its changed-field list. A successful Save must install the returned row version as the new baseline and clear the unsaved count.
