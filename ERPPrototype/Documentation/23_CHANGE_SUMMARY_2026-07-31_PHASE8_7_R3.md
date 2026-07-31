@@ -1,8 +1,8 @@
 # Phase 8.7-R3 — Browser Dirty-State Module Extraction
 
-**Date:** 2026-07-31  
-**Base:** `Phase8.7-R2-Stable`  
-**Status:** Patch prepared; runtime regression required before Commit/Tag
+**Date:** 2026-07-31
+**Base:** `Phase8.7-R2-Stable`
+**Status:** Accepted after focused dirty-state and save regression
 
 ## What changed?
 

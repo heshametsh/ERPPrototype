@@ -1,6 +1,6 @@
 # 18 — Phase 8.5-R2 Save Reconciliation Without Full Grid Refresh
 
-**Status:** Pending user build and runtime regression  
+**Status:** Accepted after focused runtime and performance regression
 **Apply over:** Phase 8.5-R1
 
 ## What the user experienced

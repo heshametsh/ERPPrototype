@@ -1,5 +1,7 @@
 # Phase 8.7-R1 — Blazor Save Workflow Extraction
 
+**Status:** Accepted after focused build and runtime regression
+
 ## Goal
 
 Give the complete Blazor save journey one clear owner without changing any user-facing or persistence behaviour.

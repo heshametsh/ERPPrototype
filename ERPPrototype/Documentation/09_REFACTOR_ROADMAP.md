@@ -124,20 +124,24 @@ Practical example: changing from year 2026 to 2025 disconnects the old sheet thr
 
 **R2 completed and automated acceptance passed 10/10:** `WorkOrderSavePlanBuilder` owns input grouping, changed-field normalization, editable-value normalization, field validation, changed/deleted overlap rejection, and required RowVersion presence. `WorkOrderService` still owns authorization, global uniqueness, database RowVersion enforcement, database loading, year movement execution, transaction, persistence, commit, and rollback. The runner now includes four direct plan tests plus the original six SQL scenarios. No further R3/R4 service split is planned before Phase 8.9.
 
-### Phase 8.9 — Final Consolidation — CURRENT CLOSURE STEP
+### Phase 8.9 — Final Consolidation — COMPLETED AND ACCEPTED
 
-- Remove generated build output, machine-local files, duplicate root documentation, and obsolete patch README files from deliverable archives.
-- Keep historical engineering evidence inside `Documentation` rather than as competing root files.
-- Run one Release build plus the 10 automated save tests.
-- Check project-owned JavaScript syntax when Node.js is available.
-- Create a source-only archive that excludes `bin`, `obj`, `.vs`, binaries, publish output, and nested ZIP files.
-- Do not perform another WorkOrderService split. After PASS, close Phase 8 and return to product features.
+Completed outcomes:
 
-Phase 8.9 intentionally changes no production behavior, so prior accepted browser/performance evidence remains valid. A new manual grid tour is required only if the automated build/tests fail or a production file is changed during closure.
+- Generated build output, machine-local files, duplicate root documentation, and obsolete patch README files are excluded from deliverable archives.
+- Historical engineering evidence remains inside `Documentation` rather than as competing root files.
+- Release build passed.
+- The 10 automated save tests passed against an isolated temporary SQL Server database.
+- Git source hygiene passed.
+- A source-only archive was created with 169 files and a size of 3.06 MB, excluding `bin`, `obj`, `.vs`, binaries, publish output, and nested ZIP files.
+- The optional local Node.js check was skipped because Node.js was unavailable; project-owned JavaScript separately passed syntax checks and no production JavaScript changed in Phase 8.9.
+- No additional WorkOrderService split was performed.
+
+Phase 8.9 changed no production behavior, so prior accepted browser/performance evidence remained valid and no new manual grid tour was required.
 
 ## Refactor Stop Rule After Phase 8
 
-After Phase 8.9 passes, maintainability refactoring stops. New extraction work is allowed only when a feature or measured defect demonstrates a concrete ownership, testability, or performance problem. The next planned work is permissions/account management, Import/Export, warehouse, and invoices.
+Phase 8.9 passed and maintainability refactoring is closed. New extraction work is allowed only when a feature or measured defect demonstrates a concrete ownership, testability, or performance problem. The next planned work is permissions and role experience, branch account management, Import/Export, warehouse, and invoices.
 
 ## Rules for Every Refactor Patch
 

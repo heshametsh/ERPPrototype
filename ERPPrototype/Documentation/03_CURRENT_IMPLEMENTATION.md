@@ -1,8 +1,8 @@
 # 03 — Current Implementation
 
-**Status:** Phase 8.8-R2 accepted after 10/10 automated tests; Phase 8.9 closure tooling prepared with no production behavior change
+**Status:** Phase 8.9 accepted; maintainability refactor closed with no production behavior change in the closure step
 **Review date:** 2026-07-31
-**Important:** Runtime behavior is based on the current code plus user-generated browser performance reports. This review environment still does not contain .NET SDK, so a local Clean/Rebuild remains required after applying the patch.
+**Acceptance evidence:** Developer-machine Release Build PASS, 10/10 isolated SQL Server save tests, Git source hygiene PASS, and a 169-file clean source archive of 3.06 MB. The optional local Node.js check was skipped because Node.js was unavailable; project-owned JavaScript files separately passed syntax checks, and Phase 8.9 changed no production JavaScript.
 
 ## 1. Snapshot
 
@@ -15,7 +15,7 @@
 | Database | SQL Server / LocalDB in Development |
 | ORM | EF Core 10.0.9 |
 | Grid | Tabulator 6.5.0 |
-| Current accepted runtime checkpoint | Phase 8.8-R2 accepted after 10/10 automated save tests |
+| Current accepted runtime checkpoint | Phase 8.9 accepted; Phase 8 refactor closed after build, 10/10 save tests, Git hygiene, and clean archive PASS |
 | Main grid coordinator | `wwwroot/js/tabulatorTest.js` — 2,331 lines after Dirty-State extraction |
 | Work-order markup | `Components/Pages/WorkOrders.razor` — 208 lines |
 | Work-order save service/facade | `Data/WorkOrderService.cs` — about 955 lines after pure save-plan extraction |
@@ -419,13 +419,13 @@ Runtime status: accepted on the developer machine with 6/6 PASS before the R2 ex
 Practical example: the builder can reject a saved row missing RowVersion before opening a DbContext, while the service remains the only place that verifies the actual database RowVersion and commits the transaction.
 
 
-## 26. Phase 8.9 — Final Closure Candidate
+## 26. Phase 8.9 — Accepted Final Closure
 
-Phase 8.9 changes documentation and engineering tools only. It adds:
+Phase 8.9 changed documentation and engineering tools only. It added:
 
 - `Tools/Invoke-Phase8Verification.ps1` for Release build, optional JavaScript syntax checks, and the 10 automated save tests.
 - `Tools/Remove-LocalBuildArtifacts.ps1` for local `bin/obj/.vs` and machine-file cleanup.
 - `Tools/New-CleanProjectArchive.ps1` for a source-only ZIP that excludes build output and binaries.
 - `Tools/Invoke-Phase8Closure.ps1` to run cleanup, verification, and clean archive creation in one command.
 
-No production C#, Razor, JavaScript, migration, database rule, or UI behavior changes in Phase 8.9. Acceptance requires the closure script to report PASS.
+No production C#, Razor, JavaScript, migration, database rule, or UI behavior changed in Phase 8.9. The closure workflow reported Release Build PASS, 10/10 automated save tests, Git source hygiene PASS, and clean archive creation PASS. Maintainability refactoring is now closed; further extraction requires a feature or measured defect that proves a concrete need.

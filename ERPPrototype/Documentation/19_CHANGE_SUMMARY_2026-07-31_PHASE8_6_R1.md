@@ -1,7 +1,7 @@
 # 19 — Change Summary — Phase 8.6-R1 Grid Lifecycle Module
 
-**Date:** 2026-07-31  
-**Status:** Static verification passed; user browser regression required  
+**Date:** 2026-07-31
+**Status:** Accepted after focused user browser regression
 **Base:** Phase 8.5-R2 accepted behavior
 
 ## What changed

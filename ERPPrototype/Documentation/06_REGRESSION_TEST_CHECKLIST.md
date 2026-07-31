@@ -404,9 +404,11 @@ Phase 8.8-R2 automated save safety net: PASS
 Acceptance: the web project builds through the project reference, all ten tests pass against the temporary isolated database, and the database is deleted after the run. No manual browser regression is required for R2 unless an automated test fails or the build reports a runtime-contract change.
 
 
-## Y. Phase 8.9 — Automated Final Closure
+## Y. Phase 8.9 — Automated Final Closure — ACCEPTED
 
-Phase 8.9 changes documentation and engineering tools only. From the project folder run:
+Phase 8.9 changed documentation and engineering tools only. The accepted developer-machine run produced Release Build PASS, 10/10 save tests, Git source hygiene PASS, and a clean 3.06 MB source archive. Use the commands below whenever the closure evidence needs to be reproduced.
+
+From the project folder run:
 
 ```powershell
 .\Tools\Invoke-Phase8Closure.ps1
@@ -434,4 +436,4 @@ Phase 8.9 automated verification: PASS
 Phase 8.9 closure workflow: PASS
 ```
 
-No new manual grid regression is required because Phase 8.9 changes no production C#, Razor, JavaScript, migration, database rule, or UI behavior. If any production file is modified while resolving a failure, rerun the focused checklist for that owner before closure.
+No new manual grid regression was required because Phase 8.9 changed no production C#, Razor, JavaScript, migration, database rule, or UI behavior. If a future closure rerun requires modifying a production file, rerun the focused checklist for that owner before accepting the new checkpoint.

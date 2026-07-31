@@ -1,7 +1,7 @@
 # Phase 8.9 — Final Consolidation and Automated Closure
 
 **Date:** 2026-07-31
-**Status:** Implemented; acceptance requires the one-command closure workflow
+**Status:** Accepted; Phase 8 maintainability refactor closed
 **Base:** User-confirmed Phase 8.8-R2 with 10/10 automated tests
 
 ## Goal
@@ -30,19 +30,28 @@ The uploaded ZIP was about 9.8 MB because `ERPPrototype.IntegrationTests/bin` an
 
 None. No application C#, Razor, JavaScript, migration, schema, permission, save rule, or UI behavior changes in Phase 8.9.
 
-## Acceptance
+## Accepted evidence
 
-Run:
+The developer-machine closure run produced:
 
-```powershell
-.\Tools\Invoke-Phase8Closure.ps1
-```
+- Release Build: PASS.
+- 10/10 automated save tests: PASS on a temporary isolated SQL Server database.
+- Git source hygiene: PASS.
+- Clean source archive: PASS — 169 files, 3.06 MB.
+- Production database usage: none.
+- Optional Node.js syntax step: skipped locally because Node.js was unavailable; project-owned JavaScript separately passed syntax checks, and no production JavaScript changed in Phase 8.9.
 
-Required output:
+Recorded output:
 
 ```text
 Phase 8.9 automated verification: PASS
 Phase 8.9 closure workflow: PASS
 ```
 
-After PASS, create the final Phase 8 Git checkpoint and return to product features.
+To reproduce the evidence, run:
+
+```powershell
+.\Tools\Invoke-Phase8Closure.ps1
+```
+
+Phase 8 is now closed. The next work returns to product features rather than further file splitting.

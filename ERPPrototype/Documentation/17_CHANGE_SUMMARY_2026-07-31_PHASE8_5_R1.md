@@ -1,6 +1,6 @@
 # 17 — Phase 8.5-R1 Large Field Batch Replacement
 
-**Status:** Pending user build and runtime regression
+**Status:** Accepted as an intermediate correction; final runtime checkpoint superseded by Phase 8.5-R2
 **Apply over:** Phase 8.5
 
 ## What the user experienced

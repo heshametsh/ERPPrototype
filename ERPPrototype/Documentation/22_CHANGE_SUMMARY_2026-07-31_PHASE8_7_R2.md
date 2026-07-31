@@ -1,8 +1,8 @@
 # Phase 8.7-R2 — Save Request and Result Separation
 
-**Date:** 2026-07-31  
-**Base:** `Phase8.7-R1-Stable`  
-**Status:** Patch prepared; runtime regression required.
+**Date:** 2026-07-31
+**Base:** `Phase8.7-R1-Stable`
+**Status:** Accepted after focused build and runtime regression.
 
 ## What the employee sees
 
