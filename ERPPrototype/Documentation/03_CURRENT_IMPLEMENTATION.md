@@ -1,6 +1,6 @@
 # 03 — Current Implementation
 
-**Status:** Phase 8.5-R2 user-tested stable behavior with Phase 8.6-R1 lifecycle extraction pending focused regression  
+**Status:** Phase 8.6-R1 user-tested stable behavior with Phase 8.6-R2 interaction extraction pending focused regression  
 **Review date:** 2026-07-31  
 **Important:** Runtime behavior is based on the current code plus user-generated browser performance reports. This review environment still does not contain .NET SDK, so a local Clean/Rebuild remains required after applying the patch.
 
@@ -15,8 +15,8 @@
 | Database | SQL Server / LocalDB in Development |
 | ORM | EF Core 10.0.9 |
 | Grid | Tabulator 6.5.0 |
-| Grid stable checkpoint | `Phase8.5-Stable` candidate after user regression; Phase 8.6-R1 is not tagged until lifecycle tests pass |
-| Main grid coordinator | `wwwroot/js/tabulatorTest.js` — about 3,339 lines after Phase 8.6-R1 extraction |
+| Grid stable checkpoint | `Phase8.6-R1-Stable` after repeated year-switch, navigation, wheel, clipboard, structure, and save regression |
+| Main grid coordinator | `wwwroot/js/tabulatorTest.js` — 2,627 lines after Phase 8.6-R2 extraction |
 | Work-order page | `Components/Pages/WorkOrders.razor` — 1,071 lines |
 | Work-order service | `Data/WorkOrderService.cs` — 953 lines |
 | Migrations | 29 files |
@@ -304,3 +304,19 @@ A new `wwwroot/js/tabulatorLifecycle.js` module owns nine lifecycle members that
 No business rule, column behavior, navigation algorithm, save path, filter behavior, or Tabulator configuration was intentionally changed.
 
 Practical result: when the employee changes year or leaves the Work Orders page, the same cleanup route disconnects the old sheet before another instance is created.
+
+## 19. Phase 8.6-R2 — Interaction Ownership Extraction
+
+A new `wwwroot/js/tabulatorInteractions.js` module owns the binding of one live sheet's user interactions:
+
+- Resize and right-click range guard.
+- Cell editing start/cancel/commit.
+- Active-cell and active-range ownership.
+- Context menu open/close activation.
+- Keyboard navigation, direct typing, Delete/Backspace, Undo, and Redo.
+- Document Copy/Paste ownership.
+
+The existing interaction algorithms were moved without intentional logic changes. `tabulatorLifecycle.js` still owns cleanup and removes the exact handlers stored by the interaction module.
+
+Practical example: after changing from year 2026 to 2025, the new sheet binds one interaction set. One Arrow press moves one cell, one Paste runs once, and one resize restores one viewport anchor. Future user-created input columns can enter the same generic printable-key path instead of adding another document listener.
+

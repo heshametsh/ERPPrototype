@@ -191,3 +191,30 @@ Future custom fields must use a stable field id and register metadata such as ty
 `tabulatorTest.js` remains the coordinator that builds the Tabulator configuration and binds feature behavior. This patch does not move navigation algorithms or change runtime behavior.
 
 **Work example:** changing the selected year is like closing one Excel workbook before opening another. The old workbook must stop receiving keyboard and copy/paste commands; otherwise one key press could reach both the old and new sheet.
+
+## 14. Current Interaction Boundary — Phase 8.6-R2
+
+`tabulatorInteractions.js` is the single current binding owner for user actions on one live Work Orders sheet:
+
+- grid/container interactions: right-click range guard and resize;
+- Tabulator edit and selection events;
+- active-sheet pointer tracking and context menu activation;
+- keyboard navigation, direct typing, clear, Undo/Redo;
+- document Copy/Paste handlers.
+
+`tabulatorLifecycle.js` owns removing document/window/container handlers and cancelling asynchronous work. `tabulatorTest.js` remains the coordinator and keeps the underlying navigation, selection, resize-restoration, clipboard, history, and structure algorithms.
+
+**Dependency direction:**
+
+```text
+tabulatorTest.initialize
+        |
+        +--> tabulatorLifecycle: create/dispose one grid owner
+        |
+        +--> tabulatorInteractions: bind one live interaction set
+        |
+        +--> feature modules: execute the requested operation
+```
+
+**Work example:** the interaction module is the reception desk that receives one user command and routes it to the correct department. It does not decide duplicate rules or save logic, and it must not create a second route for a future custom column.
+

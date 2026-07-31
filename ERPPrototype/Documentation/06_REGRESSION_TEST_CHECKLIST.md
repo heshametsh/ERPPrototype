@@ -233,3 +233,22 @@ Decision: Accept / Roll back / Investigate
 - [ ] Optional lifecycle audit: listener/timer/RAF/observer owners return to one active grid after each switch instead of increasing continuously.
 
 **Work example:** after switching years five times, pressing Delete must clear the selected range once—not send the command to five hidden sheets.
+
+## R. Phase 8.6-R2 — Grid Interaction Ownership
+
+- [ ] Open a year with thousands of rows; ArrowDown and ArrowUp each move one cell per press.
+- [ ] Enter quick typing in a text/input column, then use all four arrows; movement and edit commit remain unchanged.
+- [ ] Double-click a Notes/Status cell; Left/Right move inside the text instead of leaving the editor.
+- [ ] Select one cell and press Delete/Backspace; the cell clears once and Undo restores it once.
+- [ ] Select a multi-row range; Copy and Paste run once and create one Undo transaction.
+- [ ] Right-click an unselected cell; the real range is created and one context menu opens.
+- [ ] Click outside the sheet; sheet shortcuts stop, and the context menu closes.
+- [ ] Insert above/below and delete rows from the context menu; no duplicate operation occurs.
+- [ ] Go to a deep row, resize the browser, and confirm the same logical row remains near the top.
+- [ ] Change year at least three times, then repeat arrows, Copy/Paste, right-click, Resize, Undo, and Redo.
+- [ ] Leave `/work-orders` and return; old document handlers do not respond.
+- [ ] Save one safe edit and refresh; interaction extraction has not changed persistence.
+- [ ] Console contains no `tabulatorInteractions` registration/load error and no red JavaScript error.
+
+**Work example:** after switching years three times, pressing Ctrl+V must paste one range and create one Undo step—not three hidden pastes.
+

@@ -194,3 +194,13 @@
 - **Reason:** the old and new year sheets must never receive the same keyboard, copy, paste, resize, or pointer action.
 - **Example:** when the employee moves from 2026 to 2025, we disconnect the 2026 sheet before opening 2025, just as a machine is isolated before another control panel is connected.
 - **Constraint:** R1 is extraction only. Navigation and resize algorithms are not changed until the lifecycle regression passes.
+
+## DEC-025 — One interaction binding owner for each live Work Orders sheet
+
+- **Date:** 2026-07-31
+- **Status:** Accepted for focused regression
+- **Decision:** `tabulatorInteractions.js` owns binding grid/window/document user interactions. `tabulatorLifecycle.js` owns their cleanup. The feature algorithms remain in their existing modules during R2.
+- **Reason:** event ownership must be auditable before future user-created columns and layouts are added. A new column may register metadata and reuse the shared route, but must not add another document-level keyboard or clipboard path.
+- **Example:** a custom “Estimated Value” input column uses the existing direct-typing, selection, Copy/Paste, Undo, and dirty-field pipeline. It does not install a new keydown handler.
+- **Constraint:** R2 is extraction only; no shortcut, navigation, resize, clipboard, context-menu, or edit behavior is intentionally changed.
+

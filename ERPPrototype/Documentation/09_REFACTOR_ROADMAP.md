@@ -1,6 +1,6 @@
 # 09 — Maintainability Refactor Roadmap
 
-**Runtime baseline:** Phase 8.5-R2 accepted after user regression on 2026-07-31. Field-level tracking, large batch editing, duplicate-query scoping, and save-result merge are the current stable behavior.  
+**Runtime baseline:** Phase 8.6-R1 accepted after user regression on 2026-07-31. Field-level tracking, batch editing, save-result merge, and single grid lifecycle ownership are the current stable behavior.  
 **Refactor policy:** incremental extraction, identical runtime behaviour, focused regression after every step, and no rewrite.
 
 ## Refactor Objectives
@@ -98,19 +98,15 @@ Structural result:
 
 ## Planned Following Phases
 
-### Phase 8.6 — Grid Lifecycle and Interaction Review — R1 PENDING USER TEST
+### Phase 8.6 — Grid Lifecycle and Interaction Review
 
-`tabulatorLifecycle.js` now owns one grid instance from creation state through disposal:
+**R1 completed and user-tested:** `tabulatorLifecycle.js` owns one grid instance from state creation through disposal. Repeated year switching kept one initialization per opened sheet, stable navigation, and no duplicate action.
 
-- Desktop-pointer detection and page viewport locking.
-- Grid-session state construction.
-- Document/window listener cleanup.
-- Resize timer and animation-frame cancellation.
-- Tabulator instance disposal and the public `destroy` call.
+**R2 pending focused regression:** `tabulatorInteractions.js` now owns the binding of resize, right-click guard, cell edit/selection events, active-sheet pointer tracking, keyboard commands, and document Copy/Paste.
 
-`tabulatorTest.js` still owns grid initialization and behavior coordination in R1. Navigation and viewport-restoration algorithms remain in core until a later focused extraction proves a safe boundary.
+`tabulatorTest.js` remains the coordinator and retains the actual algorithms. R2 changes ownership location only; it does not change shortcut or grid behavior.
 
-Practical example: changing from year 2026 to 2025 first disconnects the old sheet's keyboard, copy, paste, pointer, resize, auto-scroll, and popup resources, then creates exactly one new sheet instance.
+Practical example: changing from year 2026 to 2025 disconnects the old sheet through Lifecycle, then Interactions binds exactly one command route for the new sheet.
 
 ### Phase 8.7 — Save and Dirty-State Review
 
@@ -167,6 +163,10 @@ Keep the business result of field-level tracking, but stop treating every saved 
 Acceptance: after a 4,952-row Paste and Save, arrows remain usable without changing year, and `save.delta.update-rows` should report near-zero rows when the server returned no different sheet values.
 
 
-## Current Focused Regression for Phase 8.6-R1
+## Phase 8.6-R1 Result
 
-Use section Q in `06_REGRESSION_TEST_CHECKLIST.md`. The required evidence is repeated year switching, page leave/return, resize at a deep row, and Console/lifecycle audit confirmation that one active grid owner remains. Do not continue to interaction extraction if any duplicate action, lost selection, page-scroll lock, or red Console error appears.
+Section Q passed in user testing. Six grid initializations matched six opened sheets across year changes, navigation stayed below the regression threshold, and Copy/Paste, right-click, wheel, structure operations, and Save remained functional.
+
+## Current Focused Regression for Phase 8.6-R2
+
+Use section R in `06_REGRESSION_TEST_CHECKLIST.md`. The required evidence is one action per key/pointer/clipboard event before and after repeated year switches, preserved quick/text edit modes, deep-row Resize stability, and no `tabulatorInteractions` or red Console error.
