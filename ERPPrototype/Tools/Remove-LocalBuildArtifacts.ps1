@@ -9,7 +9,7 @@ if (-not (Test-Path (Join-Path $projectRoot 'ERPPrototype.csproj'))) {
     throw "ERPPrototype.csproj was not found at $projectRoot"
 }
 
-$directoryNames = @('.vs', 'bin', 'obj', 'Debug', 'Release', 'artifacts', 'TestResults', 'coverage', 'publish')
+$directoryNames = @('.vs', 'bin', 'obj', 'Debug', 'Release', 'artifacts', 'TestResults', 'TestArtifacts', 'playwright-report', 'coverage', 'publish')
 $directories = Get-ChildItem $projectRoot -Directory -Recurse -Force -ErrorAction SilentlyContinue |
     Where-Object { $directoryNames -contains $_.Name } |
     Sort-Object FullName -Descending

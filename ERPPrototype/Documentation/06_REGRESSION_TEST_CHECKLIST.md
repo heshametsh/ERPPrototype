@@ -151,7 +151,7 @@
 - Connected smoke/regression checks reported by the user: PASS.
 - E6F structural focus guard: PASS; no Console errors after Insert/Delete/Undo/Redo/Copy-Paste/Save.
 - Provisional navigation baseline recorded from two clean runs; strict three-run median deferred by user decision.
-- Automated browser tests: غير موجودة حتى الآن.
+- Automated browser tests: Phase 9.0 foundation candidate covers Login, employee scope, sheet opening, and year switching; broader grid journeys remain pending.
 
 ## M. Phase 6 Closure Regression — Required Before New Tag
 
@@ -437,3 +437,37 @@ Phase 8.9 closure workflow: PASS
 ```
 
 No new manual grid regression was required because Phase 8.9 changed no production C#, Razor, JavaScript, migration, database rule, or UI behavior. If a future closure rerun requires modifying a production file, rerun the focused checklist for that owner before accepting the new checkpoint.
+
+## Z. Phase 9.0 — Browser Automation Foundation
+
+Run from the Solution directory:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\ERPPrototype\Tools\Invoke-Phase9Foundation.ps1 -Headed
+```
+
+The visible `-Headed` run is preferred for first acceptance. Later regression can omit `-Headed`. The command must:
+
+1. Build the integration project and browser project in Release.
+2. Pass the existing 10 SQL Server save tests.
+3. Create a uniquely named temporary E2E database.
+4. Start the web app on a random loopback port with that connection only.
+5. Open Chromium and log in as the seeded Employee through the real login page.
+6. Reach `/work-orders` and show the seeded branch and department.
+7. Show the current-year work order.
+8. switch to the previous year and show the previous-year work order while the current-year row is absent.
+9. Save `phase9-foundation-pass.png` under ignored `TestArtifacts`.
+10. Stop the web process and delete the temporary database.
+
+Required output:
+
+```text
+Result: 10/10 passed.
+Phase 8.8-R2 automated save safety net: PASS
+Result: 4/4 browser checks passed.
+Phase 9.0 browser automation foundation: PASS
+Phase 9.0 automated foundation verification: PASS
+```
+
+On failure, send the console output and the generated failure screenshot/trace path. Do not point the runner at the development or production database.
+

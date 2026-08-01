@@ -101,3 +101,11 @@ The confirmed 18-second duplicate-query regression was fixed by scoping identity
 - The report showed `save.delta.update-rows` repainting 4,952 rows and taking about 1.12 seconds even though the user-visible pasted values were already present.
 - R2 keeps field-level tracking and changes Save reconciliation so hidden server values are merged without repainting rows; only genuinely different sheet values are sent through the grid update path.
 - Post-Save navigation was tested in the later R2/R3 regressions and accepted; reopen only on a repeatable regression.
+
+## Phase 9 Browser Automation Limits
+
+- Phase 9.0 requires SQL Server LocalDB by default; `ERP_TEST_SQLSERVER_CONNECTION` may point to a dedicated disposable SQL Server instance, never to development or production data.
+- The first run may download Playwright Chromium into the current Windows user's browser cache. This increases machine cache usage but does not increase the clean project ZIP.
+- Phase 9.0 proves only Login, Employee scope, initial sheet rendering, and year switching. Edit/Save, duplicate UI messages, Copy/Paste, Undo/Redo, filters, custom columns, and financial fields require later browser scenarios.
+- The test-only `E2ETest` environment disables HTTPS redirection for the random loopback process. Normal Development and Production behavior is unchanged.
+

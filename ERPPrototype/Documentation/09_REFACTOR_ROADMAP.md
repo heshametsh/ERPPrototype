@@ -230,3 +230,18 @@ Practical example: R2 must be free to reorganize how changed rows are normalized
 Run the automated runner from section X in `06_REGRESSION_TEST_CHECKLIST.md`. Acceptance requires 10/10 PASS. The four plan tests prove the extracted pure boundary; the six SQL tests prove that permissions, uniqueness, concurrency, routing, mixed persistence, and rollback remain unchanged.
 
 Practical example: Arabic/Persian identity digits and surrounding whitespace are normalized before a DbContext is created, but whether that identity already exists anywhere in the company is still decided inside the transaction-backed service and the database unique index.
+
+## Post-Refactor Product Sequence — Phase 9
+
+Phase 8 remains closed. Phase 9 is feature work plus automated protection, not another maintainability split.
+
+1. **9.0 Browser foundation:** Login, Employee scope, sheet open, and year switching on an isolated temporary app/database.
+2. **9.1 Financial columns:** estimated amount, approved/actual amount, cumulative partial amount, calculated remaining amount, validation, and visible/whole-sheet totals.
+3. **9.2 Column behavior:** filter and correct typed sorting on every fixed column, resizing, and per-user layout persistence.
+4. **9.3 Custom columns:** department-level definitions and typed values without dynamic SQL schema changes.
+5. **9.4 Long notes:** fixed row height, ellipsis/tooltip, and large editor rather than variable height on thousands of rows.
+6. **9.5 Mouse edge auto-scroll:** progressive Excel-like speed with selection and virtual-row regression checks.
+7. **9.6 Sheet closure:** one command combining integration, browser, JavaScript, and performance evidence before role screens.
+
+Each feature adds Integration tests for data/business rules and Browser tests for the user journey. Manual testing is limited to visual judgment and perceived Excel-like interaction.
+

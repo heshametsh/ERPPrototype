@@ -22,6 +22,12 @@
     <Content Remove="ERPPrototype.IntegrationTests/**/*" />
     <EmbeddedResource Remove="ERPPrototype.IntegrationTests/**/*" />
     <None Remove="ERPPrototype.IntegrationTests/**/*" />
+
+    <!-- Keep the standalone browser-test source out of the web project. -->
+    <Compile Remove="ERPPrototype.E2ETests/**/*.cs" />
+    <Content Remove="ERPPrototype.E2ETests/**/*" />
+    <EmbeddedResource Remove="ERPPrototype.E2ETests/**/*" />
+    <None Remove="ERPPrototype.E2ETests/**/*" />
   </ItemGroup>
 
 </Project>

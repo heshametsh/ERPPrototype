@@ -35,7 +35,7 @@ if (Test-Path $outputFullPath) {
 
 $excludedDirectoryNames = @(
     '.git', '.vs', 'bin', 'obj', 'Debug', 'Release', 'artifacts',
-    'TestResults', 'coverage', 'publish'
+    'TestResults', 'TestArtifacts', 'playwright-report', 'coverage', 'publish'
 )
 
 $excludedRelativePrefixes = @(

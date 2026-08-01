@@ -2,11 +2,20 @@
 using ERPPrototype.Components.Account;
 using ERPPrototype.Data;
 using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Custom non-Development environments do not automatically load the
+// build-time static-web-assets manifest. The isolated browser-test host
+// needs the same generated Blazor/CSS assets as a normal local run.
+if (builder.Environment.IsEnvironment("E2ETest"))
+{
+    builder.WebHost.UseStaticWebAssets();
+}
 
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
@@ -151,7 +160,10 @@ app.UseStatusCodePagesWithReExecute(
     "/not-found",
     createScopeForStatusCodePages: true);
 
-app.UseHttpsRedirection();
+if (!app.Environment.IsEnvironment("E2ETest"))
+{
+    app.UseHttpsRedirection();
+}
 app.UseAntiforgery();
 
 app.MapStaticAssets();

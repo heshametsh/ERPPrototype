@@ -1,6 +1,6 @@
 # 03 — Current Implementation
 
-**Status:** Phase 8.9 accepted; maintainability refactor closed with no production behavior change in the closure step
+**Status:** Phase 8.9 accepted and refactor closed; Phase 9.0 browser-automation foundation implemented as an acceptance candidate
 **Review date:** 2026-07-31
 **Acceptance evidence:** Developer-machine Release Build PASS, 10/10 isolated SQL Server save tests, Git source hygiene PASS, and a 169-file clean source archive of 3.06 MB. The optional local Node.js check was skipped because Node.js was unavailable; project-owned JavaScript files separately passed syntax checks, and Phase 8.9 changed no production JavaScript.
 
@@ -15,12 +15,13 @@
 | Database | SQL Server / LocalDB in Development |
 | ORM | EF Core 10.0.9 |
 | Grid | Tabulator 6.5.0 |
-| Current accepted runtime checkpoint | Phase 8.9 accepted; Phase 8 refactor closed after build, 10/10 save tests, Git hygiene, and clean archive PASS |
+| Current accepted runtime checkpoint | `Phase8.9-Stable`; Phase 9.0 remains a candidate until 10/10 integration and 4/4 browser checks pass on the developer machine |
 | Main grid coordinator | `wwwroot/js/tabulatorTest.js` — 2,331 lines after Dirty-State extraction |
 | Work-order markup | `Components/Pages/WorkOrders.razor` — 208 lines |
 | Work-order save service/facade | `Data/WorkOrderService.cs` — about 955 lines after pure save-plan extraction |
 | Work-order save-plan builder | `Data/WorkOrderSavePlanBuilder.cs` — normalization and validation only; no database access |
 | Work-order read service | `Data/WorkOrderQueryService.cs` — 223 lines |
+| Browser automation project | `ERPPrototype.E2ETests` using Microsoft Playwright 1.61.0; isolated LocalDB and local app process |
 | Migrations | 29 files |
 | Runtime code changed in Phase 6.1 | Diagnostics only: `tabulatorPerformance.js` and read-only `tabulatorRangeAutoScroll.snapshot()` |
 
@@ -187,7 +188,7 @@ Implemented:
 - ProjectManager operating page.
 - User rename/reset password/activate/deactivate workflows.
 - Admin audit trail.
-- Automated browser tests.
+- Broad automated browser coverage beyond the Phase 9.0 login/sheet/year foundation.
 - A conventional unit-test framework; current pure-plan and SQL integration checks run through the standalone automated runner.
 - Production monitoring and client-side error reporting.
 - Proven 10,000-row strategy.
@@ -429,3 +430,29 @@ Phase 8.9 changed documentation and engineering tools only. It added:
 - `Tools/Invoke-Phase8Closure.ps1` to run cleanup, verification, and clean archive creation in one command.
 
 No production C#, Razor, JavaScript, migration, database rule, or UI behavior changed in Phase 8.9. The closure workflow reported Release Build PASS, 10/10 automated save tests, Git source hygiene PASS, and clean archive creation PASS. Maintainability refactoring is now closed; further extraction requires a feature or measured defect that proves a concrete need.
+
+## 27. Phase 9.0 — Browser Automation Foundation Candidate
+
+Phase 9.0 introduces `ERPPrototype.E2ETests` as a standalone console runner rather than placing browser code inside the web project. The runner:
+
+- creates a uniquely named SQL Server/LocalDB database and applies the real migrations;
+- seeds an active Employee, branch, department, and rows in the current and previous years;
+- starts the Release web application on a random loopback HTTP port using the temporary connection string;
+- runs Chromium through Playwright;
+- logs in through the real Identity UI;
+- verifies employee branch and department scope;
+- verifies the current-year row;
+- changes the year selector and verifies the previous-year row replaces it;
+- stops the app and deletes the temporary database;
+- saves a success screenshot, or a screenshot plus Playwright trace when the journey fails.
+
+The only web-startup hook is an `E2ETest` environment check that disables HTTPS redirection for the loopback test process. Development and production environments retain the existing HTTPS behavior. No migration, Work Order business rule, grid JavaScript, or normal UI behavior changes in Phase 9.0.
+
+Acceptance command from the Solution directory:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\ERPPrototype\Tools\Invoke-Phase9Foundation.ps1 -Headed
+```
+
+Required markers: integration `10/10`, browser `4/4`, and `Phase 9.0 automated foundation verification: PASS`. The first run may install the Playwright Chromium binary in the user cache; it is not stored in the project source.
+
