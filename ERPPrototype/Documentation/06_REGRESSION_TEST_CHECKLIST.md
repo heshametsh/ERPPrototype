@@ -151,7 +151,7 @@
 - Connected smoke/regression checks reported by the user: PASS.
 - E6F structural focus guard: PASS; no Console errors after Insert/Delete/Undo/Redo/Copy-Paste/Save.
 - Provisional navigation baseline recorded from two clean runs; strict three-run median deferred by user decision.
-- Automated browser tests: Phase 9.0 foundation candidate covers Login, employee scope, sheet opening, and year switching; broader grid journeys remain pending.
+- Automated browser tests: Phase 9.0 foundation passed 4/4; Phase 9.0B hardens selectors, readiness, diagnostics, and Smoke/Full execution before broader grid journeys.
 
 ## M. Phase 6 Closure Regression — Required Before New Tag
 
@@ -471,3 +471,40 @@ Phase 9.0 automated foundation verification: PASS
 
 On failure, send the console output and the generated failure screenshot/trace path. Do not point the runner at the development or production database.
 
+
+
+## AA. Phase 9.0B — Browser Automation Hardening
+
+From the Solution directory, run the visible Full suite:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\ERPPrototype\Tools\Invoke-ERPTests.ps1 -Suite Full -Headed
+```
+
+Required automated evidence:
+
+1. Release builds for integration and browser projects succeed.
+2. Existing save safety tests report `10/10 passed`.
+3. Login is located through `data-testid`, not visible text or a generic `h1`.
+4. The authenticated Work Orders page waits for the registered Tabulator table and state.
+5. Full suite reports `9/9 browser checks passed`.
+6. No page error or same-origin HTTP 5xx is recorded.
+7. A success screenshot is produced. On failure, screenshot, trace, diagnostics, and web log are produced.
+8. Temporary process and database are removed unless `-KeepDatabase` is explicitly supplied.
+9. `TestArtifacts` retains no more than the latest 10 run directories.
+10. Normal Development/Production behavior and visible UI remain unchanged.
+
+Fast browser-only smoke command:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\ERPPrototype\Tools\Invoke-ERPTests.ps1 -Suite Smoke -SkipIntegration
+```
+
+Acceptance markers:
+
+```text
+Result: 10/10 passed.
+Result: 9/9 browser checks passed.
+Phase 9.0B Full browser suite: PASS
+ERPPrototype automated verification: PASS
+```

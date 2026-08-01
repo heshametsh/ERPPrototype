@@ -1,6 +1,6 @@
 # 03 — Current Implementation
 
-**Status:** Phase 8.9 accepted and refactor closed; Phase 9.0 browser-automation foundation implemented as an acceptance candidate
+**Status:** Phase 9.0 accepted after SQL 10/10 and browser 4/4; Phase 9.0B hardening implemented as an acceptance candidate
 **Review date:** 2026-07-31
 **Acceptance evidence:** Developer-machine Release Build PASS, 10/10 isolated SQL Server save tests, Git source hygiene PASS, and a 169-file clean source archive of 3.06 MB. The optional local Node.js check was skipped because Node.js was unavailable; project-owned JavaScript files separately passed syntax checks, and Phase 8.9 changed no production JavaScript.
 
@@ -15,7 +15,7 @@
 | Database | SQL Server / LocalDB in Development |
 | ORM | EF Core 10.0.9 |
 | Grid | Tabulator 6.5.0 |
-| Current accepted runtime checkpoint | `Phase8.9-Stable`; Phase 9.0 remains a candidate until 10/10 integration and 4/4 browser checks pass on the developer machine |
+| Current accepted runtime checkpoint | Phase 9.0 runtime accepted: integration 10/10 and browser 4/4 on an isolated temporary database and local process |
 | Main grid coordinator | `wwwroot/js/tabulatorTest.js` — 2,331 lines after Dirty-State extraction |
 | Work-order markup | `Components/Pages/WorkOrders.razor` — 208 lines |
 | Work-order save service/facade | `Data/WorkOrderService.cs` — about 955 lines after pure save-plan extraction |
@@ -431,7 +431,7 @@ Phase 8.9 changed documentation and engineering tools only. It added:
 
 No production C#, Razor, JavaScript, migration, database rule, or UI behavior changed in Phase 8.9. The closure workflow reported Release Build PASS, 10/10 automated save tests, Git source hygiene PASS, and clean archive creation PASS. Maintainability refactoring is now closed; further extraction requires a feature or measured defect that proves a concrete need.
 
-## 27. Phase 9.0 — Browser Automation Foundation Candidate
+## 27. Phase 9.0 — Browser Automation Foundation Accepted
 
 Phase 9.0 introduces `ERPPrototype.E2ETests` as a standalone console runner rather than placing browser code inside the web project. The runner:
 
@@ -454,5 +454,24 @@ Acceptance command from the Solution directory:
 powershell -ExecutionPolicy Bypass -File .\ERPPrototype\Tools\Invoke-Phase9Foundation.ps1 -Headed
 ```
 
-Required markers: integration `10/10`, browser `4/4`, and `Phase 9.0 automated foundation verification: PASS`. The first run may install the Playwright Chromium binary in the user cache; it is not stored in the project source.
+Accepted markers: integration `10/10`, browser `4/4`, and `Phase 9.0 automated foundation verification: PASS`. The first run may install the Playwright Chromium binary in the user cache; it is not stored in the project source.
 
+
+
+## 28. Phase 9.0B — Browser Automation Hardening Candidate
+
+Phase 9.0B keeps the same isolated LocalDB/database and local web-process model, but replaces brittle text/CSS selectors with stable `data-testid` hooks and Page Objects. The web UI gains test-only attributes with no visible styling or business-behavior change.
+
+The browser project now owns:
+
+- `LoginPage` and `WorkOrdersPage` reusable interaction boundaries;
+- explicit readiness for the login page, authenticated page, generated Blazor assets, and the registered Tabulator table/state;
+- `Smoke` (5 checks) and `Full` (9 checks) suites;
+- a common browser session that installs Chromium when absent, owns context isolation, tracing, screenshots, and cleanup;
+- browser diagnostics for page errors, HTTP 5xx responses, console errors, and failed requests;
+- artifact retention limited to the latest 10 runs;
+- `Tools/Invoke-ERPTests.ps1` as the canonical command, with the old Phase 9 script retained as a compatibility wrapper.
+
+The Full suite remains a foundation journey, not the final Work Orders coverage. Edit/Save, insert/delete, duplicate UI, Undo/Redo, Copy/Paste, search/filter, and future financial/custom columns belong to Phase 9.0C and later feature phases.
+
+No migration, Work Order rule, save path, JavaScript behavior, or database shape changes in Phase 9.0B. Acceptance requires Release build, existing SQL tests 10/10, and Full browser checks 9/9.

@@ -4,25 +4,31 @@
 
 ## نقطة الاستقرار الحالية
 
-- `Phase8.9-Stable`: إغلاق الـRefactor بعد Release Build ناجح، واختبارات الحفظ الآلية `10/10`، وفحص Git، وإنشاء نسخة مصدر نظيفة.
-- لا يوجد Refactor إضافي مخطط له بدون مشكلة أو ميزة تثبت الحاجة.
-- `Phase 9.0`: مرشح تأسيس أول رحلة متصفح آلية قبل استكمال تعديلات شيت أوامر العمل.
+- `Phase8.9-Stable`: إغلاق الـRefactor بعد Release Build ناجح واختبارات الحفظ `10/10`.
+- `Phase 9.0`: قُبل بعد نجاح اختبارات الحفظ `10/10` ورحلة المتصفح `4/4` على قاعدة وتطبيق مؤقتين.
+- `Phase 9.0B`: مرشح تثبيت منصة اختبارات المتصفح قبل إضافة سيناريوهات الشيت والميزات الجديدة.
 
-## التحقق الآلي الحالي
+## التحقق الآلي
 
-لتشغيل اختبارات الحفظ العشرة فقط من داخل مجلد المشروع:
-
-```powershell
-.\Tools\Invoke-Phase8Verification.ps1
-```
-
-لتشغيل اختبارات الحفظ ثم مشاهدة رحلة المتصفح الأولى من مجلد الـSolution:
+التشغيل الكامل، وهو الوضع الافتراضي:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\ERPPrototype\Tools\Invoke-Phase9Foundation.ps1 -Headed
+powershell -ExecutionPolicy Bypass -File .\Tools\Invoke-ERPTests.ps1 -Suite Full
 ```
 
-رحلة المتصفح تستخدم قاعدة SQL Server مؤقتة وتطبيقًا محليًا على منفذ عشوائي، ثم تختبر تسجيل الدخول وفتح شيت الموظف وتغيير السنة. لا تستخدم قاعدة التطوير أو الإنتاج.
+لمشاهدة المتصفح أثناء التنفيذ:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\Tools\Invoke-ERPTests.ps1 -Suite Full -Headed
+```
+
+تشغيل Smoke سريع، مع إمكانية تخطي اختبارات SQL عندما يكون المطلوب فحص المتصفح فقط:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\Tools\Invoke-ERPTests.ps1 -Suite Smoke -SkipIntegration
+```
+
+الاختبارات تستخدم قاعدة SQL Server مؤقتة وتطبيقًا محليًا على منفذ عشوائي. لا تستخدم قاعدة التطوير أو الإنتاج. تحتفظ الأداة بآخر 10 مجلدات تشخيص فقط داخل `ERPPrototype.E2ETests/TestArtifacts`.
 
 ## إنشاء ZIP نظيف
 
@@ -30,6 +36,6 @@ powershell -ExecutionPolicy Bypass -File .\ERPPrototype\Tools\Invoke-Phase9Found
 .\Tools\New-CleanProjectArchive.ps1
 ```
 
-الأداة تستبعد `bin` و`obj` و`.vs` و`TestArtifacts` وملفات الجهاز والبناء، ولذلك لا يزيد حجم التسليم بسبب نواتج التشغيل أو ملفات المتصفح التشخيصية.
+الأداة تستبعد `bin` و`obj` و`.vs` و`TestArtifacts` وملفات الجهاز والبناء.
 
 ابدأ من `START_HERE_ERP_PROTOTYPE.md` ثم `Documentation/00_DOCUMENTATION_INDEX.md`.

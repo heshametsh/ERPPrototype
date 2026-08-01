@@ -8,11 +8,16 @@ internal static class Phase9FoundationRunner
         {
             var options = E2ETestOptions.Parse(args);
             var projectRoot = FindProjectRoot();
-            var artifactDirectory = CreateArtifactDirectory(projectRoot);
+            var artifactDirectory =
+                E2EArtifactManager.CreateRunDirectory(projectRoot);
 
-            Console.WriteLine("ERPPrototype Phase 9.0 browser foundation test");
-            Console.WriteLine("A temporary isolated SQL Server database and local web process will be used.");
-            Console.WriteLine($"Browser mode: {(options.Headed ? "headed/visible" : "headless")}");
+            Console.WriteLine("ERPPrototype browser automation platform");
+            Console.WriteLine(
+                "A temporary isolated SQL Server database and local web process will be used.");
+            Console.WriteLine(
+                $"Browser mode: {(options.Headed ? "headed/visible" : "headless")}");
+            Console.WriteLine($"Suite: {options.Suite}");
+            Console.WriteLine($"Artifacts: {artifactDirectory}");
             Console.WriteLine();
 
             await using var database =
@@ -32,21 +37,27 @@ internal static class Phase9FoundationRunner
                 application.BaseUri,
                 database.Seed,
                 artifactDirectory,
-                options.Headed);
+                options.Headed,
+                options.Suite);
 
-            await browserTest.RunAsync();
+            var passedChecks = await browserTest.RunAsync();
 
             Console.WriteLine();
-            Console.WriteLine("Result: 4/4 browser checks passed.");
-            Console.WriteLine("Phase 9.0 browser automation foundation: PASS");
-            Console.WriteLine("The temporary web process was isolated from the developer database.");
+            Console.WriteLine(
+                $"Result: {passedChecks}/{browserTest.ExpectedCheckCount} " +
+                "browser checks passed.");
+            Console.WriteLine(
+                $"Phase 9.0B {options.Suite} browser suite: PASS");
+            Console.WriteLine(
+                "The temporary web process was isolated from the developer database.");
 
             return 0;
         }
         catch (Exception exception)
         {
             Console.Error.WriteLine();
-            Console.Error.WriteLine("Phase 9.0 browser automation foundation: FAIL");
+            Console.Error.WriteLine(
+                "Phase 9.0B browser automation platform: FAIL");
             Console.Error.WriteLine(exception);
 
             return 1;
@@ -73,17 +84,5 @@ internal static class Phase9FoundationRunner
 
         throw new DirectoryNotFoundException(
             "Could not locate ERPPrototype.csproj from the E2E runner output directory.");
-    }
-
-    private static string CreateArtifactDirectory(string projectRoot)
-    {
-        var directory = Path.Combine(
-            projectRoot,
-            "ERPPrototype.E2ETests",
-            "TestArtifacts",
-            DateTime.Now.ToString("yyyyMMdd-HHmmss"));
-
-        Directory.CreateDirectory(directory);
-        return directory;
     }
 }

@@ -1,5 +1,4 @@
 using System.Globalization;
-using Microsoft.Playwright;
 
 namespace ERPPrototype.E2ETests;
 
@@ -7,274 +6,106 @@ internal sealed class Phase9FoundationBrowserTest(
     Uri baseUri,
     E2ESeedData seed,
     string artifactDirectory,
-    bool headed)
+    bool headed,
+    E2ETestSuite suite)
 {
-    private const float HeadedSlowMotionMilliseconds = 90;
+    public int ExpectedCheckCount =>
+        suite == E2ETestSuite.Smoke ? 5 : 9;
 
-    public async Task RunAsync()
+    public async Task<int> RunAsync()
     {
-        using var playwright = await Playwright.CreateAsync();
-        var browser = await LaunchChromiumAsync(playwright);
+        await using var browserSession =
+            await E2EBrowserSession.CreateAsync(
+                baseUri,
+                artifactDirectory,
+                headed);
+
+        var checks = new BrowserCheckRecorder();
+        var loginPage = new LoginPage(browserSession.Page, baseUri);
+        var workOrdersPage = new WorkOrdersPage(browserSession.Page);
+        var artifactName =
+            $"phase9-foundation-{suite.ToString().ToLowerInvariant()}";
 
         try
         {
-            var context = await browser.NewContextAsync(
-                new BrowserNewContextOptions
-                {
-                    Locale = "ar-SA",
-                    ViewportSize = new ViewportSize
-                    {
-                        Width = 1440,
-                        Height = 1000
-                    }
-                });
+            await loginPage.OpenAsync();
+            checks.Pass("Login form is rendered through stable test hooks");
 
-            try
+            await loginPage.LoginAsync(seed);
+            await workOrdersPage.WaitUntilReadyAsync();
+
+            E2ETestAssert.Equal(
+                "Work Orders",
+                await workOrdersPage.GetTitleAsync(),
+                "The employee did not reach the Work Orders page.");
+
+            checks.Pass("Login reaches the employee Work Orders sheet");
+
+            var scopeText = await workOrdersPage.GetScopeAsync();
+
+            E2ETestAssert.Contains(
+                seed.BranchName,
+                scopeText,
+                "The employee branch was not shown on the sheet.");
+
+            E2ETestAssert.Contains(
+                seed.DepartmentName,
+                scopeText,
+                "The employee department was not shown on the sheet.");
+
+            checks.Pass("Employee branch and department scope are visible");
+
+            E2ETestAssert.Equal(
+                seed.CurrentYear.ToString(CultureInfo.InvariantCulture),
+                await workOrdersPage.GetSelectedYearAsync(),
+                "The sheet did not open on the current work year.");
+
+            checks.Pass("Blazor and Tabulator reach an explicit ready state");
+
+            await workOrdersPage.WaitForWorkOrderAsync(
+                seed.CurrentYearWorkOrderNumber);
+
+            checks.Pass("Current-year work-order data is rendered");
+
+            if (suite == E2ETestSuite.Full)
             {
-                await context.Tracing.StartAsync(
-                    new TracingStartOptions
-                    {
-                        Screenshots = true,
-                        Snapshots = true,
-                        Sources = true
-                    });
+                await workOrdersPage.SelectYearAsync(seed.PreviousYear);
 
-                var page = await context.NewPageAsync();
-                page.SetDefaultTimeout(30_000);
+                E2ETestAssert.Equal(
+                    seed.PreviousYear.ToString(CultureInfo.InvariantCulture),
+                    await workOrdersPage.GetSelectedYearAsync(),
+                    "The year selector did not settle on the requested year.");
 
-                try
-                {
-                    await RunJourneyAsync(page);
+                checks.Pass("Year selector changes to the requested year");
 
-                    var successScreenshot = Path.Combine(
-                        artifactDirectory,
-                        "phase9-foundation-pass.png");
+                await workOrdersPage.WaitForWorkOrderAsync(
+                    seed.PreviousYearWorkOrderNumber);
 
-                    await page.ScreenshotAsync(
-                        new PageScreenshotOptions
-                        {
-                            Path = successScreenshot,
-                            FullPage = true
-                        });
+                checks.Pass("Selected-year work-order data is rendered");
 
-                    await context.Tracing.StopAsync();
+                E2ETestAssert.True(
+                    !await workOrdersPage.HasVisibleWorkOrderAsync(
+                        seed.CurrentYearWorkOrderNumber),
+                    "The current-year row remained visible after switching years.");
 
-                    Console.WriteLine(
-                        $"Browser evidence screenshot: {successScreenshot}");
-                }
-                catch
-                {
-                    var failureScreenshot = Path.Combine(
-                        artifactDirectory,
-                        "phase9-foundation-failure.png");
+                checks.Pass("Rows from the previous selection are removed");
 
-                    var tracePath = Path.Combine(
-                        artifactDirectory,
-                        "phase9-foundation-trace.zip");
-
-                    try
-                    {
-                        await page.ScreenshotAsync(
-                            new PageScreenshotOptions
-                            {
-                                Path = failureScreenshot,
-                                FullPage = true
-                            });
-                    }
-                    catch
-                    {
-                    }
-
-                    await context.Tracing.StopAsync(
-                        new TracingStopOptions
-                        {
-                            Path = tracePath
-                        });
-
-                    Console.WriteLine(
-                        $"Failure screenshot: {failureScreenshot}");
-                    Console.WriteLine($"Playwright trace: {tracePath}");
-
-                    throw;
-                }
+                browserSession.Diagnostics.AssertNoCriticalErrors();
+                checks.Pass("Journey completes without page errors or HTTP 5xx responses");
             }
-            finally
-            {
-                await context.CloseAsync();
-            }
+
+            E2ETestAssert.Equal(
+                ExpectedCheckCount,
+                checks.PassedCount,
+                "The browser journey did not execute the expected number of checks.");
+
+            await browserSession.CaptureSuccessAsync(artifactName);
+            return checks.PassedCount;
         }
-        finally
+        catch
         {
-            await browser.CloseAsync();
-        }
-    }
-
-    private async Task RunJourneyAsync(IPage page)
-    {
-        var loginUri = new Uri(
-            baseUri,
-            "/Account/Login?ReturnUrl=%2Fwork-orders");
-
-        await page.GotoAsync(
-            loginUri.ToString(),
-            new PageGotoOptions
-            {
-                WaitUntil = WaitUntilState.DOMContentLoaded
-            });
-
-        await page.Locator("#Input\\.UserName").FillAsync(seed.UserName);
-        await page.Locator("#Input\\.Password").FillAsync(seed.Password);
-        await page.Locator("button.login-button").ClickAsync();
-
-        await page.WaitForURLAsync(
-            "**/work-orders",
-            new PageWaitForURLOptions
-            {
-                Timeout = 45_000
-            });
-
-        await page.Locator("h1").WaitForAsync(
-            new LocatorWaitForOptions
-            {
-                State = WaitForSelectorState.Visible
-            });
-
-        E2ETestAssert.Equal(
-            "Work Orders",
-            (await page.Locator("h1").InnerTextAsync()).Trim(),
-            "The employee did not reach the Work Orders page.");
-
-        var subtitle = page.Locator(".page-subtitle");
-        await subtitle.WaitForAsync(
-            new LocatorWaitForOptions
-            {
-                State = WaitForSelectorState.Visible
-            });
-
-        var subtitleText = (await subtitle.InnerTextAsync()).Trim();
-
-        E2ETestAssert.Contains(
-            seed.BranchName,
-            subtitleText,
-            "The employee branch was not shown on the sheet.");
-
-        E2ETestAssert.Contains(
-            seed.DepartmentName,
-            subtitleText,
-            "The employee department was not shown on the sheet.");
-
-        var yearSelector = page.Locator("select.work-year-select");
-        await yearSelector.WaitForAsync(
-            new LocatorWaitForOptions
-            {
-                State = WaitForSelectorState.Visible
-            });
-
-        E2ETestAssert.Equal(
-            seed.CurrentYear.ToString(CultureInfo.InvariantCulture),
-            await yearSelector.InputValueAsync(),
-            "The sheet did not open on the current work year.");
-
-        await WaitForWorkOrderAsync(
-            page,
-            seed.CurrentYearWorkOrderNumber);
-
-        await yearSelector.SelectOptionAsync(
-            seed.PreviousYear.ToString(CultureInfo.InvariantCulture));
-
-        await page.WaitForFunctionAsync(
-            """
-            expectedYear => {
-                const selector = document.querySelector('select.work-year-select');
-                return selector && selector.value === String(expectedYear) && !selector.disabled;
-            }
-            """,
-            seed.PreviousYear);
-
-        await WaitForWorkOrderAsync(
-            page,
-            seed.PreviousYearWorkOrderNumber);
-
-        E2ETestAssert.True(
-            !await HasVisibleWorkOrderAsync(
-                page,
-                seed.CurrentYearWorkOrderNumber),
-            "The current-year row remained visible after switching to the previous year.");
-
-        Console.WriteLine("[PASS] Login reaches the employee Work Orders sheet");
-        Console.WriteLine("[PASS] Employee branch and department scope are visible");
-        Console.WriteLine("[PASS] Current-year work-order data is rendered");
-        Console.WriteLine("[PASS] Changing the year renders the selected year's data");
-    }
-
-    private static async Task WaitForWorkOrderAsync(
-        IPage page,
-        string workOrderNumber)
-    {
-        await page.WaitForFunctionAsync(
-            """
-            expected => Array.from(
-                document.querySelectorAll(
-                    '#tabulator-test-table .tabulator-cell[tabulator-field="workOrderNumber"]'
-                )
-            ).some(cell => (cell.textContent || '').trim() === expected)
-            """,
-            workOrderNumber,
-            new PageWaitForFunctionOptions
-            {
-                Timeout = 45_000
-            });
-    }
-
-    private static async Task<bool> HasVisibleWorkOrderAsync(
-        IPage page,
-        string workOrderNumber)
-    {
-        return await page.EvaluateAsync<bool>(
-            """
-            expected => Array.from(
-                document.querySelectorAll(
-                    '#tabulator-test-table .tabulator-cell[tabulator-field="workOrderNumber"]'
-                )
-            ).some(cell => (cell.textContent || '').trim() === expected)
-            """,
-            workOrderNumber);
-    }
-
-    private async Task<IBrowser> LaunchChromiumAsync(IPlaywright playwright)
-    {
-        var launchOptions = new BrowserTypeLaunchOptions
-        {
-            Headless = !headed,
-            SlowMo = headed
-                ? HeadedSlowMotionMilliseconds
-                : 0
-        };
-
-        try
-        {
-            return await playwright.Chromium.LaunchAsync(launchOptions);
-        }
-        catch (PlaywrightException exception)
-            when (exception.Message.Contains(
-                "Executable doesn't exist",
-                StringComparison.OrdinalIgnoreCase))
-        {
-            Console.WriteLine(
-                "Playwright Chromium is not installed. " +
-                "Installing it once in the user browser cache...");
-
-            var installExitCode = Microsoft.Playwright.Program.Main(
-                new[] { "install", "chromium" });
-
-            if (installExitCode != 0)
-            {
-                throw new InvalidOperationException(
-                    $"Playwright Chromium installation failed with exit code {installExitCode}.",
-                    exception);
-            }
-
-            return await playwright.Chromium.LaunchAsync(launchOptions);
+            await browserSession.CaptureFailureAsync(artifactName);
+            throw;
         }
     }
 }

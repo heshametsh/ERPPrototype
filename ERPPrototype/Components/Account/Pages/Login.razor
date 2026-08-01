@@ -13,7 +13,7 @@
 
 <PageTitle>تسجيل الدخول | Work Orders Prototype</PageTitle>
 
-<div class="login-page">
+<div class="login-page" data-testid="login-page">
 
     <div class="login-visual">
         <div class="visual-overlay"></div>
@@ -62,7 +62,9 @@
                 </p>
             </div>
 
-            <StatusMessage Message="@errorMessage" />
+            <div data-testid="login-status">
+                <StatusMessage Message="@errorMessage" />
+            </div>
 
             <EditForm EditContext="editContext"
                       method="post"
@@ -81,6 +83,7 @@
 
                     <InputText @bind-Value="Input.UserName"
                                id="Input.UserName"
+                               data-testid="login-username"
                                class="form-control"
                                autocomplete="username"
                                aria-required="true"
@@ -98,6 +101,7 @@
                     <InputText type="password"
                                @bind-Value="Input.Password"
                                id="Input.Password"
+                               data-testid="login-password"
                                class="form-control"
                                autocomplete="current-password"
                                aria-required="true"
@@ -117,7 +121,8 @@
                 </div>
 
                 <button type="submit"
-                        class="login-button">
+                        class="login-button"
+                        data-testid="login-submit">
                     تسجيل الدخول
                 </button>
 

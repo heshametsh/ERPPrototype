@@ -19,7 +19,7 @@
 | GRID-003 | P1 | Insert/Delete/structural Undo تستخدم full `setData` | تعيد بناء بيانات الشيت والتحقق | لا نضيف عمليات هيكلية ثقيلة جديدة | تحسين مرحلي بعد فصل الموديولات |
 | GRID-004 | P1 | 10,000 صف غير مختبرة | Client-side loading قد لا يظل مقبولًا | اختبار منفصل قبل قرار معماري | مطلوب قبل تحديد سعة المنتج |
 | GRID-005 | P3 | Search Debounce غير منفذ | البحث الحالي يعمل مع كل تغيير في النص، لكن لا توجد شكوى أو قياس يثبت عبئًا مؤثرًا مع بيانات البروتوتايب الحالية | إبقاء السلوك المباشر لتجنب Timer وتعقيد غير مطلوب | يعاد تقييمه عند بيانات أكبر أو بطء بحث مثبت |
-| TEST-001 | P1 | تغطية الاختبارات الآلية غير مكتملة للواجهة | مسار الحفظ محمي بـ10 اختبارات Plan/SQL، لكن تسجيل الدخول ورحلة الشيت لم تُغطَّ باختبارات متصفح | الاختبارات اليدوية تقتصر على UX، ويُضاف Browser automation مع ثبات selectors | الرحلات الرئيسية مطلوبة قبل Pilot |
+| TEST-001 | P1 | تغطية اختبارات المتصفح غير مكتملة للعمليات التحريرية | Login/Scope/Open/Year تعمل آليًا، لكن Edit/Save/Insert/Delete/Undo/Redo لم تدخل Full Regression بعد | Phase 9.0B يثبت المنصة وPhase 9.0C يضيف رحلات الشيت الحالية | الرحلات الرئيسية مطلوبة قبل Pilot |
 | AUTH-001 | P1 | BranchManager workflow غير مكتمل | الحساب موجود لكن لا شاشة read-only أو إدارة فرع | لا نقدمه كميزة منتهية | مطلوب قبل Pilot للدور |
 | AUTH-002 | P1 | Workflow وصلاحيات العرض الشامل لـ`ProjectManager` غير مكتملة | الاسم النهائي محسوم ومتطابق في المنتج والكود، لكن شاشة التشغيل ما زالت محدودة | لا نقدمه كميزة منتهية | مطلوب قبل Pilot للدور |
 | AUTH-003 | P1 | Rename/reset password/activate/deactivate غير مكتملة | الحسابات ثابتة لكن تغيير الأشخاص غير مدعوم | Admin ينشئ الحساب فقط حاليًا | مطلوب قبل Pilot |
@@ -106,6 +106,6 @@ The confirmed 18-second duplicate-query regression was fixed by scoping identity
 
 - Phase 9.0 requires SQL Server LocalDB by default; `ERP_TEST_SQLSERVER_CONNECTION` may point to a dedicated disposable SQL Server instance, never to development or production data.
 - The first run may download Playwright Chromium into the current Windows user's browser cache. This increases machine cache usage but does not increase the clean project ZIP.
-- Phase 9.0 proves only Login, Employee scope, initial sheet rendering, and year switching. Edit/Save, duplicate UI messages, Copy/Paste, Undo/Redo, filters, custom columns, and financial fields require later browser scenarios.
+- Phase 9.0 passed Login, Employee scope, initial sheet rendering, and year switching. Phase 9.0B hardens the platform but does not yet cover Edit/Save, duplicate UI messages, Copy/Paste, Undo/Redo, filters, custom columns, or financial fields.
 - The test-only `E2ETest` environment disables HTTPS redirection for the random loopback process. Normal Development and Production behavior is unchanged.
 

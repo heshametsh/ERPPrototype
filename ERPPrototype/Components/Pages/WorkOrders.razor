@@ -22,15 +22,17 @@
 
 <PageTitle>Work Orders</PageTitle>
 
-<div class="work-orders-page tabulator-workorders-page">
+<div class="work-orders-page tabulator-workorders-page"
+     data-testid="work-orders-page">
 
     <div class="work-orders-sticky-controls">
         <div class="page-header-row">
             <div class="page-title-block">
-                <h1>Work Orders</h1>
+                <h1 data-testid="work-orders-title">Work Orders</h1>
 
                 <div class="page-context-row">
-                    <div class="page-subtitle">
+                    <div class="page-subtitle"
+                         data-testid="work-orders-scope">
                         @if (IsLoading)
                         {
                             <span>Loading department data...</span>
@@ -52,6 +54,7 @@
 
                             <select @key="YearSelectorRenderKey"
                                     class="work-year-select"
+                                    data-testid="work-year-selector"
                                     value="@SelectedWorkYear"
                                     disabled="@(IsSaving || IsYearLoading)"
                                     @onchange="ChangeWorkYearAsync">
@@ -71,6 +74,7 @@
                     <div class="page-actions-buttons">
                         <button type="button"
                                 class="page-action-button page-action-button-secondary"
+                                data-testid="work-orders-undo"
                                 disabled="@IsYearLoading"
                                 onclick="window.tabulatorTest.undo('tabulator-test-table')">
                             Undo
@@ -78,6 +82,7 @@
 
                         <button type="button"
                                 class="page-action-button page-action-button-secondary"
+                                data-testid="work-orders-redo"
                                 disabled="@IsYearLoading"
                                 onclick="window.tabulatorTest.redo('tabulator-test-table')">
                             Redo
@@ -85,6 +90,7 @@
 
                         <button type="button"
                                 class="page-action-button page-action-button-secondary"
+                                data-testid="work-orders-insert"
                                 disabled="@IsYearLoading"
                                 onclick="window.tabulatorTest.openInsertDialog('tabulator-test-table')">
                             Insert Rows
@@ -92,6 +98,7 @@
 
                         <button type="button"
                                 class="page-action-button page-action-button-secondary"
+                                data-testid="work-orders-delete"
                                 disabled="@IsYearLoading"
                                 onclick="window.tabulatorTest.deleteSelectedRows('tabulator-test-table')">
                             Delete Rows
@@ -99,6 +106,7 @@
 
                         <button type="button"
                                 class="page-action-button page-action-button-primary"
+                                data-testid="work-orders-copy"
                                 disabled="@IsYearLoading"
                                 onclick="window.tabulatorTest.copyRange('tabulator-test-table')">
                             Copy Selected Cells
@@ -106,6 +114,7 @@
 
                         <button type="button"
                                 class="page-action-button page-action-button-primary"
+                                data-testid="work-orders-save"
                                 disabled="@(IsSaving || IsYearLoading)"
                                 @onclick="SaveChangesAsync">
                             @(IsYearLoading ? "Loading..." : IsSaving ? "Saving..." : "Save")
@@ -113,7 +122,8 @@
                     </div>
 
                     <div class="save-status"
-                         id="tabulator-test-table-status">
+                         id="tabulator-test-table-status"
+                         data-testid="work-orders-status">
                         Preparing database rows...
                     </div>
                 </div>
@@ -122,13 +132,15 @@
 
         @if (IsLoading)
         {
-            <div class="alert alert-info">
+            <div class="alert alert-info"
+                 data-testid="work-orders-loading">
                 Loading work orders from SQL Server...
             </div>
         }
         else if (!string.IsNullOrWhiteSpace(ErrorMessage))
         {
-            <div class="alert alert-danger">
+            <div class="alert alert-danger"
+                 data-testid="work-orders-error">
                 @ErrorMessage
             </div>
         }
@@ -143,6 +155,7 @@
                 <div class="validation-navigator-slot">
                     <div class="validation-navigator"
                          id="tabulator-test-table-validation-panel"
+                         data-testid="work-orders-validation"
                          role="status"
                          aria-live="polite"
                          hidden>
@@ -187,6 +200,7 @@
                     <input @key="SelectedWorkYear"
                            id="tabulator-work-order-search"
                            class="work-order-search-input"
+                           data-testid="work-orders-search"
                            type="search"
                            inputmode="numeric"
                            autocomplete="off"
@@ -201,7 +215,8 @@
     @if (!IsLoading && string.IsNullOrWhiteSpace(ErrorMessage))
     {
         <div class="tabulator-card">
-            <div id="tabulator-test-table"></div>
+            <div id="tabulator-test-table"
+                 data-testid="work-orders-grid"></div>
         </div>
     }
 
