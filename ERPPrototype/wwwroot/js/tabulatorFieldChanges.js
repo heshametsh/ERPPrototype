@@ -450,6 +450,14 @@
                 );
             }
 
+            if (effectiveChanges.some(change =>
+                this.doesFieldAffectAggregates?.(change.field))) {
+                this.scheduleAggregateRefresh?.(
+                    elementId,
+                    "content-batch"
+                );
+            }
+
             if (options.postProcess !== false) {
                 const changedFieldsByRow =
                     this.buildChangedFieldsByRow(effectiveChanges);

@@ -421,6 +421,10 @@ window.tabulatorTest = {
                 table
             );
 
+            window.tabulatorTest.initializeAggregates?.(
+                elementId
+            );
+
             /*
              * The sheet must open without a preselected first cell.
              */
@@ -2370,6 +2374,11 @@ window.tabulatorTest = {
 
         this.syncValidationUi(elementId);
         this.renderStatus(elementId);
+        this.scheduleAggregateRefresh?.(
+            elementId,
+            "save-delta",
+            "full"
+        );
 
         this.recordPerformanceStage(
             elementId,

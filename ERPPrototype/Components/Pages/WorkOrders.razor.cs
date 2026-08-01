@@ -392,9 +392,9 @@ public partial class WorkOrders
         }
 
         var normalized =
-    WorkOrderFinancialRules.NormalizeAmount(value)
-    ?? throw new InvalidOperationException(
-        "A non-null amount could not be normalized.");
+            WorkOrderFinancialRules.NormalizeAmount(value)
+            ?? throw new InvalidOperationException(
+                "A non-null amount could not be normalized.");
 
         return normalized == decimal.Truncate(normalized)
             ? normalized.ToString("#,0", CultureInfo.InvariantCulture)

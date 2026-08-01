@@ -20,6 +20,9 @@ internal sealed class WorkOrdersPage(IPage page)
     private ILocator DeleteButton => page.GetByTestId("work-orders-delete");
     private ILocator Status => page.GetByTestId("work-orders-status");
     private ILocator ValidationPanel => page.GetByTestId("work-orders-validation");
+    private ILocator Summary => page.GetByTestId("work-orders-summary");
+    private ILocator SelectionSummary =>
+        page.GetByTestId("work-orders-selection-summary");
 
     public async Task WaitUntilReadyAsync()
     {
@@ -49,6 +52,12 @@ internal sealed class WorkOrdersPage(IPage page)
             });
 
         await Grid.WaitForAsync(
+            new LocatorWaitForOptions
+            {
+                State = WaitForSelectorState.Visible
+            });
+
+        await Summary.WaitForAsync(
             new LocatorWaitForOptions
             {
                 State = WaitForSelectorState.Visible
@@ -683,6 +692,10 @@ internal sealed class WorkOrdersPage(IPage page)
         await WaitForActiveRowCountAsync(
             expectedRemainingRows,
             StressTimeoutMs);
+        await WaitForAggregateRowCountAsync(
+            "visible",
+            expectedRemainingRows,
+            StressTimeoutMs);
     }
 
     private async Task ClickCellAsync(
@@ -768,6 +781,256 @@ internal sealed class WorkOrdersPage(IPage page)
         await WaitUntilReadyAsync();
     }
 
+    public async Task WaitForAggregateReadyAsync()
+    {
+        await page.WaitForFunctionAsync(
+            """
+            tableId => {
+                const overview = document.getElementById(
+                    `${tableId}-summary-overview`
+                );
+
+                return Boolean(
+                    overview?.dataset?.aggregateReady === 'true' &&
+                    window.tabulatorTest?.getAggregateSnapshot?.(tableId)
+                );
+            }
+            """,
+            TableId,
+            new PageWaitForFunctionOptions
+            {
+                Timeout = NormalTimeoutMs
+            });
+    }
+
+    public async Task WaitForAggregateRowCountAsync(
+        string scope,
+        int expectedCount,
+        int timeoutMs = NormalTimeoutMs)
+    {
+        await page.WaitForFunctionAsync(
+            """
+            args => {
+                const snapshot =
+                    window.tabulatorTest?.getAggregateSnapshot?.(
+                        args.tableId
+                    );
+
+                return Number(
+                    snapshot?.[args.scope]?.rowCount ?? -1
+                ) === args.expectedCount;
+            }
+            """,
+            new
+            {
+                tableId = TableId,
+                scope,
+                expectedCount
+            },
+            new PageWaitForFunctionOptions
+            {
+                Timeout = timeoutMs
+            });
+    }
+
+    public async Task<int> GetAggregateRowCountAsync(string scope)
+    {
+        return await page.EvaluateAsync<int>(
+            """
+            args => Number(
+                window.tabulatorTest
+                    ?.getAggregateSnapshot?.(args.tableId)
+                    ?.[args.scope]
+                    ?.rowCount ?? 0
+            )
+            """,
+            new
+            {
+                tableId = TableId,
+                scope
+            });
+    }
+
+    public async Task<long> GetAggregateAmountCentsAsync(
+        string scope,
+        string field)
+    {
+        return await page.EvaluateAsync<long>(
+            """
+            args => Number(
+                window.tabulatorTest
+                    ?.getAggregateSnapshot?.(args.tableId)
+                    ?.[args.scope]
+                    ?.amounts
+                    ?.[args.field] ?? 0
+            )
+            """,
+            new
+            {
+                tableId = TableId,
+                scope,
+                field
+            });
+    }
+
+    public async Task WaitForAggregateAmountCentsAsync(
+        string scope,
+        string field,
+        long expectedCents,
+        int timeoutMs = NormalTimeoutMs)
+    {
+        await page.WaitForFunctionAsync(
+            """
+            args => {
+                const snapshot =
+                    window.tabulatorTest?.getAggregateSnapshot?.(
+                        args.tableId
+                    );
+
+                return Number(
+                    snapshot?.[args.scope]?.amounts?.[args.field] ?? 0
+                ) === args.expectedCents;
+            }
+            """,
+            new
+            {
+                tableId = TableId,
+                scope,
+                field,
+                expectedCents
+            },
+            new PageWaitForFunctionOptions
+            {
+                Timeout = timeoutMs
+            });
+    }
+
+    public async Task<string> GetSummaryItemTextAsync(string testId)
+    {
+        return (
+            await page.GetByTestId(testId).InnerTextAsync()
+        ).Trim();
+    }
+
+    public async Task SelectContiguousRowsAsync(
+        int anchorRowId,
+        int rowCount)
+    {
+        var selected = await page.EvaluateAsync<bool>(
+            """
+            async args => {
+                const api = window.tabulatorTest;
+                const table = api?.tables?.[args.tableId];
+                const rows = table?.getRows('active') ?? [];
+                const anchorIndex = rows.findIndex(
+                    row => row.getIndex() === args.anchorRowId
+                );
+
+                if (
+                    !api ||
+                    !table ||
+                    anchorIndex < 0 ||
+                    args.rowCount < 1
+                ) {
+                    return false;
+                }
+
+                const maximumStart = Math.max(
+                    0,
+                    rows.length - args.rowCount
+                );
+                const startIndex = Math.min(
+                    anchorIndex,
+                    maximumStart
+                );
+                const endIndex = Math.min(
+                    rows.length - 1,
+                    startIndex + args.rowCount - 1
+                );
+                const startRow = rows[startIndex];
+                const endRow = rows[endIndex];
+
+                await table.scrollToRow(startRow, 'top', true);
+
+                const startCell = startRow.getCell('notes');
+                const endCell = endRow.getCell('notes');
+
+                if (!startCell || !endCell) {
+                    return false;
+                }
+
+                api.clearTableRanges(args.tableId);
+                table.addRange(startCell, endCell);
+
+                await new Promise(
+                    resolve => window.requestAnimationFrame(resolve)
+                );
+
+                return true;
+            }
+            """,
+            new
+            {
+                tableId = TableId,
+                anchorRowId,
+                rowCount
+            });
+
+        E2ETestAssert.True(
+            selected,
+            $"Could not select {rowCount} contiguous rows from row Id {anchorRowId}.");
+    }
+
+    public async Task WaitForSelectionAggregateAsync(
+        int expectedRowCount,
+        int timeoutMs = NormalTimeoutMs)
+    {
+        await page.WaitForFunctionAsync(
+            """
+            args => {
+                const snapshot =
+                    window.tabulatorTest?.getAggregateSnapshot?.(
+                        args.tableId
+                    );
+                const selection = document.getElementById(
+                    `${args.tableId}-summary-selection`
+                );
+
+                return Boolean(
+                    snapshot?.selection?.rowCount ===
+                        args.expectedRowCount &&
+                    (
+                        args.expectedRowCount === 0
+                            ? selection?.hidden === true
+                            : selection?.hidden === false
+                    )
+                );
+            }
+            """,
+            new
+            {
+                tableId = TableId,
+                expectedRowCount
+            },
+            new PageWaitForFunctionOptions
+            {
+                Timeout = timeoutMs
+            });
+    }
+
+    public async Task ClearSelectionAsync()
+    {
+        await page.EvaluateAsync(
+            """
+            tableId => {
+                window.tabulatorTest?.clearTableRanges?.(tableId);
+            }
+            """,
+            TableId);
+
+        await WaitForSelectionAggregateAsync(0);
+    }
+
     public async Task<BrowserStructureStressMetrics>
         RunThousandRowStructureStressAsync(
             int anchorRowId,
@@ -795,6 +1058,10 @@ internal sealed class WorkOrdersPage(IPage page)
                 await WaitForActiveRowCountAsync(
                     originalRowCount + 1_000,
                     StressTimeoutMs);
+                await WaitForAggregateRowCountAsync(
+                    "visible",
+                    originalRowCount,
+                    StressTimeoutMs);
 
                 await WaitForDirtyRowCountAsync(
                     1_000,
@@ -820,6 +1087,10 @@ internal sealed class WorkOrdersPage(IPage page)
                     TableId);
 
                 await WaitForActiveRowCountAsync(
+                    originalRowCount,
+                    StressTimeoutMs);
+                await WaitForAggregateRowCountAsync(
+                    "visible",
                     originalRowCount,
                     StressTimeoutMs);
 
@@ -849,6 +1120,10 @@ internal sealed class WorkOrdersPage(IPage page)
                 await WaitForActiveRowCountAsync(
                     originalRowCount + 1_000,
                     StressTimeoutMs);
+                await WaitForAggregateRowCountAsync(
+                    "visible",
+                    originalRowCount,
+                    StressTimeoutMs);
 
                 await WaitForDirtyRowCountAsync(
                     1_000,
@@ -874,6 +1149,10 @@ internal sealed class WorkOrdersPage(IPage page)
                     TableId);
 
                 await WaitForActiveRowCountAsync(
+                    originalRowCount,
+                    StressTimeoutMs);
+                await WaitForAggregateRowCountAsync(
+                    "visible",
                     originalRowCount,
                     StressTimeoutMs);
 

@@ -163,7 +163,18 @@
                     clientKey:
                         cell.getRow().getData().clientKey,
                     field: cell.getField(),
-                    oldValue: cell.getValue()
+                    oldValue: cell.getValue(),
+                    aggregateBefore:
+                        window.tabulatorTest
+                            .doesFieldAffectAggregates?.(
+                                cell.getField()
+                            )
+                            ? window.tabulatorTest
+                                .captureAggregateRowState?.(
+                                    elementId,
+                                    cell.getRow().getData()
+                                )
+                            : null
                 };
 
                 /*
@@ -257,6 +268,13 @@
                         ? pending.oldValue
                         : cell.getOldValue();
 
+                const aggregateBefore =
+                    pending &&
+                        pending.rowId === rowId &&
+                        pending.field === field
+                        ? pending.aggregateBefore
+                        : null;
+
                 let newValue =
                     cell.getValue();
 
@@ -291,6 +309,27 @@
                     void window.tabulatorTest.syncFinancialRows(
                         elementId,
                         [rowId]
+                    ).then(() => {
+                        window.tabulatorTest
+                            .applyAggregateRowDelta?.(
+                                elementId,
+                                rowId,
+                                aggregateBefore
+                            );
+                    }).catch(() => {
+                        window.tabulatorTest.scheduleAggregateRefresh?.(
+                            elementId,
+                            "financial-cell-edit-error"
+                        );
+                    });
+                } else if (
+                    window.tabulatorTest
+                        .doesFieldAffectAggregates?.(field)
+                ) {
+                    window.tabulatorTest.applyAggregateRowDelta?.(
+                        elementId,
+                        rowId,
+                        aggregateBefore
                     );
                 }
 
@@ -351,10 +390,25 @@
 
             table.on("rangeAdded", function () {
                 state.isActive = true;
+                window.tabulatorTest.scheduleSelectionAggregateRefresh?.(
+                    elementId,
+                    "range-added"
+                );
             });
 
             table.on("rangeChanged", function () {
                 state.isActive = true;
+                window.tabulatorTest.scheduleSelectionAggregateRefresh?.(
+                    elementId,
+                    "range-changed"
+                );
+            });
+
+            table.on("rangeRemoved", function () {
+                window.tabulatorTest.scheduleSelectionAggregateRefresh?.(
+                    elementId,
+                    "range-removed"
+                );
             });
 
             state.pointerDownHandler = function (event) {

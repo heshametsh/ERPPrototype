@@ -1206,6 +1206,11 @@
                     transaction
                 );
 
+                this.scheduleAggregateRefresh?.(
+                    elementId,
+                    "structure-undo"
+                );
+
                 this.setStatus(
                     elementId,
                     `تم التراجع عن: ${transaction.label}.`
@@ -1292,6 +1297,11 @@
 
                 state.undoStack.push(
                     transaction
+                );
+
+                this.scheduleAggregateRefresh?.(
+                    elementId,
+                    "structure-redo"
                 );
 
                 this.setStatus(

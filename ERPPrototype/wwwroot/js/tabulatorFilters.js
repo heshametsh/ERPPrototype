@@ -1374,6 +1374,12 @@ window.tabulatorFilters = {
         );
 
         this.updateAllIcons(host, elementId);
+
+        host.scheduleAggregateRefresh?.(
+            elementId,
+            "filter-applied",
+            "visible"
+        );
     },
 
     updateIcon: function (

@@ -278,6 +278,85 @@
     }
 
 /* =========================
+   FINANCIAL SUMMARY BAR
+   ========================= */
+
+.work-orders-summary-bar {
+    display: flex;
+    align-items: stretch;
+    gap: 10px;
+    min-height: 64px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    margin-top: 10px;
+    padding: 8px;
+    border: 1px solid #cbd9e4;
+    border-radius: 10px;
+    background: #ffffff;
+    direction: ltr;
+    box-shadow: 0 5px 16px rgba(15, 42, 70, 0.055);
+}
+
+.work-orders-summary-overview {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(135px, 1fr));
+    gap: 8px;
+    min-width: 640px;
+    flex: 1 1 640px;
+}
+
+.work-orders-summary-item {
+    min-width: 0;
+    padding: 7px 10px;
+    border: 1px solid #dbe5ed;
+    border-radius: 8px;
+    background: #f7fafc;
+}
+
+.work-orders-summary-label {
+    display: block;
+    margin-bottom: 3px;
+    overflow: hidden;
+    color: #60788b;
+    font-size: 0.72rem;
+    font-weight: 750;
+    line-height: 1.15;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.work-orders-summary-value {
+    display: block;
+    overflow: hidden;
+    color: #142d42;
+    font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+    font-size: 0.91rem;
+    font-variant-numeric: tabular-nums;
+    font-weight: 800;
+    line-height: 1.25;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.work-orders-selection-summary {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(135px, 1fr));
+    gap: 8px;
+    width: 600px;
+    min-width: 600px;
+    flex: 0 0 600px;
+}
+
+.work-orders-selection-summary[hidden] {
+    display: none !important;
+}
+
+.work-orders-selection-summary .work-orders-summary-item {
+    border-color: #9fcfdf;
+    background: #edf8fc;
+}
+
+/* =========================
    RESPONSIVE
    ========================= */
 
@@ -315,6 +394,7 @@
     .validation-navigator-slot {
         min-height: 68px;
     }
+
 }
 
 

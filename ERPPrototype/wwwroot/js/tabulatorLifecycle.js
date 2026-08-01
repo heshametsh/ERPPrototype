@@ -33,11 +33,21 @@
                 window.visualViewport?.height || window.innerHeight;
             const elementTop =
                 element.getBoundingClientRect().top;
+            const summary = document.getElementById(
+                `${element.id}-summary`
+            );
+            const summaryHeight =
+                summary?.getBoundingClientRect().height ?? 0;
+            const summaryGap = summaryHeight > 0 ? 10 : 0;
 
             return Math.max(
                 minimumHeight,
                 Math.floor(
-                    viewportHeight - elementTop - bottomGap
+                    viewportHeight -
+                    elementTop -
+                    summaryHeight -
+                    summaryGap -
+                    bottomGap
                 )
             );
         },
@@ -172,6 +182,26 @@
                 );
                 state.verticalNavigationFrame = null;
             }
+
+            if (
+                state.aggregateRefreshFrame !== null &&
+                state.aggregateRefreshFrame !== undefined
+            ) {
+                window.cancelAnimationFrame(
+                    state.aggregateRefreshFrame
+                );
+                state.aggregateRefreshFrame = null;
+            }
+
+            if (
+                state.selectionAggregateRefreshFrame !== null &&
+                state.selectionAggregateRefreshFrame !== undefined
+            ) {
+                window.cancelAnimationFrame(
+                    state.selectionAggregateRefreshFrame
+                );
+                state.selectionAggregateRefreshFrame = null;
+            }
         },
 
         disposeTableInstance: function (elementId) {
@@ -180,6 +210,7 @@
 
             window.tabulatorFilters?.closeActivePopup?.(elementId);
             window.tabulatorRangeAutoScroll?.detach?.(elementId);
+            this.resetAggregatesUi?.(elementId);
 
             this.detachLifecycleEventHandlers(table, state);
             this.cancelLifecycleAsyncWork(state);
@@ -291,6 +322,14 @@
                  * same repeat policy and the same central state.
                  */
                 verticalNavigationFrame: null,
+
+                aggregateRefreshFrame: null,
+                aggregateRefreshReason: "",
+                aggregateRefreshScope: "visible",
+                selectionAggregateRefreshFrame: null,
+                selectionAggregateRefreshReason: "",
+                aggregateSnapshot: null,
+                customAmountAggregateFields: [],
 
                 viewportLockApplied: false,
                 previousDocumentOverflow: "",

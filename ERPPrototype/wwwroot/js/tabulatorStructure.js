@@ -1324,6 +1324,11 @@
                     rows: insertedRows
                 }
             );
+
+            this.scheduleAggregateRefresh?.(
+                elementId,
+                "structure-insert"
+            );
         },
 
         /*
@@ -1635,6 +1640,11 @@
                             : `حذف ${deletedRows.length.toLocaleString()} صفوف`,
                     rows: deletedRows
                 }
+            );
+
+            this.scheduleAggregateRefresh?.(
+                elementId,
+                "structure-delete"
             );
         },
 

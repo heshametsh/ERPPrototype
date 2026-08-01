@@ -826,6 +826,16 @@
                 } catch {
                 }
             }
+
+            /*
+             * Do not rely only on Tabulator's rangeRemoved event.
+             * Some programmatic clear paths can finish without refreshing
+             * the selected-row financial summary.
+             */
+            this.scheduleSelectionAggregateRefresh?.(
+                elementId,
+                "ranges-cleared"
+            );
         },
 
         ensureRangeBeforeRightClick: function (elementId, event) {

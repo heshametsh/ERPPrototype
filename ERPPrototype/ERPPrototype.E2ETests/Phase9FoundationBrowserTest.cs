@@ -16,9 +16,9 @@ internal sealed class Phase9FoundationBrowserTest(
 
     public int ExpectedCheckCount => suite switch
     {
-        E2ETestSuite.Smoke => 8,
-        E2ETestSuite.Full => 31,
-        E2ETestSuite.Stress => 38,
+        E2ETestSuite.Smoke => 9,
+        E2ETestSuite.Full => 35,
+        E2ETestSuite.Stress => 42,
         _ => throw new ArgumentOutOfRangeException(nameof(suite))
     };
 
@@ -92,6 +92,33 @@ internal sealed class Phase9FoundationBrowserTest(
             checks.Pass(
                 $"Current-year sheet contains {seed.RowsPerYear:N0} active rows");
 
+            await workOrdersPage.WaitForAggregateReadyAsync();
+            await workOrdersPage.WaitForAggregateRowCountAsync(
+                "year",
+                seed.RowsPerYear);
+            await workOrdersPage.WaitForAggregateRowCountAsync(
+                "visible",
+                seed.RowsPerYear);
+
+            var initialYearWorkOrderValueCents =
+                await workOrdersPage.GetAggregateAmountCentsAsync(
+                    "year",
+                    "workOrderValue");
+
+            E2ETestAssert.True(
+                initialYearWorkOrderValueCents > 0,
+                "The initial financial summary did not calculate Work Order Value.");
+
+            E2ETestAssert.Equal(
+                initialYearWorkOrderValueCents,
+                await workOrdersPage.GetAggregateAmountCentsAsync(
+                    "visible",
+                    "workOrderValue"),
+                "The unfiltered visible total did not match the year total.");
+
+            checks.Pass(
+                "Financial summary loads year and visible totals without scanning rendered DOM rows");
+
             var renderedRowCount =
                 await workOrdersPage.GetRenderedRowCountAsync();
 
@@ -155,6 +182,29 @@ internal sealed class Phase9FoundationBrowserTest(
                 await browserSession.ObserveAsync(
                     "البحث عزل أمر عمل واحد قرب نهاية الشيت");
 
+                await workOrdersPage.WaitForAggregateRowCountAsync(
+                    "visible",
+                    1);
+
+                var filteredRowValueCents = ParseAmountCents(
+                    await workOrdersPage.GetCellValueAsync(
+                        seed.CurrentYearLastRowId,
+                        "workOrderValue"));
+
+                E2ETestAssert.Equal(
+                    filteredRowValueCents,
+                    await workOrdersPage.GetAggregateAmountCentsAsync(
+                        "visible",
+                        "workOrderValue"),
+                    "The filtered financial summary did not match the isolated row.");
+
+                E2ETestAssert.Equal(
+                    initialYearWorkOrderValueCents,
+                    await workOrdersPage.GetAggregateAmountCentsAsync(
+                        "year",
+                        "workOrderValue"),
+                    "Filtering changed the fixed year total.");
+
                 await workOrdersPage.ClearSearchAsync(seed.RowsPerYear);
 
                 E2ETestAssert.Equal(
@@ -165,8 +215,21 @@ internal sealed class Phase9FoundationBrowserTest(
                 checks.Pass(
                     "Clearing search restores all 1,000 current-year rows");
 
+                await workOrdersPage.WaitForAggregateRowCountAsync(
+                    "visible",
+                    seed.RowsPerYear);
+                E2ETestAssert.Equal(
+                    initialYearWorkOrderValueCents,
+                    await workOrdersPage.GetAggregateAmountCentsAsync(
+                        "visible",
+                        "workOrderValue"),
+                    "Clearing search did not restore the visible financial total.");
+
+                checks.Pass(
+                    "Column filtering changes visible totals while preserving fixed year totals");
+
                 const string persistedNote =
-                    "Phase 9.1A browser save persisted under 1,000-row load";
+                    "Phase 9.1B browser save persisted under 1,000-row load";
 
                 var editSaveReloadStartedAt = Stopwatch.GetTimestamp();
 
@@ -227,6 +290,27 @@ internal sealed class Phase9FoundationBrowserTest(
                 checks.Pass(
                     "Seeded financial values load with a derived Remaining Amount");
 
+                var oldWorkOrderValueCents = ParseAmountCents(
+                    await workOrdersPage.GetCellValueAsync(
+                        seed.CurrentYearMiddleRowId,
+                        "workOrderValue"));
+                var oldPartialAmountCents = ParseAmountCents(
+                    await workOrdersPage.GetCellValueAsync(
+                        seed.CurrentYearMiddleRowId,
+                        "partialAmount"));
+                var aggregateWorkOrderValueBefore =
+                    await workOrdersPage.GetAggregateAmountCentsAsync(
+                        "year",
+                        "workOrderValue");
+                var aggregatePartialAmountBefore =
+                    await workOrdersPage.GetAggregateAmountCentsAsync(
+                        "year",
+                        "partialAmount");
+                var aggregateRemainingAmountBefore =
+                    await workOrdersPage.GetAggregateAmountCentsAsync(
+                        "year",
+                        "remainingAmount");
+
                 await workOrdersPage.SetCellValueAsync(
                     seed.CurrentYearMiddleRowId,
                     "workOrderValue",
@@ -255,6 +339,34 @@ internal sealed class Phase9FoundationBrowserTest(
                 await browserSession.ObserveAsync(
                     "تم تعديل قيمة أمر العمل والجزئي — المتبقي اتحسب تلقائيًا");
 
+                const long editedWorkOrderValueCents = 125_000_057;
+                const long editedPartialAmountCents = 25_000_026;
+                const long editedRemainingAmountCents = 100_000_031;
+                var oldRemainingAmountCents =
+                    oldWorkOrderValueCents - oldPartialAmountCents;
+
+                await workOrdersPage.WaitForAggregateAmountCentsAsync(
+                    "year",
+                    "workOrderValue",
+                    aggregateWorkOrderValueBefore -
+                    oldWorkOrderValueCents +
+                    editedWorkOrderValueCents);
+                await workOrdersPage.WaitForAggregateAmountCentsAsync(
+                    "year",
+                    "partialAmount",
+                    aggregatePartialAmountBefore -
+                    oldPartialAmountCents +
+                    editedPartialAmountCents);
+                await workOrdersPage.WaitForAggregateAmountCentsAsync(
+                    "year",
+                    "remainingAmount",
+                    aggregateRemainingAmountBefore -
+                    oldRemainingAmountCents +
+                    editedRemainingAmountCents);
+
+                checks.Pass(
+                    "Financial summary updates before Save after edit and paste");
+
                 await workOrdersPage.UndoAsync();
                 await workOrdersPage.WaitForCellValueAsync(
                     seed.CurrentYearMiddleRowId,
@@ -264,6 +376,17 @@ internal sealed class Phase9FoundationBrowserTest(
                     seed.CurrentYearMiddleRowId,
                     "remainingAmount",
                     "1,250,000.57");
+                await workOrdersPage.WaitForAggregateAmountCentsAsync(
+                    "year",
+                    "partialAmount",
+                    aggregatePartialAmountBefore -
+                    oldPartialAmountCents);
+                await workOrdersPage.WaitForAggregateAmountCentsAsync(
+                    "year",
+                    "remainingAmount",
+                    aggregateRemainingAmountBefore -
+                    oldRemainingAmountCents +
+                    editedWorkOrderValueCents);
 
                 await workOrdersPage.RedoAsync();
                 await workOrdersPage.WaitForCellValueAsync(
@@ -274,9 +397,21 @@ internal sealed class Phase9FoundationBrowserTest(
                     seed.CurrentYearMiddleRowId,
                     "remainingAmount",
                     "1,000,000.31");
+                await workOrdersPage.WaitForAggregateAmountCentsAsync(
+                    "year",
+                    "partialAmount",
+                    aggregatePartialAmountBefore -
+                    oldPartialAmountCents +
+                    editedPartialAmountCents);
+                await workOrdersPage.WaitForAggregateAmountCentsAsync(
+                    "year",
+                    "remainingAmount",
+                    aggregateRemainingAmountBefore -
+                    oldRemainingAmountCents +
+                    editedRemainingAmountCents);
 
                 checks.Pass(
-                    "Undo and Redo keep the calculated Remaining Amount consistent");
+                    "Undo and Redo keep calculated values and financial totals consistent");
 
                 await workOrdersPage.SaveAndWaitAsync();
                 await workOrdersPage.WaitForDirtyRowCountAsync(0);
@@ -309,6 +444,30 @@ internal sealed class Phase9FoundationBrowserTest(
                     "Saved financial amounts persist and recalculate after reload");
                 await browserSession.ObserveAsync(
                     "تم حفظ المبالغ ثم Refresh — القيمة والجزئي والمتبقي ما زالوا صحيحين");
+
+                await workOrdersPage.SelectContiguousRowsAsync(
+                    seed.CurrentYearMiddleRowId,
+                    20);
+                await workOrdersPage.WaitForSelectionAggregateAsync(20);
+
+                E2ETestAssert.True(
+                    await workOrdersPage.GetAggregateAmountCentsAsync(
+                        "selection",
+                        "workOrderValue") > 0,
+                    "The selected-row summary did not total Work Order Value.");
+
+                E2ETestAssert.Contains(
+                    "20",
+                    await workOrdersPage.GetSummaryItemTextAsync(
+                        "work-orders-selection-count"),
+                    "The selected-row summary did not show 20 unique work orders.");
+
+                checks.Pass(
+                    "Selecting 20 rows shows unique work-order count and financial totals");
+                await browserSession.ObserveAsync(
+                    "تم تحديد 20 صف — ظهر عدد الأوامر ومجموع القيم المحددة");
+
+                await workOrdersPage.ClearSelectionAsync();
 
                 await workOrdersPage.SetCellValueAsync(
                     seed.CurrentYearMiddleRowId,
@@ -631,6 +790,25 @@ internal sealed class Phase9FoundationBrowserTest(
             await browserSession.CaptureFailureAsync(artifactName);
             throw;
         }
+    }
+
+    private static long ParseAmountCents(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return 0;
+        }
+
+        var amount = decimal.Parse(
+            value,
+            NumberStyles.AllowThousands | NumberStyles.AllowDecimalPoint,
+            CultureInfo.InvariantCulture);
+
+        return decimal.ToInt64(
+            decimal.Round(
+                amount * 100m,
+                0,
+                MidpointRounding.AwayFromZero));
     }
 }
 
