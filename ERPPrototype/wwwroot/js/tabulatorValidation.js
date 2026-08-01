@@ -141,15 +141,21 @@
             workOrderNumber: 0,
             workTypeCode: 1,
             assignmentDate: 2,
-            basket: 3,
-            status: 4,
-            notes: 5
+            workOrderValue: 3,
+            partialAmount: 4,
+            remainingAmount: 5,
+            basket: 6,
+            status: 7,
+            notes: 8
         },
 
         validationFieldLabels: {
             workOrderNumber: "رقم أمر العمل",
             workTypeCode: "نوع أمر العمل",
             assignmentDate: "تاريخ الإسناد",
+            workOrderValue: "قيمة أمر العمل",
+            partialAmount: "المبلغ الجزئي",
+            remainingAmount: "المبلغ المتبقي",
             basket: "السلة",
             status: "الحالة",
             notes: "الملاحظات"
@@ -1154,7 +1160,22 @@
                     isPersistedRow ||
                     !isBlank;
 
-                for (const field of fields ?? []) {
+                const affectedRules =
+                    this.getAffectedValidationRuleKeys(fields);
+                const fieldsToValidate = new Set(fields ?? []);
+
+                for (const fieldKey of this.getValidatableFieldKeys()) {
+                    const fieldDefinition =
+                        this.getFieldDefinition(fieldKey);
+
+                    if (fieldDefinition?.validationRules.some(
+                        ruleKey => affectedRules.has(ruleKey)
+                    )) {
+                        fieldsToValidate.add(fieldKey);
+                    }
+                }
+
+                for (const field of fieldsToValidate) {
                     const definition = this.getFieldDefinition(field);
 
                     if (!definition || definition.validators.length === 0) {
@@ -1186,9 +1207,6 @@
                         );
                     }
                 }
-
-                const affectedRules =
-                    this.getAffectedValidationRuleKeys(fields);
 
                 if (affectedRules.has("work-order-identity")) {
                     identityRows.add(String(rowKey));
@@ -2190,6 +2208,10 @@
         {
             key: "work-order-identity",
             dependsOn: ["workOrderNumber", "workTypeCode"]
+        },
+        {
+            key: "financial-amounts",
+            dependsOn: ["workOrderValue", "partialAmount"]
         }
     ]);
 
@@ -2287,9 +2309,108 @@
             ]
         },
         {
+            key: "workOrderValue",
+            label: "Work Order Value",
+            order: 40,
+            normalize: function (value) {
+                return this.normalizeAmountValue(value);
+            },
+            validationRules: ["financial-amounts"],
+            validators: [
+                function (value, rowData, options) {
+                    const parsed = this.parseAmount(value);
+
+                    if (parsed.empty) {
+                        return options.forceRequired
+                            ? {
+                                code: "required",
+                                message: "قيمة أمر العمل مطلوبة ويجب أن تكون أكبر من صفر."
+                            }
+                            : null;
+                    }
+
+                    if (!parsed.valid) {
+                        return {
+                            code: "invalid_amount",
+                            message: "أدخل قيمة أمر عمل رقمية صحيحة."
+                        };
+                    }
+
+                    if (parsed.cents <= 0) {
+                        return {
+                            code: "positive_amount",
+                            message: "قيمة أمر العمل يجب أن تكون أكبر من صفر."
+                        };
+                    }
+
+                    const partial = this.parseAmount(
+                        rowData?.partialAmount
+                    );
+
+                    if (
+                        partial.valid &&
+                        !partial.empty &&
+                        partial.cents > parsed.cents
+                    ) {
+                        return {
+                            code: "partial_above_value",
+                            message:
+                                "لا يمكن جعل قيمة أمر العمل أقل من " +
+                                `المبلغ الجزئي المسجل: ${partial.formatted}.`
+                        };
+                    }
+
+                    return null;
+                }
+            ]
+        },
+        {
+            key: "partialAmount",
+            label: "Partial Amount",
+            order: 50,
+            normalize: function (value) {
+                return this.normalizeAmountValue(value);
+            },
+            validationRules: ["financial-amounts"],
+            validators: [
+                function (value) {
+                    const parsed = this.parseAmount(value);
+
+                    if (parsed.empty) {
+                        return null;
+                    }
+
+                    if (!parsed.valid) {
+                        return {
+                            code: "invalid_amount",
+                            message: "أدخل مبلغًا جزئيًا رقميًا صحيحًا."
+                        };
+                    }
+
+                    return parsed.cents > 0
+                        ? null
+                        : {
+                            code: "positive_amount",
+                            message: "المبلغ الجزئي يجب أن يكون أكبر من صفر عند إدخاله."
+                        };
+                }
+            ]
+        },
+        {
+            key: "remainingAmount",
+            label: "Remaining Amount",
+            order: 60,
+            persisted: false,
+            trackChanges: false,
+            countsAsContent: false,
+            normalize: function (value) {
+                return this.normalizeAmountValue(value);
+            }
+        },
+        {
             key: "basket",
             label: "السلة",
-            order: 40,
+            order: 70,
             normalize: function (value) {
                 return String(value ?? "").trim();
             },
@@ -2320,7 +2441,7 @@
         {
             key: "status",
             label: "الحالة",
-            order: 50,
+            order: 80,
             normalize: function (value) {
                 return String(value ?? "");
             },
@@ -2338,7 +2459,7 @@
         {
             key: "notes",
             label: "الملاحظات",
-            order: 60,
+            order: 90,
             normalize: function (value) {
                 return String(value ?? "");
             },

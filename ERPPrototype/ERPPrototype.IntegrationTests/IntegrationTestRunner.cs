@@ -40,6 +40,15 @@ internal static class IntegrationTestRunner
                 "Save plan ignores blank rows and preserves new rows",
                 planTests.IgnoresBlankRowsAndPreservesNewRowIdentityAsync),
             (
+                "Save plan normalizes and calculates financial amounts",
+                planTests.NormalizesAndValidatesFinancialAmountsAsync),
+            (
+                "Save plan rejects missing or inconsistent financial amounts",
+                planTests.RejectsInvalidFinancialAmountsAsync),
+            (
+                "Unrelated legacy edits do not execute financial rules",
+                planTests.UnrelatedLegacyEditDoesNotRunFinancialRulesAsync),
+            (
                 "Save plan rejects changed and deleted overlap",
                 planTests.RejectsChangedAndDeletedSameRecordAsync),
             (
@@ -57,6 +66,15 @@ internal static class IntegrationTestRunner
             (
                 "AssignmentDate routes the work order to the destination year",
                 integrationTests.AssignmentDateMovesWorkOrderToDestinationYearAsync),
+            (
+                "Financial amounts save with consistent rounding and remaining value",
+                integrationTests.FinancialAmountsSaveAndRemainConsistentAsync),
+            (
+                "Partial Amount above Work Order Value is rejected without persistence",
+                integrationTests.PartialAmountAboveValueIsRejectedWithoutChangingDatabaseAsync),
+            (
+                "SQL Server constraints reject impossible financial amounts",
+                integrationTests.DatabaseConstraintRejectsImpossibleFinancialAmountsAsync),
             (
                 "Add, update, and delete return a consistent result",
                 integrationTests.AddUpdateDeleteReturnConsistentResultAsync),
@@ -98,7 +116,7 @@ internal static class IntegrationTestRunner
         {
             Console.WriteLine(
                 includeStress
-                    ? "Phase 9.0C SQL Server stress safety net: PASS"
+                    ? "Phase 9.1A SQL Server financial safety net: PASS"
                     : "Phase 8.8-R2 automated save safety net: PASS");
 
             return 0;
@@ -106,7 +124,7 @@ internal static class IntegrationTestRunner
 
         Console.WriteLine(
             includeStress
-                ? "Phase 9.0C SQL Server stress safety net: FAIL"
+                ? "Phase 9.1A SQL Server financial safety net: FAIL"
                 : "Phase 8.8-R2 automated save safety net: FAIL");
 
         foreach (var failure in failures)

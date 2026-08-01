@@ -86,6 +86,8 @@ window.tabulatorTest = {
             "workOrderNumber",
             "workTypeCode",
             "assignmentDate",
+            "workOrderValue",
+            "partialAmount",
             "basket"
         ]);
 
@@ -188,6 +190,8 @@ window.tabulatorTest = {
                 hozAlign: "center"
             },
 
+            columnHeaderSortMulti: false,
+
             columnDefaults: {
                 headerHozAlign: "center",
                 vertAlign: "middle",
@@ -276,6 +280,63 @@ window.tabulatorTest = {
                                 onRendered
                             );
                     }
+                },
+                {
+                    title: "Work Order Value",
+                    field: "workOrderValue",
+                    editor: "input",
+                    editorParams: {
+                        elementAttributes: {
+                            inputmode: "decimal",
+                            autocomplete: "off"
+                        }
+                    },
+                    formatter: function (cell) {
+                        return window.tabulatorTest.amountFormatter(cell);
+                    },
+                    sorter: function (first, second) {
+                        return window.tabulatorTest.amountSorter(first, second);
+                    },
+                    minWidth: 185,
+                    widthGrow: 0.95,
+                    hozAlign: "right",
+                    headerHozAlign: "left"
+                },
+                {
+                    title: "Partial Amount",
+                    field: "partialAmount",
+                    editor: "input",
+                    editorParams: {
+                        elementAttributes: {
+                            inputmode: "decimal",
+                            autocomplete: "off"
+                        }
+                    },
+                    formatter: function (cell) {
+                        return window.tabulatorTest.amountFormatter(cell);
+                    },
+                    sorter: function (first, second) {
+                        return window.tabulatorTest.amountSorter(first, second);
+                    },
+                    minWidth: 175,
+                    widthGrow: 0.9,
+                    hozAlign: "right",
+                    headerHozAlign: "left"
+                },
+                {
+                    title: "Remaining Amount",
+                    field: "remainingAmount",
+                    editor: false,
+                    formatter: function (cell) {
+                        return window.tabulatorTest.amountFormatter(cell);
+                    },
+                    sorter: function (first, second) {
+                        return window.tabulatorTest.amountSorter(first, second);
+                    },
+                    minWidth: 185,
+                    widthGrow: 0.95,
+                    hozAlign: "right",
+                    headerHozAlign: "left"
                 },
                 {
                     title: "Basket",
@@ -1045,6 +1106,9 @@ window.tabulatorTest = {
         clone.workOrderNumber = rowData?.workOrderNumber ?? "";
         clone.workTypeCode = rowData?.workTypeCode ?? "";
         clone.assignmentDate = rowData?.assignmentDate ?? "";
+        clone.workOrderValue = rowData?.workOrderValue ?? "";
+        clone.partialAmount = rowData?.partialAmount ?? "";
+        clone.remainingAmount = rowData?.remainingAmount ?? "";
         clone.basket = rowData?.basket ?? "";
         clone.status = rowData?.status ?? "";
         clone.notes = rowData?.notes ?? "";

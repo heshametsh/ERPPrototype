@@ -172,6 +172,8 @@ internal sealed class IntegrationTestDatabase : IAsyncDisposable
         string? notes,
         DateTime? assignmentDate = null,
         long? displayOrder = null,
+        decimal workOrderValue = 125_000m,
+        decimal? partialAmount = null,
         CancellationToken cancellationToken = default)
     {
         await using var dbContext =
@@ -190,6 +192,8 @@ internal sealed class IntegrationTestDatabase : IAsyncDisposable
                         (value * 10L) + (digit - '0')) *
                 1_000_000_000L,
             AssignmentDate = assignmentDate,
+            WorkOrderValue = workOrderValue,
+            PartialAmount = partialAmount,
             Busket = WorkOrderBuskets.InProgress,
             Status = "تحت التنفيذ",
             Notes = notes,
@@ -290,6 +294,8 @@ internal sealed class IntegrationTestDatabase : IAsyncDisposable
             WorkYear = source.WorkYear,
             DisplayOrder = source.DisplayOrder,
             AssignmentDate = source.AssignmentDate,
+            WorkOrderValue = source.WorkOrderValue,
+            PartialAmount = source.PartialAmount,
             Busket = source.Busket,
             Status = source.Status,
             Notes = source.Notes,

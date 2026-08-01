@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Globalization;
 using Microsoft.Playwright;
 
@@ -325,7 +325,8 @@ internal sealed class WorkOrdersPage(IPage page)
     public async Task SetCellValueAsync(
         int rowId,
         string field,
-        string value)
+        string value,
+        string? expectedValue = null)
     {
         var targetToken = $"e2e-cell-{Guid.NewGuid():N}";
 
@@ -426,7 +427,7 @@ internal sealed class WorkOrdersPage(IPage page)
                 tableId = TableId,
                 rowId,
                 field,
-                value
+                value = expectedValue ?? value
             },
             new PageWaitForFunctionOptions
             {
@@ -455,6 +456,134 @@ internal sealed class WorkOrdersPage(IPage page)
                 rowId,
                 field
             });
+    }
+
+    public async Task PasteCellValueAsync(
+        int rowId,
+        string field,
+        string clipboardText,
+        string expectedValue)
+    {
+        await page.EvaluateAsync(
+            """
+            tableId => {
+                window.tabulatorTest?.clearTableRanges(tableId);
+            }
+            """,
+            TableId);
+
+        await ClickCellAsync(rowId, field);
+
+        await page.WaitForFunctionAsync(
+            """
+            args => {
+                const api = window.tabulatorTest;
+                const table = api?.tables?.[args.tableId];
+                const range = api?.getActiveRange?.(table);
+                const matrix = range?.getStructuredCells?.();
+                const cell = matrix?.[0]?.[0];
+
+                return Boolean(
+                    Array.isArray(matrix) &&
+                    matrix.length === 1 &&
+                    matrix[0].length === 1 &&
+                    cell &&
+                    cell.getRow().getIndex() === args.rowId &&
+                    cell.getField() === args.field
+                );
+            }
+            """,
+            new
+            {
+                tableId = TableId,
+                rowId,
+                field
+            },
+            new PageWaitForFunctionOptions
+            {
+                Timeout = NormalTimeoutMs
+            });
+
+        var pasted = await page.EvaluateAsync<bool>(
+            """
+            async args => {
+                return await window.tabulatorTest.pasteClipboardText(
+                    args.tableId,
+                    args.clipboardText
+                );
+            }
+            """,
+            new
+            {
+                tableId = TableId,
+                clipboardText
+            });
+
+        E2ETestAssert.True(
+            pasted,
+            $"Could not paste into field '{field}' on row Id {rowId}.");
+
+        await WaitForCellValueAsync(
+            rowId,
+            field,
+            expectedValue);
+    }
+
+    public async Task WaitForCellValueAsync(
+        int rowId,
+        string field,
+        string expectedValue,
+        int timeoutMs = NormalTimeoutMs)
+    {
+        await page.WaitForFunctionAsync(
+            """
+            args => {
+                const table =
+                    window.tabulatorTest?.tables?.[args.tableId];
+                const row = table?.getRow(args.rowId);
+                const cell = row?.getCell(args.field);
+
+                return Boolean(
+                    cell &&
+                    String(cell.getValue() ?? '') === args.expectedValue
+                );
+            }
+            """,
+            new
+            {
+                tableId = TableId,
+                rowId,
+                field,
+                expectedValue
+            },
+            new PageWaitForFunctionOptions
+            {
+                Timeout = timeoutMs
+            });
+    }
+
+    public async Task UndoAsync()
+    {
+        await page.EvaluateAsync<bool>(
+            """
+            async tableId => {
+                await window.tabulatorTest.undo(tableId);
+                return true;
+            }
+            """,
+            TableId);
+    }
+
+    public async Task RedoAsync()
+    {
+        await page.EvaluateAsync<bool>(
+            """
+            async tableId => {
+                await window.tabulatorTest.redo(tableId);
+                return true;
+            }
+            """,
+            TableId);
     }
 
     public async Task SaveAndWaitAsync()

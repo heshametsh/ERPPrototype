@@ -133,6 +133,170 @@ internal sealed class WorkOrderSavePlanBuilderTests
         return Task.CompletedTask;
     }
 
+
+    public Task NormalizesAndValidatesFinancialAmountsAsync()
+    {
+        var record = CreateNewRecord(
+            -3019,
+            "810000019",
+            "419",
+            WorkOrderBuskets.InProgress,
+            "تحت التنفيذ",
+            "financial-normalization");
+        record.WorkOrderValue = 1_250_000.565m;
+        record.PartialAmount = 250_000.255m;
+
+        var result = builder.Build(
+            2026,
+            addedRecords: [record],
+            changedRecords: Array.Empty<WorkOrderChangeSet>(),
+            deletedRecords: []);
+
+        TestAssert.True(
+            result.Succeeded,
+            $"The financial save plan failed: {result.Failure?.ErrorMessage}");
+
+        var planned = result.Plan!.NewRecords.Single();
+
+        TestAssert.Equal(
+            (decimal?)1_250_000.57m,
+            planned.WorkOrderValue,
+            "Work Order Value was not rounded away from zero to two decimals.");
+
+        TestAssert.Equal(
+            (decimal?)250_000.26m,
+            planned.PartialAmount,
+            "Partial Amount was not rounded away from zero to two decimals.");
+
+        TestAssert.Equal(
+            (decimal?)1_000_000.31m,
+            WorkOrderFinancialRules.CalculateRemainingAmount(
+                planned.WorkOrderValue,
+                planned.PartialAmount),
+            "Remaining Amount was not calculated from normalized values.");
+
+        return Task.CompletedTask;
+    }
+
+    public Task RejectsInvalidFinancialAmountsAsync()
+    {
+        var missingValue = CreateNewRecord(
+            -3020,
+            "810000020",
+            "420",
+            WorkOrderBuskets.InProgress,
+            "تحت التنفيذ",
+            "missing-value");
+        missingValue.WorkOrderValue = null;
+
+        var missingResult = builder.Build(
+            2026,
+            addedRecords: [missingValue],
+            changedRecords: Array.Empty<WorkOrderChangeSet>(),
+            deletedRecords: []);
+
+        TestAssert.False(
+            missingResult.Succeeded,
+            "A new work order without Work Order Value entered database execution.");
+
+        var zeroValue = CreateNewRecord(
+            -3022,
+            "810000025",
+            "425",
+            WorkOrderBuskets.InProgress,
+            "تحت التنفيذ",
+            "zero-value");
+        zeroValue.WorkOrderValue = 0m;
+
+        var zeroValueResult = builder.Build(
+            2026,
+            addedRecords: [zeroValue],
+            changedRecords: Array.Empty<WorkOrderChangeSet>(),
+            deletedRecords: []);
+
+        TestAssert.False(
+            zeroValueResult.Succeeded,
+            "A zero Work Order Value entered database execution.");
+
+        var zeroPartial = CreateNewRecord(
+            -3023,
+            "810000026",
+            "426",
+            WorkOrderBuskets.InProgress,
+            "تحت التنفيذ",
+            "zero-partial");
+        zeroPartial.PartialAmount = 0m;
+
+        var zeroPartialResult = builder.Build(
+            2026,
+            addedRecords: [zeroPartial],
+            changedRecords: Array.Empty<WorkOrderChangeSet>(),
+            deletedRecords: []);
+
+        TestAssert.False(
+            zeroPartialResult.Succeeded,
+            "An entered zero Partial Amount entered database execution.");
+
+        var excessivePartial = CreateNewRecord(
+            -3021,
+            "810000021",
+            "421",
+            WorkOrderBuskets.InProgress,
+            "تحت التنفيذ",
+            "partial-above-value");
+        excessivePartial.WorkOrderValue = 100_000m;
+        excessivePartial.PartialAmount = 100_000.01m;
+
+        var excessiveResult = builder.Build(
+            2026,
+            addedRecords: [excessivePartial],
+            changedRecords: Array.Empty<WorkOrderChangeSet>(),
+            deletedRecords: []);
+
+        TestAssert.False(
+            excessiveResult.Succeeded,
+            "A Partial Amount above Work Order Value entered database execution.");
+
+        TestAssert.True(
+            excessiveResult.Failure?.ErrorMessage?.Contains(
+                "cannot be less than",
+                StringComparison.OrdinalIgnoreCase) == true,
+            "The financial validation did not return the expected relationship error.");
+
+        return Task.CompletedTask;
+    }
+
+    public Task UnrelatedLegacyEditDoesNotRunFinancialRulesAsync()
+    {
+        var legacy = CreateExistingRecord(
+            3027,
+            "810000027",
+            "427");
+        legacy.WorkOrderValue = null;
+        legacy.PartialAmount = null;
+        legacy.Notes = "legacy-note-change";
+
+        var result = builder.Build(
+            2026,
+            addedRecords: [],
+            changedRecords:
+            [
+                new WorkOrderChangeSet(
+                    legacy,
+                    new HashSet<string>(StringComparer.Ordinal)
+                    {
+                        WorkOrderFieldRegistry.Notes
+                    })
+            ],
+            deletedRecords: []);
+
+        TestAssert.True(
+            result.Succeeded,
+            "An unrelated Notes edit incorrectly ran financial validation for a legacy row.");
+
+        return Task.CompletedTask;
+    }
+
     public Task RejectsChangedAndDeletedSameRecordAsync()
     {
         var changed = CreateExistingRecord(
@@ -212,6 +376,8 @@ internal sealed class WorkOrderSavePlanBuilderTests
             WorkYear = 2026,
             DisplayOrder = 0,
             AssignmentDate = null,
+            WorkOrderValue = 125_000m,
+            PartialAmount = null,
             Busket = basket,
             Status = status,
             Notes = notes
@@ -229,6 +395,8 @@ internal sealed class WorkOrderSavePlanBuilderTests
             WorkYear = 2026,
             DisplayOrder = id * 1_000_000_000L,
             AssignmentDate = null,
+            WorkOrderValue = 125_000m,
+            PartialAmount = null,
             Busket = WorkOrderBuskets.InProgress,
             Status = "تحت التنفيذ",
             Notes = null,
@@ -244,6 +412,8 @@ internal sealed class WorkOrderSavePlanBuilderTests
             WorkYear = source.WorkYear,
             DisplayOrder = source.DisplayOrder,
             AssignmentDate = source.AssignmentDate,
+            WorkOrderValue = source.WorkOrderValue,
+            PartialAmount = source.PartialAmount,
             Busket = source.Busket,
             Status = source.Status,
             Notes = source.Notes,

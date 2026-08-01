@@ -293,6 +293,12 @@ public partial class WorkOrders
                     "dd/MM/yyyy",
                     CultureInfo.InvariantCulture)
                 ?? string.Empty,
+            WorkOrderValue = FormatAmount(record.WorkOrderValue),
+            PartialAmount = FormatAmount(record.PartialAmount),
+            RemainingAmount = FormatAmount(
+                WorkOrderFinancialRules.CalculateRemainingAmount(
+                    record.WorkOrderValue,
+                    record.PartialAmount)),
             Basket = record.Busket,
             Status = record.Status,
             Notes = record.Notes ?? string.Empty,

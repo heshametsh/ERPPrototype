@@ -64,6 +64,32 @@ public partial class WorkOrders
                 };
             }
 
+            if (!TryParseAmount(
+                    row.WorkOrderValue,
+                    out var workOrderValue))
+            {
+                return new SaveRequestPreparation
+                {
+                    DirtyRows = dirtyRows,
+                    DeletedRows = deletedRows,
+                    ValidationMessage =
+                        $"تعذر الحفظ: قيمة أمر العمل غير صحيحة في أمر العمل {row.WorkOrderNumber}."
+                };
+            }
+
+            if (!TryParseAmount(
+                    row.PartialAmount,
+                    out var partialAmount))
+            {
+                return new SaveRequestPreparation
+                {
+                    DirtyRows = dirtyRows,
+                    DeletedRows = deletedRows,
+                    ValidationMessage =
+                        $"تعذر الحفظ: المبلغ الجزئي غير صحيح في أمر العمل {row.WorkOrderNumber}."
+                };
+            }
+
             var destinationYear =
                 assignmentDate?.Year ?? selectedWorkYear;
 
@@ -88,6 +114,8 @@ public partial class WorkOrders
                 WorkOrderNumber = row.WorkOrderNumber ?? string.Empty,
                 WorkTypeCode = row.WorkTypeCode ?? string.Empty,
                 AssignmentDate = assignmentDate,
+                WorkOrderValue = workOrderValue,
+                PartialAmount = partialAmount,
                 Busket = row.Basket ?? string.Empty,
                 Status = row.Status ?? string.Empty,
                 Notes = row.Notes
@@ -148,6 +176,8 @@ public partial class WorkOrders
             string.IsNullOrWhiteSpace(row.WorkOrderNumber) &&
             string.IsNullOrWhiteSpace(row.WorkTypeCode) &&
             string.IsNullOrWhiteSpace(row.AssignmentDate) &&
+            string.IsNullOrWhiteSpace(row.WorkOrderValue) &&
+            string.IsNullOrWhiteSpace(row.PartialAmount) &&
             string.IsNullOrWhiteSpace(row.Basket) &&
             string.IsNullOrWhiteSpace(row.Status) &&
             string.IsNullOrWhiteSpace(row.Notes);
@@ -176,6 +206,60 @@ public partial class WorkOrders
 
         assignmentDate = parsedDate.Date;
         return true;
+    }
+
+
+    private static bool TryParseAmount(
+        string? value,
+        out decimal? amount)
+    {
+        amount = null;
+
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return true;
+        }
+
+        var normalized = NormalizeAmountText(value);
+
+        if (!decimal.TryParse(
+                normalized,
+                NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint,
+                CultureInfo.InvariantCulture,
+                out var parsedAmount))
+        {
+            return false;
+        }
+
+        amount = WorkOrderFinancialRules.NormalizeAmount(parsedAmount);
+        return true;
+    }
+
+    private static string NormalizeAmountText(string value)
+    {
+        var characters = value
+            .Trim()
+            .Select(character =>
+                character switch
+                {
+                    >= '\u0660' and <= '\u0669' =>
+                        (char)('0' + character - '\u0660'),
+
+                    >= '\u06F0' and <= '\u06F9' =>
+                        (char)('0' + character - '\u06F0'),
+
+                    '\u066B' => '.',
+                    _ => character
+                })
+            .Where(character =>
+                character != ',' &&
+                character != '\u066C' &&
+                character != ' ' &&
+                character != '\u00A0' &&
+                character != '\u202F')
+            .ToArray();
+
+        return new string(characters);
     }
 
     private static byte[] DecodeRowVersion(string? value)

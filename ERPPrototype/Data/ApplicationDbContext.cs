@@ -1,4 +1,4 @@
-﻿using ERPPrototype.Data.Entities;
+using ERPPrototype.Data.Entities;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
@@ -85,6 +85,18 @@ public class ApplicationDbContext(
                     tableBuilder.HasCheckConstraint(
                         "CK_WorkOrders_WorkTypeCode_ThreeDigits",
                         "DATALENGTH([WorkTypeCode]) = 3 AND [WorkTypeCode] COLLATE Latin1_General_100_BIN2 NOT LIKE '%[^0-9]%'");
+
+                    tableBuilder.HasCheckConstraint(
+                        "CK_WorkOrders_WorkOrderValue_Positive",
+                        "[WorkOrderValue] IS NULL OR [WorkOrderValue] > 0");
+
+                    tableBuilder.HasCheckConstraint(
+                        "CK_WorkOrders_PartialAmount_Positive",
+                        "[PartialAmount] IS NULL OR [PartialAmount] > 0");
+
+                    tableBuilder.HasCheckConstraint(
+                        "CK_WorkOrders_PartialAmount_NotAboveValue",
+                        "[PartialAmount] IS NULL OR ([WorkOrderValue] IS NOT NULL AND [PartialAmount] <= [WorkOrderValue])");
                 });
 
             entity.HasKey(workOrder => workOrder.Id);
@@ -106,6 +118,12 @@ public class ApplicationDbContext(
                 .IsRequired();
 
             entity.Property(workOrder => workOrder.AssignmentDate);
+
+            entity.Property(workOrder => workOrder.WorkOrderValue)
+                .HasPrecision(18, 2);
+
+            entity.Property(workOrder => workOrder.PartialAmount)
+                .HasPrecision(18, 2);
 
             entity.Property(workOrder => workOrder.Busket)
                 .HasMaxLength(150)

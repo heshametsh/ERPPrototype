@@ -18,6 +18,8 @@
             "workOrderNumber",
             "workTypeCode",
             "assignmentDate",
+            "workOrderValue",
+            "partialAmount",
             "basket",
             "status",
             "notes"

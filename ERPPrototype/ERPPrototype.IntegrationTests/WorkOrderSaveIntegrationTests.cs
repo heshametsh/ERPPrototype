@@ -20,6 +20,13 @@ internal sealed class WorkOrderSaveIntegrationTests(
             WorkOrderFieldRegistry.AssignmentDate
         };
 
+    private static readonly IReadOnlySet<string> FinancialFields =
+        new HashSet<string>(StringComparer.Ordinal)
+        {
+            WorkOrderFieldRegistry.WorkOrderValue,
+            WorkOrderFieldRegistry.PartialAmount
+        };
+
     public async Task EmployeeCannotModifyAnotherDepartmentAsync()
     {
         var foreignWorkOrder = await database.SeedWorkOrderAsync(
@@ -219,6 +226,147 @@ internal sealed class WorkOrderSaveIntegrationTests(
         TestAssert.True(
             stored.DisplayOrder > 0,
             "The moved work order did not receive a destination display order.");
+    }
+
+    public async Task FinancialAmountsSaveAndRemainConsistentAsync()
+    {
+        var original = await database.SeedWorkOrderAsync(
+            database.DepartmentAId,
+            database.EmployeeAId,
+            "810000022",
+            "422",
+            2026,
+            "financial-save",
+            workOrderValue: 100_000m);
+
+        var change = IntegrationTestDatabase.Clone(original);
+        change.WorkOrderValue = 1_250_000.565m;
+        change.PartialAmount = 250_000.255m;
+
+        var result = await database.Service.SaveChangesAsync(
+            database.EmployeeAId,
+            2026,
+            addedRecords: [],
+            changedRecords:
+            [
+                new WorkOrderChangeSet(
+                    change,
+                    FinancialFields)
+            ],
+            deletedRecords: []);
+
+        TestAssert.True(
+            result.Succeeded,
+            $"Saving valid financial amounts failed: {result.ErrorMessage}");
+
+        var stored = await database.ReadWorkOrderAsync(original.Id);
+        TestAssert.NotNull(stored, "The financial test row disappeared.");
+
+        TestAssert.Equal(
+            (decimal?)1_250_000.57m,
+            stored!.WorkOrderValue,
+            "Work Order Value was not persisted with the approved rounding rule.");
+
+        TestAssert.Equal(
+            (decimal?)250_000.26m,
+            stored.PartialAmount,
+            "Partial Amount was not persisted with the approved rounding rule.");
+
+        TestAssert.Equal(
+            (decimal?)1_000_000.31m,
+            WorkOrderFinancialRules.CalculateRemainingAmount(
+                stored.WorkOrderValue,
+                stored.PartialAmount),
+            "Remaining Amount was inconsistent after the database save.");
+    }
+
+    public async Task PartialAmountAboveValueIsRejectedWithoutChangingDatabaseAsync()
+    {
+        var original = await database.SeedWorkOrderAsync(
+            database.DepartmentAId,
+            database.EmployeeAId,
+            "810000023",
+            "423",
+            2026,
+            "financial-rejection",
+            workOrderValue: 100_000m,
+            partialAmount: 20_000m);
+
+        var invalid = IntegrationTestDatabase.Clone(original);
+        invalid.PartialAmount = 100_000.01m;
+
+        var result = await database.Service.SaveChangesAsync(
+            database.EmployeeAId,
+            2026,
+            addedRecords: [],
+            changedRecords:
+            [
+                new WorkOrderChangeSet(
+                    invalid,
+                    FinancialFields)
+            ],
+            deletedRecords: []);
+
+        TestAssert.False(
+            result.Succeeded,
+            "A Partial Amount above Work Order Value was saved.");
+
+        TestAssert.Equal(
+            WorkOrderSaveFailureType.Validation,
+            result.FailureType,
+            "The invalid financial relationship should fail validation.");
+
+        var stored = await database.ReadWorkOrderAsync(original.Id);
+        TestAssert.NotNull(stored, "The rejected financial row disappeared.");
+
+        TestAssert.Equal(
+            (decimal?)20_000m,
+            stored!.PartialAmount,
+            "The rejected financial change modified the database.");
+    }
+
+    public async Task DatabaseConstraintRejectsImpossibleFinancialAmountsAsync()
+    {
+        await using var dbContext =
+            await database.Factory.CreateDbContextAsync();
+
+        dbContext.WorkOrders.Add(
+            new WorkOrder
+            {
+                DepartmentId = database.DepartmentAId,
+                WorkOrderNumber = "810000024",
+                WorkTypeCode = "424",
+                WorkYear = 2026,
+                DisplayOrder = 24_000_000_000L,
+                AssignmentDate = null,
+                WorkOrderValue = 100_000m,
+                PartialAmount = 100_000.01m,
+                Busket = WorkOrderBuskets.InProgress,
+                Status = "تحت التنفيذ",
+                Notes = "direct-database-constraint",
+                CreatedAt = DateTime.UtcNow,
+                CreatedBy = database.EmployeeAId
+            });
+
+        var rejected = false;
+
+        try
+        {
+            await dbContext.SaveChangesAsync();
+        }
+        catch (DbUpdateException)
+        {
+            rejected = true;
+        }
+
+        TestAssert.True(
+            rejected,
+            "SQL Server accepted a Partial Amount above Work Order Value.");
+
+        TestAssert.Equal(
+            0,
+            await database.CountIdentityAsync("810000024", "424"),
+            "The database constraint failure left an invalid financial row behind.");
     }
 
     public async Task AddUpdateDeleteReturnConsistentResultAsync()
@@ -518,6 +666,8 @@ internal sealed class WorkOrderSaveIntegrationTests(
             WorkYear = saved.WorkYear,
             DisplayOrder = saved.DisplayOrder,
             AssignmentDate = saved.AssignmentDate,
+            WorkOrderValue = saved.WorkOrderValue,
+            PartialAmount = saved.PartialAmount,
             Busket = saved.Busket,
             Status = saved.Status,
             Notes = saved.Notes,
@@ -538,6 +688,8 @@ internal sealed class WorkOrderSaveIntegrationTests(
             WorkYear = workYear,
             DisplayOrder = 0,
             AssignmentDate = null,
+            WorkOrderValue = 125_000m,
+            PartialAmount = null,
             Busket = WorkOrderBuskets.InProgress,
             Status = "تحت التنفيذ",
             Notes = notes

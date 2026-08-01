@@ -14,6 +14,8 @@ public static class WorkOrderFieldRegistry
     public const string WorkOrderNumber = "workOrderNumber";
     public const string WorkTypeCode = "workTypeCode";
     public const string AssignmentDate = "assignmentDate";
+    public const string WorkOrderValue = "workOrderValue";
+    public const string PartialAmount = "partialAmount";
     public const string Basket = "basket";
     public const string Status = "status";
     public const string Notes = "notes";
@@ -25,6 +27,8 @@ public static class WorkOrderFieldRegistry
             WorkOrderNumber,
             WorkTypeCode,
             AssignmentDate,
+            WorkOrderValue,
+            PartialAmount,
             Basket,
             Status,
             Notes
@@ -35,6 +39,13 @@ public static class WorkOrderFieldRegistry
         {
             WorkOrderNumber,
             WorkTypeCode
+        };
+
+    public static readonly IReadOnlySet<string> FinancialFields =
+        new HashSet<string>(StringComparer.Ordinal)
+        {
+            WorkOrderValue,
+            PartialAmount
         };
 
     public static readonly IReadOnlySet<string> WorkYearRoutingFields =
@@ -48,6 +59,7 @@ public static class WorkOrderFieldRegistry
         {
             WorkOrderNumber,
             WorkTypeCode,
+            WorkOrderValue,
             Basket
         };
 

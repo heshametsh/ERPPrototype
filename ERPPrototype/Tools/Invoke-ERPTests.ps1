@@ -72,11 +72,11 @@ if (-not $SkipIntegration) {
         '--no-build'
     )
 
-    $integrationTitle = 'Running the 10 SQL Server save safety checks'
+    $integrationTitle = 'Running the 16 SQL Server save and financial safety checks'
 
     if ($Suite -eq 'Stress') {
         $integrationArguments += @('--', '--stress')
-        $integrationTitle = 'Running 10 core SQL Server checks plus the 1,000-row batch stress check'
+        $integrationTitle = 'Running 16 core SQL Server checks plus the 1,000-row batch stress check'
     }
 
     Invoke-DotNetStep -Title $integrationTitle -Arguments $integrationArguments
@@ -106,18 +106,18 @@ Invoke-DotNetStep -Title "Running the $Suite browser suite" -Arguments $browserA
 
 $expectedBrowserChecks = switch ($Suite) {
     'Smoke' { 8 }
-    'Full' { 26 }
-    'Stress' { 33 }
+    'Full' { 31 }
+    'Stress' { 38 }
 }
 
 $integrationSummary = if ($SkipIntegration) {
     'Integration tests: skipped'
 }
 elseif ($Suite -eq 'Stress') {
-    'Integration tests: 11/11 PASS (includes 1,000-row add/update/delete)'
+    'Integration tests: 17/17 PASS (includes 1,000-row add/update/delete)'
 }
 else {
-    'Integration tests: 10/10 PASS'
+    'Integration tests: 16/16 PASS'
 }
 
 Write-Host "`nERPPrototype automated verification: PASS" -ForegroundColor Green

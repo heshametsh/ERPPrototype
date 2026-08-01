@@ -368,6 +368,12 @@ public partial class WorkOrders
                             "dd/MM/yyyy",
                             CultureInfo.InvariantCulture)
                         ?? string.Empty,
+                    WorkOrderValue = FormatAmount(workOrder.WorkOrderValue),
+                    PartialAmount = FormatAmount(workOrder.PartialAmount),
+                    RemainingAmount = FormatAmount(
+                        WorkOrderFinancialRules.CalculateRemainingAmount(
+                            workOrder.WorkOrderValue,
+                            workOrder.PartialAmount)),
                     Basket = workOrder.Busket,
                     Status = workOrder.Status,
                     Notes = workOrder.Notes ?? string.Empty,
@@ -375,6 +381,24 @@ public partial class WorkOrders
                         workOrder.RowVersion)
                 })
             .ToList();
+    }
+
+
+    private static string FormatAmount(decimal? value)
+    {
+        if (value is null)
+        {
+            return string.Empty;
+        }
+
+        var normalized =
+    WorkOrderFinancialRules.NormalizeAmount(value)
+    ?? throw new InvalidOperationException(
+        "A non-null amount could not be normalized.");
+
+        return normalized == decimal.Truncate(normalized)
+            ? normalized.ToString("#,0", CultureInfo.InvariantCulture)
+            : normalized.ToString("#,0.00", CultureInfo.InvariantCulture);
     }
 
 
@@ -438,6 +462,9 @@ public partial class WorkOrders
         public string WorkOrderNumber { get; set; } = string.Empty;
         public string WorkTypeCode { get; set; } = string.Empty;
         public string AssignmentDate { get; set; } = string.Empty;
+        public string WorkOrderValue { get; set; } = string.Empty;
+        public string PartialAmount { get; set; } = string.Empty;
+        public string RemainingAmount { get; set; } = string.Empty;
         public string Basket { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
         public string Notes { get; set; } = string.Empty;

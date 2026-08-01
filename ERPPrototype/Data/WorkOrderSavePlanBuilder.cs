@@ -137,6 +137,8 @@ public sealed class WorkOrderSavePlanBuilder
             string.IsNullOrWhiteSpace(workOrder.WorkOrderNumber) &&
             string.IsNullOrWhiteSpace(workOrder.WorkTypeCode) &&
             workOrder.AssignmentDate is null &&
+            workOrder.WorkOrderValue is null &&
+            workOrder.PartialAmount is null &&
             string.IsNullOrWhiteSpace(workOrder.Busket) &&
             string.IsNullOrWhiteSpace(workOrder.Status) &&
             string.IsNullOrWhiteSpace(workOrder.Notes);
@@ -163,6 +165,13 @@ public sealed class WorkOrderSavePlanBuilder
             workOrder.WorkTypeCode =
                 NormalizeIdentityDigits(
                     workOrder.WorkTypeCode?.Trim() ?? string.Empty);
+        }
+
+        if (WorkOrderFieldRegistry.Affects(
+                fields,
+                WorkOrderFieldRegistry.FinancialFields))
+        {
+            WorkOrderFinancialRules.Normalize(workOrder);
         }
 
         if (fields.Contains(WorkOrderFieldRegistry.Basket))
@@ -252,6 +261,20 @@ public sealed class WorkOrderSavePlanBuilder
                     3))
             {
                 return "Work Type must contain exactly 3 digits.";
+            }
+        }
+
+        if (WorkOrderFieldRegistry.Affects(
+                fields,
+                WorkOrderFieldRegistry.FinancialFields))
+        {
+            var financialError = WorkOrderFinancialRules.Validate(
+                workOrder,
+                requireWorkOrderValue: true);
+
+            if (!string.IsNullOrWhiteSpace(financialError))
+            {
+                return financialError;
             }
         }
 

@@ -749,6 +749,8 @@ public sealed class WorkOrderService(
             workOrder.WorkYear,
             workOrder.DisplayOrder,
             workOrder.AssignmentDate,
+            workOrder.WorkOrderValue,
+            workOrder.PartialAmount,
             workOrder.Busket,
             workOrder.Status,
             workOrder.Notes,
@@ -782,6 +784,16 @@ public sealed class WorkOrderService(
         if (changedFields.Contains(WorkOrderFieldRegistry.AssignmentDate))
         {
             target.AssignmentDate = source.AssignmentDate;
+        }
+
+        if (changedFields.Contains(WorkOrderFieldRegistry.WorkOrderValue))
+        {
+            target.WorkOrderValue = source.WorkOrderValue;
+        }
+
+        if (changedFields.Contains(WorkOrderFieldRegistry.PartialAmount))
+        {
+            target.PartialAmount = source.PartialAmount;
         }
 
         if (changedFields.Contains(WorkOrderFieldRegistry.Basket))
@@ -833,6 +845,8 @@ public sealed record WorkOrderSheetRow(
     string WorkOrderNumber,
     string WorkTypeCode,
     DateTime? AssignmentDate,
+    decimal? WorkOrderValue,
+    decimal? PartialAmount,
     string Busket,
     string Status,
     string? Notes,
@@ -855,6 +869,8 @@ public sealed record WorkOrderSavedRecord(
     int WorkYear,
     long DisplayOrder,
     DateTime? AssignmentDate,
+    decimal? WorkOrderValue,
+    decimal? PartialAmount,
     string Busket,
     string Status,
     string? Notes,

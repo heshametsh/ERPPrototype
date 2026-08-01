@@ -942,6 +942,9 @@
                 workOrderNumber: "",
                 workTypeCode: "",
                 assignmentDate: "",
+                workOrderValue: "",
+                partialAmount: "",
+                remainingAmount: "",
                 basket: "",
                 status: "",
                 notes: ""

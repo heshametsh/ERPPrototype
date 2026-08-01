@@ -443,6 +443,13 @@
                 }
             }
 
+            if (typeof this.syncDerivedFieldsForChanges === "function") {
+                await this.syncDerivedFieldsForChanges(
+                    elementId,
+                    effectiveChanges
+                );
+            }
+
             if (options.postProcess !== false) {
                 const changedFieldsByRow =
                     this.buildChangedFieldsByRow(effectiveChanges);

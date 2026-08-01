@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json;
 
@@ -17,8 +17,8 @@ internal sealed class Phase9FoundationBrowserTest(
     public int ExpectedCheckCount => suite switch
     {
         E2ETestSuite.Smoke => 8,
-        E2ETestSuite.Full => 26,
-        E2ETestSuite.Stress => 33,
+        E2ETestSuite.Full => 31,
+        E2ETestSuite.Stress => 38,
         _ => throw new ArgumentOutOfRangeException(nameof(suite))
     };
 
@@ -166,7 +166,7 @@ internal sealed class Phase9FoundationBrowserTest(
                     "Clearing search restores all 1,000 current-year rows");
 
                 const string persistedNote =
-                    "Phase 9.0C browser save persisted under 1,000-row load";
+                    "Phase 9.1A browser save persisted under 1,000-row load";
 
                 var editSaveReloadStartedAt = Stopwatch.GetTimestamp();
 
@@ -207,6 +207,143 @@ internal sealed class Phase9FoundationBrowserTest(
                     "Saved edit persists after reload and the sheet returns to 1,000 rows");
                 await browserSession.ObserveAsync(
                     "تم الحفظ ثم Refresh — الملاحظة ما زالت محفوظة في قاعدة البيانات");
+
+                E2ETestAssert.True(
+                    !string.IsNullOrWhiteSpace(
+                        await workOrdersPage.GetCellValueAsync(
+                            seed.CurrentYearMiddleRowId,
+                            "workOrderValue")),
+                    "The seeded current-year row did not contain Work Order Value.");
+
+                E2ETestAssert.Equal(
+                    await workOrdersPage.GetCellValueAsync(
+                        seed.CurrentYearMiddleRowId,
+                        "workOrderValue"),
+                    await workOrdersPage.GetCellValueAsync(
+                        seed.CurrentYearMiddleRowId,
+                        "remainingAmount"),
+                    "A row without Partial Amount did not derive Remaining Amount from Work Order Value.");
+
+                checks.Pass(
+                    "Seeded financial values load with a derived Remaining Amount");
+
+                await workOrdersPage.SetCellValueAsync(
+                    seed.CurrentYearMiddleRowId,
+                    "workOrderValue",
+                    "1250000.565",
+                    expectedValue: "1,250,000.57");
+
+                await workOrdersPage.WaitForCellValueAsync(
+                    seed.CurrentYearMiddleRowId,
+                    "remainingAmount",
+                    "1,250,000.57");
+
+                await workOrdersPage.PasteCellValueAsync(
+                    seed.CurrentYearMiddleRowId,
+                    "partialAmount",
+                    "250000.255",
+                    expectedValue: "250,000.26");
+
+                await workOrdersPage.WaitForCellValueAsync(
+                    seed.CurrentYearMiddleRowId,
+                    "remainingAmount",
+                    "1,000,000.31");
+                await workOrdersPage.WaitForDirtyRowCountAsync(1);
+
+                checks.Pass(
+                    "Financial edit and paste round to halalas and update Remaining Amount automatically");
+                await browserSession.ObserveAsync(
+                    "تم تعديل قيمة أمر العمل والجزئي — المتبقي اتحسب تلقائيًا");
+
+                await workOrdersPage.UndoAsync();
+                await workOrdersPage.WaitForCellValueAsync(
+                    seed.CurrentYearMiddleRowId,
+                    "partialAmount",
+                    string.Empty);
+                await workOrdersPage.WaitForCellValueAsync(
+                    seed.CurrentYearMiddleRowId,
+                    "remainingAmount",
+                    "1,250,000.57");
+
+                await workOrdersPage.RedoAsync();
+                await workOrdersPage.WaitForCellValueAsync(
+                    seed.CurrentYearMiddleRowId,
+                    "partialAmount",
+                    "250,000.26");
+                await workOrdersPage.WaitForCellValueAsync(
+                    seed.CurrentYearMiddleRowId,
+                    "remainingAmount",
+                    "1,000,000.31");
+
+                checks.Pass(
+                    "Undo and Redo keep the calculated Remaining Amount consistent");
+
+                await workOrdersPage.SaveAndWaitAsync();
+                await workOrdersPage.WaitForDirtyRowCountAsync(0);
+                await workOrdersPage.ReloadAndWaitAsync();
+                await workOrdersPage.WaitForActiveRowCountAsync(
+                    seed.RowsPerYear);
+
+                E2ETestAssert.Equal(
+                    "1,250,000.57",
+                    await workOrdersPage.GetCellValueAsync(
+                        seed.CurrentYearMiddleRowId,
+                        "workOrderValue"),
+                    "Work Order Value did not persist after reload.");
+
+                E2ETestAssert.Equal(
+                    "250,000.26",
+                    await workOrdersPage.GetCellValueAsync(
+                        seed.CurrentYearMiddleRowId,
+                        "partialAmount"),
+                    "Partial Amount did not persist after reload.");
+
+                E2ETestAssert.Equal(
+                    "1,000,000.31",
+                    await workOrdersPage.GetCellValueAsync(
+                        seed.CurrentYearMiddleRowId,
+                        "remainingAmount"),
+                    "Remaining Amount was not derived consistently after reload.");
+
+                checks.Pass(
+                    "Saved financial amounts persist and recalculate after reload");
+                await browserSession.ObserveAsync(
+                    "تم حفظ المبالغ ثم Refresh — القيمة والجزئي والمتبقي ما زالوا صحيحين");
+
+                await workOrdersPage.SetCellValueAsync(
+                    seed.CurrentYearMiddleRowId,
+                    "partialAmount",
+                    "2000000",
+                    expectedValue: "2,000,000");
+                await workOrdersPage.WaitForDirtyRowCountAsync(1);
+
+                var invalidFinancialStatus =
+                    await workOrdersPage.SaveAndWaitForFailureAsync(
+                        "لا يمكن الحفظ");
+
+                E2ETestAssert.Contains(
+                    "لا يمكن الحفظ",
+                    invalidFinancialStatus,
+                    "A Partial Amount above Work Order Value did not block save.");
+
+                E2ETestAssert.Contains(
+                    "المبلغ الجزئي",
+                    await workOrdersPage.GetValidationPanelTextAsync(),
+                    "Financial validation did not explain the invalid relationship.");
+
+                checks.Pass(
+                    "Partial Amount above Work Order Value is rejected in the sheet");
+
+                await workOrdersPage.UndoAsync();
+                await workOrdersPage.WaitForCellValueAsync(
+                    seed.CurrentYearMiddleRowId,
+                    "partialAmount",
+                    "250,000.26");
+                await workOrdersPage.WaitForCellValueAsync(
+                    seed.CurrentYearMiddleRowId,
+                    "remainingAmount",
+                    "1,000,000.31");
+                await workOrdersPage.WaitForDirtyRowCountAsync(0);
 
                 await workOrdersPage.SelectYearAsync(seed.PreviousYear);
 

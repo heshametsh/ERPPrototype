@@ -149,6 +149,8 @@ public sealed class WorkOrderQueryService(
                 workOrder.WorkOrderNumber,
                 workOrder.WorkTypeCode,
                 workOrder.AssignmentDate,
+                workOrder.WorkOrderValue,
+                workOrder.PartialAmount,
                 workOrder.Busket,
                 workOrder.Status,
                 workOrder.Notes,

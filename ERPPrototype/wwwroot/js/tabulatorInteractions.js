@@ -257,13 +257,41 @@
                         ? pending.oldValue
                         : cell.getOldValue();
 
-                const newValue =
+                let newValue =
                     cell.getValue();
+
+                const normalizedValue =
+                    window.tabulatorTest.normalizeFieldValue(
+                        elementId,
+                        field,
+                        newValue
+                    );
+
+                if (!Object.is(newValue, normalizedValue)) {
+                    state.applyingHistory = true;
+
+                    try {
+                        cell.setValue(normalizedValue, true);
+                        newValue = normalizedValue;
+                    } finally {
+                        state.applyingHistory = false;
+                    }
+                }
 
                 state.pendingEdit = null;
 
                 if (Object.is(oldValue, newValue)) {
                     return;
+                }
+
+                if (
+                    typeof window.tabulatorTest.syncFinancialRows === "function" &&
+                    window.tabulatorTest.isFinancialField(field)
+                ) {
+                    void window.tabulatorTest.syncFinancialRows(
+                        elementId,
+                        [rowId]
+                    );
                 }
 
                 window.tabulatorTest.pushTransaction(

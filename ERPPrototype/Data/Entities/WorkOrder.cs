@@ -1,4 +1,4 @@
-﻿namespace ERPPrototype.Data.Entities;
+namespace ERPPrototype.Data.Entities;
 
 public sealed class WorkOrder
 {
@@ -13,6 +13,10 @@ public sealed class WorkOrder
     public long DisplayOrder { get; set; }
 
     public DateTime? AssignmentDate { get; set; }
+
+    public decimal? WorkOrderValue { get; set; }
+
+    public decimal? PartialAmount { get; set; }
 
     public string Busket { get; set; } = string.Empty;
 

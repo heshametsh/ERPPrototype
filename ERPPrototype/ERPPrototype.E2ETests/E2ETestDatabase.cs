@@ -246,6 +246,18 @@ internal sealed class E2ETestDatabase : IAsyncDisposable
 
         for (var index = 1; index <= RowsPerYear; index++)
         {
+            var workOrderValue =
+                50_000m +
+                ((index % 400) * 5_000m) +
+                ((index % 4) * 0.25m);
+
+            var partialAmount = index % 3 == 0
+                ? decimal.Round(
+                    workOrderValue * 0.30m,
+                    2,
+                    MidpointRounding.AwayFromZero)
+                : (decimal?)null;
+
             rows.Add(
                 new WorkOrder
                 {
@@ -259,6 +271,8 @@ internal sealed class E2ETestDatabase : IAsyncDisposable
                         year,
                         ((index - 1) % 12) + 1,
                         ((index - 1) % 28) + 1),
+                    WorkOrderValue = workOrderValue,
+                    PartialAmount = partialAmount,
                     Busket = WorkOrderBuskets.InProgress,
                     Status = "تحت التنفيذ",
                     Notes = $"{notePrefix} {index:D4}",
