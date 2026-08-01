@@ -1,9 +1,10 @@
 [CmdletBinding()]
 param(
     [switch]$Headed,
+    [switch]$Observe,
     [switch]$KeepDatabase,
 
-    [ValidateSet('Smoke', 'Full')]
+    [ValidateSet('Smoke', 'Full', 'Stress')]
     [string]$Suite = 'Full',
 
     [switch]$SkipIntegration
@@ -44,6 +45,8 @@ if (-not $SkipIntegration -and -not (Test-Path $integrationProject)) {
 Write-Host 'ERPPrototype automated verification' -ForegroundColor Green
 Write-Host "Project: $projectRoot"
 Write-Host "Browser suite: $Suite"
+Write-Host "Browser mode: $(if ($Observe) { 'Observe (visible and slowed)' } elseif ($Headed) { 'Headed' } else { 'Headless' })"
+Write-Host 'Browser dataset: 1,000 rows per year (2,000 seeded rows total)'
 
 if (-not $SkipIntegration) {
     Invoke-DotNetStep -Title 'Building the SQL Server integration-test project in Release' -Arguments @(
@@ -62,12 +65,21 @@ Invoke-DotNetStep -Title 'Building browser tests, web application, and reference
 )
 
 if (-not $SkipIntegration) {
-    Invoke-DotNetStep -Title 'Running the 10 SQL Server save safety checks' -Arguments @(
+    $integrationArguments = @(
         'run',
         '--project', $integrationProject,
         '--configuration', 'Release',
         '--no-build'
     )
+
+    $integrationTitle = 'Running the 10 SQL Server save safety checks'
+
+    if ($Suite -eq 'Stress') {
+        $integrationArguments += @('--', '--stress')
+        $integrationTitle = 'Running 10 core SQL Server checks plus the 1,000-row batch stress check'
+    }
+
+    Invoke-DotNetStep -Title $integrationTitle -Arguments $integrationArguments
 }
 
 $browserArguments = @(
@@ -79,7 +91,10 @@ $browserArguments = @(
     '--suite', $Suite.ToLowerInvariant()
 )
 
-if ($Headed) {
+if ($Observe) {
+    $browserArguments += '--observe'
+}
+elseif ($Headed) {
     $browserArguments += '--headed'
 }
 
@@ -89,8 +104,21 @@ if ($KeepDatabase) {
 
 Invoke-DotNetStep -Title "Running the $Suite browser suite" -Arguments $browserArguments
 
-$expectedBrowserChecks = if ($Suite -eq 'Smoke') { 5 } else { 9 }
-$integrationSummary = if ($SkipIntegration) { 'Integration tests: skipped' } else { 'Integration tests: 10/10 PASS' }
+$expectedBrowserChecks = switch ($Suite) {
+    'Smoke' { 8 }
+    'Full' { 26 }
+    'Stress' { 33 }
+}
+
+$integrationSummary = if ($SkipIntegration) {
+    'Integration tests: skipped'
+}
+elseif ($Suite -eq 'Stress') {
+    'Integration tests: 11/11 PASS (includes 1,000-row add/update/delete)'
+}
+else {
+    'Integration tests: 10/10 PASS'
+}
 
 Write-Host "`nERPPrototype automated verification: PASS" -ForegroundColor Green
 Write-Host "$integrationSummary | Browser checks: $expectedBrowserChecks/$expectedBrowserChecks PASS ($Suite)"

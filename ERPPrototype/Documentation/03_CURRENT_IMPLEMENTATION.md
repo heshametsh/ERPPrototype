@@ -1,6 +1,6 @@
 # 03 — Current Implementation
 
-**Status:** Phase 9.0 accepted after SQL 10/10 and browser 4/4; Phase 9.0B hardening implemented as an acceptance candidate
+**Status:** Phase 9.0B accepted after SQL 10/10 and browser Full 9/9; Phase 9.0C 1,000-row stress coverage implemented as an acceptance candidate
 **Review date:** 2026-07-31
 **Acceptance evidence:** Developer-machine Release Build PASS, 10/10 isolated SQL Server save tests, Git source hygiene PASS, and a 169-file clean source archive of 3.06 MB. The optional local Node.js check was skipped because Node.js was unavailable; project-owned JavaScript files separately passed syntax checks, and Phase 8.9 changed no production JavaScript.
 
@@ -15,7 +15,7 @@
 | Database | SQL Server / LocalDB in Development |
 | ORM | EF Core 10.0.9 |
 | Grid | Tabulator 6.5.0 |
-| Current accepted runtime checkpoint | Phase 9.0 runtime accepted: integration 10/10 and browser 4/4 on an isolated temporary database and local process |
+| Current accepted runtime checkpoint | Phase 9.0B accepted: integration 10/10 and browser Full 9/9 on isolated temporary infrastructure |
 | Main grid coordinator | `wwwroot/js/tabulatorTest.js` — 2,331 lines after Dirty-State extraction |
 | Work-order markup | `Components/Pages/WorkOrders.razor` — 208 lines |
 | Work-order save service/facade | `Data/WorkOrderService.cs` — about 955 lines after pure save-plan extraction |
@@ -475,3 +475,13 @@ The browser project now owns:
 The Full suite remains a foundation journey, not the final Work Orders coverage. Edit/Save, insert/delete, duplicate UI, Undo/Redo, Copy/Paste, search/filter, and future financial/custom columns belong to Phase 9.0C and later feature phases.
 
 No migration, Work Order rule, save path, JavaScript behavior, or database shape changes in Phase 9.0B. Acceptance requires Release build, existing SQL tests 10/10, and Full browser checks 9/9.
+
+
+## 29. Phase 9.0C — 1,000-Row Coverage Candidate
+
+The E2E database now contains 1,000 Work Orders per year for two years. Smoke and Full therefore exercise the same large sheet size used by the current acceptance candidate. Full covers virtual scrolling to row 1,000, search restore, one-cell Save with reload persistence, and switching between two independent 1,000-row years. Stress adds 1,000 unsaved rows to an existing 1,000-row table, verifies Undo/Redo/final Undo, and records timings. The SQL runner gains an optional 1,000-row add/update/delete service test.
+
+## Phase 9.0C-R2 candidate — observable and complete current-sheet browser coverage
+
+The automated platform now has an optional Observe mode and Full/Stress browser coverage for duplicate rejection, saved deletion, and Assignment Date year movement. Acceptance requires 11/11 SQL Server checks and 33/33 Stress browser checks. No production behavior changed.
+

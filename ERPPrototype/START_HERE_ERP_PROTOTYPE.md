@@ -138,3 +138,8 @@ powershell -ExecutionPolicy Bypass -File .\ERPPrototype\Tools\Invoke-ERPTests.ps
 - نقطة مراجعة كبيرة: يجوز تسليم نسخة مصدر كاملة نظيفة.
 - لا تُرسل ملفات `bin` أو `obj` أو `.vs` أو `*.user` أو ملفات تنفيذ ومكتبات مبنية.
 - استخدم `Tools/New-CleanProjectArchive.ps1` عند تجهيز المشروع للرفع.
+
+### Current candidate: Phase 9.0C-R2
+
+Close current-sheet automation with optional Observe mode plus browser checks for duplicate rejection, saved deletion, and Assignment Date movement between years. Accept only after 11/11 integration and 33/33 Stress browser checks.
+

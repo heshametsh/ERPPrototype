@@ -5,11 +5,14 @@ namespace ERPPrototype.E2ETests;
 internal sealed class E2EBrowserSession : IAsyncDisposable
 {
     private const float HeadedSlowMotionMilliseconds = 90;
+    private const float ObserveSlowMotionMilliseconds = 650;
+    private const int ObservePauseMilliseconds = 1_250;
 
     private readonly IPlaywright playwright;
     private readonly IBrowser browser;
     private readonly IBrowserContext context;
     private readonly string artifactDirectory;
+    private readonly bool observe;
     private bool tracingActive;
 
     private E2EBrowserSession(
@@ -18,12 +21,14 @@ internal sealed class E2EBrowserSession : IAsyncDisposable
         IBrowserContext context,
         IPage page,
         BrowserDiagnostics diagnostics,
-        string artifactDirectory)
+        string artifactDirectory,
+        bool observe)
     {
         this.playwright = playwright;
         this.browser = browser;
         this.context = context;
         this.artifactDirectory = artifactDirectory;
+        this.observe = observe;
         Page = page;
         Diagnostics = diagnostics;
         tracingActive = true;
@@ -33,10 +38,13 @@ internal sealed class E2EBrowserSession : IAsyncDisposable
 
     public BrowserDiagnostics Diagnostics { get; }
 
+    public bool ObserveEnabled => observe;
+
     public static async Task<E2EBrowserSession> CreateAsync(
         Uri baseUri,
         string artifactDirectory,
-        bool headed)
+        bool headed,
+        bool observe)
     {
         var playwright = await Playwright.CreateAsync();
         IBrowser? browser = null;
@@ -44,7 +52,11 @@ internal sealed class E2EBrowserSession : IAsyncDisposable
 
         try
         {
-            browser = await LaunchChromiumAsync(playwright, headed);
+            browser = await LaunchChromiumAsync(
+                playwright,
+                headed || observe,
+                observe);
+
             context = await browser.NewContextAsync(
                 new BrowserNewContextOptions
                 {
@@ -76,7 +88,8 @@ internal sealed class E2EBrowserSession : IAsyncDisposable
                 context,
                 page,
                 diagnostics,
-                artifactDirectory);
+                artifactDirectory,
+                observe);
         }
         catch
         {
@@ -93,6 +106,54 @@ internal sealed class E2EBrowserSession : IAsyncDisposable
             playwright.Dispose();
             throw;
         }
+    }
+
+    public async Task ObserveAsync(
+        string step,
+        int pauseMilliseconds = ObservePauseMilliseconds)
+    {
+        if (!observe)
+        {
+            return;
+        }
+
+        Console.WriteLine($"[OBSERVE] {step}");
+
+        await Page.EvaluateAsync(
+            """
+            step => {
+                const id = 'erp-e2e-observe-banner';
+                let banner = document.getElementById(id);
+
+                if (!banner) {
+                    banner = document.createElement('div');
+                    banner.id = id;
+                    banner.style.position = 'fixed';
+                    banner.style.top = '14px';
+                    banner.style.left = '50%';
+                    banner.style.transform = 'translateX(-50%)';
+                    banner.style.zIndex = '2147483647';
+                    banner.style.maxWidth = '90vw';
+                    banner.style.padding = '12px 20px';
+                    banner.style.borderRadius = '10px';
+                    banner.style.background = 'rgba(15, 35, 55, 0.94)';
+                    banner.style.color = '#ffffff';
+                    banner.style.fontFamily = 'Segoe UI, Arial, sans-serif';
+                    banner.style.fontSize = '18px';
+                    banner.style.fontWeight = '700';
+                    banner.style.boxShadow = '0 8px 24px rgba(0, 0, 0, 0.35)';
+                    banner.style.direction = 'rtl';
+                    banner.style.textAlign = 'center';
+                    banner.style.pointerEvents = 'none';
+                    document.body.appendChild(banner);
+                }
+
+                banner.textContent = step;
+            }
+            """,
+            step);
+
+        await Page.WaitForTimeoutAsync(pauseMilliseconds);
     }
 
     public async Task CaptureSuccessAsync(string name)
@@ -207,14 +268,17 @@ internal sealed class E2EBrowserSession : IAsyncDisposable
 
     private static async Task<IBrowser> LaunchChromiumAsync(
         IPlaywright playwright,
-        bool headed)
+        bool headed,
+        bool observe)
     {
         var launchOptions = new BrowserTypeLaunchOptions
         {
             Headless = !headed,
-            SlowMo = headed
-                ? HeadedSlowMotionMilliseconds
-                : 0
+            SlowMo = observe
+                ? ObserveSlowMotionMilliseconds
+                : headed
+                    ? HeadedSlowMotionMilliseconds
+                    : 0
         };
 
         try

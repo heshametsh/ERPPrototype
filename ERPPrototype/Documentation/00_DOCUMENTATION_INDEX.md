@@ -49,6 +49,7 @@
 | `27_CHANGE_SUMMARY_2026-07-31_PHASE8_9.md` | الإغلاق النهائي المقبول والتنظيف والأتمتة | ما دليل قبول Phase 8.9 وكيف نعيد التحقق وننشئ ZIP نظيفًا؟ |
 | `28_CHANGE_SUMMARY_2026-07-31_PHASE9_0.md` | تأسيس أول رحلة متصفح آلية مع قاعدة وتطبيق مؤقتين | كيف يعمل Login/Sheet/Year E2E وما حدود قبوله؟ |
 | `29_CHANGE_SUMMARY_2026-08-01_PHASE9_0B.md` | تثبيت منصة Playwright وselectors والأدوات المشتركة | كيف تعمل Smoke/Full والـPage Objects والتشخيص؟ |
+| `30_CHANGE_SUMMARY_2026-08-01_PHASE9_0C.md` | تغطية وضغط 1,000 صف لكل سنة | كيف تعمل Full/Stress وما دليل Baseline والأحمال الجماعية؟ |
 
 ## المجلدات المساعدة
 

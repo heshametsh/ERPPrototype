@@ -1,4 +1,6 @@
+using System.Diagnostics;
 using System.Globalization;
+using System.Text.Json;
 
 namespace ERPPrototype.E2ETests;
 
@@ -7,10 +9,18 @@ internal sealed class Phase9FoundationBrowserTest(
     E2ESeedData seed,
     string artifactDirectory,
     bool headed,
+    bool observe,
     E2ETestSuite suite)
 {
-    public int ExpectedCheckCount =>
-        suite == E2ETestSuite.Smoke ? 5 : 9;
+    private const int MaximumExpectedRenderedRows = 150;
+
+    public int ExpectedCheckCount => suite switch
+    {
+        E2ETestSuite.Smoke => 8,
+        E2ETestSuite.Full => 26,
+        E2ETestSuite.Stress => 33,
+        _ => throw new ArgumentOutOfRangeException(nameof(suite))
+    };
 
     public async Task<int> RunAsync()
     {
@@ -18,21 +28,30 @@ internal sealed class Phase9FoundationBrowserTest(
             await E2EBrowserSession.CreateAsync(
                 baseUri,
                 artifactDirectory,
-                headed);
+                headed,
+                observe);
 
         var checks = new BrowserCheckRecorder();
         var loginPage = new LoginPage(browserSession.Page, baseUri);
         var workOrdersPage = new WorkOrdersPage(browserSession.Page);
         var artifactName =
-            $"phase9-foundation-{suite.ToString().ToLowerInvariant()}";
+            $"phase9-current-sheet-{suite.ToString().ToLowerInvariant()}";
 
         try
         {
             await loginPage.OpenAsync();
             checks.Pass("Login form is rendered through stable test hooks");
+            await browserSession.ObserveAsync(
+                "صفحة تسجيل الدخول جاهزة — سيبدأ تسجيل الدخول تلقائيًا");
+
+            var loginToGridStartedAt = Stopwatch.GetTimestamp();
 
             await loginPage.LoginAsync(seed);
             await workOrdersPage.WaitUntilReadyAsync();
+
+            var loginToGridMilliseconds =
+                Stopwatch.GetElapsedTime(loginToGridStartedAt)
+                    .TotalMilliseconds;
 
             E2ETestAssert.Equal(
                 "Work Orders",
@@ -62,13 +81,133 @@ internal sealed class Phase9FoundationBrowserTest(
 
             checks.Pass("Blazor and Tabulator reach an explicit ready state");
 
+            await workOrdersPage.WaitForActiveRowCountAsync(
+                seed.RowsPerYear);
+
+            E2ETestAssert.Equal(
+                seed.RowsPerYear,
+                await workOrdersPage.GetActiveRowCountAsync(),
+                "The current-year sheet did not load the expected stress dataset.");
+
+            checks.Pass(
+                $"Current-year sheet contains {seed.RowsPerYear:N0} active rows");
+
+            var renderedRowCount =
+                await workOrdersPage.GetRenderedRowCountAsync();
+
+            E2ETestAssert.True(
+                renderedRowCount > 0 &&
+                renderedRowCount <= MaximumExpectedRenderedRows,
+                "Virtual DOM rendered an unexpected number of row elements. " +
+                $"Rendered: {renderedRowCount}; expected at most " +
+                $"{MaximumExpectedRenderedRows}.");
+
+            checks.Pass(
+                "Virtual DOM keeps the rendered row window bounded under 1,000-row load");
+
             await workOrdersPage.WaitForWorkOrderAsync(
-                seed.CurrentYearWorkOrderNumber);
+                seed.CurrentYearFirstWorkOrderNumber);
 
-            checks.Pass("Current-year work-order data is rendered");
+            checks.Pass("First current-year work order is rendered");
+            await browserSession.ObserveAsync(
+                "تم فتح شيت السنة الحالية وفيه 1000 أمر عمل");
 
-            if (suite == E2ETestSuite.Full)
+            double lastRowScrollMilliseconds = 0;
+            double searchMilliseconds = 0;
+            double editSaveReloadMilliseconds = 0;
+            BrowserStructureStressMetrics? structureStress = null;
+
+            if (suite is E2ETestSuite.Full or E2ETestSuite.Stress)
             {
+                var scrollStartedAt = Stopwatch.GetTimestamp();
+
+                await workOrdersPage.ScrollToRowAsync(
+                    seed.CurrentYearLastRowId);
+
+                await workOrdersPage.WaitForWorkOrderAsync(
+                    seed.CurrentYearLastWorkOrderNumber);
+
+                lastRowScrollMilliseconds =
+                    Stopwatch.GetElapsedTime(scrollStartedAt)
+                        .TotalMilliseconds;
+
+                checks.Pass(
+                    "The 1,000th current-year row is reachable through virtual scrolling");
+                await browserSession.ObserveAsync(
+                    "تم الوصول إلى الصف رقم 1000 باستخدام Virtual Scroll");
+
+                var searchStartedAt = Stopwatch.GetTimestamp();
+
+                await workOrdersPage.SearchWorkOrderAsync(
+                    seed.CurrentYearLastWorkOrderNumber);
+
+                E2ETestAssert.Equal(
+                    1,
+                    await workOrdersPage.GetActiveRowCountAsync(),
+                    "Searching for a unique work order did not reduce the active data to one row.");
+
+                searchMilliseconds =
+                    Stopwatch.GetElapsedTime(searchStartedAt)
+                        .TotalMilliseconds;
+
+                checks.Pass(
+                    "Search isolates a work order near the end of the 1,000-row sheet");
+                await browserSession.ObserveAsync(
+                    "البحث عزل أمر عمل واحد قرب نهاية الشيت");
+
+                await workOrdersPage.ClearSearchAsync(seed.RowsPerYear);
+
+                E2ETestAssert.Equal(
+                    seed.RowsPerYear,
+                    await workOrdersPage.GetActiveRowCountAsync(),
+                    "Clearing search did not restore the complete current-year dataset.");
+
+                checks.Pass(
+                    "Clearing search restores all 1,000 current-year rows");
+
+                const string persistedNote =
+                    "Phase 9.0C browser save persisted under 1,000-row load";
+
+                var editSaveReloadStartedAt = Stopwatch.GetTimestamp();
+
+                await workOrdersPage.SetCellValueAsync(
+                    seed.CurrentYearMiddleRowId,
+                    "notes",
+                    persistedNote);
+
+                await workOrdersPage.WaitForDirtyRowCountAsync(1);
+
+                checks.Pass(
+                    "Editing a middle-row cell marks exactly one row dirty");
+                await browserSession.ObserveAsync(
+                    "تم تعديل ملاحظة في منتصف الألف صف — يوجد صف واحد غير محفوظ");
+
+                await workOrdersPage.SaveAndWaitAsync();
+                await workOrdersPage.WaitForDirtyRowCountAsync(0);
+
+                checks.Pass(
+                    "Saving a cell edit succeeds on the 1,000-row sheet");
+
+                await workOrdersPage.ReloadAndWaitAsync();
+                await workOrdersPage.WaitForActiveRowCountAsync(
+                    seed.RowsPerYear);
+
+                E2ETestAssert.Equal(
+                    persistedNote,
+                    await workOrdersPage.GetCellValueAsync(
+                        seed.CurrentYearMiddleRowId,
+                        "notes"),
+                    "The saved browser edit did not survive a full page reload.");
+
+                editSaveReloadMilliseconds =
+                    Stopwatch.GetElapsedTime(editSaveReloadStartedAt)
+                        .TotalMilliseconds;
+
+                checks.Pass(
+                    "Saved edit persists after reload and the sheet returns to 1,000 rows");
+                await browserSession.ObserveAsync(
+                    "تم الحفظ ثم Refresh — الملاحظة ما زالت محفوظة في قاعدة البيانات");
+
                 await workOrdersPage.SelectYearAsync(seed.PreviousYear);
 
                 E2ETestAssert.Equal(
@@ -76,28 +215,276 @@ internal sealed class Phase9FoundationBrowserTest(
                     await workOrdersPage.GetSelectedYearAsync(),
                     "The year selector did not settle on the requested year.");
 
-                checks.Pass("Year selector changes to the requested year");
+                checks.Pass(
+                    "Year selector changes to the previous stress dataset");
+
+                await workOrdersPage.WaitForActiveRowCountAsync(
+                    seed.RowsPerYear);
+
+                E2ETestAssert.Equal(
+                    seed.RowsPerYear,
+                    await workOrdersPage.GetActiveRowCountAsync(),
+                    "The previous-year sheet did not load 1,000 rows.");
+
+                checks.Pass(
+                    "Previous-year sheet also contains 1,000 active rows");
+
+                await workOrdersPage.ScrollToRowAsync(
+                    seed.PreviousYearLastRowId);
 
                 await workOrdersPage.WaitForWorkOrderAsync(
-                    seed.PreviousYearWorkOrderNumber);
+                    seed.PreviousYearLastWorkOrderNumber);
 
-                checks.Pass("Selected-year work-order data is rendered");
+                checks.Pass(
+                    "The 1,000th previous-year row is reachable after changing year");
 
                 E2ETestAssert.True(
-                    !await workOrdersPage.HasVisibleWorkOrderAsync(
-                        seed.CurrentYearWorkOrderNumber),
-                    "The current-year row remained visible after switching years.");
+                    !await workOrdersPage.ContainsWorkOrderInDataAsync(
+                        seed.CurrentYearFirstWorkOrderNumber),
+                    "Current-year data remained in the active table after changing year.");
 
-                checks.Pass("Rows from the previous selection are removed");
-
-                browserSession.Diagnostics.AssertNoCriticalErrors();
-                checks.Pass("Journey completes without page errors or HTTP 5xx responses");
+                checks.Pass(
+                    "Changing year replaces the active 1,000-row dataset without leakage");
+                await browserSession.ObserveAsync(
+                    "تم تغيير السنة وتحميل 1000 سجل مختلف بدون اختلاط البيانات");
             }
+
+            if (suite == E2ETestSuite.Stress)
+            {
+                await workOrdersPage.SelectYearAsync(seed.CurrentYear);
+                await workOrdersPage.WaitForActiveRowCountAsync(
+                    seed.RowsPerYear);
+
+                checks.Pass(
+                    "Stress run returns to the clean 1,000-row current-year sheet");
+
+                E2ETestAssert.Equal(
+                    0,
+                    await workOrdersPage.GetDirtyRowCountAsync(),
+                    "The structural stress run did not start from a clean sheet.");
+
+                checks.Pass(
+                    "Structural stress begins with no unsaved rows");
+
+                structureStress =
+                    await workOrdersPage.RunThousandRowStructureStressAsync(
+                        seed.CurrentYearMiddleRowId,
+                        seed.RowsPerYear,
+                      step => browserSession.ObserveAsync(step));
+
+                checks.Pass(
+                    "Bulk insert adds 1,000 rows to a 1,000-row sheet");
+                checks.Pass(
+                    "Bulk Undo restores the original 1,000 rows and clears dirty state");
+                checks.Pass(
+                    "Bulk Redo restores all 1,000 inserted rows");
+                checks.Pass(
+                    "Final Undo returns the browser to a clean 1,000-row baseline");
+
+                E2ETestAssert.Equal(
+                    seed.RowsPerYear,
+                    structureStress.FinalRowCount,
+                    "The final structural stress row count was not restored.");
+
+                E2ETestAssert.Equal(
+                    0,
+                    structureStress.FinalDirtyRowCount,
+                    "The final structural stress dirty state was not cleared.");
+
+                var stressReport = new BrowserStressReport(
+                    Suite: suite.ToString(),
+                    RowsPerYear: seed.RowsPerYear,
+                    TotalSeededRows: seed.RowsPerYear * 2,
+                    LoginToGridMilliseconds: loginToGridMilliseconds,
+                    LastRowScrollMilliseconds: lastRowScrollMilliseconds,
+                    SearchMilliseconds: searchMilliseconds,
+                    EditSaveReloadMilliseconds: editSaveReloadMilliseconds,
+                    Structure: structureStress,
+                    CapturedAtUtc: DateTime.UtcNow);
+
+                var reportPath = Path.Combine(
+                    artifactDirectory,
+                    "phase9-1000-row-stress-metrics.json");
+
+                await File.WriteAllTextAsync(
+                    reportPath,
+                    JsonSerializer.Serialize(
+                        stressReport,
+                        new JsonSerializerOptions
+                        {
+                            WriteIndented = true
+                        }));
+
+                Console.WriteLine(
+                    $"1,000-row stress metrics: {reportPath}");
+
+                checks.Pass(
+                    "Stress timings are captured as a reusable performance baseline");
+            }
+
+            if (suite is E2ETestSuite.Full or E2ETestSuite.Stress)
+            {
+                await workOrdersPage.SelectYearAsync(seed.CurrentYear);
+                await workOrdersPage.WaitForActiveRowCountAsync(
+                    seed.RowsPerYear);
+
+                var duplicateTargetType =
+                    await workOrdersPage.GetCellValueAsync(
+                        seed.CurrentYearLastRowId,
+                        "workTypeCode");
+
+                var duplicateSourceType =
+                    await workOrdersPage.GetCellValueAsync(
+                        seed.CurrentYearFirstRowId,
+                        "workTypeCode");
+
+                await workOrdersPage.SetCellValueAsync(
+                    seed.CurrentYearLastRowId,
+                    "workOrderNumber",
+                    seed.CurrentYearFirstWorkOrderNumber);
+
+                await workOrdersPage.SetCellValueAsync(
+                    seed.CurrentYearLastRowId,
+                    "workTypeCode",
+                    duplicateSourceType);
+
+                await workOrdersPage.WaitForDirtyRowCountAsync(1);
+
+                checks.Pass(
+                    "Creating a duplicate identity marks only the edited row dirty");
+                await browserSession.ObserveAsync(
+                    "تم إنشاء رقم أمر عمل مكرر عمدًا — الحفظ التالي يجب أن يُرفض");
+
+                var duplicateStatus =
+                    await workOrdersPage.SaveAndWaitForFailureAsync(
+                        "لا يمكن الحفظ");
+
+                E2ETestAssert.Contains(
+                    "لا يمكن الحفظ",
+                    duplicateStatus,
+                    "The duplicate edit did not block the save action.");
+
+                E2ETestAssert.True(
+                    await workOrdersPage.IsValidationPanelVisibleAsync(),
+                    "The duplicate row was rejected without showing the validation navigator.");
+
+                E2ETestAssert.Contains(
+                    "مكرر",
+                    await workOrdersPage.GetValidationPanelTextAsync(),
+                    "The validation navigator did not explain the duplicate identity.");
+
+                checks.Pass(
+                    "Duplicate save is rejected and the validation navigator is shown");
+                await browserSession.ObserveAsync(
+                    "تم رفض الحفظ وظهر تنبيه التكرار على الصف المخالف");
+
+                const string correctedUniqueWorkOrderNumber = "929999999";
+
+                await workOrdersPage.SetCellValueAsync(
+                    seed.CurrentYearLastRowId,
+                    "workOrderNumber",
+                    correctedUniqueWorkOrderNumber);
+
+                await workOrdersPage.SetCellValueAsync(
+                    seed.CurrentYearLastRowId,
+                    "workTypeCode",
+                    duplicateTargetType);
+
+                await workOrdersPage.WaitForDirtyRowCountAsync(1);
+                await workOrdersPage.SaveAndWaitAsync();
+                await workOrdersPage.WaitForDirtyRowCountAsync(0);
+                await workOrdersPage.WaitForActiveRowCountAsync(
+                    seed.RowsPerYear);
+
+                E2ETestAssert.True(
+                    await workOrdersPage.ContainsWorkOrderInDataAsync(
+                        correctedUniqueWorkOrderNumber),
+                    "The corrected unique work order was not present after save.");
+
+                checks.Pass(
+                    "Correcting the duplicate allows the same row to save cleanly");
+
+                await workOrdersPage.DeleteRowAsync(
+                    seed.CurrentYearFirstRowId,
+                    expectedRemainingRows: seed.RowsPerYear - 1);
+
+                await workOrdersPage.WaitForDirtyRowCountAsync(1);
+                checks.Pass(
+                    "Deleting one saved row reduces the 1,000-row sheet and marks one deletion");
+                await browserSession.ObserveAsync(
+                    "تم حذف صف محفوظ — العدد أصبح 999 قبل الحفظ");
+
+                await workOrdersPage.SaveAndWaitAsync();
+                await workOrdersPage.ReloadAndWaitAsync();
+                await workOrdersPage.WaitForActiveRowCountAsync(
+                    seed.RowsPerYear - 1);
+
+                E2ETestAssert.True(
+                    !await workOrdersPage.ContainsWorkOrderInDataAsync(
+                        seed.CurrentYearFirstWorkOrderNumber),
+                    "The deleted work order returned after reload.");
+
+                checks.Pass(
+                    "Saved deletion remains absent after a full page reload");
+                await browserSession.ObserveAsync(
+                    "تم حفظ الحذف ثم Refresh — الصف المحذوف لم يرجع");
+
+                var destinationDate =
+                    $"01/01/{seed.PreviousYear}";
+
+                await workOrdersPage.SetCellValueAsync(
+                    seed.CurrentYearMiddleRowId,
+                    "assignmentDate",
+                    destinationDate);
+
+                await workOrdersPage.WaitForDirtyRowCountAsync(1);
+                checks.Pass(
+                    "Changing Assignment Date to another year marks one row dirty");
+                await browserSession.ObserveAsync(
+                    "تم تغيير تاريخ الإسناد إلى السنة السابقة — الصف جاهز للنقل");
+
+                await workOrdersPage.SaveAndWaitAsync();
+                await workOrdersPage.WaitForActiveRowCountAsync(
+                    seed.RowsPerYear - 2);
+                await workOrdersPage.ReloadAndWaitAsync();
+                await workOrdersPage.WaitForActiveRowCountAsync(
+                    seed.RowsPerYear - 2);
+
+                E2ETestAssert.True(
+                    !await workOrdersPage.ContainsWorkOrderInDataAsync(
+                        seed.CurrentYearMiddleWorkOrderNumber),
+                    "The moved work order remained in the source year after save.");
+
+                checks.Pass(
+                    "Saving the year-changing date removes the row from the source year");
+
+                await workOrdersPage.SelectYearAsync(seed.PreviousYear);
+                await workOrdersPage.WaitForActiveRowCountAsync(
+                    seed.RowsPerYear + 1);
+
+                E2ETestAssert.True(
+                    await workOrdersPage.ContainsWorkOrderInDataAsync(
+                        seed.CurrentYearMiddleWorkOrderNumber),
+                    "The moved work order was not present in the destination year.");
+
+                checks.Pass(
+                    "The moved work order appears in the destination year with 1,001 rows");
+                await browserSession.ObserveAsync(
+                    "تم النقل بنجاح — السنة السابقة أصبحت 1001 صف");
+            }
+
+            browserSession.Diagnostics.AssertNoCriticalErrors();
+            checks.Pass(
+                "Journey completes without page errors or HTTP 5xx responses");
 
             E2ETestAssert.Equal(
                 ExpectedCheckCount,
                 checks.PassedCount,
                 "The browser journey did not execute the expected number of checks.");
+
+            await browserSession.ObserveAsync(
+                $"اكتملت الرحلة بنجاح: {checks.PassedCount}/{ExpectedCheckCount} PASS",
+                pauseMilliseconds: 2_000);
 
             await browserSession.CaptureSuccessAsync(artifactName);
             return checks.PassedCount;
@@ -109,3 +496,14 @@ internal sealed class Phase9FoundationBrowserTest(
         }
     }
 }
+
+internal sealed record BrowserStressReport(
+    string Suite,
+    int RowsPerYear,
+    int TotalSeededRows,
+    double LoginToGridMilliseconds,
+    double LastRowScrollMilliseconds,
+    double SearchMilliseconds,
+    double EditSaveReloadMilliseconds,
+    BrowserStructureStressMetrics Structure,
+    DateTime CapturedAtUtc);

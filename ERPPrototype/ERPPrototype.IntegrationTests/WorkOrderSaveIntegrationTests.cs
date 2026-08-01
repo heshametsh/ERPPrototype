@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using ERPPrototype.Data;
 using ERPPrototype.Data.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -394,6 +395,134 @@ internal sealed class WorkOrderSaveIntegrationTests(
                 "412"),
             "The new row was committed despite the failed transaction.");
     }
+
+    public async Task LargeBatchOf1000RowsSupportsAddUpdateDeleteAsync()
+    {
+        const int rowCount = 1_000;
+        var currentYear = DateTime.Now.Year;
+
+        var addedRecords = Enumerable.Range(1, rowCount)
+            .Select(index =>
+                CreateNewRecord(
+                    temporaryId: -30_000 - index,
+                    workOrderNumber:
+                        (830_000_000 + index).ToString("D9"),
+                    workTypeCode: "401",
+                    workYear: currentYear,
+                    notes: $"stress-add-{index:D4}"))
+            .ToArray();
+
+        var addStartedAt = Stopwatch.GetTimestamp();
+
+        var addResult = await database.Service.SaveChangesAsync(
+            database.EmployeeAId,
+            currentYear,
+            addedRecords: addedRecords,
+            changedRecords: Array.Empty<WorkOrderChangeSet>(),
+            deletedRecords: []);
+
+        var addMilliseconds =
+            Stopwatch.GetElapsedTime(addStartedAt).TotalMilliseconds;
+
+        TestAssert.True(
+            addResult.Succeeded,
+            $"Adding 1,000 rows failed: {addResult.ErrorMessage}");
+
+        TestAssert.Equal(
+            rowCount,
+            addResult.SavedRecords?.Count ?? 0,
+            "The 1,000-row add did not return every saved record.");
+
+        TestAssert.Equal(
+            rowCount,
+            await database.CountWorkOrdersByNumberPrefixAsync("830"),
+            "The database did not persist exactly 1,000 stress rows.");
+
+        var changedRecords = addResult.SavedRecords!
+            .Select((saved, index) =>
+            {
+                var record = MapSavedRecord(saved);
+                record.Notes = $"stress-update-{index + 1:D4}";
+
+                return new WorkOrderChangeSet(
+                    record,
+                    NotesOnly);
+            })
+            .ToArray();
+
+        var updateStartedAt = Stopwatch.GetTimestamp();
+
+        var updateResult = await database.Service.SaveChangesAsync(
+            database.EmployeeAId,
+            currentYear,
+            addedRecords: [],
+            changedRecords: changedRecords,
+            deletedRecords: []);
+
+        var updateMilliseconds =
+            Stopwatch.GetElapsedTime(updateStartedAt).TotalMilliseconds;
+
+        TestAssert.True(
+            updateResult.Succeeded,
+            $"Updating 1,000 rows failed: {updateResult.ErrorMessage}");
+
+        TestAssert.Equal(
+            rowCount,
+            updateResult.SavedRecords?.Count ?? 0,
+            "The 1,000-row update did not return every saved record.");
+
+        var deletedRecords = updateResult.SavedRecords!
+            .Select(MapSavedRecord)
+            .ToArray();
+
+        var deleteStartedAt = Stopwatch.GetTimestamp();
+
+        var deleteResult = await database.Service.SaveChangesAsync(
+            database.EmployeeAId,
+            currentYear,
+            addedRecords: [],
+            changedRecords: Array.Empty<WorkOrderChangeSet>(),
+            deletedRecords: deletedRecords);
+
+        var deleteMilliseconds =
+            Stopwatch.GetElapsedTime(deleteStartedAt).TotalMilliseconds;
+
+        TestAssert.True(
+            deleteResult.Succeeded,
+            $"Deleting 1,000 rows failed: {deleteResult.ErrorMessage}");
+
+        TestAssert.Equal(
+            rowCount,
+            deleteResult.DeletedRecordIds?.Count ?? 0,
+            "The 1,000-row delete did not return every deleted Id.");
+
+        TestAssert.Equal(
+            0,
+            await database.CountWorkOrdersByNumberPrefixAsync("830"),
+            "The stress rows remained after the 1,000-row delete.");
+
+        Console.WriteLine(
+            $"       1,000-row service timings: " +
+            $"add={addMilliseconds:N1} ms, " +
+            $"update={updateMilliseconds:N1} ms, " +
+            $"delete={deleteMilliseconds:N1} ms");
+    }
+
+    private static WorkOrder MapSavedRecord(
+        WorkOrderSavedRecord saved) =>
+        new()
+        {
+            Id = saved.Id,
+            WorkOrderNumber = saved.WorkOrderNumber,
+            WorkTypeCode = saved.WorkTypeCode,
+            WorkYear = saved.WorkYear,
+            DisplayOrder = saved.DisplayOrder,
+            AssignmentDate = saved.AssignmentDate,
+            Busket = saved.Busket,
+            Status = saved.Status,
+            Notes = saved.Notes,
+            RowVersion = saved.RowVersion.ToArray()
+        };
 
     private static WorkOrder CreateNewRecord(
         int temporaryId,

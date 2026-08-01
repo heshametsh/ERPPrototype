@@ -9,6 +9,8 @@ namespace ERPPrototype.E2ETests;
 
 internal sealed class E2ETestDatabase : IAsyncDisposable
 {
+    internal const int RowsPerYear = 1_000;
+
     private const string DefaultBaseConnection =
         "Server=(localdb)\\MSSQLLocalDB;Integrated Security=true;" +
         "TrustServerCertificate=true;MultipleActiveResultSets=true;";
@@ -189,40 +191,29 @@ internal sealed class E2ETestDatabase : IAsyncDisposable
                 RoleId = employeeRole.Id
             });
 
-        const string currentYearWorkOrderNumber = "920000001";
-        const string previousYearWorkOrderNumber = "920000002";
+        var currentRows = CreateYearRows(
+            employee.Id,
+            department.Id,
+            currentYear,
+            workOrderBase: 920_000_000,
+            notePrefix: "Phase 9 current-year browser row");
 
-        dbContext.WorkOrders.AddRange(
-            new WorkOrder
-            {
-                WorkOrderNumber = currentYearWorkOrderNumber,
-                WorkTypeCode = "401",
-                WorkYear = currentYear,
-                DisplayOrder = 1_000_000_000L,
-                AssignmentDate = new DateTime(currentYear, 1, 15),
-                Busket = WorkOrderBuskets.InProgress,
-                Status = "تحت التنفيذ",
-                Notes = "Phase 9 current-year browser row",
-                DepartmentId = department.Id,
-                CreatedAt = DateTime.UtcNow,
-                CreatedBy = employee.Id
-            },
-            new WorkOrder
-            {
-                WorkOrderNumber = previousYearWorkOrderNumber,
-                WorkTypeCode = "402",
-                WorkYear = previousYear,
-                DisplayOrder = 1_000_000_000L,
-                AssignmentDate = new DateTime(previousYear, 2, 20),
-                Busket = WorkOrderBuskets.InProgress,
-                Status = "تحت التنفيذ",
-                Notes = "Phase 9 previous-year browser row",
-                DepartmentId = department.Id,
-                CreatedAt = DateTime.UtcNow,
-                CreatedBy = employee.Id
-            });
+        var previousRows = CreateYearRows(
+            employee.Id,
+            department.Id,
+            previousYear,
+            workOrderBase: 921_000_000,
+            notePrefix: "Phase 9 previous-year browser row");
 
+        dbContext.WorkOrders.AddRange(currentRows);
+        dbContext.WorkOrders.AddRange(previousRows);
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        var currentFirst = currentRows[0];
+        var currentMiddle = currentRows[RowsPerYear / 2 - 1];
+        var currentLast = currentRows[^1];
+        var previousFirst = previousRows[0];
+        var previousLast = previousRows[^1];
 
         return new E2ESeedData(
             UserName: userName,
@@ -231,8 +222,53 @@ internal sealed class E2ETestDatabase : IAsyncDisposable
             DepartmentName: departmentType.Name,
             CurrentYear: currentYear,
             PreviousYear: previousYear,
-            CurrentYearWorkOrderNumber: currentYearWorkOrderNumber,
-            PreviousYearWorkOrderNumber: previousYearWorkOrderNumber);
+            RowsPerYear: RowsPerYear,
+            CurrentYearFirstRowId: currentFirst.Id,
+            CurrentYearFirstWorkOrderNumber: currentFirst.WorkOrderNumber,
+            CurrentYearMiddleRowId: currentMiddle.Id,
+            CurrentYearMiddleWorkOrderNumber: currentMiddle.WorkOrderNumber,
+            CurrentYearLastRowId: currentLast.Id,
+            CurrentYearLastWorkOrderNumber: currentLast.WorkOrderNumber,
+            PreviousYearFirstWorkOrderNumber: previousFirst.WorkOrderNumber,
+            PreviousYearLastRowId: previousLast.Id,
+            PreviousYearLastWorkOrderNumber: previousLast.WorkOrderNumber);
+    }
+
+    private static List<WorkOrder> CreateYearRows(
+        string employeeId,
+        int departmentId,
+        int year,
+        int workOrderBase,
+        string notePrefix)
+    {
+        var workTypeCodes = new[] { "401", "402", "801", "802" };
+        var rows = new List<WorkOrder>(RowsPerYear);
+
+        for (var index = 1; index <= RowsPerYear; index++)
+        {
+            rows.Add(
+                new WorkOrder
+                {
+                    WorkOrderNumber =
+                        (workOrderBase + index).ToString("D9"),
+                    WorkTypeCode =
+                        workTypeCodes[(index - 1) % workTypeCodes.Length],
+                    WorkYear = year,
+                    DisplayOrder = index * 1_000_000_000L,
+                    AssignmentDate = new DateTime(
+                        year,
+                        ((index - 1) % 12) + 1,
+                        ((index - 1) % 28) + 1),
+                    Busket = WorkOrderBuskets.InProgress,
+                    Status = "تحت التنفيذ",
+                    Notes = $"{notePrefix} {index:D4}",
+                    DepartmentId = departmentId,
+                    CreatedAt = DateTime.UtcNow.AddTicks(index),
+                    CreatedBy = employeeId
+                });
+        }
+
+        return rows;
     }
 
     public async ValueTask DisposeAsync()
@@ -266,5 +302,13 @@ internal sealed record E2ESeedData(
     string DepartmentName,
     int CurrentYear,
     int PreviousYear,
-    string CurrentYearWorkOrderNumber,
-    string PreviousYearWorkOrderNumber);
+    int RowsPerYear,
+    int CurrentYearFirstRowId,
+    string CurrentYearFirstWorkOrderNumber,
+    int CurrentYearMiddleRowId,
+    string CurrentYearMiddleWorkOrderNumber,
+    int CurrentYearLastRowId,
+    string CurrentYearLastWorkOrderNumber,
+    string PreviousYearFirstWorkOrderNumber,
+    int PreviousYearLastRowId,
+    string PreviousYearLastWorkOrderNumber);

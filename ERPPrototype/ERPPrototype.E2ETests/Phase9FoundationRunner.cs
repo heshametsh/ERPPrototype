@@ -15,8 +15,11 @@ internal static class Phase9FoundationRunner
             Console.WriteLine(
                 "A temporary isolated SQL Server database and local web process will be used.");
             Console.WriteLine(
-                $"Browser mode: {(options.Headed ? "headed/visible" : "headless")}");
+                $"Browser mode: {GetBrowserMode(options)}");
             Console.WriteLine($"Suite: {options.Suite}");
+            Console.WriteLine(
+                $"Seed: {E2ETestDatabase.RowsPerYear:N0} rows per year, " +
+                $"{E2ETestDatabase.RowsPerYear * 2:N0} total rows");
             Console.WriteLine($"Artifacts: {artifactDirectory}");
             Console.WriteLine();
 
@@ -38,6 +41,7 @@ internal static class Phase9FoundationRunner
                 database.Seed,
                 artifactDirectory,
                 options.Headed,
+                options.Observe,
                 options.Suite);
 
             var passedChecks = await browserTest.RunAsync();
@@ -47,7 +51,7 @@ internal static class Phase9FoundationRunner
                 $"Result: {passedChecks}/{browserTest.ExpectedCheckCount} " +
                 "browser checks passed.");
             Console.WriteLine(
-                $"Phase 9.0B {options.Suite} browser suite: PASS");
+                $"Phase 9.0C {options.Suite} browser suite: PASS");
             Console.WriteLine(
                 "The temporary web process was isolated from the developer database.");
 
@@ -57,11 +61,24 @@ internal static class Phase9FoundationRunner
         {
             Console.Error.WriteLine();
             Console.Error.WriteLine(
-                "Phase 9.0B browser automation platform: FAIL");
+                "Phase 9.0C browser automation platform: FAIL");
             Console.Error.WriteLine(exception);
 
             return 1;
         }
+    }
+
+
+    private static string GetBrowserMode(E2ETestOptions options)
+    {
+        if (options.Observe)
+        {
+            return "observe/visible/slow";
+        }
+
+        return options.Headed
+            ? "headed/visible"
+            : "headless";
     }
 
     private static string FindProjectRoot()

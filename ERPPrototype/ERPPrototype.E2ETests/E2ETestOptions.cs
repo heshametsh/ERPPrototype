@@ -2,12 +2,14 @@ namespace ERPPrototype.E2ETests;
 
 internal sealed record E2ETestOptions(
     bool Headed,
+    bool Observe,
     bool KeepDatabase,
     E2ETestSuite Suite)
 {
     public static E2ETestOptions Parse(string[] args)
     {
         var headed = false;
+        var observe = false;
         var keepDatabase = false;
         var suite = E2ETestSuite.Full;
 
@@ -20,6 +22,16 @@ internal sealed record E2ETestOptions(
                     "--headed",
                     StringComparison.OrdinalIgnoreCase))
             {
+                headed = true;
+                continue;
+            }
+
+            if (string.Equals(
+                    argument,
+                    "--observe",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                observe = true;
                 headed = true;
                 continue;
             }
@@ -51,6 +63,15 @@ internal sealed record E2ETestOptions(
                 continue;
             }
 
+            if (string.Equals(
+                    argument,
+                    "--stress",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                suite = E2ETestSuite.Stress;
+                continue;
+            }
+
             if (argument.StartsWith(
                     "--suite=",
                     StringComparison.OrdinalIgnoreCase))
@@ -67,7 +88,7 @@ internal sealed record E2ETestOptions(
                 if (index + 1 >= args.Length)
                 {
                     throw new ArgumentException(
-                        "The --suite option requires Smoke or Full.");
+                        "The --suite option requires Smoke, Full, or Stress.");
                 }
 
                 suite = ParseSuite(args[++index]);
@@ -80,6 +101,7 @@ internal sealed record E2ETestOptions(
 
         return new E2ETestOptions(
             Headed: headed,
+            Observe: observe,
             KeepDatabase: keepDatabase,
             Suite: suite);
     }
@@ -95,6 +117,6 @@ internal sealed record E2ETestOptions(
         }
 
         throw new ArgumentException(
-            $"Unknown E2E suite '{value}'. Use Smoke or Full.");
+            $"Unknown E2E suite '{value}'. Use Smoke, Full, or Stress.");
     }
 }

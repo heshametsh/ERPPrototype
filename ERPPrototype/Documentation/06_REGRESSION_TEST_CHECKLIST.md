@@ -508,3 +508,12 @@ Result: 9/9 browser checks passed.
 Phase 9.0B Full browser suite: PASS
 ERPPrototype automated verification: PASS
 ```
+
+## Phase 9.0C-R2 acceptance command
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\ERPPrototype\Tools\Invoke-ERPTests.ps1 -Suite Stress -Observe
+```
+
+Required: Integration 11/11 PASS and Browser 33/33 PASS. Observe mode is visual evidence only; assertions remain identical to the normal Stress suite.
+

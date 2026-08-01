@@ -236,6 +236,18 @@ internal sealed class IntegrationTestDatabase : IAsyncDisposable
             cancellationToken);
     }
 
+    public async Task<int> CountWorkOrdersByNumberPrefixAsync(
+        string prefix,
+        CancellationToken cancellationToken = default)
+    {
+        await using var dbContext =
+            await Factory.CreateDbContextAsync(cancellationToken);
+
+        return await dbContext.WorkOrders.CountAsync(
+            item => item.WorkOrderNumber.StartsWith(prefix),
+            cancellationToken);
+    }
+
     public async Task UpdateNotesDirectlyAsync(
         int id,
         string notes,

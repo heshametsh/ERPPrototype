@@ -245,3 +245,8 @@ Phase 8 remains closed. Phase 9 is feature work plus automated protection, not a
 
 Each feature adds Integration tests for data/business rules and Browser tests for the user journey. Manual testing is limited to visual judgment and perceived Excel-like interaction.
 
+
+
+## Phase 9.0C — Current-Sheet Coverage and Stress
+
+Phase 8 remains closed. Phase 9.0C expands automation only: 1,000 rows per year, Full functional coverage for load/search/edit/save/refresh/year switching, and a separate Stress suite for 1,000-row structural insert/Undo/Redo plus a 1,000-row SQL service batch. This is product protection, not additional refactoring.

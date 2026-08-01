@@ -10,10 +10,18 @@ internal static class IntegrationTestRunner
                 "--keep-database",
                 StringComparison.OrdinalIgnoreCase));
 
+        var includeStress = args.Any(argument =>
+            string.Equals(
+                argument,
+                "--stress",
+                StringComparison.OrdinalIgnoreCase));
+
         Console.WriteLine(
             "ERPPrototype WorkOrder SQL Server integration tests");
         Console.WriteLine(
-            "A temporary isolated database will be created.\n");
+            "A temporary isolated database will be created.");
+        Console.WriteLine(
+            $"Suite: {(includeStress ? "Stress" : "Core")}\n");
 
         await using var database =
             await IntegrationTestDatabase.CreateAsync(keepDatabase);
@@ -23,7 +31,7 @@ internal static class IntegrationTestRunner
         var planTests = new WorkOrderSavePlanBuilderTests();
         var integrationTests = new WorkOrderSaveIntegrationTests(database);
 
-        var cases = new (string Name, Func<Task> Execute)[]
+        var cases = new List<(string Name, Func<Task> Execute)>
         {
             (
                 "Save plan normalizes editable fields",
@@ -57,6 +65,14 @@ internal static class IntegrationTestRunner
                 integrationTests.DatabaseFailureRollsBackWholeSaveAsync)
         };
 
+        if (includeStress)
+        {
+            cases.Add(
+                (
+                    "1,000-row add, update, and delete batch remains consistent",
+                    integrationTests.LargeBatchOf1000RowsSupportsAddUpdateDeleteAsync));
+        }
+
         var failures = new List<(string Name, Exception Error)>();
 
         foreach (var testCase in cases)
@@ -76,17 +92,22 @@ internal static class IntegrationTestRunner
 
         Console.WriteLine();
         Console.WriteLine(
-            $"Result: {cases.Length - failures.Count}/{cases.Length} passed.");
+            $"Result: {cases.Count - failures.Count}/{cases.Count} passed.");
 
         if (failures.Count == 0)
         {
             Console.WriteLine(
-                "Phase 8.8-R2 automated save safety net: PASS");
+                includeStress
+                    ? "Phase 9.0C SQL Server stress safety net: PASS"
+                    : "Phase 8.8-R2 automated save safety net: PASS");
+
             return 0;
         }
 
         Console.WriteLine(
-            "Phase 8.8-R2 automated save safety net: FAIL");
+            includeStress
+                ? "Phase 9.0C SQL Server stress safety net: FAIL"
+                : "Phase 8.8-R2 automated save safety net: FAIL");
 
         foreach (var failure in failures)
         {
