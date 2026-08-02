@@ -130,7 +130,7 @@ internal sealed class Phase9FoundationBrowserTest(
                 "The initial all-open dataset did not match the year total.");
 
             E2ETestAssert.Contains(
-                "Work Orders",
+			"Open Work Orders",
                 await workOrdersPage.GetSummaryItemTextAsync(
                     "work-orders-summary-count"),
                 "The header did not render the Work Orders summary.");

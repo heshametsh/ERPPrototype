@@ -448,7 +448,7 @@
 
             fragment.appendChild(
                 this.buildAggregateItem(
-                    "Work Orders",
+                    "Open Work Orders",
                     this.formatAggregateCount(
                         snapshot.open.rowCount
                     ),
