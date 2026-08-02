@@ -105,9 +105,9 @@ if ($KeepDatabase) {
 Invoke-DotNetStep -Title "Running the $Suite browser suite" -Arguments $browserArguments
 
 $expectedBrowserChecks = switch ($Suite) {
-    'Smoke' { 9 }
-    'Full' { 46 }
-    'Stress' { 53 }
+    'Smoke' { 10 }
+    'Full' { 47 }
+    'Stress' { 54 }
 }
 
 $integrationSummary = if ($SkipIntegration) {

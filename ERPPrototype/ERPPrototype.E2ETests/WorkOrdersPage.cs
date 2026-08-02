@@ -21,6 +21,8 @@ internal sealed class WorkOrdersPage(IPage page)
     private ILocator Status => page.GetByTestId("work-orders-status");
     private ILocator ValidationPanel => page.GetByTestId("work-orders-validation");
     private ILocator Summary => page.GetByTestId("work-orders-summary");
+    private ILocator BasketDashboard =>
+        page.GetByTestId("work-orders-basket-dashboard");
     private ILocator SelectionSummary =>
         page.GetByTestId("work-orders-selection-summary");
 
@@ -939,6 +941,117 @@ internal sealed class WorkOrdersPage(IPage page)
         ).Trim();
     }
 
+    public async Task WaitForBasketDashboardReadyAsync(
+        int timeoutMs = NormalTimeoutMs)
+    {
+        await BasketDashboard.WaitForAsync(
+            new LocatorWaitForOptions
+            {
+                State = WaitForSelectorState.Visible,
+                Timeout = timeoutMs
+            });
+
+        await page.WaitForFunctionAsync(
+            """
+            tableId => {
+                const dashboard = document.getElementById(
+                    `${tableId}-basket-dashboard`
+                );
+
+                return Boolean(
+                    dashboard?.dataset?.dashboardReady === 'true' &&
+                    window.tabulatorTest
+                        ?.getBasketDashboardSnapshot?.(tableId)
+                );
+            }
+            """,
+            TableId,
+            new PageWaitForFunctionOptions
+            {
+                Timeout = timeoutMs
+            });
+    }
+
+    public async Task<int> GetBasketDashboardCardCountAsync()
+    {
+        return await BasketDashboard
+            .Locator("[data-testid='work-orders-basket-card']")
+            .CountAsync();
+    }
+
+    public async Task<BasketDashboardEntrySnapshot>
+        GetBasketDashboardEntryAsync(string basket)
+    {
+        var values = await page.EvaluateAsync<long[]>(
+            """
+            args => {
+                const snapshot = window.tabulatorTest
+                    ?.getBasketDashboardSnapshot?.(args.tableId);
+                const entry = snapshot?.baskets?.find(
+                    item => item.basket === args.basket
+                );
+
+                return entry
+                    ? [
+                        Number(entry.rowCount ?? 0),
+                        Number(entry.remainingAmountCents ?? 0)
+                    ]
+                    : [-1, -1];
+            }
+            """,
+            new
+            {
+                tableId = TableId,
+                basket
+            });
+
+        return new BasketDashboardEntrySnapshot(
+            RowCount: checked((int)values[0]),
+            RemainingAmountCents: values[1]);
+    }
+
+    public async Task WaitForBasketDashboardEntryAsync(
+        string basket,
+        int expectedRowCount,
+        long expectedRemainingAmountCents,
+        int timeoutMs = NormalTimeoutMs)
+    {
+        await page.WaitForFunctionAsync(
+            """
+            args => {
+                const snapshot = window.tabulatorTest
+                    ?.getBasketDashboardSnapshot?.(args.tableId);
+                const entry = snapshot?.baskets?.find(
+                    item => item.basket === args.basket
+                );
+
+                return Boolean(
+                    entry &&
+                    Number(entry.rowCount ?? -1) ===
+                        args.expectedRowCount &&
+                    Number(entry.remainingAmountCents ?? -1) ===
+                        args.expectedRemainingAmountCents
+                );
+            }
+            """,
+            new
+            {
+                tableId = TableId,
+                basket,
+                expectedRowCount,
+                expectedRemainingAmountCents
+            },
+            new PageWaitForFunctionOptions
+            {
+                Timeout = timeoutMs
+            });
+    }
+
+    public async Task<string> GetBasketDashboardTextAsync()
+    {
+        return (await BasketDashboard.InnerTextAsync()).Trim();
+    }
+
     public async Task<string[]> GetValueFilterOptionsAsync(
         string field)
     {
@@ -1372,15 +1485,47 @@ internal sealed class WorkOrdersPage(IPage page)
     private async Task<ILocator> OpenValueFilterPopupAsync(
         string field)
     {
-        var headerButton = Grid.Locator(
-            $".tabulator-col[tabulator-field='{field}'] " +
-            ".tabulator-header-popup-button");
+        var opened = await page.EvaluateAsync<bool>(
+            """
+            args => {
+                const api = window.tabulatorTest;
+                const table = api?.tables?.[args.tableId];
+                const button = table
+                    ?.getColumn?.(args.field)
+                    ?.getElement?.()
+                    ?.querySelector(
+                        '.tabulator-header-popup-button');
 
-        await headerButton.ClickAsync(
-            new LocatorClickOptions
+                if (!button) {
+                    return false;
+                }
+
+                /*
+                 * Dispatch from the page instead of Playwright ClickAsync.
+                 * Browser auto-scroll on a header-only element can move the
+                 * header independently from the Tabulator body while the
+                 * popup is being mounted.
+                 */
+                button.dispatchEvent(
+                    new MouseEvent('click', {
+                        bubbles: true,
+                        cancelable: true,
+                        view: window
+                    })
+                );
+
+                return true;
+            }
+            """,
+            new
             {
-                Force = true
+                tableId = TableId,
+                field
             });
+
+        E2ETestAssert.True(
+            opened,
+            $"Value filter header button '{field}' was not found.");
 
         var popup = page.Locator(
             $".excel-filter-popup[data-filter-field='{field}']" +
@@ -1392,6 +1537,15 @@ internal sealed class WorkOrdersPage(IPage page)
                 State = WaitForSelectorState.Visible,
                 Timeout = NormalTimeoutMs
             });
+
+        await popup
+            .Locator("[data-filter-role=\"search\"]")
+            .WaitForAsync(
+                new LocatorWaitForOptions
+                {
+                    State = WaitForSelectorState.Visible,
+                    Timeout = NormalTimeoutMs
+                });
 
         return popup;
     }
@@ -1858,6 +2012,10 @@ internal sealed class WorkOrdersPage(IPage page)
         return Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds;
     }
 }
+
+internal sealed record BasketDashboardEntrySnapshot(
+    int RowCount,
+    long RemainingAmountCents);
 
 internal sealed record BrowserStructureStressMetrics(
     int ExistingRows,

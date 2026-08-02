@@ -247,6 +247,7 @@
                     elementId,
                     rowData
                 ),
+                basket: String(rowData?.basket ?? "").trim(),
                 amounts: this.captureAggregateRowAmounts(
                     elementId,
                     rowData
@@ -296,6 +297,13 @@
                     elementId,
                     row.getData()
                 );
+
+            this.applyBasketDashboardRowDelta?.(
+                elementId,
+                beforeState,
+                afterState
+            );
+
             const definitions =
                 this.getAggregateAmountFields(elementId);
             const beforeIncluded = beforeState.included === true;
@@ -570,6 +578,11 @@
                 elementId,
                 snapshot
             );
+            this.refreshBasketDashboard?.(
+                elementId,
+                yearRows,
+                snapshot.reason
+            );
 
             this.recordPerformanceStage?.(
                 elementId,
@@ -809,7 +822,7 @@
             if (overview) {
                 overview.replaceChildren(
                     this.buildAggregateItem(
-                        "Work Orders",
+                        "Open Work Orders",
                         "Calculating...",
                         "work-orders-summary-count"
                     )
@@ -822,6 +835,8 @@
                 selection.replaceChildren();
                 selection.dataset.aggregateReady = "false";
             }
+
+            this.resetBasketDashboardUi?.(elementId);
         },
 
         getAggregateSnapshot: function (elementId) {

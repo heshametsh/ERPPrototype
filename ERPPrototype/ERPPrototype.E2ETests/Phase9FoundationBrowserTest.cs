@@ -16,9 +16,9 @@ internal sealed class Phase9FoundationBrowserTest(
 
     public int ExpectedCheckCount => suite switch
     {
-        E2ETestSuite.Smoke => 9,
-        E2ETestSuite.Full => 46,
-        E2ETestSuite.Stress => 53,
+        E2ETestSuite.Smoke => 10,
+        E2ETestSuite.Full => 47,
+        E2ETestSuite.Stress => 54,
         _ => throw new ArgumentOutOfRangeException(nameof(suite))
     };
 
@@ -130,10 +130,10 @@ internal sealed class Phase9FoundationBrowserTest(
                 "The initial all-open dataset did not match the year total.");
 
             E2ETestAssert.Contains(
-			"Open Work Orders",
+                "Open Work Orders",
                 await workOrdersPage.GetSummaryItemTextAsync(
                     "work-orders-summary-count"),
-                "The header did not render the Work Orders summary.");
+                "The header did not render the Open Work Orders summary.");
             E2ETestAssert.Contains(
                 "Work Order Value",
                 await workOrdersPage.GetSummaryItemTextAsync(
@@ -149,6 +149,49 @@ internal sealed class Phase9FoundationBrowserTest(
                 await workOrdersPage.GetSummaryItemTextAsync(
                     "work-orders-summary-remainingAmount"),
                 "The header did not render Remaining Amount.");
+
+            await workOrdersPage.WaitForBasketDashboardReadyAsync();
+
+            E2ETestAssert.Equal(
+                ERPPrototype.Data.WorkOrderBuskets.All.Count,
+                await workOrdersPage.GetBasketDashboardCardCountAsync(),
+                "The Basket dashboard did not render every workflow stage.");
+
+            var initialInProgressDashboard =
+                await workOrdersPage.GetBasketDashboardEntryAsync(
+                    ERPPrototype.Data.WorkOrderBuskets.InProgress);
+            var initialCompletedDashboard =
+                await workOrdersPage.GetBasketDashboardEntryAsync(
+                    ERPPrototype.Data.WorkOrderBuskets.WorkOrderCompleted);
+
+            E2ETestAssert.Equal(
+                seed.RowsPerYear,
+                initialInProgressDashboard.RowCount,
+                "The Basket dashboard did not count the seeded In Progress rows.");
+            E2ETestAssert.Equal(
+                initialOpenRemainingAmountCents,
+                initialInProgressDashboard.RemainingAmountCents,
+                "The Basket dashboard did not total Remaining Amount.");
+            E2ETestAssert.Equal(
+                0,
+                initialCompletedDashboard.RowCount,
+                "The completed Basket should start empty in the test dataset.");
+
+            var dashboardText =
+                await workOrdersPage.GetBasketDashboardTextAsync();
+
+            E2ETestAssert.Contains(
+                "Remaining Amount",
+                dashboardText,
+                "The Basket dashboard did not label Remaining Amount.");
+            E2ETestAssert.True(
+                !dashboardText.Contains(
+                    "Work Order Value",
+                    StringComparison.Ordinal),
+                "The Basket dashboard must not display Work Order Value.");
+
+            checks.Pass(
+                "Basket dashboard shows every workflow stage with order count and Remaining Amount");
 
             var firstRowWorkOrderValueCents = ParseAmountCents(
                 await workOrdersPage.GetCellValueAsync(
@@ -185,6 +228,15 @@ internal sealed class Phase9FoundationBrowserTest(
                 "remainingAmount",
                 initialOpenRemainingAmountCents -
                 firstRowRemainingAmountCents);
+            await workOrdersPage.WaitForBasketDashboardEntryAsync(
+                ERPPrototype.Data.WorkOrderBuskets.InProgress,
+                seed.RowsPerYear - 1,
+                initialOpenRemainingAmountCents -
+                firstRowRemainingAmountCents);
+            await workOrdersPage.WaitForBasketDashboardEntryAsync(
+                ERPPrototype.Data.WorkOrderBuskets.WorkOrderCompleted,
+                1,
+                firstRowRemainingAmountCents);
 
             E2ETestAssert.Equal(
                 seed.RowsPerYear,
@@ -207,6 +259,14 @@ internal sealed class Phase9FoundationBrowserTest(
                 "open",
                 "remainingAmount",
                 initialOpenRemainingAmountCents);
+            await workOrdersPage.WaitForBasketDashboardEntryAsync(
+                ERPPrototype.Data.WorkOrderBuskets.InProgress,
+                seed.RowsPerYear,
+                initialOpenRemainingAmountCents);
+            await workOrdersPage.WaitForBasketDashboardEntryAsync(
+                ERPPrototype.Data.WorkOrderBuskets.WorkOrderCompleted,
+                0,
+                0);
             await workOrdersPage.WaitForDirtyRowCountAsync(0);
 
             checks.Pass(
@@ -307,6 +367,19 @@ internal sealed class Phase9FoundationBrowserTest(
                         "open",
                         "workOrderValue"),
                     "Search changed the fixed open Work Order Value total.");
+
+                var filteredDashboard =
+                    await workOrdersPage.GetBasketDashboardEntryAsync(
+                        ERPPrototype.Data.WorkOrderBuskets.InProgress);
+
+                E2ETestAssert.Equal(
+                    seed.RowsPerYear,
+                    filteredDashboard.RowCount,
+                    "Search changed the fixed Basket dashboard count.");
+                E2ETestAssert.Equal(
+                    initialOpenRemainingAmountCents,
+                    filteredDashboard.RemainingAmountCents,
+                    "Search changed the fixed Basket dashboard Remaining Amount.");
 
                 await workOrdersPage.ClearSearchAsync(seed.RowsPerYear);
 
