@@ -1012,6 +1012,43 @@ internal sealed class WorkOrdersPage(IPage page)
             });
     }
 
+    public async Task<string> GetHeaderControlSnapshotAsync(
+        params string[] fields)
+    {
+        return await page.EvaluateAsync<string>(
+            """
+            args => {
+                const api = window.tabulatorTest;
+                const table = api?.tables?.[args.tableId];
+
+                if (!table) {
+                    return '';
+                }
+
+                return args.fields.map(field => {
+                    const element = table
+                        .getColumn(field)
+                        ?.getElement?.();
+
+                    return [
+                        field,
+                        element?.querySelectorAll(
+                            '.tabulator-header-popup-button'
+                        ).length ?? -1,
+                        element?.querySelectorAll(
+                            '.tabulator-col-sorter-element'
+                        ).length ?? -1
+                    ].join(':');
+                }).join('|');
+            }
+            """,
+            new
+            {
+                tableId = TableId,
+                fields
+            });
+    }
+
     public async Task SortFinancialColumnAsync(
         string field,
         string direction)

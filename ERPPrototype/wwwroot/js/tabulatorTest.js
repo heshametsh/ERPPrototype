@@ -305,25 +305,6 @@ window.tabulatorTest = {
                     hozAlign: "right",
                     headerHozAlign: "left",
 
-                    headerPopupIcon:
-                        window.tabulatorFilters.icon(
-                            "Filter Work Order Value"
-                        ),
-
-                    headerPopup: function (
-                        event,
-                        column,
-                        onRendered
-                    ) {
-                        return window.tabulatorFilters
-                            .createAmountPopup(
-                                window.tabulatorTest,
-                                elementId,
-                                column,
-                                onRendered,
-                                "workOrderValue"
-                            );
-                    }
                 },
                 {
                     title: "Partial Amount",
@@ -346,25 +327,6 @@ window.tabulatorTest = {
                     hozAlign: "right",
                     headerHozAlign: "left",
 
-                    headerPopupIcon:
-                        window.tabulatorFilters.icon(
-                            "Filter Partial Amount"
-                        ),
-
-                    headerPopup: function (
-                        event,
-                        column,
-                        onRendered
-                    ) {
-                        return window.tabulatorFilters
-                            .createAmountPopup(
-                                window.tabulatorTest,
-                                elementId,
-                                column,
-                                onRendered,
-                                "partialAmount"
-                            );
-                    }
                 },
                 {
                     title: "Remaining Amount",
@@ -381,25 +343,6 @@ window.tabulatorTest = {
                     hozAlign: "right",
                     headerHozAlign: "left",
 
-                    headerPopupIcon:
-                        window.tabulatorFilters.icon(
-                            "Filter Remaining Amount"
-                        ),
-
-                    headerPopup: function (
-                        event,
-                        column,
-                        onRendered
-                    ) {
-                        return window.tabulatorFilters
-                            .createAmountPopup(
-                                window.tabulatorTest,
-                                elementId,
-                                column,
-                                onRendered,
-                                "remainingAmount"
-                            );
-                    }
                 },
                 {
                     title: "Basket",

@@ -183,21 +183,67 @@
 /* =========================
    OPEN WORK-ORDER SUMMARY
    Replaces the old instruction bar and remains independent from filters.
+   Dynamic items are created by JavaScript, so ::deep is required for
+   Blazor CSS isolation to style them.
    ========================= */
 
 .work-orders-open-summary {
     display: grid;
-    grid-template-columns: repeat(4, minmax(135px, 1fr));
-    gap: 8px;
-    min-height: 64px;
+    grid-template-columns: minmax(170px, 0.8fr) repeat(3, minmax(220px, 1fr));
+    gap: 10px;
+    min-height: 82px;
     margin-bottom: 16px;
-    padding: 8px;
-    border: 1px solid #c9dfef;
+    padding: 10px;
+    border: 1px solid #c8ddec;
     border-left: 4px solid var(--uds-blue-600);
-    border-radius: 8px;
-    background: linear-gradient(90deg, #f8fbfd 0%, #eef7fc 100%);
+    border-radius: 10px;
+    background: linear-gradient(90deg, #f6fbfe 0%, #edf7fc 100%);
     direction: ltr;
-    box-shadow: 0 5px 14px rgba(18, 50, 77, 0.035);
+    box-shadow: 0 6px 18px rgba(18, 50, 77, 0.05);
+}
+
+.work-orders-open-summary ::deep .work-orders-summary-item {
+    display: flex;
+    min-width: 0;
+    min-height: 60px;
+    padding: 10px 14px;
+    flex-direction: column;
+    justify-content: center;
+    gap: 5px;
+    border: 1px solid #d7e4ed;
+    border-top: 3px solid #74b7dc;
+    border-radius: 9px;
+    background: rgba(255, 255, 255, 0.94);
+    box-shadow: 0 3px 10px rgba(15, 42, 70, 0.045);
+}
+
+.work-orders-open-summary ::deep .work-orders-summary-item:first-child {
+    border-top-color: var(--uds-blue-600);
+    background: #ffffff;
+}
+
+.work-orders-open-summary ::deep .work-orders-summary-label {
+    display: block;
+    overflow: hidden;
+    color: #60788b;
+    font-size: 0.74rem;
+    font-weight: 750;
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.work-orders-open-summary ::deep .work-orders-summary-value {
+    display: block;
+    overflow: hidden;
+    color: #102d45;
+    font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+    font-size: 1.06rem;
+    font-variant-numeric: tabular-nums;
+    font-weight: 850;
+    line-height: 1.25;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 /* =========================
@@ -344,6 +390,12 @@
 /* =========================
    RESPONSIVE
    ========================= */
+
+@media (max-width: 1180px) {
+    .work-orders-open-summary {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
 
 @media (max-width: 800px) {
     .tabulator-workorders-page {

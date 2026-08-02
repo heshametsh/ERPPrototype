@@ -331,108 +331,19 @@ internal sealed class Phase9FoundationBrowserTest(
                 checks.Pass(
                     "Search changes visible rows while the open-work-order header remains fixed");
 
-                const long minimumFilteredValueCents = 6_000_050;
-                const long maximumFilteredValueCents = 6_500_075;
-
-                await workOrdersPage.ApplyAmountFilterAsync(
-                    "workOrderValue",
-                    "60,000.50",
-                    "٦٥٬٠٠٠٫٧٥",
-                    includeBlank: false,
-                    expectedRowCount: 6);
-
-                var rangeFilteredAmounts =
-                    await workOrdersPage.GetActiveAmountCentsAsync(
-                        "workOrderValue");
-
                 E2ETestAssert.Equal(
-                    6,
-                    rangeFilteredAmounts.Length,
-                    "The Work Order Value range filter did not return the expected six rows.");
-
-                E2ETestAssert.True(
-                    rangeFilteredAmounts.All(value =>
-                        value >= minimumFilteredValueCents &&
-                        value <= maximumFilteredValueCents),
-                    "The Work Order Value range filter returned a value outside its inclusive bounds.");
-
-                await workOrdersPage.WaitForAggregateRowCountAsync(
-                    "visible",
-                    6);
-
-                E2ETestAssert.Equal(
-                    rangeFilteredAmounts.Sum(),
-                    await workOrdersPage.GetAggregateAmountCentsAsync(
-                        "visible",
-                        "workOrderValue"),
-                    "The visible Work Order Value total did not match the numeric range-filtered rows.");
-
-                E2ETestAssert.Equal(
-                    initialYearWorkOrderValueCents,
-                    await workOrdersPage.GetAggregateAmountCentsAsync(
-                        "year",
-                        "workOrderValue"),
-                    "The amount range filter changed the fixed year total.");
-                E2ETestAssert.Equal(
-                    seed.RowsPerYear,
-                    await workOrdersPage.GetAggregateRowCountAsync("open"),
-                    "The amount filter changed the fixed open-work-order count.");
-                E2ETestAssert.Equal(
-                    initialOpenWorkOrderValueCents,
-                    await workOrdersPage.GetAggregateAmountCentsAsync(
-                        "open",
-                        "workOrderValue"),
-                    "The amount filter changed the fixed open Work Order Value total.");
+                    "workOrderValue:0:1|partialAmount:0:1|" +
+                    "remainingAmount:0:1",
+                    await workOrdersPage.GetHeaderControlSnapshotAsync(
+                        "workOrderValue",
+                        "partialAmount",
+                        "remainingAmount"),
+                    "Financial headers must expose sort controls without filter buttons.");
 
                 checks.Pass(
-                    "Financial amount range filter accepts formatted Arabic/English values and uses inclusive bounds");
+                    "Financial columns show numeric sorting without filter icons");
                 await browserSession.ObserveAsync(
-                    "تم فلترة قيمة أمر العمل من 60,000.50 إلى 65,000.75 وظهر 6 أوامر فقط");
-
-                await workOrdersPage.ClearAmountFilterAsync(
-                    "workOrderValue",
-                    seed.RowsPerYear);
-
-                await workOrdersPage.WaitForAggregateRowCountAsync(
-                    "visible",
-                    seed.RowsPerYear);
-
-                E2ETestAssert.Equal(
-                    initialYearWorkOrderValueCents,
-                    await workOrdersPage.GetAggregateAmountCentsAsync(
-                        "visible",
-                        "workOrderValue"),
-                    "Clearing the Work Order Value filter did not restore the complete visible total.");
-
-                checks.Pass(
-                    "Clearing a financial range filter restores every current-year work order and visible total");
-
-                await workOrdersPage.ApplyAmountFilterAsync(
-                    "partialAmount",
-                    string.Empty,
-                    string.Empty,
-                    includeBlank: false,
-                    expectedRowCount: seed.RowsPerYear / 3);
-
-                var nonBlankPartialAmounts =
-                    await workOrdersPage.GetActiveAmountCentsAsync(
-                        "partialAmount");
-
-                E2ETestAssert.Equal(
-                    seed.RowsPerYear / 3,
-                    nonBlankPartialAmounts.Length,
-                    "The Partial Amount nonblank filter did not return every paid row.");
-
-                E2ETestAssert.True(
-                    nonBlankPartialAmounts.All(value => value > 0),
-                    "The Partial Amount nonblank filter returned a blank or non-positive value.");
-
-                await workOrdersPage.ClearAmountFilterAsync(
-                    "partialAmount",
-                    seed.RowsPerYear);
-
-                checks.Pass(
-                    "Financial filters can exclude blank Partial Amount rows and clear back to the full year");
+                    "أعمدة المبالغ فيها ترتيب رقمي فقط بدون فلتر");
 
                 await workOrdersPage.SortFinancialColumnAsync(
                     "workOrderValue",
@@ -463,7 +374,7 @@ internal sealed class Phase9FoundationBrowserTest(
                     "Ascending financial sort did not remain a single-column sort.");
 
                 checks.Pass(
-                    "Work Order Value sorts numerically ascending through the column header using one sorter");
+                    "Work Order Value sorts numerically ascending through its dedicated sort icon");
 
                 await workOrdersPage.SortFinancialColumnAsync(
                     "workOrderValue",
@@ -500,15 +411,83 @@ internal sealed class Phase9FoundationBrowserTest(
                     await workOrdersPage.GetSorterSnapshotAsync(),
                     "Descending financial sort did not replace the previous direction as one-column sort.");
 
+                checks.Pass(
+                    "Descending Work Order Value sort moves complete rows and replaces the previous direction");
+
+                var partialAmounts =
+                    await workOrdersPage.GetActiveAmountCentsAsync(
+                        "partialAmount");
+                var maximumPartialAmount = partialAmounts.Max();
+
+                await workOrdersPage.SortFinancialColumnAsync(
+                    "partialAmount",
+                    "desc");
+
+                var descendingPartialAmounts =
+                    await workOrdersPage.GetActiveAmountCentsAsync(
+                        "partialAmount");
+                var firstPartialRow =
+                    await workOrdersPage.GetFirstActiveFinancialRowAsync(
+                        "partialAmount");
+
+                E2ETestAssert.True(
+                    descendingPartialAmounts
+                        .Zip(descendingPartialAmounts.Skip(1))
+                        .All(pair => pair.First >= pair.Second),
+                    "Partial Amount descending sort was not numeric.");
+                E2ETestAssert.True(
+                    firstPartialRow.EndsWith(
+                        $"|{maximumPartialAmount}",
+                        StringComparison.Ordinal),
+                    "Partial Amount descending sort did not place the maximum paid amount first.");
+                E2ETestAssert.Equal(
+                    "1|partialAmount|desc",
+                    await workOrdersPage.GetSorterSnapshotAsync(),
+                    "Partial Amount did not replace the previous financial sorter.");
+
+                checks.Pass(
+                    "Partial Amount sorts numerically and keeps blank values outside the paid sequence");
+
+                var remainingAmounts =
+                    await workOrdersPage.GetActiveAmountCentsAsync(
+                        "remainingAmount");
+                var maximumRemainingAmount = remainingAmounts.Max();
+
+                await workOrdersPage.SortFinancialColumnAsync(
+                    "remainingAmount",
+                    "desc");
+
+                var descendingRemainingAmounts =
+                    await workOrdersPage.GetActiveAmountCentsAsync(
+                        "remainingAmount");
+                var firstRemainingRow =
+                    await workOrdersPage.GetFirstActiveFinancialRowAsync(
+                        "remainingAmount");
+
+                E2ETestAssert.True(
+                    descendingRemainingAmounts
+                        .Zip(descendingRemainingAmounts.Skip(1))
+                        .All(pair => pair.First >= pair.Second),
+                    "Remaining Amount descending sort was not numeric.");
+                E2ETestAssert.True(
+                    firstRemainingRow.EndsWith(
+                        $"|{maximumRemainingAmount}",
+                        StringComparison.Ordinal),
+                    "Remaining Amount descending sort did not place the maximum remaining amount first.");
+                E2ETestAssert.Equal(
+                    "1|remainingAmount|desc",
+                    await workOrdersPage.GetSorterSnapshotAsync(),
+                    "Remaining Amount did not remain a single-column sort.");
+
                 await workOrdersPage.ClearSortAsync();
 
                 checks.Pass(
-                    "Descending financial sort moves complete rows and replaces the previous sort direction");
+                    "Remaining Amount sorts numerically and the sheet returns to its natural order");
                 await browserSession.ObserveAsync(
-                    "تم ترتيب قيمة أمر العمل تصاعدي ثم تنازلي وتحرك الصف كاملًا");
+                    "تم اختبار ترتيب أعمدة القيمة والجزئي والمتبقي وتحرك الصف كاملًا");
 
                 const string persistedNote =
-                    "Phase 9.1D1 browser save persisted under 1,000-row load";
+                    "Phase 9.1D2 browser save persisted under 1,000-row load";
 
                 var editSaveReloadStartedAt = Stopwatch.GetTimestamp();
 
