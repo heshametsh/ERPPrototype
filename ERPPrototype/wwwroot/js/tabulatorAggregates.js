@@ -448,7 +448,7 @@
 
             fragment.appendChild(
                 this.buildAggregateItem(
-                    "Open Work Orders",
+                    "Work Orders",
                     this.formatAggregateCount(
                         snapshot.open.rowCount
                     ),
@@ -462,7 +462,7 @@
 
                 fragment.appendChild(
                     this.buildAggregateItem(
-                        `Open ${definition.label}`,
+                        definition.label,
                         this.formatAmountCents(openCents),
                         `work-orders-summary-${definition.field}`
                     )
@@ -809,7 +809,7 @@
             if (overview) {
                 overview.replaceChildren(
                     this.buildAggregateItem(
-                        "Open Work Orders",
+                        "Work Orders",
                         "Calculating...",
                         "work-orders-summary-count"
                     )

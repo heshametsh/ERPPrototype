@@ -130,25 +130,25 @@ internal sealed class Phase9FoundationBrowserTest(
                 "The initial all-open dataset did not match the year total.");
 
             E2ETestAssert.Contains(
-                "Open Work Orders",
+                "Work Orders",
                 await workOrdersPage.GetSummaryItemTextAsync(
                     "work-orders-summary-count"),
-                "The header did not render the Open Work Orders summary.");
+                "The header did not render the Work Orders summary.");
             E2ETestAssert.Contains(
-                "Open Work Order Value",
+                "Work Order Value",
                 await workOrdersPage.GetSummaryItemTextAsync(
                     "work-orders-summary-workOrderValue"),
-                "The header did not render Open Work Order Value.");
+                "The header did not render Work Order Value.");
             E2ETestAssert.Contains(
-                "Open Partial Amount",
+                "Partial Amount",
                 await workOrdersPage.GetSummaryItemTextAsync(
                     "work-orders-summary-partialAmount"),
-                "The header did not render Open Partial Amount.");
+                "The header did not render Partial Amount.");
             E2ETestAssert.Contains(
-                "Open Remaining Amount",
+                "Remaining Amount",
                 await workOrdersPage.GetSummaryItemTextAsync(
                     "work-orders-summary-remainingAmount"),
-                "The header did not render Open Remaining Amount.");
+                "The header did not render Remaining Amount.");
 
             var firstRowWorkOrderValueCents = ParseAmountCents(
                 await workOrdersPage.GetCellValueAsync(
@@ -721,7 +721,7 @@ internal sealed class Phase9FoundationBrowserTest(
                     "The selected-row summary did not show 20 unique work orders.");
 
                 checks.Pass(
-                    "Selecting 20 rows shows unique work-order count and financial totals");
+                    "Selecting 20 rows shows a visible status bar with unique work-order count and financial totals");
                 await browserSession.ObserveAsync(
                     "تم تحديد 20 صف — ظهر عدد الأوامر ومجموع القيم المحددة");
 

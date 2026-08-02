@@ -1367,7 +1367,7 @@ internal sealed class WorkOrdersPage(IPage page)
                     `${args.tableId}-summary-selection`
                 );
 
-                return Boolean(
+                const isExpectedState = Boolean(
                     snapshot?.selection?.rowCount ===
                         args.expectedRowCount &&
                     (
@@ -1375,6 +1375,21 @@ internal sealed class WorkOrdersPage(IPage page)
                             ? selection?.hidden === true
                             : selection?.hidden === false
                     )
+                );
+
+                if (!isExpectedState || args.expectedRowCount === 0) {
+                    return isExpectedState;
+                }
+
+                const rect = selection.getBoundingClientRect();
+
+                return Boolean(
+                    rect.width > 0 &&
+                    rect.height > 0 &&
+                    rect.bottom > 0 &&
+                    rect.top < window.innerHeight &&
+                    rect.right > 0 &&
+                    rect.left < window.innerWidth
                 );
             }
             """,
