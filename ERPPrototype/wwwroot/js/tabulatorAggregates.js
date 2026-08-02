@@ -105,6 +105,69 @@
             );
         },
 
+        isOpenAggregateWorkOrderRow: function (
+            elementId,
+            rowData
+        ) {
+            if (!this.isAggregateWorkOrderRow(elementId, rowData)) {
+                return false;
+            }
+
+            const completedBasket = String(
+                this.states[elementId]?.completedBasket ?? ""
+            ).trim();
+
+            if (!completedBasket) {
+                return true;
+            }
+
+            return String(rowData?.basket ?? "").trim() !==
+                completedBasket;
+        },
+
+        calculateOpenAggregateTotals: function (
+            elementId,
+            rows
+        ) {
+            const totals =
+                this.createEmptyAggregateTotals(elementId);
+            const definitions =
+                this.getAggregateAmountFields(elementId);
+
+            for (const row of rows ?? []) {
+                const data =
+                    typeof row?.getData === "function"
+                        ? row.getData()
+                        : row;
+
+                if (!this.isOpenAggregateWorkOrderRow(
+                    elementId,
+                    data
+                )) {
+                    continue;
+                }
+
+                totals.rowCount++;
+
+                for (const definition of definitions) {
+                    const parsed = this.parseAmount(
+                        data[definition.field]
+                    );
+
+                    if (
+                        parsed.valid &&
+                        !parsed.empty &&
+                        Number.isSafeInteger(parsed.cents)
+                    ) {
+                        totals.amounts[definition.field] +=
+                            parsed.cents;
+                    }
+                }
+            }
+
+            return totals;
+        },
+
         doesFieldAffectAggregates: function (field) {
             const definition = this.getFieldDefinition?.(field);
 
@@ -180,6 +243,10 @@
                     elementId,
                     rowData
                 ),
+                openIncluded: this.isOpenAggregateWorkOrderRow(
+                    elementId,
+                    rowData
+                ),
                 amounts: this.captureAggregateRowAmounts(
                     elementId,
                     rowData
@@ -233,15 +300,29 @@
                 this.getAggregateAmountFields(elementId);
             const beforeIncluded = beforeState.included === true;
             const afterIncluded = afterState.included === true;
+            const beforeOpenIncluded =
+                beforeState.openIncluded === true;
+            const afterOpenIncluded =
+                afterState.openIncluded === true;
             const rowCountDifference =
                 Number(afterIncluded) - Number(beforeIncluded);
+            const openRowCountDifference =
+                Number(afterOpenIncluded) -
+                Number(beforeOpenIncluded);
+            const openSnapshot =
+                snapshot.open ??
+                this.createEmptyAggregateTotals(elementId);
             const nextYearAmounts = {
                 ...snapshot.year.amounts
             };
             const nextVisibleAmounts = {
                 ...snapshot.visible.amounts
             };
+            const nextOpenAmounts = {
+                ...openSnapshot.amounts
+            };
             let hasAmountDifference = false;
+            let hasOpenAmountDifference = false;
 
             for (const definition of definitions) {
                 const field = definition.field;
@@ -252,18 +333,37 @@
                     ? afterState.amounts?.[field] ?? 0
                     : 0;
                 const difference = afterAmount - beforeAmount;
+                const beforeOpenAmount = beforeOpenIncluded
+                    ? beforeState.amounts?.[field] ?? 0
+                    : 0;
+                const afterOpenAmount = afterOpenIncluded
+                    ? afterState.amounts?.[field] ?? 0
+                    : 0;
+                const openDifference =
+                    afterOpenAmount - beforeOpenAmount;
 
                 if (difference !== 0) {
                     hasAmountDifference = true;
+                }
+
+                if (openDifference !== 0) {
+                    hasOpenAmountDifference = true;
                 }
 
                 nextYearAmounts[field] =
                     (nextYearAmounts[field] ?? 0) + difference;
                 nextVisibleAmounts[field] =
                     (nextVisibleAmounts[field] ?? 0) + difference;
+                nextOpenAmounts[field] =
+                    (nextOpenAmounts[field] ?? 0) + openDifference;
             }
 
-            if (rowCountDifference === 0 && !hasAmountDifference) {
+            if (
+                rowCountDifference === 0 &&
+                openRowCountDifference === 0 &&
+                !hasAmountDifference &&
+                !hasOpenAmountDifference
+            ) {
                 return true;
             }
 
@@ -278,6 +378,12 @@
                     rowCount:
                         snapshot.visible.rowCount + rowCountDifference,
                     amounts: nextVisibleAmounts
+                },
+                open: {
+                    rowCount:
+                        openSnapshot.rowCount +
+                        openRowCountDifference,
+                    amounts: nextOpenAmounts
                 },
                 reason: "cell-edit-delta"
             };
@@ -333,37 +439,31 @@
                 `${elementId}-summary-overview`
             );
 
-            if (!container || !snapshot) {
+            if (!container || !snapshot?.open) {
                 return;
             }
 
-            const definitions =
-                this.getAggregateAmountFields(elementId);
+            const definitions = coreAmountFields;
             const fragment = document.createDocumentFragment();
 
             fragment.appendChild(
                 this.buildAggregateItem(
-                    "Work Orders (Visible / Year)",
-                    `${this.formatAggregateCount(
-                        snapshot.visible.rowCount
-                    )} / ${this.formatAggregateCount(
-                        snapshot.year.rowCount
-                    )}`,
+                    "Open Work Orders",
+                    this.formatAggregateCount(
+                        snapshot.open.rowCount
+                    ),
                     "work-orders-summary-count"
                 )
             );
 
             for (const definition of definitions) {
-                const visibleCents =
-                    snapshot.visible.amounts[definition.field] ?? 0;
-                const yearCents =
-                    snapshot.year.amounts[definition.field] ?? 0;
+                const openCents =
+                    snapshot.open.amounts[definition.field] ?? 0;
 
                 fragment.appendChild(
                     this.buildAggregateItem(
-                        `${definition.label} (Visible / Year)`,
-                        `${this.formatAmountCents(visibleCents)} / ` +
-                        `${this.formatAmountCents(yearCents)}`,
+                        `Open ${definition.label}`,
+                        this.formatAmountCents(openCents),
                         `work-orders-summary-${definition.field}`
                     )
                 );
@@ -437,6 +537,10 @@
                 elementId,
                 yearRows
             );
+            const openTotals = this.calculateOpenAggregateTotals(
+                elementId,
+                yearRows
+            );
             const hasActiveFilter =
                 this.hasActiveAggregateFilter(elementId);
             const visibleRows = hasActiveFilter
@@ -454,6 +558,7 @@
             const snapshot = {
                 year: yearTotals,
                 visible: visibleTotals,
+                open: openTotals,
                 selection:
                     state.aggregateSnapshot?.selection ??
                     this.createEmptyAggregateTotals(elementId),
@@ -473,7 +578,8 @@
                 {
                     reason: snapshot.reason,
                     yearRows: snapshot.year.rowCount,
-                    visibleRows: snapshot.visible.rowCount
+                    visibleRows: snapshot.visible.rowCount,
+                    openRows: snapshot.open.rowCount
                 }
             );
 
@@ -557,6 +663,7 @@
                 state.aggregateSnapshot ?? {
                     year: this.createEmptyAggregateTotals(elementId),
                     visible: this.createEmptyAggregateTotals(elementId),
+                    open: this.createEmptyAggregateTotals(elementId),
                     selection: this.createEmptyAggregateTotals(elementId),
                     reason: "initial"
                 };
@@ -702,7 +809,7 @@
             if (overview) {
                 overview.replaceChildren(
                     this.buildAggregateItem(
-                        "Visible Work Orders",
+                        "Open Work Orders",
                         "Calculating...",
                         "work-orders-summary-count"
                     )

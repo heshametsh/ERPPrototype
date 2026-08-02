@@ -413,8 +413,35 @@ internal sealed class WorkOrdersPage(IPage page)
                 Timeout = NormalTimeoutMs
             });
 
-        await editor.FillAsync(value);
-        await editor.PressAsync("Enter");
+        if (string.Equals(
+            field,
+            "basket",
+            StringComparison.Ordinal))
+        {
+            var option =
+                page
+                    .Locator(".tabulator-edit-list")
+                    .GetByText(
+                        value,
+                        new LocatorGetByTextOptions
+                        {
+                            Exact = true
+                        });
+
+            await option.WaitForAsync(
+                new LocatorWaitForOptions
+                {
+                    State = WaitForSelectorState.Visible,
+                    Timeout = NormalTimeoutMs
+                });
+
+            await option.ClickAsync();
+        }
+        else
+        {
+            await editor.FillAsync(value);
+            await editor.PressAsync("Enter");
+        }
 
         await page.WaitForFunctionAsync(
             """

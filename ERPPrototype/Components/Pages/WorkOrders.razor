@@ -146,9 +146,20 @@
         }
         else
         {
-            <div class="grid-instructions">
-                Select any cell, then use Insert Rows or right-click inside the sheet.
-                Insert or delete rows where needed, then press Save to store the changes in SQL Server.
+            <div class="work-orders-open-summary"
+                 id="tabulator-test-table-summary-overview"
+                 data-testid="work-orders-summary"
+                 data-aggregate-ready="false"
+                 aria-live="polite">
+                <div class="work-orders-summary-item"
+                     data-testid="work-orders-summary-count">
+                    <span class="work-orders-summary-label">
+                        Open Work Orders
+                    </span>
+                    <strong class="work-orders-summary-value">
+                        Calculating...
+                    </strong>
+                </div>
             </div>
 
             <div class="work-order-toolbar-row">
@@ -219,30 +230,12 @@
                  data-testid="work-orders-grid"></div>
         </div>
 
-        <div class="work-orders-summary-bar"
-             id="tabulator-test-table-summary"
-             data-testid="work-orders-summary"
-             aria-live="polite">
-            <div class="work-orders-summary-overview"
-                 id="tabulator-test-table-summary-overview"
-                 data-aggregate-ready="false">
-                <div class="work-orders-summary-item"
-                     data-testid="work-orders-summary-count">
-                    <span class="work-orders-summary-label">
-                        Visible Work Orders
-                    </span>
-                    <strong class="work-orders-summary-value">
-                        Calculating...
-                    </strong>
-                </div>
-            </div>
-
-            <div class="work-orders-selection-summary"
-                 id="tabulator-test-table-summary-selection"
-                 data-testid="work-orders-selection-summary"
-                 data-aggregate-ready="false"
-                 hidden>
-            </div>
+        <div class="work-orders-selection-summary work-orders-selection-summary-bar"
+             id="tabulator-test-table-summary-selection"
+             data-testid="work-orders-selection-summary"
+             data-aggregate-ready="false"
+             aria-live="polite"
+             hidden>
         </div>
     }
 

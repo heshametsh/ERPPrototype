@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json;
 
@@ -99,25 +99,118 @@ internal sealed class Phase9FoundationBrowserTest(
             await workOrdersPage.WaitForAggregateRowCountAsync(
                 "visible",
                 seed.RowsPerYear);
+            await workOrdersPage.WaitForAggregateRowCountAsync(
+                "open",
+                seed.RowsPerYear);
 
             var initialYearWorkOrderValueCents =
                 await workOrdersPage.GetAggregateAmountCentsAsync(
                     "year",
                     "workOrderValue");
+            var initialOpenWorkOrderValueCents =
+                await workOrdersPage.GetAggregateAmountCentsAsync(
+                    "open",
+                    "workOrderValue");
+            var initialOpenPartialAmountCents =
+                await workOrdersPage.GetAggregateAmountCentsAsync(
+                    "open",
+                    "partialAmount");
+            var initialOpenRemainingAmountCents =
+                await workOrdersPage.GetAggregateAmountCentsAsync(
+                    "open",
+                    "remainingAmount");
 
             E2ETestAssert.True(
-                initialYearWorkOrderValueCents > 0,
-                "The initial financial summary did not calculate Work Order Value.");
+                initialOpenWorkOrderValueCents > 0,
+                "The open-work-order summary did not calculate Work Order Value.");
 
             E2ETestAssert.Equal(
                 initialYearWorkOrderValueCents,
-                await workOrdersPage.GetAggregateAmountCentsAsync(
-                    "visible",
-                    "workOrderValue"),
-                "The unfiltered visible total did not match the year total.");
+                initialOpenWorkOrderValueCents,
+                "The initial all-open dataset did not match the year total.");
+
+            E2ETestAssert.Contains(
+                "Open Work Orders",
+                await workOrdersPage.GetSummaryItemTextAsync(
+                    "work-orders-summary-count"),
+                "The header did not render the Open Work Orders summary.");
+            E2ETestAssert.Contains(
+                "Open Work Order Value",
+                await workOrdersPage.GetSummaryItemTextAsync(
+                    "work-orders-summary-workOrderValue"),
+                "The header did not render Open Work Order Value.");
+            E2ETestAssert.Contains(
+                "Open Partial Amount",
+                await workOrdersPage.GetSummaryItemTextAsync(
+                    "work-orders-summary-partialAmount"),
+                "The header did not render Open Partial Amount.");
+            E2ETestAssert.Contains(
+                "Open Remaining Amount",
+                await workOrdersPage.GetSummaryItemTextAsync(
+                    "work-orders-summary-remainingAmount"),
+                "The header did not render Open Remaining Amount.");
+
+            var firstRowWorkOrderValueCents = ParseAmountCents(
+                await workOrdersPage.GetCellValueAsync(
+                    seed.CurrentYearFirstRowId,
+                    "workOrderValue"));
+            var firstRowPartialAmountCents = ParseAmountCents(
+                await workOrdersPage.GetCellValueAsync(
+                    seed.CurrentYearFirstRowId,
+                    "partialAmount"));
+            var firstRowRemainingAmountCents = ParseAmountCents(
+                await workOrdersPage.GetCellValueAsync(
+                    seed.CurrentYearFirstRowId,
+                    "remainingAmount"));
+
+            await workOrdersPage.SetCellValueAsync(
+                seed.CurrentYearFirstRowId,
+                "basket",
+                ERPPrototype.Data.WorkOrderBuskets.WorkOrderCompleted);
+            await workOrdersPage.WaitForAggregateRowCountAsync(
+                "open",
+                seed.RowsPerYear - 1);
+            await workOrdersPage.WaitForAggregateAmountCentsAsync(
+                "open",
+                "workOrderValue",
+                initialOpenWorkOrderValueCents -
+                firstRowWorkOrderValueCents);
+            await workOrdersPage.WaitForAggregateAmountCentsAsync(
+                "open",
+                "partialAmount",
+                initialOpenPartialAmountCents -
+                firstRowPartialAmountCents);
+            await workOrdersPage.WaitForAggregateAmountCentsAsync(
+                "open",
+                "remainingAmount",
+                initialOpenRemainingAmountCents -
+                firstRowRemainingAmountCents);
+
+            E2ETestAssert.Equal(
+                seed.RowsPerYear,
+                await workOrdersPage.GetAggregateRowCountAsync("year"),
+                "Completing one work order changed the year row count.");
+
+            await workOrdersPage.UndoAsync();
+            await workOrdersPage.WaitForAggregateRowCountAsync(
+                "open",
+                seed.RowsPerYear);
+            await workOrdersPage.WaitForAggregateAmountCentsAsync(
+                "open",
+                "workOrderValue",
+                initialOpenWorkOrderValueCents);
+            await workOrdersPage.WaitForAggregateAmountCentsAsync(
+                "open",
+                "partialAmount",
+                initialOpenPartialAmountCents);
+            await workOrdersPage.WaitForAggregateAmountCentsAsync(
+                "open",
+                "remainingAmount",
+                initialOpenRemainingAmountCents);
+            await workOrdersPage.WaitForDirtyRowCountAsync(0);
 
             checks.Pass(
-                "Financial summary loads year and visible totals without scanning rendered DOM rows");
+                "Header summary shows open count and financial totals and excludes completed work orders");
 
             var renderedRowCount =
                 await workOrdersPage.GetRenderedRowCountAsync();
@@ -204,6 +297,16 @@ internal sealed class Phase9FoundationBrowserTest(
                         "year",
                         "workOrderValue"),
                     "Filtering changed the fixed year total.");
+                E2ETestAssert.Equal(
+                    seed.RowsPerYear,
+                    await workOrdersPage.GetAggregateRowCountAsync("open"),
+                    "Search changed the fixed open-work-order count.");
+                E2ETestAssert.Equal(
+                    initialOpenWorkOrderValueCents,
+                    await workOrdersPage.GetAggregateAmountCentsAsync(
+                        "open",
+                        "workOrderValue"),
+                    "Search changed the fixed open Work Order Value total.");
 
                 await workOrdersPage.ClearSearchAsync(seed.RowsPerYear);
 
@@ -226,7 +329,7 @@ internal sealed class Phase9FoundationBrowserTest(
                     "Clearing search did not restore the visible financial total.");
 
                 checks.Pass(
-                    "Column filtering changes visible totals while preserving fixed year totals");
+                    "Search changes visible rows while the open-work-order header remains fixed");
 
                 const long minimumFilteredValueCents = 6_000_050;
                 const long maximumFilteredValueCents = 6_500_075;
@@ -270,6 +373,16 @@ internal sealed class Phase9FoundationBrowserTest(
                         "year",
                         "workOrderValue"),
                     "The amount range filter changed the fixed year total.");
+                E2ETestAssert.Equal(
+                    seed.RowsPerYear,
+                    await workOrdersPage.GetAggregateRowCountAsync("open"),
+                    "The amount filter changed the fixed open-work-order count.");
+                E2ETestAssert.Equal(
+                    initialOpenWorkOrderValueCents,
+                    await workOrdersPage.GetAggregateAmountCentsAsync(
+                        "open",
+                        "workOrderValue"),
+                    "The amount filter changed the fixed open Work Order Value total.");
 
                 checks.Pass(
                     "Financial amount range filter accepts formatted Arabic/English values and uses inclusive bounds");
@@ -395,7 +508,7 @@ internal sealed class Phase9FoundationBrowserTest(
                     "تم ترتيب قيمة أمر العمل تصاعدي ثم تنازلي وتحرك الصف كاملًا");
 
                 const string persistedNote =
-                    "Phase 9.1C browser save persisted under 1,000-row load";
+                    "Phase 9.1D1 browser save persisted under 1,000-row load";
 
                 var editSaveReloadStartedAt = Stopwatch.GetTimestamp();
 
@@ -466,15 +579,15 @@ internal sealed class Phase9FoundationBrowserTest(
                         "partialAmount"));
                 var aggregateWorkOrderValueBefore =
                     await workOrdersPage.GetAggregateAmountCentsAsync(
-                        "year",
+                        "open",
                         "workOrderValue");
                 var aggregatePartialAmountBefore =
                     await workOrdersPage.GetAggregateAmountCentsAsync(
-                        "year",
+                        "open",
                         "partialAmount");
                 var aggregateRemainingAmountBefore =
                     await workOrdersPage.GetAggregateAmountCentsAsync(
-                        "year",
+                        "open",
                         "remainingAmount");
 
                 await workOrdersPage.SetCellValueAsync(
@@ -512,26 +625,26 @@ internal sealed class Phase9FoundationBrowserTest(
                     oldWorkOrderValueCents - oldPartialAmountCents;
 
                 await workOrdersPage.WaitForAggregateAmountCentsAsync(
-                    "year",
+                    "open",
                     "workOrderValue",
                     aggregateWorkOrderValueBefore -
                     oldWorkOrderValueCents +
                     editedWorkOrderValueCents);
                 await workOrdersPage.WaitForAggregateAmountCentsAsync(
-                    "year",
+                    "open",
                     "partialAmount",
                     aggregatePartialAmountBefore -
                     oldPartialAmountCents +
                     editedPartialAmountCents);
                 await workOrdersPage.WaitForAggregateAmountCentsAsync(
-                    "year",
+                    "open",
                     "remainingAmount",
                     aggregateRemainingAmountBefore -
                     oldRemainingAmountCents +
                     editedRemainingAmountCents);
 
                 checks.Pass(
-                    "Financial summary updates before Save after edit and paste");
+                    "Open-work-order header updates before Save after edit and paste");
 
                 await workOrdersPage.UndoAsync();
                 await workOrdersPage.WaitForCellValueAsync(
@@ -543,12 +656,12 @@ internal sealed class Phase9FoundationBrowserTest(
                     "remainingAmount",
                     "1,250,000.57");
                 await workOrdersPage.WaitForAggregateAmountCentsAsync(
-                    "year",
+                    "open",
                     "partialAmount",
                     aggregatePartialAmountBefore -
                     oldPartialAmountCents);
                 await workOrdersPage.WaitForAggregateAmountCentsAsync(
-                    "year",
+                    "open",
                     "remainingAmount",
                     aggregateRemainingAmountBefore -
                     oldRemainingAmountCents +
@@ -564,13 +677,13 @@ internal sealed class Phase9FoundationBrowserTest(
                     "remainingAmount",
                     "1,000,000.31");
                 await workOrdersPage.WaitForAggregateAmountCentsAsync(
-                    "year",
+                    "open",
                     "partialAmount",
                     aggregatePartialAmountBefore -
                     oldPartialAmountCents +
                     editedPartialAmountCents);
                 await workOrdersPage.WaitForAggregateAmountCentsAsync(
-                    "year",
+                    "open",
                     "remainingAmount",
                     aggregateRemainingAmountBefore -
                     oldRemainingAmountCents +

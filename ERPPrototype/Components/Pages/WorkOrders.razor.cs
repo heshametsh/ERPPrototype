@@ -192,6 +192,7 @@ public partial class WorkOrders
                     InitializationAttempt = initializationAttempt,
                     ExpectedRows = Rows.Count,
                     SelectedWorkYear,
+                    CompletedBasket = WorkOrderBuskets.WorkOrderCompleted,
                     InitialPageOpen = !PageOpenPerformanceStagesRecorded
                 });
 

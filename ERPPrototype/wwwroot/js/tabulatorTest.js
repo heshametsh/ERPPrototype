@@ -95,6 +95,9 @@ window.tabulatorTest = {
             data,
             baskets
         );
+        state.completedBasket = String(
+            openContext?.completedBasket ?? ""
+        ).trim();
         this.states[elementId] = state;
 
         this.rebuildIdentityIndex(
