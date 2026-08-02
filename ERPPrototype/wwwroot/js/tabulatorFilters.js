@@ -17,6 +17,24 @@ window.tabulatorFilters = {
             stateKey: "basketValues",
             title: "Filter Basket",
             storageKey: "uds-basket-filter-size"
+        },
+        workOrderValue: {
+            stateKey: "workOrderValueAmount",
+            title: "Filter Work Order Value",
+            storageKey: "uds-work-order-value-filter-size",
+            type: "amount"
+        },
+        partialAmount: {
+            stateKey: "partialAmountAmount",
+            title: "Filter Partial Amount",
+            storageKey: "uds-partial-amount-filter-size",
+            type: "amount"
+        },
+        remainingAmount: {
+            stateKey: "remainingAmountAmount",
+            title: "Filter Remaining Amount",
+            storageKey: "uds-remaining-amount-filter-size",
+            type: "amount"
         }
     },
 
@@ -48,6 +66,68 @@ window.tabulatorFilters = {
         }
 
         return String(value ?? "").trim();
+    },
+
+    cloneAmountFilter: function (filter) {
+        if (!filter) {
+            return null;
+        }
+
+        return {
+            minCents:
+                Number.isSafeInteger(filter.minCents)
+                    ? filter.minCents
+                    : null,
+            maxCents:
+                Number.isSafeInteger(filter.maxCents)
+                    ? filter.maxCents
+                    : null,
+            includeBlank: filter.includeBlank === true
+        };
+    },
+
+    isAmountFilterActive: function (filter) {
+        if (!filter) {
+            return false;
+        }
+
+        return (
+            Number.isSafeInteger(filter.minCents) ||
+            Number.isSafeInteger(filter.maxCents) ||
+            filter.includeBlank === false
+        );
+    },
+
+    amountMatchesFilter: function (host, value, filter) {
+        if (!this.isAmountFilterActive(filter)) {
+            return true;
+        }
+
+        const parsed = host.parseAmount(value);
+
+        if (!parsed.valid) {
+            return false;
+        }
+
+        if (parsed.empty) {
+            return filter.includeBlank === true;
+        }
+
+        if (
+            Number.isSafeInteger(filter.minCents) &&
+            parsed.cents < filter.minCents
+        ) {
+            return false;
+        }
+
+        if (
+            Number.isSafeInteger(filter.maxCents) &&
+            parsed.cents > filter.maxCents
+        ) {
+            return false;
+        }
+
+        return true;
     },
 
     rowMatchesExternalFilters: function (
@@ -106,11 +186,38 @@ window.tabulatorFilters = {
                 ).trim()
             );
 
+        const matchesWorkOrderValue =
+            excludedField === "workOrderValue" ||
+            this.amountMatchesFilter(
+                host,
+                rowData.workOrderValue,
+                filters.workOrderValueAmount
+            );
+
+        const matchesPartialAmount =
+            excludedField === "partialAmount" ||
+            this.amountMatchesFilter(
+                host,
+                rowData.partialAmount,
+                filters.partialAmountAmount
+            );
+
+        const matchesRemainingAmount =
+            excludedField === "remainingAmount" ||
+            this.amountMatchesFilter(
+                host,
+                rowData.remainingAmount,
+                filters.remainingAmountAmount
+            );
+
         return (
             matchesWorkOrder &&
             matchesWorkType &&
             matchesDate &&
-            matchesBasket
+            matchesBasket &&
+            matchesWorkOrderValue &&
+            matchesPartialAmount &&
+            matchesRemainingAmount
         );
     },
 
@@ -311,7 +418,7 @@ window.tabulatorFilters = {
             );
 
             const searchInput = container.querySelector(
-                ".excel-filter-search"
+                ".excel-filter-search, .excel-amount-filter-input"
             );
 
             if (!shell) {
@@ -856,6 +963,309 @@ window.tabulatorFilters = {
         return ui.container;
     },
 
+    createAmountPopup: function (
+        host,
+        elementId,
+        column,
+        onRendered,
+        field
+    ) {
+        const definition = this.getDefinition(field);
+        const state = host.states[elementId];
+
+        if (!definition || !state) {
+            return document.createElement("div");
+        }
+
+        const applied = this.cloneAmountFilter(
+            state.externalFilters[definition.stateKey]
+        );
+
+        const container = document.createElement("div");
+        container.className =
+            "excel-filter-popup excel-amount-filter-popup";
+        container.dir = "ltr";
+        container.dataset.filterField = field;
+        container.dataset.filterType = "amount";
+
+        const title = document.createElement("div");
+        title.className = "excel-filter-title";
+        title.textContent = definition.title;
+
+        const help = document.createElement("div");
+        help.className = "excel-amount-filter-help";
+        help.textContent =
+            "Enter an inclusive minimum, maximum, or both.";
+
+        const fields = document.createElement("div");
+        fields.className = "excel-amount-filter-fields";
+
+        const createField = (labelText, role, cents) => {
+            const label = document.createElement("label");
+            label.className = "excel-amount-filter-field";
+
+            const caption = document.createElement("span");
+            caption.textContent = labelText;
+
+            const input = document.createElement("input");
+            input.type = "text";
+            input.inputMode = "decimal";
+            input.autocomplete = "off";
+            input.className = "excel-amount-filter-input";
+            input.dataset.filterRole = role;
+            input.placeholder = role === "min"
+                ? "Minimum amount"
+                : "Maximum amount";
+            input.value = Number.isSafeInteger(cents)
+                ? host.formatAmountCents(cents)
+                : "";
+
+            label.append(caption, input);
+            return { label, input };
+        };
+
+        const minimum = createField(
+            "Minimum",
+            "min",
+            applied?.minCents
+        );
+        const maximum = createField(
+            "Maximum",
+            "max",
+            applied?.maxCents
+        );
+
+        fields.append(minimum.label, maximum.label);
+
+        const includeBlankLabel = document.createElement("label");
+        includeBlankLabel.className =
+            "excel-filter-option excel-amount-blank-option";
+
+        const includeBlank = document.createElement("input");
+        includeBlank.type = "checkbox";
+        includeBlank.dataset.filterRole = "include-blank";
+        includeBlank.checked = applied?.includeBlank === true;
+
+        const includeBlankText = document.createElement("span");
+        includeBlankText.textContent = "Include blank values";
+        includeBlankLabel.append(includeBlank, includeBlankText);
+
+        const error = document.createElement("div");
+        error.className = "excel-amount-filter-error";
+        error.dataset.filterRole = "error";
+        error.hidden = true;
+
+        const actions = document.createElement("div");
+        actions.className = "excel-filter-actions";
+
+        const clear = document.createElement("button");
+        clear.type = "button";
+        clear.className =
+            "excel-filter-button excel-filter-button-secondary";
+        clear.dataset.filterRole = "clear";
+        clear.textContent = "Clear Filter";
+
+        const apply = document.createElement("button");
+        apply.type = "button";
+        apply.className =
+            "excel-filter-button excel-filter-button-primary";
+        apply.dataset.filterRole = "apply";
+        apply.textContent = "Apply";
+
+        actions.append(clear, apply);
+
+        const showError = message => {
+            error.textContent = message;
+            error.hidden = message === "";
+            container.dataset.filterValid =
+                message === "" ? "true" : "false";
+        };
+
+        const parseBound = (input, labelText) => {
+            const text = input.value.trim();
+
+            if (text === "") {
+                return { valid: true, cents: null };
+            }
+
+            const parsed = host.parseAmount(text);
+
+            if (!parsed.valid || parsed.empty) {
+                return {
+                    valid: false,
+                    message: `${labelText} is not a valid amount.`
+                };
+            }
+
+            return { valid: true, cents: parsed.cents };
+        };
+
+        const normalizeInput = input => {
+            if (input.value.trim() === "") {
+                return;
+            }
+
+            const parsed = host.parseAmount(input.value);
+
+            if (parsed.valid && !parsed.empty) {
+                input.value = parsed.formatted;
+            }
+        };
+
+        minimum.input.addEventListener(
+            "blur",
+            () => normalizeInput(minimum.input)
+        );
+        maximum.input.addEventListener(
+            "blur",
+            () => normalizeInput(maximum.input)
+        );
+
+        clear.addEventListener("click", () => {
+            const oldFilters = host.cloneExternalFilters(
+                state.externalFilters
+            );
+
+            state.externalFilters[definition.stateKey] = null;
+
+            const newFilters = host.cloneExternalFilters(
+                state.externalFilters
+            );
+
+            host.pushFilterTransaction(
+                elementId,
+                oldFilters,
+                newFilters,
+                `Clear ${definition.title}`
+            );
+
+            this.closePopup(
+                elementId,
+                container,
+                () => this.apply(host, elementId)
+            );
+        });
+
+        const applyPendingFilter = () => {
+            showError("");
+
+            const minimumResult = parseBound(
+                minimum.input,
+                "Minimum"
+            );
+
+            if (!minimumResult.valid) {
+                showError(minimumResult.message);
+                minimum.input.focus({ preventScroll: true });
+                return;
+            }
+
+            const maximumResult = parseBound(
+                maximum.input,
+                "Maximum"
+            );
+
+            if (!maximumResult.valid) {
+                showError(maximumResult.message);
+                maximum.input.focus({ preventScroll: true });
+                return;
+            }
+
+            if (
+                Number.isSafeInteger(minimumResult.cents) &&
+                Number.isSafeInteger(maximumResult.cents) &&
+                minimumResult.cents > maximumResult.cents
+            ) {
+                showError(
+                    "Minimum amount cannot be greater than maximum amount."
+                );
+                maximum.input.focus({ preventScroll: true });
+                return;
+            }
+
+            normalizeInput(minimum.input);
+            normalizeInput(maximum.input);
+
+            const oldFilters = host.cloneExternalFilters(
+                state.externalFilters
+            );
+
+            const nextFilter = {
+                minCents: minimumResult.cents,
+                maxCents: maximumResult.cents,
+                includeBlank: includeBlank.checked
+            };
+
+            state.externalFilters[definition.stateKey] =
+                this.isAmountFilterActive(nextFilter)
+                    ? nextFilter
+                    : null;
+
+            const newFilters = host.cloneExternalFilters(
+                state.externalFilters
+            );
+
+            host.pushFilterTransaction(
+                elementId,
+                oldFilters,
+                newFilters,
+                definition.title
+            );
+
+            this.closePopup(
+                elementId,
+                container,
+                () => this.apply(host, elementId)
+            );
+        };
+
+        apply.addEventListener("click", applyPendingFilter);
+
+        container.addEventListener("keydown", event => {
+            if (event.key === "Enter") {
+                event.preventDefault();
+                event.stopPropagation();
+                applyPendingFilter();
+            }
+        });
+
+        const resizeHandle = this.createResizeHandle();
+
+        container.append(
+            title,
+            help,
+            fields,
+            includeBlankLabel,
+            error,
+            actions,
+            resizeHandle
+        );
+
+        this.mountPopup(
+            container,
+            onRendered,
+            {
+                elementId,
+                field,
+                storageKey: definition.storageKey,
+                anchorElement:
+                    column
+                        .getElement()
+                        .querySelector(
+                            ".tabulator-header-popup-button"
+                        ),
+                defaultWidth: 310,
+                defaultHeight: 300,
+                minWidth: 270,
+                minHeight: 260,
+                maxWidth: 480,
+                maxHeight: 520
+            }
+        );
+
+        return container;
+    },
+
     createDatePopup: function (
         host,
         elementId,
@@ -1351,7 +1761,16 @@ window.tabulatorFilters = {
             ).trim() !== "" ||
             (filters.workTypeCodes ?? []).length > 0 ||
             (filters.assignmentDates ?? []).length > 0 ||
-            (filters.basketValues ?? []).length > 0;
+            (filters.basketValues ?? []).length > 0 ||
+            this.isAmountFilterActive(
+                filters.workOrderValueAmount
+            ) ||
+            this.isAmountFilterActive(
+                filters.partialAmountAmount
+            ) ||
+            this.isAmountFilterActive(
+                filters.remainingAmountAmount
+            );
 
         if (!hasAnyFilter) {
             table.clearFilter();
@@ -1410,12 +1829,17 @@ window.tabulatorFilters = {
                 ".tabulator-header-popup-button"
             );
 
-        const values =
-            state.externalFilters[definition.stateKey] ?? [];
+        const value =
+            state.externalFilters[definition.stateKey];
+
+        const isFiltered =
+            definition.type === "amount"
+                ? this.isAmountFilterActive(value)
+                : (value ?? []).length > 0;
 
         button?.classList.toggle(
             "is-filtered",
-            values.length > 0
+            isFiltered
         );
     },
 
@@ -1437,8 +1861,18 @@ window.tabulatorFilters = {
             return;
         }
 
+        const changedFieldSet =
+            new Set(fields ?? []);
+
+        if (
+            changedFieldSet.has("workOrderValue") ||
+            changedFieldSet.has("partialAmount")
+        ) {
+            changedFieldSet.add("remainingAmount");
+        }
+
         const uniqueFields =
-            Array.from(new Set(fields ?? []));
+            Array.from(changedFieldSet);
 
         const shouldReapplyActiveFilter =
             uniqueFields.some(field => {
@@ -1455,11 +1889,14 @@ window.tabulatorFilters = {
                     return false;
                 }
 
-                return (
+                const value =
                     state.externalFilters[
                         definition.stateKey
-                    ] ?? []
-                ).length > 0;
+                    ];
+
+                return definition.type === "amount"
+                    ? this.isAmountFilterActive(value)
+                    : (value ?? []).length > 0;
             });
 
         /*

@@ -495,6 +495,69 @@ textarea {
     margin-top: 9px;
 }
 
+.excel-amount-filter-help {
+    margin: 0 0 10px;
+    color: #60778a;
+    font-size: 0.78rem;
+    line-height: 1.35;
+}
+
+.excel-amount-filter-fields {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+}
+
+.excel-amount-filter-field {
+    display: grid;
+    gap: 5px;
+    color: #24394c;
+    font-size: 0.8rem;
+    font-weight: 700;
+}
+
+.excel-amount-filter-input {
+    box-sizing: border-box;
+    width: 100%;
+    height: 34px;
+    padding: 5px 9px;
+    border: 1px solid #b8c8d5;
+    border-radius: 4px;
+    background: #ffffff;
+    color: #172d42;
+    font: inherit;
+    font-size: 0.83rem;
+    text-align: right;
+    outline: none;
+}
+
+.excel-amount-filter-input:focus {
+    border-color: #1683c4;
+    box-shadow: 0 0 0 2px rgba(22, 131, 196, 0.12);
+}
+
+.excel-amount-blank-option {
+    margin-top: 10px;
+    border-top: 1px solid #e3e9ee;
+    border-bottom: 1px solid #e3e9ee;
+    background: #f7f9fb;
+}
+
+.excel-amount-filter-error {
+    margin-top: 8px;
+    padding: 7px 8px;
+    border: 1px solid #e1a2a2;
+    border-radius: 4px;
+    background: #fff4f4;
+    color: #a32626;
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+
+.excel-amount-filter-error[hidden] {
+    display: none;
+}
+
 .excel-filter-button {
     min-width: 76px;
     height: 31px;

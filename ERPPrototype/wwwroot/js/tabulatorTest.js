@@ -300,7 +300,27 @@ window.tabulatorTest = {
                     minWidth: 185,
                     widthGrow: 0.95,
                     hozAlign: "right",
-                    headerHozAlign: "left"
+                    headerHozAlign: "left",
+
+                    headerPopupIcon:
+                        window.tabulatorFilters.icon(
+                            "Filter Work Order Value"
+                        ),
+
+                    headerPopup: function (
+                        event,
+                        column,
+                        onRendered
+                    ) {
+                        return window.tabulatorFilters
+                            .createAmountPopup(
+                                window.tabulatorTest,
+                                elementId,
+                                column,
+                                onRendered,
+                                "workOrderValue"
+                            );
+                    }
                 },
                 {
                     title: "Partial Amount",
@@ -321,7 +341,27 @@ window.tabulatorTest = {
                     minWidth: 175,
                     widthGrow: 0.9,
                     hozAlign: "right",
-                    headerHozAlign: "left"
+                    headerHozAlign: "left",
+
+                    headerPopupIcon:
+                        window.tabulatorFilters.icon(
+                            "Filter Partial Amount"
+                        ),
+
+                    headerPopup: function (
+                        event,
+                        column,
+                        onRendered
+                    ) {
+                        return window.tabulatorFilters
+                            .createAmountPopup(
+                                window.tabulatorTest,
+                                elementId,
+                                column,
+                                onRendered,
+                                "partialAmount"
+                            );
+                    }
                 },
                 {
                     title: "Remaining Amount",
@@ -336,7 +376,27 @@ window.tabulatorTest = {
                     minWidth: 185,
                     widthGrow: 0.95,
                     hozAlign: "right",
-                    headerHozAlign: "left"
+                    headerHozAlign: "left",
+
+                    headerPopupIcon:
+                        window.tabulatorFilters.icon(
+                            "Filter Remaining Amount"
+                        ),
+
+                    headerPopup: function (
+                        event,
+                        column,
+                        onRendered
+                    ) {
+                        return window.tabulatorFilters
+                            .createAmountPopup(
+                                window.tabulatorTest,
+                                elementId,
+                                column,
+                                onRendered,
+                                "remainingAmount"
+                            );
+                    }
                 },
                 {
                     title: "Basket",

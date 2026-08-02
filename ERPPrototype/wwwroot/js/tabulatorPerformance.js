@@ -2009,6 +2009,7 @@
                 ["getUniqueValues", "filters.unique-values"],
                 ["createValuePopup", "filters.open-value-popup"],
                 ["createDatePopup", "filters.open-date-popup"],
+                ["createAmountPopup", "filters.open-amount-popup"],
                 ["apply", "filters.apply"],
                 ["refreshFields", "filters.refresh-fields"],
                 ["updateAllIcons", "filters.update-icons"]

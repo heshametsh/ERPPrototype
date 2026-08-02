@@ -912,6 +912,313 @@ internal sealed class WorkOrdersPage(IPage page)
         ).Trim();
     }
 
+    public async Task ApplyAmountFilterAsync(
+        string field,
+        string minimum,
+        string maximum,
+        bool includeBlank,
+        int expectedRowCount)
+    {
+        var popup = await OpenAmountFilterPopupAsync(field);
+
+        await popup
+            .Locator("[data-filter-role=\"min\"]")
+            .FillAsync(minimum);
+
+        await popup
+            .Locator("[data-filter-role=\"max\"]")
+            .FillAsync(maximum);
+
+        await popup
+            .Locator("[data-filter-role=\"include-blank\"]")
+            .SetCheckedAsync(includeBlank);
+
+        await popup
+            .Locator("[data-filter-role=\"apply\"]")
+            .ClickAsync();
+
+        await WaitForActiveRowCountAsync(expectedRowCount);
+        await WaitForAmountFilterStateAsync(field, true);
+    }
+
+    public async Task ClearAmountFilterAsync(
+        string field,
+        int expectedRowCount)
+    {
+        var popup = await OpenAmountFilterPopupAsync(field);
+
+        await popup
+            .Locator("[data-filter-role=\"clear\"]")
+            .ClickAsync();
+
+        await WaitForActiveRowCountAsync(expectedRowCount);
+        await WaitForAmountFilterStateAsync(field, false);
+    }
+
+    public async Task<long[]> GetActiveAmountCentsAsync(string field)
+    {
+        return await page.EvaluateAsync<long[]>(
+            """
+            args => {
+                const api = window.tabulatorTest;
+                const table = api?.tables?.[args.tableId];
+
+                if (!api || !table) {
+                    return [];
+                }
+
+                return table.getRows('active').map(row => {
+                    const parsed = api.parseAmount(
+                        row.getData()?.[args.field]
+                    );
+
+                    return parsed.valid && !parsed.empty
+                        ? parsed.cents
+                        : null;
+                }).filter(value => value !== null);
+            }
+            """,
+            new
+            {
+                tableId = TableId,
+                field
+            });
+    }
+
+    public async Task SortFinancialColumnAsync(
+        string field,
+        string direction)
+    {
+        var sorted = await page.EvaluateAsync<bool>(
+            """
+            async args => {
+                const api = window.tabulatorTest;
+                const table = api?.tables?.[args.tableId];
+                const column = table?.getColumn(args.field);
+                const title = column
+                    ?.getElement?.()
+                    ?.querySelector('.tabulator-col-sorter-element');
+
+                if (!table || !column || !title) {
+                    return false;
+                }
+
+                const readSorter = () => {
+                    const sorters = table.getSorters();
+                    const sorter = sorters[0];
+
+                    return {
+                        count: sorters.length,
+                        field:
+                            sorter?.field ??
+                            sorter?.column?.getField?.() ??
+                            '',
+                        direction: sorter?.dir ?? ''
+                    };
+                };
+
+                for (let attempt = 0; attempt < 4; attempt++) {
+                    const current = readSorter();
+
+                    if (
+                        current.count === 1 &&
+                        current.field === args.field &&
+                        current.direction === args.direction
+                    ) {
+                        return true;
+                    }
+
+                    title.dispatchEvent(
+                        new MouseEvent('click', {
+                            bubbles: true,
+                            cancelable: true,
+                            view: window
+                        })
+                    );
+
+                    await new Promise(resolve =>
+                        window.requestAnimationFrame(() =>
+                            window.requestAnimationFrame(resolve)
+                        )
+                    );
+                }
+
+                const finalSorter = readSorter();
+
+                return (
+                    finalSorter.count === 1 &&
+                    finalSorter.field === args.field &&
+                    finalSorter.direction === args.direction
+                );
+            }
+            """,
+            new
+            {
+                tableId = TableId,
+                field,
+                direction
+            });
+
+        E2ETestAssert.True(
+            sorted,
+            $"Could not sort financial column '{field}' {direction} through its header.");
+    }
+
+    public async Task ClearSortAsync()
+    {
+        await page.EvaluateAsync(
+            """
+            tableId => {
+                window.tabulatorTest
+                    ?.tables?.[tableId]
+                    ?.clearSort?.();
+            }
+            """,
+            TableId);
+
+        await page.WaitForFunctionAsync(
+            """
+            tableId => {
+                const table =
+                    window.tabulatorTest?.tables?.[tableId];
+
+                return (table?.getSorters?.().length ?? -1) === 0;
+            }
+            """,
+            TableId,
+            new PageWaitForFunctionOptions
+            {
+                Timeout = NormalTimeoutMs
+            });
+    }
+
+    public async Task<string> GetFirstActiveFinancialRowAsync(
+        string field)
+    {
+        return await page.EvaluateAsync<string>(
+            """
+            args => {
+                const api = window.tabulatorTest;
+                const table = api?.tables?.[args.tableId];
+                const row = table?.getRows('active')?.[0];
+                const data = row?.getData?.();
+                const parsed = api?.parseAmount?.(
+                    data?.[args.field]
+                );
+
+                if (!data || !parsed?.valid || parsed.empty) {
+                    return '';
+                }
+
+                return [
+                    data.id,
+                    data.workOrderNumber,
+                    data.workTypeCode,
+                    parsed.cents
+                ].join('|');
+            }
+            """,
+            new
+            {
+                tableId = TableId,
+                field
+            });
+    }
+
+    public async Task<string> GetSorterSnapshotAsync()
+    {
+        return await page.EvaluateAsync<string>(
+            """
+            tableId => {
+                const table = window.tabulatorTest?.tables?.[tableId];
+                const sorters = table?.getSorters?.() ?? [];
+                const sorter = sorters[0];
+                const field =
+                    sorter?.field ??
+                    sorter?.column?.getField?.() ??
+                    '';
+
+                return [
+                    sorters.length,
+                    field,
+                    sorter?.dir ?? ''
+                ].join('|');
+            }
+            """,
+            TableId);
+    }
+
+    private async Task<ILocator> OpenAmountFilterPopupAsync(
+        string field)
+    {
+        var headerButton = Grid.Locator(
+            $".tabulator-col[tabulator-field='{field}'] " +
+            ".tabulator-header-popup-button");
+
+        await headerButton.ClickAsync(
+            new LocatorClickOptions
+            {
+                Force = true
+            });
+
+        var popup = page.Locator(
+            $".excel-amount-filter-popup[data-filter-field='{field}']");
+
+        await popup.WaitForAsync(
+            new LocatorWaitForOptions
+            {
+                State = WaitForSelectorState.Visible,
+                Timeout = NormalTimeoutMs
+            });
+
+        return popup;
+    }
+
+    private async Task WaitForAmountFilterStateAsync(
+        string field,
+        bool expectedActive)
+    {
+        await page.WaitForFunctionAsync(
+            """
+            args => {
+                const api = window.tabulatorTest;
+                const table = api?.tables?.[args.tableId];
+                const state = api?.states?.[args.tableId];
+                const definition =
+                    window.tabulatorFilters?.getDefinition?.(args.field);
+                const value = definition
+                    ? state?.externalFilters?.[definition.stateKey]
+                    : null;
+                const active =
+                    window.tabulatorFilters
+                        ?.isAmountFilterActive?.(value) === true;
+                const button = table
+                    ?.getColumn?.(args.field)
+                    ?.getElement?.()
+                    ?.querySelector(
+                        '.tabulator-header-popup-button'
+                    );
+
+                return (
+                    active === args.expectedActive &&
+                    Boolean(
+                        button?.classList.contains('is-filtered')
+                    ) === args.expectedActive
+                );
+            }
+            """,
+            new
+            {
+                tableId = TableId,
+                field,
+                expectedActive
+            },
+            new PageWaitForFunctionOptions
+            {
+                Timeout = NormalTimeoutMs
+            });
+    }
+
     public async Task SelectContiguousRowsAsync(
         int anchorRowId,
         int rowCount)

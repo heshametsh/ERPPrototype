@@ -789,6 +789,21 @@
                 basketValues:
                     Array.from(
                         filters?.basketValues ?? []
+                    ),
+
+                workOrderValueAmount:
+                    window.tabulatorFilters.cloneAmountFilter(
+                        filters?.workOrderValueAmount
+                    ),
+
+                partialAmountAmount:
+                    window.tabulatorFilters.cloneAmountFilter(
+                        filters?.partialAmountAmount
+                    ),
+
+                remainingAmountAmount:
+                    window.tabulatorFilters.cloneAmountFilter(
+                        filters?.remainingAmountAmount
                     )
             };
         },

@@ -339,7 +339,10 @@
                     workOrderNumber: "",
                     workTypeCodes: [],
                     assignmentDates: [],
-                    basketValues: []
+                    basketValues: [],
+                    workOrderValueAmount: null,
+                    partialAmountAmount: null,
+                    remainingAmountAmount: null
                 }
             };
         },
