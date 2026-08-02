@@ -921,3 +921,227 @@
         grid-template-columns: 1fr;
     }
 }
+
+/* =========================================================
+   PHASE 9.2A2 — CALM ENTERPRISE VISUAL POLISH
+   Visual-only adjustments. Business logic, calculations, filters,
+   sorting, keyboard behavior, save, and selection remain unchanged.
+   ========================================================= */
+
+.tabulator-workorders-page {
+    --ux-page: #f5f7fa;
+    --ux-card: #ffffff;
+    --ux-border: #dbe4eb;
+    --ux-border-strong: #c8d5df;
+    --ux-ink: #183047;
+    --ux-muted: #6d8192;
+    --ux-blue: #287da9;
+    --ux-blue-soft: #eaf4fa;
+    --ux-teal: #4c8b84;
+    --ux-gold: #b78a3c;
+    padding: 18px 26px 20px;
+}
+
+.page-header-row {
+    align-items: center;
+    gap: 18px;
+    margin-bottom: 12px;
+}
+
+.tabulator-workorders-page h1 {
+    font-size: 1.72rem;
+    letter-spacing: -0.02em;
+}
+
+.page-context-row {
+    margin-top: 5px;
+}
+
+.page-subtitle {
+    color: var(--ux-muted);
+    font-size: 0.84rem;
+}
+
+.page-actions-box {
+    min-width: 0;
+}
+
+.page-actions-buttons {
+    gap: 8px;
+}
+
+.page-action-button {
+    min-width: 96px;
+    height: 38px;
+    padding: 0 14px;
+    border-radius: 8px;
+    font-size: 0.82rem;
+}
+
+.page-action-button-secondary {
+    border-color: #b8c8d4;
+    background: rgba(255, 255, 255, 0.92);
+    color: #3b566b;
+}
+
+.page-action-button-secondary:hover {
+    border-color: #7f9aae;
+    background: #ffffff;
+}
+
+.page-action-button-copy {
+    border-color: #9ec9de;
+    background: #eaf5fa;
+    color: #17668e;
+    box-shadow: none;
+}
+
+.page-action-button-copy:hover {
+    border-color: #6faecc;
+    background: #dff0f8;
+    color: #105c81;
+    box-shadow: none;
+}
+
+.page-action-button-save {
+    border-color: #187ba7;
+    background: #1684b2;
+    color: #ffffff;
+    box-shadow: 0 5px 12px rgba(22, 132, 178, 0.16);
+}
+
+.page-action-button-save:hover {
+    background: #11769f;
+    box-shadow: 0 7px 16px rgba(22, 132, 178, 0.20);
+}
+
+.save-status {
+    min-height: 25px;
+    margin-top: 5px;
+    padding: 3px 10px;
+    border-color: #c7dce8;
+    background: #f1f8fc;
+    color: #376981;
+    font-size: 0.72rem;
+}
+
+.work-orders-open-summary {
+    gap: 10px;
+    min-height: 0;
+    margin-bottom: 10px;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+}
+
+.work-order-toolbar-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 44px;
+    margin: 6px 0 9px;
+}
+
+.validation-navigator-slot {
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.validation-navigator {
+    min-height: 48px;
+    padding: 7px 10px;
+}
+
+.work-order-search-box {
+    box-sizing: border-box;
+    display: grid;
+    grid-template-columns: auto minmax(170px, 1fr);
+    align-items: center;
+    gap: 8px;
+    flex: 0 0 320px;
+    width: 320px;
+    min-height: 42px;
+    padding: 5px 7px;
+    border-color: #b9cbd8;
+    border-radius: 9px;
+    background: #ffffff;
+    box-shadow: 0 2px 8px rgba(15, 42, 70, 0.045);
+}
+
+.work-order-search-label {
+    margin: 0;
+    color: #4d6c82;
+    font-size: 0.75rem;
+    white-space: nowrap;
+}
+
+.work-order-search-input {
+    height: 30px;
+    padding: 5px 10px;
+    border-color: #c3d2dd;
+    background: #fbfdff;
+    font-size: 0.85rem;
+    font-weight: 650;
+}
+
+.tabulator-workorders-page .tabulator-card {
+    border-color: var(--ux-border) !important;
+    border-radius: 11px !important;
+    box-shadow: 0 5px 16px rgba(15, 42, 70, 0.055) !important;
+}
+
+.tabulator-workorders-page ::deep .tabulator .tabulator-header,
+.tabulator-workorders-page ::deep .tabulator .tabulator-header .tabulator-col {
+    border-color: #dce5ec !important;
+    background: #f2f6f9 !important;
+}
+
+.tabulator-workorders-page ::deep .tabulator-row {
+    border-bottom-color: #e1e8ee !important;
+}
+
+.tabulator-workorders-page ::deep .tabulator-row:nth-child(even) {
+    background: #fbfdff !important;
+}
+
+.tabulator-workorders-page ::deep .tabulator-row:hover {
+    background: #f0f7fb !important;
+}
+
+.tabulator-workorders-page ::deep .tabulator-row .tabulator-cell {
+    border-right-color: #e1e8ee !important;
+}
+
+.tabulator-workorders-page ::deep .tabulator-cell.tabulator-range-selected,
+.tabulator-workorders-page ::deep .tabulator-cell.tabulator-selected,
+.tabulator-workorders-page ::deep .tabulator-cell.tabulator-range-only-cell-selected {
+    background: #e5f1f8 !important;
+}
+
+@media (max-width: 980px) {
+    .page-header-row {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .page-actions-box {
+        width: 100%;
+    }
+
+    .page-actions-buttons {
+        justify-content: flex-start;
+    }
+
+    .work-order-toolbar-row {
+        align-items: stretch;
+        flex-direction: column-reverse;
+    }
+
+    .work-order-search-box {
+        flex-basis: auto;
+        width: 100%;
+    }
+}

@@ -95,6 +95,9 @@
         buildBasketDashboardCard: function (entry, index) {
             const card = document.createElement("article");
             card.className = "work-orders-basket-dashboard-card";
+            card.classList.add(
+                entry.rowCount > 0 ? "has-data" : "is-empty"
+            );
             card.dataset.testid = "work-orders-basket-card";
             card.dataset.basketValue = entry.basket;
             card.dataset.basketIndex = String(index);

@@ -899,3 +899,192 @@ details[open] > .excel-date-summary::before {
         grid-auto-columns: minmax(180px, 86vw);
     }
 }
+
+/* =========================================================
+   PHASE 9.2A2 — DYNAMIC SUMMARY AND BASKET VISUAL POLISH
+   These elements are created by JavaScript and must remain global.
+   ========================================================= */
+
+.work-orders-open-summary .work-orders-summary-item {
+    position: relative;
+    min-height: 66px;
+    padding: 11px 14px 10px;
+    gap: 4px;
+    overflow: hidden;
+    border: 1px solid #dbe4eb;
+    border-radius: 10px;
+    background: #ffffff;
+    box-shadow: 0 2px 8px rgba(15, 42, 70, 0.045);
+}
+
+.work-orders-open-summary .work-orders-summary-item::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: 0;
+    height: 3px;
+    background: #287da9;
+}
+
+.work-orders-open-summary .work-orders-summary-item:nth-child(2)::before {
+    background: #668398;
+}
+
+.work-orders-open-summary .work-orders-summary-item:nth-child(3)::before {
+    background: #b78a3c;
+}
+
+.work-orders-open-summary .work-orders-summary-item:nth-child(4)::before {
+    background: #4c8b84;
+}
+
+.work-orders-open-summary .work-orders-summary-item:first-child {
+    border-color: #c4dce9;
+}
+
+.work-orders-open-summary .work-orders-summary-label {
+    color: #657b8c;
+    font-size: 0.70rem;
+    font-weight: 750;
+}
+
+.work-orders-open-summary .work-orders-summary-value {
+    color: #153047;
+    font-size: 1.06rem;
+    font-weight: 850;
+}
+
+.work-orders-selection-summary-bar {
+    right: 16px;
+    bottom: 10px;
+    left: 16px;
+    min-height: 56px;
+    gap: 7px;
+    padding: 6px;
+    border-color: #9cc9dc;
+    border-left-color: #287da9;
+    border-radius: 9px;
+    background: rgba(247, 251, 253, 0.985);
+    box-shadow: 0 8px 22px rgba(15, 42, 70, 0.15);
+}
+
+.work-orders-selection-summary-bar .work-orders-summary-item {
+    min-height: 42px;
+    padding: 6px 10px;
+    border-color: #c5dbe6;
+    background: #ffffff;
+}
+
+.work-orders-selection-summary-bar .work-orders-summary-label {
+    font-size: 0.67rem;
+}
+
+.work-orders-selection-summary-bar .work-orders-summary-value {
+    font-size: 0.92rem;
+}
+
+.work-orders-basket-dashboard {
+    position: relative;
+    margin: 0 0 8px;
+    padding: 9px 9px 7px;
+    border-color: #d8e3eb;
+    border-radius: 10px;
+    background: #f8fafc;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+}
+
+.work-orders-basket-dashboard-track {
+    grid-auto-columns: minmax(188px, 206px);
+    gap: 8px;
+    padding: 1px 1px 7px;
+    scrollbar-color: #aab9c4 #edf2f5;
+}
+
+.work-orders-basket-dashboard-track::-webkit-scrollbar {
+    height: 8px;
+}
+
+.work-orders-basket-dashboard-track::-webkit-scrollbar-track {
+    border-radius: 999px;
+    background: #edf2f5;
+}
+
+.work-orders-basket-dashboard-track::-webkit-scrollbar-thumb {
+    border: 2px solid #edf2f5;
+    border-radius: 999px;
+    background: #9eacb7;
+}
+
+.work-orders-basket-dashboard-card {
+    min-height: 92px;
+    padding: 10px 10px 9px;
+    border-color: #d8e3eb;
+    border-top-color: #3f8db7;
+    border-radius: 9px;
+    background: #ffffff;
+    box-shadow: 0 2px 7px rgba(16, 45, 69, 0.045);
+}
+
+.work-orders-basket-dashboard-card.has-data {
+    border-top-color: #2f86b4;
+}
+
+.work-orders-basket-dashboard-card.is-empty {
+    border-top-color: #c5d2dc;
+    background: #fbfcfd;
+    box-shadow: none;
+}
+
+.work-orders-basket-dashboard-card.is-empty .work-orders-basket-dashboard-card-title,
+.work-orders-basket-dashboard-card.is-empty .work-orders-basket-dashboard-metric strong {
+    color: #708391;
+}
+
+.work-orders-basket-dashboard-card-title {
+    display: -webkit-box;
+    min-height: 32px;
+    margin-bottom: 7px;
+    overflow: hidden;
+    color: #23465f;
+    font-size: 0.78rem;
+    line-height: 1.3;
+    text-align: left;
+    text-overflow: initial;
+    white-space: normal;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+}
+
+.work-orders-basket-dashboard-metrics {
+    grid-template-columns: 0.72fr 1.28fr;
+    gap: 6px;
+}
+
+.work-orders-basket-dashboard-metric {
+    min-width: 0;
+    padding: 5px 6px;
+    border-radius: 7px;
+    background: #f6f9fb;
+}
+
+.work-orders-basket-dashboard-card.is-empty .work-orders-basket-dashboard-metric {
+    background: #f2f5f7;
+}
+
+.work-orders-basket-dashboard-metric span {
+    color: #718593;
+    font-size: 0.62rem;
+}
+
+.work-orders-basket-dashboard-metric strong {
+    margin-top: 3px;
+    color: #18344b;
+    font-size: 0.82rem;
+}
+
+@media (max-width: 600px) {
+    .work-orders-basket-dashboard-track {
+        grid-auto-columns: minmax(176px, 84vw);
+    }
+}

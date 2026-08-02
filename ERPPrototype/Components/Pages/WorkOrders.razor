@@ -105,7 +105,7 @@
                         </button>
 
                         <button type="button"
-                                class="page-action-button page-action-button-primary"
+                                class="page-action-button page-action-button-primary page-action-button-copy"
                                 data-testid="work-orders-copy"
                                 disabled="@IsYearLoading"
                                 onclick="window.tabulatorTest.copyRange('tabulator-test-table')">
@@ -113,7 +113,7 @@
                         </button>
 
                         <button type="button"
-                                class="page-action-button page-action-button-primary"
+                                class="page-action-button page-action-button-primary page-action-button-save"
                                 data-testid="work-orders-save"
                                 disabled="@(IsSaving || IsYearLoading)"
                                 @onclick="SaveChangesAsync">
