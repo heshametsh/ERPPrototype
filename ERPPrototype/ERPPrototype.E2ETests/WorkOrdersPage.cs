@@ -939,6 +939,77 @@ internal sealed class WorkOrdersPage(IPage page)
         ).Trim();
     }
 
+    public async Task<string[]> GetValueFilterOptionsAsync(
+        string field)
+    {
+        var popup = await OpenValueFilterPopupAsync(field);
+
+        var values = await popup
+            .Locator(
+                ".excel-filter-option[data-filter-value] > span")
+            .AllInnerTextsAsync();
+
+        await CloseValueFilterPopupAsync(field, popup);
+
+        return values
+            .Select(value => value.Trim())
+            .ToArray();
+    }
+
+    public async Task ApplyValueFilterAsync(
+        string field,
+        IReadOnlyCollection<string> displayValues,
+        int expectedRowCount)
+    {
+        var popup = await OpenValueFilterPopupAsync(field);
+
+        await popup
+            .Locator("[data-filter-role=\"select-all\"]")
+            .SetCheckedAsync(false);
+
+        foreach (var displayValue in displayValues)
+        {
+            var option = popup
+                .Locator(
+                    ".excel-filter-option[data-filter-value]")
+                .Filter(
+                    new LocatorFilterOptions
+                    {
+                        HasTextString = displayValue
+                    });
+
+            E2ETestAssert.Equal(
+                1,
+                await option.CountAsync(),
+                $"Value filter '{field}' did not expose exactly one '{displayValue}' option.");
+
+            await option
+                .Locator("input[type=\"checkbox\"]")
+                .SetCheckedAsync(true);
+        }
+
+        await popup
+            .Locator("[data-filter-role=\"apply\"]")
+            .ClickAsync();
+
+        await WaitForActiveRowCountAsync(expectedRowCount);
+        await WaitForValueFilterStateAsync(field, true);
+    }
+
+    public async Task ClearValueFilterAsync(
+        string field,
+        int expectedRowCount)
+    {
+        var popup = await OpenValueFilterPopupAsync(field);
+
+        await popup
+            .Locator("[data-filter-role=\"clear\"]")
+            .ClickAsync();
+
+        await WaitForActiveRowCountAsync(expectedRowCount);
+        await WaitForValueFilterStateAsync(field, false);
+    }
+
     public async Task ApplyAmountFilterAsync(
         string field,
         string minimum,
@@ -1210,6 +1281,100 @@ internal sealed class WorkOrdersPage(IPage page)
             }
             """,
             TableId);
+    }
+
+    private async Task<ILocator> OpenValueFilterPopupAsync(
+        string field)
+    {
+        var headerButton = Grid.Locator(
+            $".tabulator-col[tabulator-field='{field}'] " +
+            ".tabulator-header-popup-button");
+
+        await headerButton.ClickAsync(
+            new LocatorClickOptions
+            {
+                Force = true
+            });
+
+        var popup = page.Locator(
+            $".excel-filter-popup[data-filter-field='{field}']" +
+            "[data-filter-type='value']");
+
+        await popup.WaitForAsync(
+            new LocatorWaitForOptions
+            {
+                State = WaitForSelectorState.Visible,
+                Timeout = NormalTimeoutMs
+            });
+
+        return popup;
+    }
+
+    private async Task CloseValueFilterPopupAsync(
+        string field,
+        ILocator popup)
+    {
+        var closed = await page.EvaluateAsync<bool>(
+            """
+            tableId =>
+                window.tabulatorFilters
+                    ?.closeActivePopup?.(tableId) === true
+            """,
+            TableId);
+
+        E2ETestAssert.True(
+            closed,
+            $"Value filter popup '{field}' could not be closed.");
+
+        await popup.WaitForAsync(
+            new LocatorWaitForOptions
+            {
+                State = WaitForSelectorState.Detached,
+                Timeout = NormalTimeoutMs
+            });
+    }
+
+    private async Task WaitForValueFilterStateAsync(
+        string field,
+        bool expectedActive)
+    {
+        await page.WaitForFunctionAsync(
+            """
+            args => {
+                const api = window.tabulatorTest;
+                const table = api?.tables?.[args.tableId];
+                const state = api?.states?.[args.tableId];
+                const definition =
+                    window.tabulatorFilters?.getDefinition?.(args.field);
+                const values = definition
+                    ? state?.externalFilters?.[definition.stateKey]
+                    : null;
+                const active =
+                    Array.isArray(values) && values.length > 0;
+                const button = table
+                    ?.getColumn?.(args.field)
+                    ?.getElement?.()
+                    ?.querySelector(
+                        '.tabulator-header-popup-button');
+
+                return Boolean(
+                    active === args.expectedActive &&
+                    button &&
+                    button.classList.contains('is-filtered') ===
+                        args.expectedActive
+                );
+            }
+            """,
+            new
+            {
+                tableId = TableId,
+                field,
+                expectedActive
+            },
+            new PageWaitForFunctionOptions
+            {
+                Timeout = NormalTimeoutMs
+            });
     }
 
     private async Task<ILocator> OpenAmountFilterPopupAsync(

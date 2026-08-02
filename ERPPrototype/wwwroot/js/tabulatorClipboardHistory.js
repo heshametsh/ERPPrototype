@@ -791,6 +791,11 @@
                         filters?.basketValues ?? []
                     ),
 
+                statusValues:
+                    Array.from(
+                        filters?.statusValues ?? []
+                    ),
+
                 workOrderValueAmount:
                     window.tabulatorFilters.cloneAmountFilter(
                         filters?.workOrderValueAmount

@@ -242,6 +242,13 @@ internal sealed class E2ETestDatabase : IAsyncDisposable
         string notePrefix)
     {
         var workTypeCodes = new[] { "401", "402", "801", "802" };
+        var statusValues = new[]
+        {
+            "تحت التنفيذ",
+            "مراجعة",
+            "متوقف",
+            string.Empty
+        };
         var rows = new List<WorkOrder>(RowsPerYear);
 
         for (var index = 1; index <= RowsPerYear; index++)
@@ -274,7 +281,8 @@ internal sealed class E2ETestDatabase : IAsyncDisposable
                     WorkOrderValue = workOrderValue,
                     PartialAmount = partialAmount,
                     Busket = WorkOrderBuskets.InProgress,
-                    Status = "تحت التنفيذ",
+                    Status =
+                        statusValues[(index - 1) % statusValues.Length],
                     Notes = $"{notePrefix} {index:D4}",
                     DepartmentId = departmentId,
                     CreatedAt = DateTime.UtcNow.AddTicks(index),

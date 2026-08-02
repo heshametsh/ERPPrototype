@@ -1,5 +1,6 @@
 window.tabulatorFilters = {
     activePopups: new Map(),
+    blankValueToken: "__UDS_FILTER_BLANK__",
 
     definitions: {
         workTypeCode: {
@@ -17,6 +18,11 @@ window.tabulatorFilters = {
             stateKey: "basketValues",
             title: "Filter Basket",
             storageKey: "uds-basket-filter-size"
+        },
+        status: {
+            stateKey: "statusValues",
+            title: "Filter Status",
+            storageKey: "uds-status-filter-size"
         },
         workOrderValue: {
             stateKey: "workOrderValueAmount",
@@ -66,6 +72,24 @@ window.tabulatorFilters = {
         }
 
         return String(value ?? "").trim();
+    },
+
+    toFilterToken: function (host, field, value) {
+        const normalized = this.normalizeFieldValue(
+            host,
+            field,
+            value
+        );
+
+        return normalized === ""
+            ? this.blankValueToken
+            : normalized;
+    },
+
+    getFilterDisplayValue: function (value) {
+        return value === this.blankValueToken
+            ? "(Blank)"
+            : String(value ?? "");
     },
 
     cloneAmountFilter: function (filter) {
@@ -152,6 +176,10 @@ window.tabulatorFilters = {
             filters.basketValues ?? []
         );
 
+        const statuses = new Set(
+            filters.statusValues ?? []
+        );
+
         const matchesWorkOrder =
             workOrderSearch === "" ||
             String(
@@ -162,9 +190,11 @@ window.tabulatorFilters = {
             excludedField === "workTypeCode" ||
             workTypes.size === 0 ||
             workTypes.has(
-                String(
-                    rowData.workTypeCode ?? ""
-                ).trim()
+                this.toFilterToken(
+                    host,
+                    "workTypeCode",
+                    rowData.workTypeCode
+                )
             );
 
         const normalizedDate =
@@ -181,9 +211,22 @@ window.tabulatorFilters = {
             excludedField === "basket" ||
             baskets.size === 0 ||
             baskets.has(
-                String(
-                    rowData.basket ?? ""
-                ).trim()
+                this.toFilterToken(
+                    host,
+                    "basket",
+                    rowData.basket
+                )
+            );
+
+        const matchesStatus =
+            excludedField === "status" ||
+            statuses.size === 0 ||
+            statuses.has(
+                this.toFilterToken(
+                    host,
+                    "status",
+                    rowData.status
+                )
             );
 
         const matchesWorkOrderValue =
@@ -215,6 +258,7 @@ window.tabulatorFilters = {
             matchesWorkType &&
             matchesDate &&
             matchesBasket &&
+            matchesStatus &&
             matchesWorkOrderValue &&
             matchesPartialAmount &&
             matchesRemainingAmount
@@ -256,21 +300,31 @@ window.tabulatorFilters = {
             field
         );
 
-        return Array.from(
-            new Set(
-                rows
-                    .map(row =>
-                        this.normalizeFieldValue(
-                            host,
-                            field,
-                            row[field]
-                        )
-                    )
-                    .filter(value =>
-                        value !== null && value !== ""
-                    )
+        const values = rows.map(row =>
+            this.toFilterToken(
+                host,
+                field,
+                row[field]
             )
+        );
+
+        const supportedValues = field === "assignmentDate"
+            ? values.filter(value =>
+                value !== this.blankValueToken
+            )
+            : values;
+
+        return Array.from(
+            new Set(supportedValues)
         ).sort((first, second) => {
+            if (first === this.blankValueToken) {
+                return second === this.blankValueToken ? 0 : 1;
+            }
+
+            if (second === this.blankValueToken) {
+                return -1;
+            }
+
             if (field === "assignmentDate") {
                 return (
                     this.dateToTime(first) -
@@ -764,6 +818,13 @@ window.tabulatorFilters = {
             definition.title
         );
 
+        ui.container.dataset.filterField = field;
+        ui.container.dataset.filterType = "value";
+        ui.search.dataset.filterRole = "search";
+        ui.selectAll.dataset.filterRole = "select-all";
+        ui.clear.dataset.filterRole = "clear";
+        ui.apply.dataset.filterRole = "apply";
+
         const options = document.createElement("div");
         options.className =
             "excel-filter-options excel-filter-scroll";
@@ -791,9 +852,12 @@ window.tabulatorFilters = {
             let visible = 0;
 
             uniqueValues.forEach(value => {
+                const displayValue =
+                    this.getFilterDisplayValue(value);
+
                 if (
                     query !== "" &&
-                    !value
+                    !displayValue
                         .toLocaleLowerCase()
                         .includes(query)
                 ) {
@@ -811,7 +875,8 @@ window.tabulatorFilters = {
                 checkbox.checked = pendingValues.has(value);
 
                 const text = document.createElement("span");
-                text.textContent = value;
+                text.textContent = displayValue;
+                label.dataset.filterValue = value;
 
                 checkbox.addEventListener(
                     "change",
@@ -1762,6 +1827,7 @@ window.tabulatorFilters = {
             (filters.workTypeCodes ?? []).length > 0 ||
             (filters.assignmentDates ?? []).length > 0 ||
             (filters.basketValues ?? []).length > 0 ||
+            (filters.statusValues ?? []).length > 0 ||
             this.isAmountFilterActive(
                 filters.workOrderValueAmount
             ) ||

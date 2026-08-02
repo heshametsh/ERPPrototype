@@ -106,8 +106,8 @@ Invoke-DotNetStep -Title "Running the $Suite browser suite" -Arguments $browserA
 
 $expectedBrowserChecks = switch ($Suite) {
     'Smoke' { 9 }
-    'Full' { 40 }
-    'Stress' { 47 }
+    'Full' { 43 }
+    'Stress' { 50 }
 }
 
 $integrationSummary = if ($SkipIntegration) {

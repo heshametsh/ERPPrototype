@@ -340,6 +340,7 @@
                     workTypeCodes: [],
                     assignmentDates: [],
                     basketValues: [],
+                    statusValues: [],
                     workOrderValueAmount: null,
                     partialAmountAmount: null,
                     remainingAmountAmount: null

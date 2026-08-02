@@ -51,7 +51,7 @@ internal static class Phase9FoundationRunner
                 $"Result: {passedChecks}/{browserTest.ExpectedCheckCount} " +
                 "browser checks passed.");
             Console.WriteLine(
-                $"Phase 9.1D2 {options.Suite} browser suite: PASS");
+                $"Phase 9.1D3A {options.Suite} browser suite: PASS");
             Console.WriteLine(
                 "The temporary web process was isolated from the developer database.");
 
@@ -61,7 +61,7 @@ internal static class Phase9FoundationRunner
         {
             Console.Error.WriteLine();
             Console.Error.WriteLine(
-                "Phase 9.1D2 browser automation platform: FAIL");
+                "Phase 9.1D3A browser automation platform: FAIL");
             Console.Error.WriteLine(exception);
 
             return 1;

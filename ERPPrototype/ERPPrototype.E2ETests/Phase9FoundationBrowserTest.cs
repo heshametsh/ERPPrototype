@@ -17,8 +17,8 @@ internal sealed class Phase9FoundationBrowserTest(
     public int ExpectedCheckCount => suite switch
     {
         E2ETestSuite.Smoke => 9,
-        E2ETestSuite.Full => 40,
-        E2ETestSuite.Stress => 47,
+        E2ETestSuite.Full => 43,
+        E2ETestSuite.Stress => 50,
         _ => throw new ArgumentOutOfRangeException(nameof(suite))
     };
 
@@ -344,6 +344,101 @@ internal sealed class Phase9FoundationBrowserTest(
                     "Financial columns show numeric sorting without filter icons");
                 await browserSession.ObserveAsync(
                     "أعمدة المبالغ فيها ترتيب رقمي فقط بدون فلتر");
+
+                E2ETestAssert.Equal(
+                    "workTypeCode:1:0|basket:1:0|status:1:0",
+                    await workOrdersPage.GetHeaderControlSnapshotAsync(
+                        "workTypeCode",
+                        "basket",
+                        "status"),
+                    "Value-filter columns must expose filter icons without sort controls.");
+
+                var workTypeOptions =
+                    await workOrdersPage.GetValueFilterOptionsAsync(
+                        "workTypeCode");
+                var basketOptions =
+                    await workOrdersPage.GetValueFilterOptionsAsync(
+                        "basket");
+                var statusOptions =
+                    await workOrdersPage.GetValueFilterOptionsAsync(
+                        "status");
+
+                E2ETestAssert.True(
+                    workTypeOptions.SequenceEqual(
+                        new[] { "401", "402", "801", "802" }),
+                    "Work Type did not expose the current sheet values in numeric order.");
+                E2ETestAssert.True(
+                    basketOptions.SequenceEqual(
+                        new[]
+                        {
+                            ERPPrototype.Data.WorkOrderBuskets.InProgress
+                        }),
+                    "Basket did not expose the current sheet value.");
+                E2ETestAssert.True(
+                    statusOptions.Contains("تحت التنفيذ") &&
+                    statusOptions.Contains("مراجعة") &&
+                    statusOptions.Contains("متوقف") &&
+                    statusOptions.Contains("(Blank)"),
+                    "Status did not expose its current values and Blank option.");
+
+                checks.Pass(
+                    "Work Type, Basket, and Status expose Excel-style current-value filters");
+
+                var quarterRows = seed.RowsPerYear / 4;
+
+                await workOrdersPage.ApplyValueFilterAsync(
+                    "status",
+                    new[] { "تحت التنفيذ" },
+                    quarterRows);
+
+                E2ETestAssert.True(
+                    (await workOrdersPage.GetValueFilterOptionsAsync(
+                        "workTypeCode"))
+                    .SequenceEqual(new[] { "401" }),
+                    "Work Type options did not update from the active Status filter.");
+                E2ETestAssert.Equal(
+                    seed.RowsPerYear,
+                    await workOrdersPage.GetAggregateRowCountAsync("open"),
+                    "A value filter changed the fixed open-work-order count.");
+
+                await workOrdersPage.ClearValueFilterAsync(
+                    "status",
+                    seed.RowsPerYear);
+
+                await workOrdersPage.ApplyValueFilterAsync(
+                    "workTypeCode",
+                    new[] { "401" },
+                    quarterRows);
+
+                E2ETestAssert.True(
+                    (await workOrdersPage.GetValueFilterOptionsAsync(
+                        "status"))
+                    .SequenceEqual(new[] { "تحت التنفيذ" }),
+                    "Status options did not update from the active Work Type filter.");
+
+                await workOrdersPage.ClearValueFilterAsync(
+                    "workTypeCode",
+                    seed.RowsPerYear);
+
+                checks.Pass(
+                    "Value-filter options update in both directions from other active columns");
+
+                await workOrdersPage.ApplyValueFilterAsync(
+                    "status",
+                    new[] { "(Blank)" },
+                    quarterRows);
+
+                E2ETestAssert.Equal(
+                    seed.RowsPerYear,
+                    await workOrdersPage.GetAggregateRowCountAsync("open"),
+                    "Filtering Blank Status changed the fixed open-work-order summary.");
+
+                await workOrdersPage.ClearValueFilterAsync(
+                    "status",
+                    seed.RowsPerYear);
+
+                checks.Pass(
+                    "Blank can be filtered and clearing restores the full sheet without changing open totals");
 
                 await workOrdersPage.SortFinancialColumnAsync(
                     "workOrderValue",

@@ -388,9 +388,30 @@ window.tabulatorTest = {
                     title: "Status",
                     field: "status",
                     editor: "input",
+                    headerSort: false,
                     minWidth: 180,
                     widthGrow: 1,
-                    headerHozAlign: "left"
+                    headerHozAlign: "left",
+
+                    headerPopupIcon:
+                        window.tabulatorFilters.icon(
+                            "Filter Status"
+                        ),
+
+                    headerPopup: function (
+                        event,
+                        column,
+                        onRendered
+                    ) {
+                        return window.tabulatorFilters
+                            .createValuePopup(
+                                window.tabulatorTest,
+                                elementId,
+                                column,
+                                onRendered,
+                                "status"
+                            );
+                    }
                 },
                 {
                     title: "Notes",
