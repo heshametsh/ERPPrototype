@@ -337,10 +337,12 @@
 
                 externalFilters: {
                     workOrderNumber: "",
+                    workOrderNumbers: [],
                     workTypeCodes: [],
                     assignmentDates: [],
                     basketValues: [],
                     statusValues: [],
+                    notesValues: [],
                     workOrderValueAmount: null,
                     partialAmountAmount: null,
                     remainingAmountAmount: null

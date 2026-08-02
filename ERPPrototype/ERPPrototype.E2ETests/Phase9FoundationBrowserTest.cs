@@ -17,8 +17,8 @@ internal sealed class Phase9FoundationBrowserTest(
     public int ExpectedCheckCount => suite switch
     {
         E2ETestSuite.Smoke => 9,
-        E2ETestSuite.Full => 43,
-        E2ETestSuite.Stress => 50,
+        E2ETestSuite.Full => 46,
+        E2ETestSuite.Stress => 53,
         _ => throw new ArgumentOutOfRangeException(nameof(suite))
     };
 
@@ -346,12 +346,16 @@ internal sealed class Phase9FoundationBrowserTest(
                     "أعمدة المبالغ فيها ترتيب رقمي فقط بدون فلتر");
 
                 E2ETestAssert.Equal(
-                    "workTypeCode:1:0|basket:1:0|status:1:0",
+                    "workOrderNumber:1:0|workTypeCode:1:0|" +
+                    "assignmentDate:1:0|basket:1:0|status:1:0|notes:1:0",
                     await workOrdersPage.GetHeaderControlSnapshotAsync(
+                        "workOrderNumber",
                         "workTypeCode",
+                        "assignmentDate",
                         "basket",
-                        "status"),
-                    "Value-filter columns must expose filter icons without sort controls.");
+                        "status",
+                        "notes"),
+                    "Every non-financial column must expose a filter icon without a sort control.");
 
                 var workTypeOptions =
                     await workOrdersPage.GetValueFilterOptionsAsync(
@@ -382,7 +386,81 @@ internal sealed class Phase9FoundationBrowserTest(
                     "Status did not expose its current values and Blank option.");
 
                 checks.Pass(
-                    "Work Type, Basket, and Status expose Excel-style current-value filters");
+                    "All non-financial columns expose Excel-style filter controls");
+
+                var workOrderNumberMetadata =
+                    await workOrdersPage.GetValueFilterMetadataAsync(
+                        "workOrderNumber");
+                var notesMetadata =
+                    await workOrdersPage.GetValueFilterMetadataAsync(
+                        "notes");
+
+                E2ETestAssert.Equal(
+                    seed.RowsPerYear,
+                    workOrderNumberMetadata.OptionCount,
+                    "Work Order Number did not expose every current-year value.");
+                E2ETestAssert.Equal(
+                    seed.RowsPerYear,
+                    notesMetadata.OptionCount,
+                    "Notes did not expose every current-year value.");
+                E2ETestAssert.True(
+                    workOrderNumberMetadata.Virtualized &&
+                    notesMetadata.Virtualized,
+                    "High-cardinality value filters must virtualize their checkbox lists.");
+                E2ETestAssert.True(
+                    (await workOrdersPage.SearchValueFilterOptionsAsync(
+                        "workOrderNumber",
+                        seed.CurrentYearLastWorkOrderNumber))
+                    .SequenceEqual(
+                        new[] { seed.CurrentYearLastWorkOrderNumber }),
+                    "Work Order Number search did not find the exact last value.");
+                E2ETestAssert.True(
+                    (await workOrdersPage.SearchValueFilterOptionsAsync(
+                        "notes",
+                        seed.CurrentYearLastNote))
+                    .SequenceEqual(
+                        new[] { seed.CurrentYearLastNote }),
+                    "Notes search did not find the exact last value.");
+
+                checks.Pass(
+                    "Work Order Number and Notes virtualize large value lists and search all values");
+
+                await workOrdersPage.ApplyValueFilterAsync(
+                    "workOrderNumber",
+                    new[] { seed.CurrentYearMiddleWorkOrderNumber },
+                    1);
+
+                E2ETestAssert.True(
+                    (await workOrdersPage.GetValueFilterOptionsAsync(
+                        "notes"))
+                    .SequenceEqual(new[] { seed.CurrentYearMiddleNote }),
+                    "Notes options did not update from the active Work Order Number filter.");
+
+                await workOrdersPage.ClearValueFilterAsync(
+                    "workOrderNumber",
+                    seed.RowsPerYear);
+
+                checks.Pass(
+                    "Work Order Number filtering narrows Notes values to the matching work order");
+
+                await workOrdersPage.ApplyValueFilterAsync(
+                    "notes",
+                    new[] { seed.CurrentYearMiddleNote },
+                    1);
+
+                E2ETestAssert.True(
+                    (await workOrdersPage.GetValueFilterOptionsAsync(
+                        "workOrderNumber"))
+                    .SequenceEqual(
+                        new[] { seed.CurrentYearMiddleWorkOrderNumber }),
+                    "Work Order Number options did not update from the active Notes filter.");
+
+                await workOrdersPage.ClearValueFilterAsync(
+                    "notes",
+                    seed.RowsPerYear);
+
+                checks.Pass(
+                    "Notes filtering narrows Work Order Number values to the matching work order");
 
                 var quarterRows = seed.RowsPerYear / 4;
 

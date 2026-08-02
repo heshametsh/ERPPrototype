@@ -956,6 +956,71 @@ internal sealed class WorkOrdersPage(IPage page)
             .ToArray();
     }
 
+    public async Task<(int OptionCount, bool Virtualized)>
+        GetValueFilterMetadataAsync(string field)
+    {
+        var popup = await OpenValueFilterPopupAsync(field);
+
+        var optionCountText =
+            await popup.GetAttributeAsync("data-filter-option-count") ?? "0";
+        var virtualizedText =
+            await popup.GetAttributeAsync("data-filter-virtualized") ?? "false";
+
+        await CloseValueFilterPopupAsync(field, popup);
+
+        return (
+            int.Parse(
+                optionCountText,
+                CultureInfo.InvariantCulture),
+            string.Equals(
+                virtualizedText,
+                "true",
+                StringComparison.OrdinalIgnoreCase));
+    }
+
+    public async Task<string[]> SearchValueFilterOptionsAsync(
+        string field,
+        string query)
+    {
+        var popup = await OpenValueFilterPopupAsync(field);
+        var search = popup.Locator(
+            "[data-filter-role=\"search\"]");
+
+        await search.FillAsync(query);
+
+        await page.WaitForFunctionAsync(
+            """
+            args => {
+                const popup = document.querySelector(
+                    `.excel-filter-popup[data-filter-field="${args.field}"]` +
+                    `[data-filter-type="value"]`);
+
+                return popup?.dataset.filterVisibleOptionCount ===
+                    String(args.expectedCount);
+            }
+            """,
+            new
+            {
+                field,
+                expectedCount = 1
+            },
+            new PageWaitForFunctionOptions
+            {
+                Timeout = NormalTimeoutMs
+            });
+
+        var values = await popup
+            .Locator(
+                ".excel-filter-option[data-filter-value] > span")
+            .AllInnerTextsAsync();
+
+        await CloseValueFilterPopupAsync(field, popup);
+
+        return values
+            .Select(value => value.Trim())
+            .ToArray();
+    }
+
     public async Task ApplyValueFilterAsync(
         string field,
         IReadOnlyCollection<string> displayValues,
@@ -967,8 +1032,29 @@ internal sealed class WorkOrdersPage(IPage page)
             .Locator("[data-filter-role=\"select-all\"]")
             .SetCheckedAsync(false);
 
+        var search = popup.Locator(
+            "[data-filter-role=\"search\"]");
+
         foreach (var displayValue in displayValues)
         {
+            await search.FillAsync(displayValue);
+
+            await page.WaitForFunctionAsync(
+                """
+                args => {
+                    const popup = document.querySelector(
+                        `.excel-filter-popup[data-filter-field="${args.field}"]` +
+                        `[data-filter-type="value"]`);
+
+                    return popup?.dataset.filterVisibleOptionCount === "1";
+                }
+                """,
+                new { field },
+                new PageWaitForFunctionOptions
+                {
+                    Timeout = NormalTimeoutMs
+                });
+
             var option = popup
                 .Locator(
                     ".excel-filter-option[data-filter-value]")

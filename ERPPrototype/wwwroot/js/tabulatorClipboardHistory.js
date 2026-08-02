@@ -776,6 +776,11 @@
                         filters?.workOrderNumber ?? ""
                     ),
 
+                workOrderNumbers:
+                    Array.from(
+                        filters?.workOrderNumbers ?? []
+                    ),
+
                 workTypeCodes:
                     Array.from(
                         filters?.workTypeCodes ?? []
@@ -794,6 +799,11 @@
                 statusValues:
                     Array.from(
                         filters?.statusValues ?? []
+                    ),
+
+                notesValues:
+                    Array.from(
+                        filters?.notesValues ?? []
                     ),
 
                 workOrderValueAmount:

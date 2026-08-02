@@ -462,6 +462,26 @@ textarea {
     background: #ffffff;
 }
 
+.excel-filter-options.is-virtualized,
+.excel-filter-virtual-canvas {
+    position: relative;
+}
+
+.excel-filter-option.is-virtual-row {
+    position: absolute;
+    right: 0;
+    left: 0;
+    box-sizing: border-box;
+    height: 31px;
+}
+
+.excel-filter-option > span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .excel-filter-scroll::-webkit-scrollbar {
     width: 10px;
 }

@@ -3,6 +3,12 @@ window.tabulatorFilters = {
     blankValueToken: "__UDS_FILTER_BLANK__",
 
     definitions: {
+        workOrderNumber: {
+            stateKey: "workOrderNumbers",
+            title: "Filter Work Order Number",
+            storageKey: "uds-work-order-number-filter-size",
+            virtualThreshold: 250
+        },
         workTypeCode: {
             stateKey: "workTypeCodes",
             title: "Filter Work Type",
@@ -23,6 +29,12 @@ window.tabulatorFilters = {
             stateKey: "statusValues",
             title: "Filter Status",
             storageKey: "uds-status-filter-size"
+        },
+        notes: {
+            stateKey: "notesValues",
+            title: "Filter Notes",
+            storageKey: "uds-notes-filter-size",
+            virtualThreshold: 250
         },
         workOrderValue: {
             stateKey: "workOrderValueAmount",
@@ -154,42 +166,69 @@ window.tabulatorFilters = {
         return true;
     },
 
+    prepareExternalFilters: function (filters) {
+        return {
+            workOrderSearch: String(
+                filters.workOrderNumber ?? ""
+            ).trim(),
+            workOrderNumbers: new Set(
+                filters.workOrderNumbers ?? []
+            ),
+            workTypes: new Set(
+                filters.workTypeCodes ?? []
+            ),
+            assignmentDates: new Set(
+                filters.assignmentDates ?? []
+            ),
+            baskets: new Set(
+                filters.basketValues ?? []
+            ),
+            statuses: new Set(
+                filters.statusValues ?? []
+            ),
+            notes: new Set(
+                filters.notesValues ?? []
+            ),
+            workOrderValueAmount:
+                filters.workOrderValueAmount,
+            partialAmountAmount:
+                filters.partialAmountAmount,
+            remainingAmountAmount:
+                filters.remainingAmountAmount
+        };
+    },
+
     rowMatchesExternalFilters: function (
         host,
         rowData,
         filters,
-        excludedField = null
+        excludedField = null,
+        preparedFilters = null
     ) {
-        const workOrderSearch = String(
-            filters.workOrderNumber ?? ""
-        ).trim();
+        const prepared = preparedFilters ??
+            this.prepareExternalFilters(filters);
 
-        const workTypes = new Set(
-            filters.workTypeCodes ?? []
-        );
-
-        const assignmentDates = new Set(
-            filters.assignmentDates ?? []
-        );
-
-        const baskets = new Set(
-            filters.basketValues ?? []
-        );
-
-        const statuses = new Set(
-            filters.statusValues ?? []
-        );
-
-        const matchesWorkOrder =
-            workOrderSearch === "" ||
+        const matchesWorkOrderSearch =
+            prepared.workOrderSearch === "" ||
             String(
                 rowData.workOrderNumber ?? ""
-            ).includes(workOrderSearch);
+            ).includes(prepared.workOrderSearch);
+
+        const matchesWorkOrderNumber =
+            excludedField === "workOrderNumber" ||
+            prepared.workOrderNumbers.size === 0 ||
+            prepared.workOrderNumbers.has(
+                this.toFilterToken(
+                    host,
+                    "workOrderNumber",
+                    rowData.workOrderNumber
+                )
+            );
 
         const matchesWorkType =
             excludedField === "workTypeCode" ||
-            workTypes.size === 0 ||
-            workTypes.has(
+            prepared.workTypes.size === 0 ||
+            prepared.workTypes.has(
                 this.toFilterToken(
                     host,
                     "workTypeCode",
@@ -204,13 +243,13 @@ window.tabulatorFilters = {
 
         const matchesDate =
             excludedField === "assignmentDate" ||
-            assignmentDates.size === 0 ||
-            assignmentDates.has(normalizedDate);
+            prepared.assignmentDates.size === 0 ||
+            prepared.assignmentDates.has(normalizedDate);
 
         const matchesBasket =
             excludedField === "basket" ||
-            baskets.size === 0 ||
-            baskets.has(
+            prepared.baskets.size === 0 ||
+            prepared.baskets.has(
                 this.toFilterToken(
                     host,
                     "basket",
@@ -220,12 +259,23 @@ window.tabulatorFilters = {
 
         const matchesStatus =
             excludedField === "status" ||
-            statuses.size === 0 ||
-            statuses.has(
+            prepared.statuses.size === 0 ||
+            prepared.statuses.has(
                 this.toFilterToken(
                     host,
                     "status",
                     rowData.status
+                )
+            );
+
+        const matchesNotes =
+            excludedField === "notes" ||
+            prepared.notes.size === 0 ||
+            prepared.notes.has(
+                this.toFilterToken(
+                    host,
+                    "notes",
+                    rowData.notes
                 )
             );
 
@@ -234,7 +284,7 @@ window.tabulatorFilters = {
             this.amountMatchesFilter(
                 host,
                 rowData.workOrderValue,
-                filters.workOrderValueAmount
+                prepared.workOrderValueAmount
             );
 
         const matchesPartialAmount =
@@ -242,7 +292,7 @@ window.tabulatorFilters = {
             this.amountMatchesFilter(
                 host,
                 rowData.partialAmount,
-                filters.partialAmountAmount
+                prepared.partialAmountAmount
             );
 
         const matchesRemainingAmount =
@@ -250,15 +300,17 @@ window.tabulatorFilters = {
             this.amountMatchesFilter(
                 host,
                 rowData.remainingAmount,
-                filters.remainingAmountAmount
+                prepared.remainingAmountAmount
             );
 
         return (
-            matchesWorkOrder &&
+            matchesWorkOrderSearch &&
+            matchesWorkOrderNumber &&
             matchesWorkType &&
             matchesDate &&
             matchesBasket &&
             matchesStatus &&
+            matchesNotes &&
             matchesWorkOrderValue &&
             matchesPartialAmount &&
             matchesRemainingAmount
@@ -277,6 +329,11 @@ window.tabulatorFilters = {
             return [];
         }
 
+        const preparedFilters =
+            this.prepareExternalFilters(
+                state.externalFilters
+            );
+
         return table
             .getData()
             .filter(row =>
@@ -284,7 +341,8 @@ window.tabulatorFilters = {
                     host,
                     row,
                     state.externalFilters,
-                    field
+                    field,
+                    preparedFilters
                 )
             );
     },
@@ -833,6 +891,25 @@ window.tabulatorFilters = {
         empty.className = "excel-filter-empty";
         empty.textContent = "No matching values.";
 
+        const virtualThreshold =
+            Number(definition.virtualThreshold) || 250;
+        const virtualized =
+            uniqueValues.length > virtualThreshold;
+
+        options.classList.toggle(
+            "is-virtualized",
+            virtualized
+        );
+
+        const virtualRowHeight = 31;
+        const virtualOverscan = 6;
+        let filteredValues = uniqueValues;
+
+        ui.container.dataset.filterOptionCount =
+            String(uniqueValues.length);
+        ui.container.dataset.filterVirtualized =
+            virtualized ? "true" : "false";
+
         const updateSelectAll = () => {
             ui.selectAll.checked =
                 uniqueValues.length > 0 &&
@@ -843,62 +920,152 @@ window.tabulatorFilters = {
                 pendingValues.size < uniqueValues.length;
         };
 
-        const render = () => {
+        const createOption = (value, virtualIndex = null) => {
+            const displayValue =
+                this.getFilterDisplayValue(value);
+
+            const label = document.createElement("label");
+            label.className = "excel-filter-option";
+            label.dataset.filterValue = value;
+            label.title = displayValue;
+
+            if (Number.isInteger(virtualIndex)) {
+                label.classList.add("is-virtual-row");
+                label.style.top =
+                    `${virtualIndex * virtualRowHeight}px`;
+            }
+
+            const checkbox = document.createElement("input");
+            checkbox.type = "checkbox";
+            checkbox.checked = pendingValues.has(value);
+
+            const text = document.createElement("span");
+            text.textContent = displayValue;
+
+            checkbox.addEventListener(
+                "change",
+                () => {
+                    if (checkbox.checked) {
+                        pendingValues.add(value);
+                    } else {
+                        pendingValues.delete(value);
+                    }
+
+                    updateSelectAll();
+                }
+            );
+
+            label.append(checkbox, text);
+            return label;
+        };
+
+        const renderVirtualRows = () => {
+            if (!virtualized || filteredValues.length === 0) {
+                return;
+            }
+
+            let canvas = options.querySelector(
+                ".excel-filter-virtual-canvas"
+            );
+
+            if (!canvas) {
+                canvas = document.createElement("div");
+                canvas.className =
+                    "excel-filter-virtual-canvas";
+                options.replaceChildren(canvas);
+            }
+
+            canvas.style.height =
+                `${filteredValues.length * virtualRowHeight}px`;
+
+            const viewportHeight =
+                options.clientHeight || 260;
+            const startIndex = Math.max(
+                0,
+                Math.floor(options.scrollTop / virtualRowHeight) -
+                    virtualOverscan
+            );
+            const endIndex = Math.min(
+                filteredValues.length,
+                Math.ceil(
+                    (options.scrollTop + viewportHeight) /
+                    virtualRowHeight
+                ) + virtualOverscan
+            );
+
+            const fragment = document.createDocumentFragment();
+
+            for (
+                let index = startIndex;
+                index < endIndex;
+                index++
+            ) {
+                fragment.appendChild(
+                    createOption(filteredValues[index], index)
+                );
+            }
+
+            canvas.replaceChildren(fragment);
+        };
+
+        const render = (resetScroll = false) => {
             const query = ui.search.value
                 .trim()
                 .toLocaleLowerCase();
 
-            options.replaceChildren();
-            let visible = 0;
+            filteredValues = uniqueValues.filter(value =>
+                query === "" ||
+                this.getFilterDisplayValue(value)
+                    .toLocaleLowerCase()
+                    .includes(query)
+            );
 
-            uniqueValues.forEach(value => {
-                const displayValue =
-                    this.getFilterDisplayValue(value);
+            ui.container.dataset.filterVisibleOptionCount =
+                String(filteredValues.length);
 
+            if (resetScroll) {
+                options.scrollTop = 0;
+            }
+
+            if (filteredValues.length === 0) {
+                options.replaceChildren(empty);
+                return;
+            }
+
+            if (virtualized) {
                 if (
-                    query !== "" &&
-                    !displayValue
-                        .toLocaleLowerCase()
-                        .includes(query)
+                    !options.querySelector(
+                        ".excel-filter-virtual-canvas"
+                    )
                 ) {
-                    return;
+                    const canvas = document.createElement("div");
+                    canvas.className =
+                        "excel-filter-virtual-canvas";
+                    options.replaceChildren(canvas);
                 }
 
-                visible++;
-
-                const label = document.createElement("label");
-                label.className = "excel-filter-option";
-
-                const checkbox =
-                    document.createElement("input");
-                checkbox.type = "checkbox";
-                checkbox.checked = pendingValues.has(value);
-
-                const text = document.createElement("span");
-                text.textContent = displayValue;
-                label.dataset.filterValue = value;
-
-                checkbox.addEventListener(
-                    "change",
-                    () => {
-                        if (checkbox.checked) {
-                            pendingValues.add(value);
-                        } else {
-                            pendingValues.delete(value);
-                        }
-
-                        updateSelectAll();
-                    }
-                );
-
-                label.append(checkbox, text);
-                options.appendChild(label);
-            });
-
-            if (visible === 0) {
-                options.appendChild(empty);
+                renderVirtualRows();
+                return;
             }
+
+            const fragment = document.createDocumentFragment();
+
+            filteredValues.forEach(value =>
+                fragment.appendChild(createOption(value))
+            );
+
+            options.replaceChildren(fragment);
         };
+
+        options.addEventListener(
+            "scroll",
+            () => {
+                if (virtualized) {
+                    renderVirtualRows();
+                }
+            },
+            { passive: true }
+        );
 
         ui.selectAll.addEventListener(
             "change",
@@ -911,12 +1078,15 @@ window.tabulatorFilters = {
                     );
                 }
 
-                render();
+                render(false);
                 updateSelectAll();
             }
         );
 
-        ui.search.addEventListener("input", render);
+        ui.search.addEventListener(
+            "input",
+            () => render(true)
+        );
 
         ui.clear.addEventListener("click", () => {
             const oldFilters =
@@ -1005,7 +1175,7 @@ window.tabulatorFilters = {
         );
 
         updateSelectAll();
-        render();
+        render(true);
 
         this.mountPopup(
             ui.container,
@@ -1024,6 +1194,10 @@ window.tabulatorFilters = {
                 defaultHeight: 380
             }
         );
+
+        if (virtualized) {
+            window.requestAnimationFrame(renderVirtualRows);
+        }
 
         return ui.container;
     },
@@ -1824,10 +1998,12 @@ window.tabulatorFilters = {
             String(
                 filters.workOrderNumber ?? ""
             ).trim() !== "" ||
+            (filters.workOrderNumbers ?? []).length > 0 ||
             (filters.workTypeCodes ?? []).length > 0 ||
             (filters.assignmentDates ?? []).length > 0 ||
             (filters.basketValues ?? []).length > 0 ||
             (filters.statusValues ?? []).length > 0 ||
+            (filters.notesValues ?? []).length > 0 ||
             this.isAmountFilterActive(
                 filters.workOrderValueAmount
             ) ||
@@ -1841,11 +2017,16 @@ window.tabulatorFilters = {
         if (!hasAnyFilter) {
             table.clearFilter();
         } else {
+            const preparedFilters =
+                this.prepareExternalFilters(filters);
+
             table.setFilter(rowData =>
                 this.rowMatchesExternalFilters(
                     host,
                     rowData,
-                    filters
+                    filters,
+                    null,
+                    preparedFilters
                 )
             );
         }
@@ -1942,10 +2123,13 @@ window.tabulatorFilters = {
 
         const shouldReapplyActiveFilter =
             uniqueFields.some(field => {
-                if (field === "workOrderNumber") {
-                    return String(
+                if (
+                    field === "workOrderNumber" &&
+                    String(
                         state.externalFilters.workOrderNumber ?? ""
-                    ).trim() !== "";
+                    ).trim() !== ""
+                ) {
+                    return true;
                 }
 
                 const definition =

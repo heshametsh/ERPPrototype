@@ -217,9 +217,30 @@ window.tabulatorTest = {
                     editorParams: {
                         requiredLength: 9
                     },
+                    headerSort: false,
                     minWidth: 210,
                     widthGrow: 1.15,
-                    headerHozAlign: "left"
+                    headerHozAlign: "left",
+
+                    headerPopupIcon:
+                        window.tabulatorFilters.icon(
+                            "Filter Work Order Number"
+                        ),
+
+                    headerPopup: function (
+                        event,
+                        column,
+                        onRendered
+                    ) {
+                        return window.tabulatorFilters
+                            .createValuePopup(
+                                window.tabulatorTest,
+                                elementId,
+                                column,
+                                onRendered,
+                                "workOrderNumber"
+                            );
+                    }
                 },
                 {
                     title: "Work Type",
@@ -417,9 +438,30 @@ window.tabulatorTest = {
                     title: "Notes",
                     field: "notes",
                     editor: "input",
+                    headerSort: false,
                     minWidth: 310,
                     widthGrow: 2,
-                    headerHozAlign: "left"
+                    headerHozAlign: "left",
+
+                    headerPopupIcon:
+                        window.tabulatorFilters.icon(
+                            "Filter Notes"
+                        ),
+
+                    headerPopup: function (
+                        event,
+                        column,
+                        onRendered
+                    ) {
+                        return window.tabulatorFilters
+                            .createValuePopup(
+                                window.tabulatorTest,
+                                elementId,
+                                column,
+                                onRendered,
+                                "notes"
+                            );
+                    }
                 }
             ]
         });
