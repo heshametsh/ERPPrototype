@@ -979,6 +979,118 @@ internal sealed class WorkOrdersPage(IPage page)
             .CountAsync();
     }
 
+    public async Task<int> GetBasketDashboardPlannedColumnCountAsync(
+        int activeBasketCount)
+    {
+        return await page.EvaluateAsync<int>(
+            """
+            count => Number(
+                window.tabulatorTest
+                    ?.getBasketDashboardColumnCount?.(count) ?? -1
+            )
+            """,
+            activeBasketCount);
+    }
+
+    public async Task<BasketDashboardLayoutSnapshot>
+        GetBasketDashboardLayoutAsync()
+    {
+        var values = await page.EvaluateAsync<int[]>(
+            """
+            tableId => {
+                const dashboard = document.getElementById(
+                    `${tableId}-basket-dashboard`
+                );
+                const track = dashboard?.querySelector(
+                    '.work-orders-basket-dashboard-track'
+                );
+                const cards = Array.from(
+                    track?.querySelectorAll(
+                        '[data-testid="work-orders-basket-card"]'
+                    ) ?? []
+                );
+
+                if (!dashboard || !track) {
+                    return [-1, -1, 1, -1, -1, -1, -1];
+                }
+
+                const dashboardRect = dashboard.getBoundingClientRect();
+                const tolerance = 2;
+                const visibleCards = cards.filter(card => {
+                    const rect = card.getBoundingClientRect();
+
+                    return Boolean(
+                        rect.width > 0 &&
+                        rect.height > 0 &&
+                        rect.left >= dashboardRect.left - tolerance &&
+                        rect.right <= dashboardRect.right + tolerance &&
+                        rect.top >= dashboardRect.top - tolerance &&
+                        rect.bottom <= dashboardRect.bottom + tolerance
+                    );
+                });
+
+                const rowTops = new Set(
+                    cards.map(card =>
+                        Math.round(card.getBoundingClientRect().top)
+                    )
+                );
+
+                const maximumCardHeight = cards.length > 0
+                    ? Math.max(
+                        ...cards.map(card =>
+                            card.getBoundingClientRect().height
+                        )
+                    )
+                    : 0;
+
+                const groups = Array.from(
+                    track.querySelectorAll(
+                        '.work-orders-basket-dashboard-list'
+                    )
+                );
+                const borderedGroups = groups.filter(group => {
+                    const style = getComputedStyle(group);
+                    const widths = [
+                        style.borderTopWidth,
+                        style.borderRightWidth,
+                        style.borderBottomWidth,
+                        style.borderLeftWidth
+                    ].map(value => Number.parseFloat(value) || 0);
+
+                    return Boolean(
+                        widths.every(width => width >= 1) &&
+                        style.borderTopStyle !== 'none' &&
+                        style.borderRightStyle !== 'none' &&
+                        style.borderBottomStyle !== 'none' &&
+                        style.borderLeftStyle !== 'none'
+                    );
+                });
+
+                return [
+                    cards.length,
+                    visibleCards.length,
+                    track.scrollWidth > track.clientWidth + tolerance
+                        ? 1
+                        : 0,
+                    rowTops.size,
+                    Math.round(maximumCardHeight),
+                    groups.length,
+                    borderedGroups.length
+                ];
+            }
+            """,
+            TableId);
+
+        return new BasketDashboardLayoutSnapshot(
+            CardCount: values[0],
+            VisibleCardCount: values[1],
+            HasHorizontalOverflow: values[2] == 1,
+            RowCount: values[3],
+            MaximumCardHeightPixels: values[4],
+            GroupCount: values[5],
+            BorderedGroupCount: values[6]);
+    }
+
     public async Task<BasketDashboardEntrySnapshot>
         GetBasketDashboardEntryAsync(string basket)
     {
@@ -1008,6 +1120,70 @@ internal sealed class WorkOrdersPage(IPage page)
         return new BasketDashboardEntrySnapshot(
             RowCount: checked((int)values[0]),
             RemainingAmountCents: values[1]);
+    }
+
+    public async Task<bool> IsBasketDashboardEntryRenderedAsync(
+        string basket)
+    {
+        return await page.EvaluateAsync<bool>(
+            """
+            args => {
+                const dashboard = document.getElementById(
+                    `${args.tableId}-basket-dashboard`
+                );
+                const rows = Array.from(
+                    dashboard?.querySelectorAll(
+                        '[data-testid="work-orders-basket-card"]'
+                    ) ?? []
+                );
+
+                return rows.some(row =>
+                    row.dataset.basketValue === args.basket &&
+                    row.getClientRects().length > 0
+                );
+            }
+            """,
+            new
+            {
+                tableId = TableId,
+                basket
+            });
+    }
+
+    public async Task WaitForBasketDashboardRenderedEntryAsync(
+        string basket,
+        bool expectedRendered,
+        int timeoutMs = NormalTimeoutMs)
+    {
+        await page.WaitForFunctionAsync(
+            """
+            args => {
+                const dashboard = document.getElementById(
+                    `${args.tableId}-basket-dashboard`
+                );
+                const rows = Array.from(
+                    dashboard?.querySelectorAll(
+                        '[data-testid="work-orders-basket-card"]'
+                    ) ?? []
+                );
+                const rendered = rows.some(row =>
+                    row.dataset.basketValue === args.basket &&
+                    row.getClientRects().length > 0
+                );
+
+                return rendered === args.expectedRendered;
+            }
+            """,
+            new
+            {
+                tableId = TableId,
+                basket,
+                expectedRendered
+            },
+            new PageWaitForFunctionOptions
+            {
+                Timeout = timeoutMs
+            });
     }
 
     public async Task WaitForBasketDashboardEntryAsync(
@@ -1809,6 +1985,59 @@ internal sealed class WorkOrdersPage(IPage page)
             });
     }
 
+    public async Task<SelectionSummaryLayoutSnapshot>
+        GetSelectionSummaryLayoutAsync()
+    {
+        var values = await page.EvaluateAsync<int[]>(
+            """
+            tableId => {
+                const summary = document.getElementById(
+                    `${tableId}-summary-selection`
+                );
+                const host = document.getElementById(
+                    `${tableId}-summary-host`
+                );
+                const grid = document.getElementById(tableId);
+                const card = grid?.closest('.tabulator-card');
+                const holder = grid?.querySelector(
+                    '.tabulator-tableholder'
+                );
+
+                if (!summary || !host || !card || !holder) {
+                    return [0, 0, 0, 0];
+                }
+
+                const summaryRect = summary.getBoundingClientRect();
+                const hostRect = host.getBoundingClientRect();
+                const cardRect = card.getBoundingClientRect();
+                const holderRect = holder.getBoundingClientRect();
+                const tolerance = 2;
+
+                return [
+                    summary.hidden === false ? 1 : 0,
+                    summaryRect.top >= cardRect.bottom - tolerance
+                        ? 1
+                        : 0,
+                    summaryRect.bottom <= window.innerHeight + tolerance &&
+                    summaryRect.top >= -tolerance
+                        ? 1
+                        : 0,
+                    host.contains(summary) &&
+                    holderRect.bottom <= summaryRect.top + tolerance
+                        ? 1
+                        : 0
+                ];
+            }
+            """,
+            TableId);
+
+        return new SelectionSummaryLayoutSnapshot(
+            IsVisible: values[0] == 1,
+            IsBelowGridCard: values[1] == 1,
+            IsWithinViewport: values[2] == 1,
+            DoesNotCoverTableHolder: values[3] == 1);
+    }
+
     public async Task ClearSelectionAsync()
     {
         await page.EvaluateAsync(
@@ -2016,6 +2245,21 @@ internal sealed class WorkOrdersPage(IPage page)
 internal sealed record BasketDashboardEntrySnapshot(
     int RowCount,
     long RemainingAmountCents);
+
+internal sealed record BasketDashboardLayoutSnapshot(
+    int CardCount,
+    int VisibleCardCount,
+    bool HasHorizontalOverflow,
+    int RowCount,
+    int MaximumCardHeightPixels,
+    int GroupCount,
+    int BorderedGroupCount);
+
+internal sealed record SelectionSummaryLayoutSnapshot(
+    bool IsVisible,
+    bool IsBelowGridCard,
+    bool IsWithinViewport,
+    bool DoesNotCoverTableHolder);
 
 internal sealed record BrowserStructureStressMetrics(
     int ExistingRows,

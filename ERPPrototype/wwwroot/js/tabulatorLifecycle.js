@@ -27,29 +27,151 @@
          * بدل height: 100% الذي كان يسبب إعادة رسم محرر الخلية.
          */
         calculateViewportTableHeight: function (element) {
-            const minimumHeight = 320;
-            const bottomGap = 14;
+            const minimumTableHeight = 320;
+            const reservedFooterHeight = 50;
+            const shellGap = 6;
+            const cardChrome = 2;
+            const bottomGap = 10;
             const viewportHeight =
                 window.visualViewport?.height || window.innerHeight;
-            const elementTop =
-                element.getBoundingClientRect().top;
-            const summary = document.getElementById(
-                `${element.id}-summary`
+            const shell = document.getElementById(
+                `${element.id}-shell`
             );
-            const summaryHeight =
-                summary?.getBoundingClientRect().height ?? 0;
-            const summaryGap = summaryHeight > 0 ? 10 : 0;
-
-            return Math.max(
-                minimumHeight,
+            const selectionSummaryHost = document.getElementById(
+                `${element.id}-summary-host`
+            );
+            const shellTop =
+                shell?.getBoundingClientRect().top ??
+                element.getBoundingClientRect().top;
+            const measuredFooterHeight =
+                selectionSummaryHost?.getBoundingClientRect().height ?? 0;
+            const footerHeight = Math.max(
+                reservedFooterHeight,
+                Math.ceil(measuredFooterHeight)
+            );
+            const minimumShellHeight =
+                minimumTableHeight + footerHeight + shellGap + cardChrome;
+            const availableShellHeight = Math.max(
+                minimumShellHeight,
                 Math.floor(
-                    viewportHeight -
-                    elementTop -
-                    summaryHeight -
-                    summaryGap -
-                    bottomGap
+                    viewportHeight - shellTop - bottomGap
                 )
             );
+
+            if (shell) {
+                shell.style.height = `${availableShellHeight}px`;
+                shell.style.setProperty(
+                    "--work-orders-selected-footer-height",
+                    `${footerHeight}px`
+                );
+            }
+
+            return Math.max(
+                minimumTableHeight,
+                availableShellHeight -
+                    footerHeight -
+                    shellGap -
+                    cardChrome
+            );
+        },
+
+        syncViewportTableHeight: function (elementId, reason = "layout") {
+            const table = this.tables[elementId];
+            const state = this.states[elementId];
+            const element = document.getElementById(elementId);
+
+            if (
+                !table ||
+                !state ||
+                !element ||
+                !state.viewportLockApplied ||
+                !this.usesDesktopPointer()
+            ) {
+                return false;
+            }
+
+            const viewportPosition =
+                this.captureTableViewportPosition?.(table) ?? null;
+            const targetHeight =
+                this.calculateViewportTableHeight(element);
+            const currentHeight = Math.round(
+                table.element?.getBoundingClientRect?.().height ?? 0
+            );
+
+            state.lastViewportLayoutReason = String(
+                reason ?? "layout"
+            );
+
+            if (Math.abs(currentHeight - targetHeight) <= 1) {
+                return false;
+            }
+
+            table.setHeight(`${targetHeight}px`);
+
+            if (viewportPosition) {
+                this.scheduleTableViewportPositionRestore?.(
+                    elementId,
+                    viewportPosition,
+                    6
+                );
+            }
+
+            return true;
+        },
+
+        scheduleViewportLayoutSync: function (
+            elementId,
+            reason = "layout"
+        ) {
+            const state = this.states[elementId];
+
+            if (!state) {
+                return false;
+            }
+
+            state.viewportLayoutSyncReason = String(
+                reason ?? "layout"
+            );
+
+            if (state.viewportLayoutSyncFrame !== null) {
+                return true;
+            }
+
+            /*
+             * Basket cards are rendered after Tabulator receives its first
+             * height. Wait for two paint frames so the dashboard's final
+             * two-row height and the shell's new top position are measurable.
+             */
+            state.viewportLayoutSyncFrame =
+                window.requestAnimationFrame(() => {
+                    const currentState = this.states[elementId];
+
+                    if (!currentState) {
+                        return;
+                    }
+
+                    currentState.viewportLayoutSyncFrame =
+                        window.requestAnimationFrame(() => {
+                            const latestState =
+                                this.states[elementId];
+
+                            if (!latestState) {
+                                return;
+                            }
+
+                            latestState.viewportLayoutSyncFrame = null;
+                            const latestReason =
+                                latestState.viewportLayoutSyncReason;
+                            latestState.viewportLayoutSyncReason = "";
+
+                            this.syncViewportTableHeight(
+                                elementId,
+                                latestReason
+                            );
+                        });
+                });
+
+            return true;
         },
 
         applyViewportLock: function (state) {
@@ -181,6 +303,17 @@
                     state.verticalNavigationFrame
                 );
                 state.verticalNavigationFrame = null;
+            }
+
+            if (
+                state.viewportLayoutSyncFrame !== null &&
+                state.viewportLayoutSyncFrame !== undefined
+            ) {
+                window.cancelAnimationFrame(
+                    state.viewportLayoutSyncFrame
+                );
+                state.viewportLayoutSyncFrame = null;
+                state.viewportLayoutSyncReason = "";
             }
 
             if (
@@ -322,6 +455,10 @@
                  * same repeat policy and the same central state.
                  */
                 verticalNavigationFrame: null,
+
+                viewportLayoutSyncFrame: null,
+                viewportLayoutSyncReason: "",
+                lastViewportLayoutReason: "",
 
                 aggregateRefreshFrame: null,
                 aggregateRefreshReason: "",

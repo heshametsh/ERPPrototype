@@ -1145,3 +1145,941 @@
         width: 100%;
     }
 }
+
+
+/* =========================================================
+   PHASE 9.2A4 — COMPACT DASHBOARD AND RESERVED SHEET FOOTER
+   The dashboard gives vertical space back to the sheet. The selected totals
+   use a normal-flow reserved footer so the last visible row is never covered.
+   ========================================================= */
+
+.work-orders-open-summary {
+    gap: 7px;
+    margin-bottom: 7px;
+}
+
+.work-order-toolbar-row {
+    min-height: 38px;
+    margin: 4px 0 6px;
+}
+
+.work-order-search-box {
+    min-height: 36px;
+    padding: 3px 6px;
+}
+
+.work-order-search-input {
+    height: 28px;
+}
+
+.work-orders-selection-summary-host {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 50px;
+    margin-top: 6px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .tabulator-workorders-page {
+        padding-bottom: 8px;
+    }
+}
+
+/* =========================================================
+   PHASE 9.2A4-R1 — VIEWPORT GRID SHELL
+   The grid and Selected totals share one viewport-sized shell. The second
+   row is permanently reserved, so the footer is visible without covering
+   the last Tabulator row and without relying on document scrolling.
+   ========================================================= */
+
+.work-orders-grid-shell {
+    box-sizing: border-box;
+    display: grid;
+    grid-template-rows: minmax(0, 1fr) 50px;
+    gap: 6px;
+    width: 100%;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.work-orders-grid-shell > .tabulator-card {
+    box-sizing: border-box;
+    min-height: 0;
+    height: 100%;
+    overflow: hidden;
+}
+
+.work-orders-grid-shell > .work-orders-selection-summary-host {
+    box-sizing: border-box;
+    display: flex;
+    align-items: stretch;
+    width: 100%;
+    min-height: 50px;
+    height: 50px;
+    margin: 0;
+    overflow: hidden;
+}
+
+@media (max-width: 600px) {
+    .work-orders-grid-shell {
+        display: block;
+        height: auto !important;
+        overflow: visible;
+    }
+
+    .work-orders-grid-shell > .work-orders-selection-summary-host {
+        min-height: 0;
+        height: auto;
+        margin-top: 6px;
+        overflow: visible;
+    }
+}
+
+/* =========================================================
+   PHASE 9.2A5 — COMPACT TOP LAYOUT
+   Search and save status share the command header. The empty validation row
+   consumes no space, so the sheet starts immediately after the dashboard.
+   ========================================================= */
+
+.page-header-row {
+    align-items: flex-start;
+    margin-bottom: 7px;
+}
+
+.page-actions-box {
+    flex: 1 1 auto;
+    max-width: 980px;
+}
+
+.page-actions-meta-row {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    min-width: 0;
+    margin-top: 5px;
+}
+
+.page-actions-meta-row .save-status {
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: 100%;
+    margin-top: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.page-header-search-box {
+    display: grid;
+    grid-template-columns: auto minmax(150px, 210px);
+    align-items: center;
+    gap: 6px;
+    flex: 0 0 auto;
+    width: auto;
+    min-height: 30px;
+    padding: 2px 5px;
+    border-radius: 7px;
+    box-shadow: none;
+}
+
+.page-header-search-box .work-order-search-label {
+    margin: 0;
+    font-size: 0.68rem;
+}
+
+.page-header-search-box .work-order-search-input {
+    width: 210px;
+    height: 26px;
+    padding: 3px 8px;
+    font-size: 0.78rem;
+}
+
+.work-orders-open-summary {
+    margin-bottom: 4px;
+}
+
+.work-order-validation-row {
+    min-height: 0;
+    margin: 0;
+}
+
+.work-order-validation-row:has(.validation-navigator:not([hidden])) {
+    margin: 4px 0 6px;
+}
+
+.work-order-validation-row .validation-navigator {
+    min-height: 44px;
+}
+
+@media (max-width: 1120px) {
+    .page-header-row {
+        flex-direction: column;
+    }
+
+    .page-actions-box {
+        width: 100%;
+        max-width: none;
+    }
+
+    .page-actions-buttons,
+    .page-actions-meta-row {
+        justify-content: flex-start;
+    }
+}
+
+@media (max-width: 720px) {
+    .page-actions-meta-row {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .page-header-search-box {
+        grid-template-columns: auto minmax(0, 1fr);
+        width: 100%;
+    }
+
+    .page-header-search-box .work-order-search-input {
+        width: 100%;
+    }
+}
+
+/* =========================================================
+   PHASE 9.2A7 — PROMINENT WORK-ORDER SEARCH
+   The search remains independent and occupies the far-right position below
+   the command buttons. The save status uses the remaining space to its left.
+   ========================================================= */
+
+.page-actions-meta-row .save-status {
+    flex: 1 1 auto;
+    order: 1;
+    text-align: right;
+}
+
+.page-header-search-box {
+    order: 2;
+    grid-template-columns: auto minmax(220px, 270px);
+    min-height: 34px;
+    padding: 3px 6px;
+    border: 1px solid #a9c8da;
+    border-radius: 8px;
+    background: #ffffff;
+    box-shadow: 0 1px 4px rgba(20, 62, 89, 0.06);
+}
+
+.page-header-search-box .work-order-search-label {
+    color: #244f6b;
+    font-size: 0.72rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.page-header-search-box .work-order-search-input {
+    width: 270px;
+    height: 28px;
+    border-color: #bfd2de;
+    background: #fbfdfe;
+    font-size: 0.80rem;
+}
+
+.page-header-search-box .work-order-search-input:focus {
+    border-color: #2c86b4;
+    background: #ffffff;
+    box-shadow: 0 0 0 2px rgba(44, 134, 180, 0.12);
+}
+
+@media (max-width: 1120px) {
+    .page-actions-meta-row .save-status {
+        text-align: left;
+    }
+}
+
+@media (max-width: 720px) {
+    .page-actions-meta-row .save-status,
+    .page-header-search-box {
+        order: initial;
+    }
+
+    .page-header-search-box {
+        grid-template-columns: auto minmax(0, 1fr);
+    }
+
+    .page-header-search-box .work-order-search-input {
+        width: 100%;
+    }
+}
+
+/* =========================================================
+   PHASE 9.2A8 — SHEET-LOCAL WORK ORDER SEARCH
+   Search stays immediately above the sheet so it remains obvious during
+   day-to-day grid work. It is no longer mixed with the command header.
+   ========================================================= */
+
+.page-actions-meta-row {
+    justify-content: flex-end;
+}
+
+.page-actions-meta-row .save-status {
+    flex: 0 1 auto;
+    order: initial;
+    text-align: right;
+}
+
+.work-orders-sheet-toolbar {
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    width: 100%;
+    min-height: 38px;
+    padding: 3px 8px 5px;
+    border-top: 1px solid #d9e4eb;
+    background: #f5f8fa;
+}
+
+.sheet-search-box {
+    box-sizing: border-box;
+    display: grid;
+    grid-template-columns: auto minmax(260px, 360px);
+    align-items: center;
+    gap: 8px;
+    width: auto;
+    min-height: 32px;
+    margin: 0;
+    padding: 3px 7px;
+    border: 1px solid #9fbfd2;
+    border-radius: 7px;
+    background: #ffffff;
+    box-shadow: 0 1px 3px rgba(20, 62, 89, 0.06);
+}
+
+.sheet-search-box .work-order-search-label {
+    margin: 0;
+    color: #183f59;
+    font-family: Tahoma, "Segoe UI", Arial, sans-serif;
+    font-size: 0.78rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.sheet-search-box .work-order-search-input {
+    width: 360px;
+    height: 28px;
+    padding: 3px 9px;
+    border-color: #b8cedb;
+    background: #fbfdfe;
+    font-family: Tahoma, "Segoe UI", Arial, sans-serif;
+    font-size: 0.82rem;
+}
+
+.sheet-search-box .work-order-search-input:focus {
+    border-color: #2c86b4;
+    background: #ffffff;
+    box-shadow: 0 0 0 2px rgba(44, 134, 180, 0.12);
+}
+
+@media (max-width: 760px) {
+    .work-orders-sheet-toolbar {
+        padding-inline: 5px;
+    }
+
+    .sheet-search-box {
+        grid-template-columns: auto minmax(0, 1fr);
+        width: 100%;
+    }
+
+    .sheet-search-box .work-order-search-input {
+        width: 100%;
+    }
+}
+
+/* =========================================================
+   PHASE 9.2A13 — UNIFIED WORK ORDERS WORKSPACE
+   A cohesive compact workspace: the grid remains dominant, controls are
+   visually quiet, search is prominent above the sheet, and all active Basket
+   stages remain readable without a horizontal scrollbar.
+   ========================================================= */
+
+.tabulator-workorders-page {
+    --workspace-page: #f4f7fa;
+    --workspace-surface: #ffffff;
+    --workspace-header: #f0f5f8;
+    --workspace-line: #d8e3eb;
+    --workspace-line-soft: #e5ecf1;
+    --workspace-text: #173149;
+    --workspace-muted: #667c8e;
+    --workspace-blue: #247eae;
+    padding: 14px 22px 10px;
+    background: var(--workspace-page);
+}
+
+.page-header-row {
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 8px;
+}
+
+.tabulator-workorders-page h1 {
+    font-size: 1.55rem;
+    line-height: 1.1;
+    letter-spacing: -0.015em;
+}
+
+.page-context-row {
+    gap: 10px;
+    margin-top: 4px;
+}
+
+.page-subtitle {
+    font-size: 0.78rem;
+}
+
+.page-actions-buttons {
+    gap: 7px;
+}
+
+.page-action-button {
+    min-width: 86px;
+    height: 35px;
+    padding: 0 12px;
+    border-radius: 7px;
+    font-size: 0.78rem;
+}
+
+.page-action-button-copy {
+    min-width: 132px;
+}
+
+.page-action-button-save {
+    min-width: 82px;
+}
+
+.save-status {
+    min-height: 23px;
+    margin-top: 4px;
+    padding: 2px 9px;
+    font-size: 0.68rem;
+}
+
+.work-year-selector {
+    min-height: 28px;
+    padding: 2px 4px 2px 8px;
+}
+
+.work-year-select {
+    height: 23px;
+}
+
+.work-orders-open-summary {
+    gap: 7px;
+    min-height: 0;
+    margin-bottom: 6px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+}
+
+.work-orders-sticky-controls {
+    margin-bottom: 4px;
+}
+
+.work-orders-sheet-toolbar {
+    min-height: 38px;
+    margin: 0;
+    padding: 3px 6px 4px;
+    border-top: 1px solid var(--workspace-line);
+    background: var(--workspace-page);
+}
+
+.sheet-search-box {
+    grid-template-columns: auto minmax(290px, 390px);
+    min-height: 32px;
+    padding: 2px 6px;
+    border-color: #abc5d6;
+    border-radius: 8px;
+    box-shadow: none;
+}
+
+.sheet-search-box .work-order-search-label {
+    color: #234f6b;
+    font-size: 0.76rem;
+    font-weight: 800;
+}
+
+.sheet-search-box .work-order-search-input {
+    width: 390px;
+    height: 28px;
+    padding: 3px 9px;
+    border-color: #bed1dd;
+    background: #ffffff;
+    font-size: 0.82rem;
+}
+
+.work-orders-grid-shell {
+    grid-template-rows: minmax(0, 1fr) 44px;
+    gap: 4px;
+}
+
+.work-orders-grid-shell > .work-orders-selection-summary-host {
+    min-height: 44px;
+    height: 44px;
+}
+
+.tabulator-workorders-page .tabulator-card {
+    border-color: var(--workspace-line) !important;
+    border-radius: 9px !important;
+    box-shadow: 0 3px 10px rgba(31, 61, 86, 0.045) !important;
+}
+
+.tabulator-workorders-page ::deep .tabulator {
+    font-size: 13.5px !important;
+}
+
+.tabulator-workorders-page ::deep .tabulator .tabulator-header {
+    min-height: 44px;
+    background: var(--workspace-header) !important;
+}
+
+.tabulator-workorders-page ::deep .tabulator .tabulator-header .tabulator-col {
+    min-height: 44px;
+    border-right-color: var(--workspace-line) !important;
+    background: var(--workspace-header) !important;
+}
+
+.tabulator-workorders-page ::deep .tabulator .tabulator-col .tabulator-col-content {
+    min-height: 44px;
+    padding: 0 31px 0 9px !important;
+}
+
+.tabulator-workorders-page ::deep .tabulator .tabulator-col-title {
+    font-size: 13px !important;
+}
+
+.tabulator-workorders-page ::deep .tabulator-row {
+    min-height: 35px !important;
+    border-bottom-color: var(--workspace-line-soft) !important;
+}
+
+.tabulator-workorders-page ::deep .tabulator-row:nth-child(even) {
+    background: #fbfcfe !important;
+}
+
+.tabulator-workorders-page ::deep .tabulator-row:hover {
+    background: #eef6fb !important;
+}
+
+.tabulator-workorders-page ::deep .tabulator-row .tabulator-cell {
+    min-height: 35px !important;
+    padding: 6px 8px !important;
+    border-right-color: var(--workspace-line-soft) !important;
+    font-size: 13.5px !important;
+    line-height: 22px !important;
+}
+
+.tabulator-workorders-page ::deep .tabulator-cell.tabulator-range-selected,
+.tabulator-workorders-page ::deep .tabulator-cell.tabulator-selected,
+.tabulator-workorders-page ::deep .tabulator-cell.tabulator-range-only-cell-selected {
+    background: #e3f0f8 !important;
+}
+
+@media (max-width: 1120px) {
+    .page-header-row {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .page-actions-box {
+        width: 100%;
+    }
+
+    .page-actions-buttons {
+        justify-content: flex-start;
+    }
+}
+
+@media (max-width: 760px) {
+    .tabulator-workorders-page {
+        padding: 12px 10px 8px;
+    }
+
+    .sheet-search-box {
+        grid-template-columns: auto minmax(0, 1fr);
+        width: 100%;
+    }
+
+    .sheet-search-box .work-order-search-input {
+        width: 100%;
+    }
+}
+
+/* =========================================================
+   PHASE 9.2A14 — COMPACT WORKSPACE LAYOUT
+   Keep the sheet dominant: scope and year share the title line, the Basket
+   overview becomes a thin data rail, search uses one clear input border, and
+   the Selected footer remains reserved below the grid.
+   ========================================================= */
+
+.tabulator-workorders-page {
+    padding: 8px 18px 6px;
+}
+
+.page-header-row {
+    gap: 12px;
+    margin-bottom: 4px;
+}
+
+@media (min-width: 1121px) {
+    .page-title-block {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        flex-wrap: nowrap;
+    }
+
+    .page-title-block h1 {
+        flex: 0 0 auto;
+        margin: 0;
+    }
+
+    .page-context-row {
+        flex: 0 1 auto;
+        gap: 8px;
+        margin-top: 0;
+        flex-wrap: nowrap;
+    }
+}
+
+.tabulator-workorders-page h1 {
+    font-size: 1.45rem;
+}
+
+.page-subtitle {
+    font-size: 0.76rem;
+    white-space: nowrap;
+}
+
+.work-year-selector {
+    min-height: 27px;
+    padding: 1px 4px 1px 7px;
+}
+
+.work-year-select {
+    height: 22px;
+}
+
+.page-actions-buttons {
+    gap: 6px;
+}
+
+.page-action-button {
+    min-width: 82px;
+    height: 33px;
+    padding-inline: 11px;
+}
+
+.page-action-button-copy {
+    min-width: 128px;
+}
+
+.page-actions-meta-row {
+    margin-top: 3px;
+}
+
+.save-status {
+    min-height: 21px;
+    margin-top: 0;
+    padding: 1px 8px;
+    font-size: 0.66rem;
+}
+
+.work-orders-sticky-controls {
+    margin-bottom: 2px;
+}
+
+.work-orders-open-summary {
+    gap: 6px;
+    margin-bottom: 3px;
+}
+
+.work-order-validation-row:has(.validation-navigator:not([hidden])) {
+    margin: 3px 0 4px;
+}
+
+.work-orders-sheet-toolbar {
+    min-height: 34px;
+    padding: 1px 6px 2px;
+    border-top: 1px solid #d8e3eb;
+    background: #f4f7fa;
+}
+
+.sheet-search-box {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    width: auto;
+    min-height: 32px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+}
+
+.sheet-search-box .work-order-search-label {
+    margin: 0;
+    color: #183f59;
+    font-size: 0.80rem;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.sheet-search-box .work-order-search-input {
+    box-sizing: border-box;
+    width: 420px;
+    height: 32px;
+    padding: 4px 11px;
+    border: 1px solid #9fbfd2;
+    border-radius: 7px;
+    background: #ffffff;
+    font-size: 0.84rem;
+    box-shadow: none;
+}
+
+.sheet-search-box .work-order-search-input:focus {
+    border-color: #2c86b4;
+    background: #ffffff;
+    box-shadow: 0 0 0 2px rgba(44, 134, 180, 0.12);
+}
+
+.work-orders-grid-shell {
+    grid-template-rows: minmax(0, 1fr) 42px;
+    gap: 3px;
+}
+
+.work-orders-grid-shell > .work-orders-selection-summary-host {
+    min-height: 42px;
+    height: 42px;
+}
+
+@media (max-width: 760px) {
+    .tabulator-workorders-page {
+        padding: 10px 8px 6px;
+    }
+
+    .sheet-search-box {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        width: 100%;
+    }
+
+    .sheet-search-box .work-order-search-input {
+        width: 100%;
+    }
+}
+
+/* =========================================================
+   PHASE 9.2A15 — FINAL WORKSPACE POLISH
+   One clear search field, calmer slate/blue table styling, and no loss of
+   the compact viewport established in A14.
+   ========================================================= */
+
+.tabulator-workorders-page {
+    --workspace-page: #f5f7fa;
+    --workspace-header: #edf2f6;
+    --workspace-line: #d7e1e9;
+    --workspace-line-soft: #e7edf2;
+    color: #1e3347;
+    font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+}
+
+.work-orders-sticky-controls {
+    margin-bottom: 2px;
+}
+
+.work-orders-open-summary {
+    gap: 7px;
+    margin-bottom: 2px;
+}
+
+.work-orders-sheet-toolbar {
+    min-height: 37px;
+    padding: 2px 6px;
+    border-top: 0;
+    border-bottom: 1px solid var(--workspace-line);
+    background: transparent;
+}
+
+.sheet-search-box {
+    position: relative;
+    display: block;
+    width: min(430px, 100%);
+    min-height: 34px;
+    margin-inline-start: auto;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+}
+
+.sheet-search-box .work-order-search-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+.sheet-search-box .work-order-search-input {
+    box-sizing: border-box;
+    width: 100%;
+    height: 34px;
+    padding: 5px 13px;
+    border: 1px solid #9fb8c9;
+    border-radius: 8px;
+    outline: 0;
+    background: #ffffff;
+    color: #173149;
+    font-family: Tahoma, "Segoe UI", Arial, sans-serif;
+    font-size: 0.86rem;
+    text-align: right;
+    direction: rtl;
+    box-shadow: none;
+}
+
+.sheet-search-box .work-order-search-input::placeholder {
+    color: #8092a2;
+    opacity: 1;
+}
+
+.sheet-search-box .work-order-search-input:hover {
+    border-color: #7fa6bd;
+}
+
+.sheet-search-box .work-order-search-input:focus {
+    border-color: #277da8;
+    background: #ffffff;
+    box-shadow: 0 0 0 2px rgba(39, 125, 168, 0.13);
+}
+
+.tabulator-workorders-page .tabulator-card {
+    border: 1px solid var(--workspace-line) !important;
+    border-radius: 8px !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
+}
+
+.tabulator-workorders-page ::deep .tabulator {
+    color: #243b50 !important;
+    font-size: 13.25px !important;
+}
+
+.tabulator-workorders-page ::deep .tabulator .tabulator-header {
+    min-height: 42px !important;
+    border-bottom: 1px solid #cbd8e2 !important;
+    background: var(--workspace-header) !important;
+}
+
+.tabulator-workorders-page ::deep .tabulator .tabulator-header .tabulator-col {
+    min-height: 42px !important;
+    border-right-color: var(--workspace-line) !important;
+    background: var(--workspace-header) !important;
+}
+
+.tabulator-workorders-page ::deep .tabulator .tabulator-col .tabulator-col-content {
+    min-height: 42px !important;
+    padding: 0 31px 0 9px !important;
+}
+
+.tabulator-workorders-page ::deep .tabulator .tabulator-col-title {
+    color: #183247 !important;
+    font-size: 12.75px !important;
+    font-weight: 700 !important;
+}
+
+.tabulator-workorders-page ::deep .tabulator-row {
+    min-height: 34px !important;
+    border-bottom-color: var(--workspace-line-soft) !important;
+    background: #ffffff !important;
+}
+
+.tabulator-workorders-page ::deep .tabulator-row:nth-child(even) {
+    background: #f8fafc !important;
+}
+
+.tabulator-workorders-page ::deep .tabulator-row:hover {
+    background: #edf6fb !important;
+}
+
+.tabulator-workorders-page ::deep .tabulator-row .tabulator-cell {
+    min-height: 34px !important;
+    padding: 5px 8px !important;
+    border-right-color: var(--workspace-line-soft) !important;
+    color: #243b50 !important;
+    font-size: 13.25px !important;
+    line-height: 23px !important;
+}
+
+.tabulator-workorders-page ::deep .tabulator-cell.tabulator-range-selected,
+.tabulator-workorders-page ::deep .tabulator-cell.tabulator-selected,
+.tabulator-workorders-page ::deep .tabulator-cell.tabulator-range-only-cell-selected {
+    background: #deedf7 !important;
+    box-shadow: inset 0 0 0 1px #2f80b7 !important;
+}
+
+.work-orders-grid-shell {
+    grid-template-rows: minmax(0, 1fr) 42px;
+    gap: 3px;
+}
+
+.work-orders-grid-shell > .work-orders-selection-summary-host {
+    min-height: 42px;
+    height: 42px;
+}
+
+@media (max-width: 760px) {
+    .sheet-search-box {
+        width: 100%;
+    }
+}
+
+/* =========================================================
+   PHASE 9.2A16 — SEARCH POSITION + BASKET COLUMN CLARITY
+   Keep the accepted compact workspace, pin the search to the physical
+   right above the sheet, and add one compact Basket legend without
+   repeating labels inside every active stage.
+   ========================================================= */
+
+.work-orders-sheet-toolbar {
+    direction: ltr;
+    justify-content: flex-end;
+    min-height: 35px;
+    padding: 1px 6px 2px;
+}
+
+.sheet-search-box {
+    width: min(430px, 100%);
+    margin: 0 0 0 auto;
+    direction: rtl;
+}
+
+.sheet-search-box .work-order-search-input {
+    width: 100%;
+}
+
+@media (max-width: 760px) {
+    .work-orders-sheet-toolbar {
+        direction: rtl;
+    }
+
+    .sheet-search-box {
+        width: 100%;
+        margin: 0;
+    }
+}

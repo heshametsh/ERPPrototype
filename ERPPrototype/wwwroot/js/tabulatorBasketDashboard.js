@@ -92,56 +92,144 @@
             return snapshot;
         },
 
+
+        getBasketDashboardColumnCount: function (activeBasketCount) {
+            const count = Math.max(0, Number(activeBasketCount) || 0);
+
+            if (count === 0) {
+                return 0;
+            }
+
+            if (count <= 4) {
+                return count;
+            }
+
+            if (count <= 8) {
+                return 4;
+            }
+
+            return Math.min(7, Math.ceil(count / 2));
+        },
+
         buildBasketDashboardCard: function (entry, index) {
-            const card = document.createElement("article");
-            card.className = "work-orders-basket-dashboard-card";
-            card.classList.add(
+            const row = document.createElement("div");
+            row.className =
+                "work-orders-basket-dashboard-card " +
+                "work-orders-basket-dashboard-row";
+            row.classList.add(
                 entry.rowCount > 0 ? "has-data" : "is-empty"
             );
-            card.dataset.testid = "work-orders-basket-card";
-            card.dataset.basketValue = entry.basket;
-            card.dataset.basketIndex = String(index);
-            card.setAttribute("role", "listitem");
+            row.dataset.testid = "work-orders-basket-card";
+            row.dataset.basketValue = entry.basket;
+            row.dataset.basketIndex = String(index);
+            row.setAttribute("role", "listitem");
 
-            const title = document.createElement("h3");
-            title.className = "work-orders-basket-dashboard-card-title";
+            const title = document.createElement("span");
+            title.className =
+                "work-orders-basket-dashboard-card-title " +
+                "work-orders-basket-dashboard-row-title";
             title.textContent = entry.basket;
             title.title = entry.basket;
 
-            const metrics = document.createElement("div");
-            metrics.className = "work-orders-basket-dashboard-metrics";
-
-            const orders = document.createElement("div");
-            orders.className = "work-orders-basket-dashboard-metric";
-
-            const ordersLabel = document.createElement("span");
-            ordersLabel.textContent = "Orders";
-
             const ordersValue = document.createElement("strong");
+            ordersValue.className =
+                "work-orders-basket-dashboard-row-value " +
+                "work-orders-basket-dashboard-row-orders";
             ordersValue.textContent = this.formatAggregateCount(
                 entry.rowCount
             );
             ordersValue.dataset.metric = "orders";
-
-            orders.append(ordersLabel, ordersValue);
-
-            const remaining = document.createElement("div");
-            remaining.className = "work-orders-basket-dashboard-metric";
-
-            const remainingLabel = document.createElement("span");
-            remainingLabel.textContent = "Remaining Amount";
+            ordersValue.setAttribute(
+                "aria-label",
+                `Orders: ${ordersValue.textContent}`
+            );
 
             const remainingValue = document.createElement("strong");
+            remainingValue.className =
+                "work-orders-basket-dashboard-row-value " +
+                "work-orders-basket-dashboard-row-remaining";
             remainingValue.textContent = this.formatAmountCents(
                 entry.remainingAmountCents
             );
             remainingValue.dataset.metric = "remainingAmount";
+            remainingValue.setAttribute(
+                "aria-label",
+                `Remaining Amount: ${remainingValue.textContent}`
+            );
 
-            remaining.append(remainingLabel, remainingValue);
-            metrics.append(orders, remaining);
-            card.append(title, metrics);
+            row.append(title, ordersValue, remainingValue);
+            return row;
+        },
 
-            return card;
+        buildBasketDashboardColumn: function (
+            items,
+            columnIndex
+        ) {
+            const column = document.createElement("section");
+            column.className = "work-orders-basket-dashboard-list";
+            column.dataset.basketColumn = String(columnIndex);
+            column.setAttribute("role", "group");
+            column.setAttribute(
+                "aria-label",
+                `Basket summary group ${columnIndex + 1}`
+            );
+
+            const header = document.createElement("div");
+            header.className = "work-orders-basket-dashboard-list-header";
+            header.setAttribute("aria-hidden", "true");
+
+            const basketHeader = document.createElement("span");
+            basketHeader.textContent = "السلة";
+
+            const ordersHeader = document.createElement("span");
+            ordersHeader.textContent = "العدد";
+
+            const remainingHeader = document.createElement("span");
+            remainingHeader.textContent = "المتبقي";
+
+            header.append(
+                basketHeader,
+                ordersHeader,
+                remainingHeader
+            );
+            column.appendChild(header);
+
+            items.forEach(item => {
+                column.appendChild(
+                    this.buildBasketDashboardCard(
+                        item.entry,
+                        item.index
+                    )
+                );
+            });
+
+            return column;
+        },
+
+        splitBasketDashboardEntries: function (entries, columnCount) {
+            const safeEntries = Array.isArray(entries) ? entries : [];
+            const safeColumnCount = Math.max(
+                1,
+                Math.min(columnCount, safeEntries.length || 1)
+            );
+            const groups = Array.from(
+                { length: safeColumnCount },
+                () => ({ items: [] })
+            );
+
+            /*
+             * Fill the visual rows from right to left in workflow order.
+             * Example with 9 active stages and 5 columns:
+             * row 1 = stages 1..5, row 2 = stages 6..9.
+             */
+            safeEntries.forEach((entry, index) => {
+                groups[index % safeColumnCount].items.push({
+                    entry: entry,
+                    index: index
+                });
+            });
+
+            return groups;
         },
 
         renderBasketDashboard: function (elementId, snapshot) {
@@ -153,18 +241,72 @@
                 return;
             }
 
+            const activeBaskets = snapshot.baskets.filter(
+                entry => entry.rowCount > 0
+            );
+
+            const accessibleLabel = document.createElement("span");
+            accessibleLabel.className =
+                "work-orders-basket-dashboard-accessible-label";
+            accessibleLabel.textContent = "Remaining Amount";
+
             const track = document.createElement("div");
-            track.className = "work-orders-basket-dashboard-track";
+            track.className =
+                "work-orders-basket-dashboard-track " +
+                "work-orders-basket-dashboard-lists";
             track.setAttribute("role", "list");
 
-            snapshot.baskets.forEach((entry, index) => {
+            /*
+             * Empty workflow stages do not consume permanent sheet space.
+             * Keep at most two visual rows on a wide desktop and rebalance
+             * the columns when a ninth, eleventh, or thirteenth active stage
+             * appears. Workflow order is preserved across each visual row.
+             */
+            const columnCount = this.getBasketDashboardColumnCount(
+                activeBaskets.length
+            );
+            const groups = this.splitBasketDashboardEntries(
+                activeBaskets,
+                columnCount
+            );
+
+            track.style.setProperty(
+                "--basket-summary-columns",
+                String(groups.length)
+            );
+
+            groups.forEach((group, columnIndex) => {
                 track.appendChild(
-                    this.buildBasketDashboardCard(entry, index)
+                    this.buildBasketDashboardColumn(
+                        group.items,
+                        columnIndex
+                    )
                 );
             });
 
-            container.replaceChildren(track);
+            container.replaceChildren(accessibleLabel, track);
+            container.hidden = activeBaskets.length === 0;
             container.dataset.dashboardReady = "true";
+            container.dataset.dashboardLayout =
+                "active-baskets-compact-matrix";
+            container.dataset.dashboardColumns = String(groups.length);
+            container.dataset.dashboardRows = String(
+                groups.length > 0
+                    ? Math.ceil(activeBaskets.length / groups.length)
+                    : 0
+            );
+            container.dataset.activeBasketCount = String(
+                activeBaskets.length
+            );
+
+            /*
+             * Recalculate the viewport-owned grid shell after the list
+             * layout settles so the Selected totals row remains visible.
+             */
+            this.scheduleViewportLayoutSync?.(
+                elementId,
+                "basket-dashboard-rendered"
+            );
         },
 
         refreshBasketDashboard: function (

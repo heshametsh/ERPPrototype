@@ -17,8 +17,8 @@ internal sealed class Phase9FoundationBrowserTest(
     public int ExpectedCheckCount => suite switch
     {
         E2ETestSuite.Smoke => 10,
-        E2ETestSuite.Full => 47,
-        E2ETestSuite.Stress => 54,
+        E2ETestSuite.Full => 48,
+        E2ETestSuite.Stress => 55,
         _ => throw new ArgumentOutOfRangeException(nameof(suite))
     };
 
@@ -153,9 +153,55 @@ internal sealed class Phase9FoundationBrowserTest(
             await workOrdersPage.WaitForBasketDashboardReadyAsync();
 
             E2ETestAssert.Equal(
-                ERPPrototype.Data.WorkOrderBuskets.All.Count,
+                1,
                 await workOrdersPage.GetBasketDashboardCardCountAsync(),
-                "The Basket dashboard did not render every workflow stage.");
+                "The Basket summary should render only the active seeded stage.");
+
+            var dashboardLayout =
+                await workOrdersPage.GetBasketDashboardLayoutAsync();
+
+            E2ETestAssert.Equal(
+                1,
+                dashboardLayout.VisibleCardCount,
+                "The active Basket summary row was not visible.");
+            E2ETestAssert.True(
+                !dashboardLayout.HasHorizontalOverflow,
+                "The Basket summary still requires horizontal scrolling.");
+            E2ETestAssert.Equal(
+                1,
+                dashboardLayout.RowCount,
+                "One active Basket should occupy one compact summary row.");
+            E2ETestAssert.True(
+                dashboardLayout.MaximumCardHeightPixels <= 24,
+                "The active Basket summary row is too tall for a sheet-first layout.");
+            E2ETestAssert.True(
+                dashboardLayout.GroupCount > 0 &&
+                dashboardLayout.GroupCount ==
+                    dashboardLayout.BorderedGroupCount,
+                "Each Basket summary group must have its own visible boundary.");
+
+            var expectedBasketColumnPlans = new (int Active, int Columns)[]
+            {
+                (1, 1),
+                (4, 4),
+                (5, 4),
+                (8, 4),
+                (9, 5),
+                (10, 5),
+                (11, 6),
+                (12, 6),
+                (13, 7)
+            };
+
+            foreach (var plan in expectedBasketColumnPlans)
+            {
+                E2ETestAssert.Equal(
+                    plan.Columns,
+                    await workOrdersPage
+                        .GetBasketDashboardPlannedColumnCountAsync(
+                            plan.Active),
+                    $"Active Basket count {plan.Active} did not use the expected balanced column plan.");
+            }
 
             var initialInProgressDashboard =
                 await workOrdersPage.GetBasketDashboardEntryAsync(
@@ -176,14 +222,22 @@ internal sealed class Phase9FoundationBrowserTest(
                 0,
                 initialCompletedDashboard.RowCount,
                 "The completed Basket should start empty in the test dataset.");
+            E2ETestAssert.True(
+                await workOrdersPage.IsBasketDashboardEntryRenderedAsync(
+                    ERPPrototype.Data.WorkOrderBuskets.InProgress),
+                "The active In Progress Basket was not rendered.");
+            E2ETestAssert.True(
+                !await workOrdersPage.IsBasketDashboardEntryRenderedAsync(
+                    ERPPrototype.Data.WorkOrderBuskets.WorkOrderCompleted),
+                "An empty completed Basket should not consume dashboard space.");
 
             var dashboardText =
                 await workOrdersPage.GetBasketDashboardTextAsync();
 
             E2ETestAssert.Contains(
-                "Remaining Amount",
+                "المتبقي",
                 dashboardText,
-                "The Basket dashboard did not label Remaining Amount.");
+                "The Basket dashboard did not label the remaining amount.");
             E2ETestAssert.True(
                 !dashboardText.Contains(
                     "Work Order Value",
@@ -191,7 +245,7 @@ internal sealed class Phase9FoundationBrowserTest(
                 "The Basket dashboard must not display Work Order Value.");
 
             checks.Pass(
-                "Basket dashboard shows every workflow stage with order count and Remaining Amount");
+                "Basket summary shows only active workflow stages in a compact matrix");
 
             var firstRowWorkOrderValueCents = ParseAmountCents(
                 await workOrdersPage.GetCellValueAsync(
@@ -237,6 +291,13 @@ internal sealed class Phase9FoundationBrowserTest(
                 ERPPrototype.Data.WorkOrderBuskets.WorkOrderCompleted,
                 1,
                 firstRowRemainingAmountCents);
+            await workOrdersPage.WaitForBasketDashboardRenderedEntryAsync(
+                ERPPrototype.Data.WorkOrderBuskets.WorkOrderCompleted,
+                expectedRendered: true);
+            E2ETestAssert.Equal(
+                2,
+                await workOrdersPage.GetBasketDashboardCardCountAsync(),
+                "A Basket did not appear when its first work order entered it.");
 
             E2ETestAssert.Equal(
                 seed.RowsPerYear,
@@ -267,6 +328,13 @@ internal sealed class Phase9FoundationBrowserTest(
                 ERPPrototype.Data.WorkOrderBuskets.WorkOrderCompleted,
                 0,
                 0);
+            await workOrdersPage.WaitForBasketDashboardRenderedEntryAsync(
+                ERPPrototype.Data.WorkOrderBuskets.WorkOrderCompleted,
+                expectedRendered: false);
+            E2ETestAssert.Equal(
+                1,
+                await workOrdersPage.GetBasketDashboardCardCountAsync(),
+                "A Basket remained visible after its final work order left it.");
             await workOrdersPage.WaitForDirtyRowCountAsync(0);
 
             checks.Pass(
@@ -970,6 +1038,25 @@ internal sealed class Phase9FoundationBrowserTest(
                     "Selecting 20 rows shows a visible status bar with unique work-order count and financial totals");
                 await browserSession.ObserveAsync(
                     "تم تحديد 20 صف — ظهر عدد الأوامر ومجموع القيم المحددة");
+
+                var selectionLayout =
+                    await workOrdersPage.GetSelectionSummaryLayoutAsync();
+
+                E2ETestAssert.True(
+                    selectionLayout.IsVisible,
+                    "The selected totals footer was not visible.");
+                E2ETestAssert.True(
+                    selectionLayout.IsBelowGridCard,
+                    "The selected totals footer still overlaps the grid card.");
+                E2ETestAssert.True(
+                    selectionLayout.IsWithinViewport,
+                    "The selected totals footer fell outside the viewport.");
+                E2ETestAssert.True(
+                    selectionLayout.DoesNotCoverTableHolder,
+                    "The selected totals footer still covers the last visible grid cells.");
+
+                checks.Pass(
+                    "Selected totals use a separate reserved footer below the sheet without covering cells");
 
                 await workOrdersPage.ClearSelectionAsync();
 
