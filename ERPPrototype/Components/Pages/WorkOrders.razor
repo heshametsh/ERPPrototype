@@ -121,12 +121,10 @@
                         </button>
                     </div>
 
-                    <div class="page-actions-meta-row">
-                        <div class="save-status"
-                             id="tabulator-test-table-status"
-                             data-testid="work-orders-status">
-                            Preparing database rows...
-                        </div>
+                    <div class="save-status"
+                         id="tabulator-test-table-status"
+                         data-testid="work-orders-status">
+                        Preparing database rows...
                     </div>
                 </div>
             }
@@ -175,42 +173,62 @@
                 </div>
             </section>
 
-            <div class="work-order-validation-row">
-                <div class="validation-navigator"
-                     id="tabulator-test-table-validation-panel"
-                     data-testid="work-orders-validation"
-                     role="status"
-                     aria-live="polite"
-                     hidden>
-                    <div class="validation-navigator-summary">
-                        <span class="validation-navigator-icon"
-                              aria-hidden="true">!</span>
+            <div class="work-order-toolbar-row">
+                <div class="validation-navigator-slot">
+                    <div class="validation-navigator"
+                         id="tabulator-test-table-validation-panel"
+                         data-testid="work-orders-validation"
+                         role="status"
+                         aria-live="polite"
+                         hidden>
+                        <div class="validation-navigator-summary">
+                            <span class="validation-navigator-icon"
+                                  aria-hidden="true">!</span>
 
-                        <div class="validation-navigator-copy">
-                            <strong id="tabulator-test-table-validation-title">
-                                توجد أخطاء تمنع الحفظ
-                            </strong>
+                            <div class="validation-navigator-copy">
+                                <strong id="tabulator-test-table-validation-title">
+                                    توجد أخطاء تمنع الحفظ
+                                </strong>
 
-                            <span id="tabulator-test-table-validation-message">
-                            </span>
+                                <span id="tabulator-test-table-validation-message">
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="validation-navigator-actions">
+                            <button type="button"
+                                    class="validation-navigator-button"
+                                    id="tabulator-test-table-validation-previous"
+                                    onclick="window.tabulatorTest.previousValidationError('tabulator-test-table')">
+                                السابق
+                            </button>
+
+                            <button type="button"
+                                    class="validation-navigator-button"
+                                    id="tabulator-test-table-validation-next"
+                                    onclick="window.tabulatorTest.nextValidationError('tabulator-test-table')">
+                                التالي
+                            </button>
                         </div>
                     </div>
+                </div>
 
-                    <div class="validation-navigator-actions">
-                        <button type="button"
-                                class="validation-navigator-button"
-                                id="tabulator-test-table-validation-previous"
-                                onclick="window.tabulatorTest.previousValidationError('tabulator-test-table')">
-                            السابق
-                        </button>
+                <div class="work-order-search-box">
+                    <label class="work-order-search-label"
+                           for="tabulator-work-order-search">
+                        بحث أمر العمل
+                    </label>
 
-                        <button type="button"
-                                class="validation-navigator-button"
-                                id="tabulator-test-table-validation-next"
-                                onclick="window.tabulatorTest.nextValidationError('tabulator-test-table')">
-                            التالي
-                        </button>
-                    </div>
+                    <input @key="SelectedWorkYear"
+                           id="tabulator-work-order-search"
+                           class="work-order-search-input"
+                           data-testid="work-orders-search"
+                           type="search"
+                           inputmode="numeric"
+                           autocomplete="off"
+                           disabled="@IsYearLoading"
+                           placeholder="اكتب رقم أمر العمل..."
+                           oninput="window.tabulatorTest.filterByWorkOrder('tabulator-test-table', this.value)" />
                 </div>
             </div>
         }
@@ -218,29 +236,6 @@
 
     @if (!IsLoading && string.IsNullOrWhiteSpace(ErrorMessage))
     {
-        <div class="work-orders-sheet-toolbar"
-             data-testid="work-orders-sheet-toolbar">
-            <div class="work-order-search-box sheet-search-box"
-                 role="search"
-                 aria-label="بحث أمر العمل">
-                <label class="work-order-search-label"
-                       for="tabulator-work-order-search">
-                    بحث أمر العمل
-                </label>
-
-                <input @key="SelectedWorkYear"
-                       id="tabulator-work-order-search"
-                       class="work-order-search-input"
-                       data-testid="work-orders-search"
-                       type="search"
-                       inputmode="numeric"
-                       autocomplete="off"
-                       disabled="@IsYearLoading"
-                       placeholder="اكتب رقم أمر العمل..."
-                       oninput="window.tabulatorTest.filterByWorkOrder('tabulator-test-table', this.value)" />
-            </div>
-        </div>
-
         <div class="work-orders-grid-shell"
              id="tabulator-test-table-shell"
              data-testid="work-orders-grid-shell">

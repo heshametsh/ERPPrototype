@@ -1,50 +1,87 @@
+/* =========================================================
+   WORK ORDERS — CONSOLIDATED PAGE STYLES
+   Phase 9.2C: one canonical rule set for the B6-R1 layout.
+   JavaScript-created KPI/Basket children are styled in wwwroot/app.css.
+   ========================================================= */
+
 .tabulator-workorders-page {
-    --uds-navy-950: #0b2239;
-    --uds-navy-800: #173a58;
-    --uds-blue-600: #0b78c7;
-    --uds-blue-500: #1592d0;
-    --uds-cyan-500: #12a8c7;
-    --uds-gold-500: #d89b2b;
-    --uds-gold-200: #efd9a8;
-    --uds-warm-50: #fcfaf5;
-    --uds-surface: #ffffff;
-    --uds-surface-soft: #f7f9fb;
-    --uds-surface-muted: #f1f5f8;
-    --uds-border: #d6e0e8;
-    --uds-border-strong: #c1ced9;
-    --uds-text: #14283b;
-    --uds-text-muted: #708397;
-    min-height: calc(100vh - 70px);
-    padding: 24px 30px 34px;
+    --wo-page: #eef3f7;
+    --wo-surface: #ffffff;
+    --wo-surface-soft: #f7fafc;
+    --wo-header: #e4edf3;
+    --wo-border: #c9d6e0;
+    --wo-border-soft: #e2e9ee;
+    --wo-border-cell: #edf1f4;
+    --wo-text: #183247;
+    --wo-muted: #5f7588;
+    --wo-primary: #0b6ea8;
+    --wo-primary-hover: #085c8e;
+    --wo-selection: #e3f1f7;
+    --wo-selection-border: rgba(76, 145, 181, 0.68);
+    box-sizing: border-box;
+    min-height: 0;
+    padding: 8px 18px 6px;
+    overflow: hidden;
+    background: var(--wo-page);
+    color: var(--wo-text);
     direction: ltr;
-    color: var(--uds-text);
+    font-family: "Segoe UI", Tahoma, Arial, sans-serif;
 }
 
-/* =========================
-   PAGE HEADER
-   ========================= */
+/* ---------- Header, scope and actions ---------- */
+.work-orders-sticky-controls {
+    position: static;
+    margin: -24px -30px 2px;
+    padding: 24px 30px 12px;
+    border-bottom: 1px solid rgba(193, 206, 217, 0.78);
+    background: #f4f7fb;
+    box-shadow: 0 8px 18px rgba(15, 42, 70, 0.055);
+}
 
 .page-header-row {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     justify-content: space-between;
-    gap: 24px;
-    margin-bottom: 16px;
+    gap: 12px;
+    min-height: 60px;
+    margin-bottom: 4px;
+    padding: 4px 0 2px;
+}
+
+.page-title-block {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    gap: 14px;
+    flex-wrap: nowrap;
 }
 
 .tabulator-workorders-page h1 {
+    flex: 0 0 auto;
     margin: 0;
-    color: var(--uds-navy-950);
-    font-size: 2rem;
-    font-weight: 800;
-    line-height: 1.15;
-    letter-spacing: -0.025em;
+    color: #183149;
+    font-size: 1.45rem;
+    font-weight: 750;
+    line-height: 1.1;
+    letter-spacing: -0.018em;
+}
+
+.page-context-row {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    gap: 8px;
+    margin-top: 0;
+    flex-wrap: nowrap;
 }
 
 .page-subtitle {
-    margin-top: 7px;
-    color: var(--uds-text-muted);
-    font-size: 0.92rem;
+    overflow: hidden;
+    color: var(--wo-muted);
+    font-size: 0.76rem;
+    font-weight: 650;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .page-actions-box {
@@ -55,24 +92,26 @@
 .page-actions-buttons {
     display: flex;
     justify-content: flex-end;
-    gap: 9px;
+    gap: 6px;
     flex-wrap: wrap;
 }
 
 .page-action-button {
-    min-width: 110px;
-    height: 40px;
-    padding: 0 16px;
-    border-radius: 9px;
-    font-size: 0.9rem;
+    min-width: 82px;
+    height: 33px;
+    padding: 0 11px;
+    border-radius: 7px;
+    font-family: inherit;
+    font-size: 0.78rem;
     font-weight: 700;
     cursor: pointer;
-    transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+    transition: background-color 0.15s ease, border-color 0.15s ease,
+        box-shadow 0.15s ease, transform 0.15s ease;
 }
 
-    .page-action-button:active {
-        transform: translateY(1px);
-    }
+.page-action-button:active:not(:disabled) {
+    transform: translateY(1px);
+}
 
 .page-action-button:disabled {
     opacity: 0.58;
@@ -81,98 +120,108 @@
     box-shadow: none;
 }
 
-
 .page-action-button-secondary {
-    border: 1px solid #9bafc0;
-    background: rgba(255, 255, 255, 0.76);
-    color: #435c70;
+    border: 1px solid #b7c7d4;
+    background: #ffffff;
+    color: #3b566c;
 }
 
-    .page-action-button-secondary:hover {
-        border-color: #6f879a;
-        background: #ffffff;
-        color: var(--uds-navy-950);
-    }
+.page-action-button-secondary:hover:not(:disabled) {
+    border-color: #8ea7ba;
+    background: #f2f7fa;
+    color: #203b52;
+}
 
-.page-action-button-primary {
-    border: 1px solid var(--uds-blue-600);
-    background: linear-gradient( 135deg, var(--uds-blue-600), var(--uds-cyan-500) );
+.page-action-button-copy {
+    min-width: 128px;
+    border: 1px solid #72a8c7;
+    background: #ffffff;
+    color: #145f89;
+    box-shadow: none;
+}
+
+.page-action-button-copy:hover:not(:disabled) {
+    border-color: #3f8eb9;
+    background: #eaf4fa;
+    color: #0d5279;
+}
+
+.page-action-button-save {
+    min-width: 82px;
+    border: 1px solid var(--wo-primary);
+    background: var(--wo-primary);
     color: #ffffff;
-    box-shadow: 0 8px 18px rgba(11, 120, 199, 0.18);
+    box-shadow: 0 2px 5px rgba(11, 110, 168, 0.22);
 }
 
-    .page-action-button-primary:hover {
-        box-shadow: 0 10px 22px rgba(11, 120, 199, 0.24);
-    }
+.page-action-button-save:hover:not(:disabled) {
+    border-color: var(--wo-primary-hover);
+    background: var(--wo-primary-hover);
+    box-shadow: 0 3px 8px rgba(8, 92, 142, 0.26);
+}
 
-/* Status uses the warm identity without overpowering the page */
 .save-status {
     display: inline-flex;
     align-items: center;
-    min-height: 28px;
-    margin-top: 7px;
-    padding: 4px 11px;
-    border: 1px solid #b9d7ea;
+    min-height: 21px;
+    margin-top: 0;
+    padding: 1px 8px;
+    border: 1px solid #c6d9e7;
     border-radius: 999px;
-    background: #eef7fc;
-    color: #185b84;
+    background: #eaf3f8;
+    color: #2d6489;
     direction: rtl;
-    font-size: 0.76rem;
+    font-size: 0.66rem;
     font-weight: 700;
 }
 
-/* =========================
-   WORK YEAR SELECTOR
-   ========================= */
-
-.page-title-block {
-    min-width: 0;
-}
-
-.page-context-row {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    flex-wrap: wrap;
-    margin-top: 7px;
-}
-
-.page-context-row .page-subtitle {
-    margin-top: 0;
-}
-
+/* ---------- Current sheet year ---------- */
 .work-year-selector {
     display: inline-flex;
     align-items: center;
-    gap: 7px;
-    min-height: 30px;
-    padding: 3px 5px 3px 10px;
-    border: 1px solid #b9d1e2;
-    border-radius: 8px;
-    background: rgba(255, 255, 255, 0.86);
-    color: #34566f;
+    min-height: 34px;
+    padding: 3px 4px 3px 10px;
+    gap: 8px;
+    border: 1px solid #72a7c4;
+    border-radius: 10px;
+    background: #eaf4fa;
+    color: #285b78;
     font-size: 0.78rem;
     font-weight: 800;
+    box-shadow: 0 1px 3px rgba(28, 86, 120, 0.10);
+}
+
+.work-year-selector:hover,
+.work-year-selector:focus-within {
+    border-color: #4e91b6;
+    background: #e4f1f8;
+}
+
+.work-year-selector > span {
+    white-space: nowrap;
 }
 
 .work-year-select {
-    height: 24px;
-    min-width: 78px;
-    padding: 0 24px 0 8px;
-    border: 1px solid #94b4ca;
-    border-radius: 6px;
-    background: #ffffff;
-    color: #173047;
-    font: inherit;
-    font-weight: 800;
+    width: 84px;
+    height: 26px;
+    padding: 0 25px 0 9px;
+    border: 1px solid #8fb4ca;
+    border-radius: 7px;
     outline: none;
+    background: #ffffff;
+    color: #173f59;
+    font: inherit;
+    font-weight: 900;
     cursor: pointer;
+    box-shadow: 0 1px 2px rgba(20, 61, 87, 0.07);
 }
 
-.work-year-select:hover:not(:disabled),
+.work-year-select:hover:not(:disabled) {
+    border-color: #5d99ba;
+}
+
 .work-year-select:focus {
-    border-color: var(--uds-blue-600);
-    box-shadow: 0 0 0 2px rgba(11, 120, 199, 0.12);
+    border-color: var(--wo-primary);
 }
 
 .work-year-select:disabled {
@@ -180,300 +229,381 @@
     cursor: default;
 }
 
-/* =========================
-   OPEN WORK-ORDER SUMMARY
-   Compact fixed summary for all open work orders in the current sheet.
-   Dynamic child items are styled globally in wwwroot/app.css because
-   JavaScript-created elements do not receive Blazor CSS-isolation attributes.
-   ========================= */
-
+/* ---------- KPI and Basket containers ---------- */
 .work-orders-open-summary {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 8px;
-    min-height: 64px;
-    margin-bottom: 16px;
-    padding: 7px;
-    border: 1px solid #c8ddec;
-    border-left: 4px solid var(--uds-blue-600);
-    border-radius: 10px;
-    background: linear-gradient(90deg, #f6fbfe 0%, #edf7fc 100%);
+    gap: 7px;
+    min-height: 0;
+    margin: 0 0 2px;
+    padding: 0;
+    border: 0;
+    background: transparent;
     direction: ltr;
-    box-shadow: 0 5px 14px rgba(18, 50, 77, 0.045);
+    box-shadow: none;
 }
 
-/* =========================
-   COMPACT WORK ORDER SEARCH
-   ========================= */
-
-.work-order-toolbar-row {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 280px;
-    grid-template-areas: "validation search";
-    align-items: stretch;
-    gap: 14px;
-    min-height: 72px;
-    margin-bottom: 12px;
+.work-orders-basket-dashboard {
+    position: relative;
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 0;
+    margin: 8px 0 5px;
+    padding: 4px 5px 5px;
+    border: 1px solid #d6e2e9;
+    border-radius: 10px;
+    background: #f8fbfd;
     direction: ltr;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.92);
+}
+
+/* ---------- Validation and stand-alone search ---------- */
+.work-order-toolbar-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 38px;
+    margin: 4px 0 0;
+    padding: 0;
+    gap: 12px;
+    border: 0;
+    background: transparent;
+    direction: ltr;
+    box-shadow: none;
 }
 
 .validation-navigator-slot {
-    grid-area: validation;
     display: flex;
     align-items: stretch;
     min-width: 0;
-    min-height: 72px;
+    flex: 1 1 auto;
 }
 
 .work-order-search-box {
-    grid-area: search;
     box-sizing: border-box;
-    width: 280px;
-    max-width: 100%;
-    min-height: 72px;
-    padding: 8px 10px 9px;
-    border: 1px solid #8fb3cb;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    width: 320px;
+    min-height: 36px;
+    padding: 3px 6px;
+    gap: 8px;
+    border: 1px solid #b9cbd8;
     border-radius: 9px;
     background: #ffffff;
     direction: rtl;
-    box-shadow: 0 5px 14px rgba(15, 42, 70, 0.055);
+    box-shadow: 0 2px 8px rgba(15, 42, 70, 0.043);
 }
 
 .work-order-search-label {
-    display: block;
-    margin-bottom: 5px;
-    color: #244a66;
-    font-size: 0.82rem;
+    color: #4d6c82;
+    font-size: 0.75rem;
     font-weight: 850;
+    white-space: nowrap;
 }
 
 .work-order-search-input {
     box-sizing: border-box;
     width: 100%;
-    height: 30px;
-    padding: 6px 11px;
-    border: 1px solid #9ab8cc;
+    height: 28px;
+    padding: 5px 10px;
+    border: 1px solid #c3d2dd;
     border-radius: 7px;
-    background: #ffffff;
-    color: #172d42;
-    direction: ltr;
-    text-align: left;
-    font-family: "Segoe UI", Tahoma, Arial, sans-serif;
-    font-size: 0.92rem;
-    font-weight: 750;
     outline: none;
+    background: #fbfdff;
+    color: #172d42;
+    direction: rtl;
+    text-align: right;
+    font-family: inherit;
+    font-size: 0.85rem;
+    font-weight: 650;
     box-shadow: inset 0 1px 2px rgba(15, 42, 70, 0.04);
-    transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease,
+        background-color 0.15s ease;
 }
 
-    .work-order-search-input::placeholder {
-        color: #7a8d9d;
-        font-weight: 600;
-    }
+.work-order-search-input::placeholder {
+    color: #7a8d9d;
+    font-weight: 600;
+    opacity: 1;
+}
 
-    .work-order-search-input:hover {
-        border-color: var(--uds-blue-600);
-        background: #ffffff;
-    }
+.work-order-search-input:hover {
+    border-color: #7fa6bd;
+    background: #ffffff;
+}
 
-    .work-order-search-input:focus {
-        border-color: var(--uds-blue-600);
-        background: #ffffff;
-        box-shadow: 0 0 0 3px rgba(11, 120, 199, 0.14);
-    }
+.work-order-search-input:focus {
+    border-color: #277da8;
+    background: #ffffff;
+    box-shadow: 0 0 0 2px rgba(39, 125, 168, 0.13);
+}
 
-/* =========================
-   FINANCIAL SUMMARY ITEMS
-   JavaScript creates the metric items, so their visual rules live in
-   wwwroot/app.css. The selected summary is fixed at the bottom of the
-   viewport there so it remains visible while the grid owns page scrolling.
-   ========================= */
+.validation-navigator {
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: min(100%, 760px);
+    min-height: 36px;
+    padding: 6px 9px;
+    gap: 12px;
+    border: 1px solid #e4a19a;
+    border-left: 4px solid #d92d20;
+    border-radius: 9px;
+    background: #fffafa;
+    color: #7f1d1d;
+    direction: rtl;
+    box-shadow: 0 4px 12px rgba(127, 29, 29, 0.06);
+}
 
+.validation-navigator[hidden],
 .work-orders-selection-summary[hidden] {
     display: none !important;
 }
 
-/* =========================
-   RESPONSIVE
-   ========================= */
-
-@media (max-width: 1180px) {
-    .work-orders-open-summary {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
+.validation-navigator-summary {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    gap: 9px;
 }
 
-@media (max-width: 800px) {
-    .tabulator-workorders-page {
-        padding: 18px 14px 26px;
-    }
-
-    .page-header-row {
-        flex-direction: column;
-    }
-
-    .page-actions-box {
-        width: 100%;
-        min-width: 0;
-        text-align: left;
-    }
-
-    .page-actions-buttons {
-        justify-content: flex-start;
-    }
-
-    .work-order-toolbar-row {
-        grid-template-columns: 1fr;
-        grid-template-areas:
-            "search"
-            "validation";
-        min-height: 0;
-    }
-
-    .work-order-search-box {
-        width: 100%;
-    }
-
-    .validation-navigator-slot {
-        min-height: 68px;
-    }
-
+.validation-navigator-icon {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: #d92d20;
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: 900;
 }
 
-
-/* Normal UDS page-header palette */
-.page-header-row {
-    padding: 4px 0 2px;
+.validation-navigator-copy {
+    display: grid;
+    min-width: 0;
+    gap: 1px;
+    text-align: right;
 }
 
-.tabulator-workorders-page h1 {
-    color: var(--uds-navy-950);
+.validation-navigator-copy strong {
+    color: #8f1d15;
+    font-size: 0.82rem;
+    font-weight: 800;
+    line-height: 1.25;
 }
 
-.page-subtitle {
-    color: #6f8496;
+.validation-navigator-copy span {
+    overflow: hidden;
+    color: #a43a31;
+    font-size: 0.76rem;
+    font-weight: 650;
+    line-height: 1.35;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
-/* =========================================================
-   TABULATOR — CLEAN ENTERPRISE GRID STYLE
-   Matches the approved reference: Segoe UI, pale gray header,
-   thin blue-gray lines, white rows, left-aligned English headers.
-   ========================================================= */
+.validation-navigator-actions {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 6px;
+    direction: ltr;
+}
 
+.validation-navigator-button {
+    min-width: 58px;
+    height: 30px;
+    padding: 0 9px;
+    border: 1px solid #d88980;
+    border-radius: 7px;
+    background: #ffffff;
+    color: #8f1d15;
+    font-size: 0.75rem;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.validation-navigator-button:hover:not(:disabled) {
+    border-color: #c43227;
+    background: #fff0ee;
+}
+
+.validation-navigator-button:disabled {
+    opacity: 0.45;
+    cursor: default;
+}
+
+/* ---------- Grid shell and fixed reserved footer ---------- */
+.work-orders-grid-shell {
+    box-sizing: border-box;
+    display: grid;
+    grid-template-rows: minmax(0, 1fr) 42px;
+    min-height: 0;
+    gap: 3px;
+    overflow: hidden;
+}
+
+.work-orders-grid-shell > .tabulator-card {
+    min-height: 0;
+}
+
+.work-orders-selection-summary-host {
+    box-sizing: border-box;
+    min-height: 42px;
+    height: 42px;
+    overflow: hidden;
+}
+
+.work-orders-grid-shell .work-orders-selection-summary-bar {
+    box-sizing: border-box;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    width: 100%;
+    min-height: 42px;
+    height: 42px;
+    padding: 0;
+    gap: 0;
+    overflow: hidden;
+    border: 1px solid #c4d3dd;
+    border-top: 2px solid #789bb1;
+    border-left: 0;
+    border-radius: 7px;
+    background: #f4f7f9;
+    direction: ltr;
+    box-shadow: none;
+    pointer-events: none;
+}
+
+/* ---------- Tabulator surface ---------- */
 .tabulator-workorders-page .tabulator-card {
     position: relative;
+    box-sizing: border-box;
+    height: 100%;
     padding: 0 !important;
     overflow: hidden;
-    border: 1px solid #dfe6ec !important;
-    border-radius: 14px !important;
+    border: 1px solid #c5d3dd !important;
+    border-radius: 9px !important;
     background: #ffffff !important;
-    box-shadow: 0 8px 24px rgba(15, 42, 70, 0.07) !important;
+    box-shadow: 0 2px 7px rgba(30, 58, 78, 0.07) !important;
+    overscroll-behavior: contain;
 }
 
-    .tabulator-workorders-page .tabulator-card::before {
-        display: none !important;
-    }
+.tabulator-workorders-page .tabulator-card::before {
+    display: none !important;
+}
 
 .tabulator-workorders-page ::deep .tabulator {
+    height: 100%;
     border: 0 !important;
     border-radius: 0 !important;
     background: #ffffff !important;
-    color: #172b3a !important;
+    color: #233d50 !important;
     font-family: "Segoe UI", Tahoma, Arial, sans-serif !important;
-    font-size: 14px !important;
+    font-size: 13.25px !important;
 }
 
-    .tabulator-workorders-page ::deep .tabulator .tabulator-header {
-        min-height: 49px;
-        border-top: 0 !important;
-        border-right: 0 !important;
-        border-bottom: 1px solid #d8e2ea !important;
-        border-left: 0 !important;
-        background: #f5f7f9 !important;
-        color: #14283b !important;
-    }
+.tabulator-workorders-page ::deep .tabulator .tabulator-header {
+    min-height: 42px !important;
+    border-top: 0 !important;
+    border-right: 0 !important;
+    border-bottom: 2px solid #89a9bd !important;
+    border-left: 0 !important;
+    background: var(--wo-header) !important;
+    color: #243f53 !important;
+}
 
-        .tabulator-workorders-page ::deep .tabulator .tabulator-header .tabulator-col {
-            min-height: 49px;
-            border-right: 1px solid #d8e2ea !important;
-            background: #f5f7f9 !important;
-        }
+.tabulator-workorders-page ::deep .tabulator .tabulator-header .tabulator-col {
+    min-height: 42px !important;
+    border-right: 1px solid #cbd8e1 !important;
+    background: var(--wo-header) !important;
+    color: #243f53 !important;
+}
 
-            .tabulator-workorders-page ::deep .tabulator .tabulator-header .tabulator-col:last-child {
-                border-right: 0 !important;
-            }
+.tabulator-workorders-page ::deep .tabulator .tabulator-header .tabulator-col:hover {
+    background: #dbe8f0 !important;
+}
 
-    .tabulator-workorders-page ::deep .tabulator .tabulator-col .tabulator-col-content {
-        min-height: 49px;
-        padding: 0 34px 0 10px !important;
-        display: flex;
-        align-items: center;
-    }
+.tabulator-workorders-page ::deep .tabulator .tabulator-header .tabulator-col:last-child {
+    border-right: 0 !important;
+}
 
-    .tabulator-workorders-page ::deep .tabulator .tabulator-col-title-holder {
-        width: 100%;
-    }
+.tabulator-workorders-page ::deep .tabulator .tabulator-col .tabulator-col-content {
+    min-height: 42px !important;
+    padding: 0 31px 0 9px !important;
+}
 
-    .tabulator-workorders-page ::deep .tabulator .tabulator-col-title {
-        color: #14283b !important;
-        font-family: "Segoe UI", Tahoma, Arial, sans-serif !important;
-        font-size: 14px !important;
-        font-weight: 700 !important;
-        line-height: 1.2;
-        text-align: left !important;
-        white-space: nowrap;
-    }
+.tabulator-workorders-page ::deep .tabulator .tabulator-col-title-holder {
+    display: flex;
+    align-items: center;
+    min-height: 42px;
+}
 
-    .tabulator-workorders-page ::deep .tabulator .tabulator-col .tabulator-arrow {
-        right: 10px !important;
-        border-top-color: #7c8f9f !important;
-        border-bottom-color: #7c8f9f !important;
-    }
+.tabulator-workorders-page ::deep .tabulator .tabulator-col-title {
+    overflow: hidden;
+    color: #243f53 !important;
+    font-size: 12.75px !important;
+    font-weight: 750 !important;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.tabulator-workorders-page ::deep .tabulator .tabulator-col .tabulator-arrow {
+    border-top-color: #607f93 !important;
+    border-bottom-color: #607f93 !important;
+}
 
 .tabulator-workorders-page ::deep .tabulator-row {
-    min-height: 38px !important;
-    border-bottom: 1px solid #d8e2ea !important;
+    min-height: 34px !important;
+    border-bottom: 1px solid var(--wo-border-soft) !important;
     background: #ffffff !important;
 }
 
-    .tabulator-workorders-page ::deep .tabulator-row:nth-child(even) {
-        background: #ffffff !important;
-    }
+.tabulator-workorders-page ::deep .tabulator-row:nth-child(even) {
+    background: #f7fafc !important;
+}
 
-    .tabulator-workorders-page ::deep .tabulator-row:hover {
-        background: #f6f9fb !important;
-    }
+.tabulator-workorders-page ::deep .tabulator-row:hover {
+    background: #edf6fb !important;
+}
 
-    .tabulator-workorders-page ::deep .tabulator-row .tabulator-cell {
-        min-height: 38px !important;
-        padding: 8px 9px !important;
-        border-right: 1px solid #d8e2ea !important;
-        border-bottom: 0 !important;
-        background: transparent !important;
-        color: #173047 !important;
-        font-family: "Segoe UI", Tahoma, Arial, sans-serif !important;
-        font-size: 14px !important;
-        font-weight: 400 !important;
-        line-height: 21px !important;
-    }
+.tabulator-workorders-page ::deep .tabulator-row .tabulator-cell {
+    min-height: 34px !important;
+    padding: 5px 8px !important;
+    border-right: 1px solid var(--wo-border-cell) !important;
+    color: #284458 !important;
+    font-size: 13.25px !important;
+    line-height: 23px !important;
+}
 
-        .tabulator-workorders-page ::deep .tabulator-row .tabulator-cell:last-child {
-            border-right: 0 !important;
-        }
+.tabulator-workorders-page ::deep .tabulator-row .tabulator-cell:last-child {
+    border-right: 0 !important;
+}
 
-        .tabulator-workorders-page ::deep .tabulator .tabulator-header .tabulator-col:first-child,
-        .tabulator-workorders-page ::deep .tabulator-row .tabulator-cell:first-child {
-            background: #f7f9fb !important;
-            color: #173047 !important;
-            font-weight: 700 !important;
-            text-align: center !important;
-        }
+.tabulator-workorders-page ::deep .tabulator .tabulator-header .tabulator-col:first-child {
+    border-right-color: #c7d5de !important;
+    background: #dce7ee !important;
+    color: #36546a !important;
+}
 
-.tabulator-workorders-page ::deep .tabulator-cell[tabulator-field="basket"],
-.tabulator-workorders-page ::deep .tabulator-cell[tabulator-field="status"],
-.tabulator-workorders-page ::deep .tabulator-cell[tabulator-field="notes"] {
-    direction: rtl;
-    text-align: right;
+.tabulator-workorders-page ::deep .tabulator-row .tabulator-cell:first-child {
+    border-right-color: #dbe5eb !important;
+    background: #f2f6f8 !important;
+    color: #4b6679 !important;
+    text-align: center;
+    font-weight: 700;
+}
+
+.tabulator-workorders-page ::deep .tabulator-row:nth-child(even) .tabulator-cell:first-child {
+    background: #edf3f6 !important;
+}
+
+.tabulator-workorders-page ::deep .tabulator-row:hover .tabulator-cell:first-child {
+    background: #e5f0f6 !important;
 }
 
 .tabulator-workorders-page ::deep .tabulator-cell[tabulator-field="workOrderNumber"],
@@ -483,85 +613,40 @@
     text-align: left;
 }
 
-.tabulator-workorders-page ::deep .tabulator-header-popup-button {
-    right: 9px !important;
-    width: 18px !important;
-    height: 18px !important;
-    color: #728797 !important;
+.tabulator-workorders-page ::deep .tabulator-cell[tabulator-field="basket"],
+.tabulator-workorders-page ::deep .tabulator-cell[tabulator-field="status"],
+.tabulator-workorders-page ::deep .tabulator-cell[tabulator-field="notes"] {
+    direction: rtl;
+    text-align: right;
 }
 
-    .tabulator-workorders-page ::deep .tabulator-header-popup-button:hover,
-    .tabulator-workorders-page ::deep .tabulator-header-popup-button.is-filtered {
-        color: #0b78c7 !important;
-        background: transparent !important;
-    }
-
-.tabulator-workorders-page ::deep .tabulator-cell.tabulator-range-selected,
-.tabulator-workorders-page ::deep .tabulator-cell.tabulator-selected,
-.tabulator-workorders-page ::deep .tabulator-cell.tabulator-range-only-cell-selected {
-    background: #e6f2fb !important;
-    box-shadow: none !important;
-    outline: none !important;
-}
-
-.tabulator-workorders-page ::deep .tabulator-cell.tabulator-editing {
-    padding: 0 !important;
-    background: #ffffff !important;
-    box-shadow: inset 0 0 0 2px #0b78c7 !important;
-}
-
-.tabulator-workorders-page ::deep .tabulator .tabulator-tableholder::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
-}
-
-.tabulator-workorders-page ::deep .tabulator .tabulator-tableholder::-webkit-scrollbar-track {
-    background: #f3f5f7;
-}
-
-.tabulator-workorders-page ::deep .tabulator .tabulator-tableholder::-webkit-scrollbar-thumb {
-    border: 2px solid #f3f5f7;
-    border-radius: 999px;
-    background: #858585;
-}
-
-/* =========================================================
-   FILTER ICONS — RIGHT SIDE FOR EVERY FILTERED COLUMN
-   ========================================================= */
-
+/* Header popup/filter button */
 .tabulator-workorders-page ::deep .tabulator-header-popup-button {
     position: absolute !important;
     top: 50% !important;
-    right: 9px !important;
-    left: auto !important;
-    z-index: 3;
+    right: 7px !important;
     display: inline-flex !important;
     align-items: center;
     justify-content: center;
     width: 22px !important;
     height: 22px !important;
-    margin: 0 !important;
-    padding: 0 !important;
+    padding: 3px !important;
     border: 1px solid transparent;
     border-radius: 5px;
-    color: #728797 !important;
+    color: #678497 !important;
     transform: translateY(-50%) !important;
 }
 
-.tabulator-workorders-page ::deep .tabulator-col-title {
-    padding-right: 26px;
-}
-
 .tabulator-workorders-page ::deep .tabulator-header-popup-button:hover {
-    border-color: #b7cfdf;
-    background: #eef7fc !important;
-    color: #0b78c7 !important;
+    border-color: #a9c2d1 !important;
+    background: #edf5f9 !important;
+    color: #176f9f !important;
 }
 
 .tabulator-workorders-page ::deep .tabulator-header-popup-button.is-filtered {
-    border-color: #0b78c7;
-    background: #dceefa !important;
-    color: #145b88 !important;
+    border-color: #68a7c7 !important;
+    background: #dceef7 !important;
+    color: var(--wo-primary) !important;
 }
 
 .tabulator-workorders-page ::deep .excel-filter-icon {
@@ -570,32 +655,69 @@
     height: 15px;
 }
 
-    .tabulator-workorders-page ::deep .excel-filter-icon svg {
-        width: 100%;
-        height: 100%;
-        fill: currentColor;
-    }
+.tabulator-workorders-page ::deep .excel-filter-icon svg {
+    width: 100%;
+    height: 100%;
+    fill: currentColor;
+}
 
-/* Bucket autocomplete remains RTL while the column title stays English. */
-.tabulator-workorders-page ::deep
-.tabulator-cell[tabulator-field="basket"].tabulator-editing,
-.tabulator-workorders-page ::deep
-.tabulator-cell[tabulator-field="basket"].tabulator-editing input {
+/* Selection and editing */
+.tabulator-workorders-page ::deep .tabulator-cell.tabulator-range-selected,
+.tabulator-workorders-page ::deep .tabulator-cell.tabulator-selected,
+.tabulator-workorders-page ::deep .tabulator-cell.tabulator-range-only-cell-selected {
+    background: var(--wo-selection) !important;
+    box-shadow: inset 0 0 0 1px rgba(76, 145, 181, 0.58) !important;
+}
+
+.tabulator-workorders-page ::deep .tabulator .tabulator-tableholder .tabulator-range-overlay .tabulator-range,
+.tabulator-workorders-page ::deep .tabulator .tabulator-tableholder .tabulator-range-overlay .tabulator-range-cell-active {
+    border: 1px solid var(--wo-selection-border) !important;
+    box-shadow: none !important;
+}
+
+.tabulator-workorders-page ::deep .tabulator .tabulator-tableholder .tabulator-range-overlay .tabulator-range.tabulator-range-active::after {
+    display: none !important;
+}
+
+.tabulator-workorders-page ::deep .tabulator-cell.tabulator-editing {
+    background: #ffffff !important;
+    box-shadow: inset 0 0 0 1px #1e78aa,
+        0 0 0 2px rgba(30, 120, 170, 0.09) !important;
+}
+
+.tabulator-workorders-page ::deep .tabulator-cell[tabulator-field="basket"].tabulator-editing,
+.tabulator-workorders-page ::deep .tabulator-cell[tabulator-field="basket"].tabulator-editing input {
     direction: rtl;
     text-align: right;
 }
 
-/* =========================================================
-   WORK-ORDER IDENTITY VALIDATION — STEP 10B
-   Clear, professional feedback while the user is typing.
-   ========================================================= */
+/* Scrollbar */
+.tabulator-workorders-page ::deep .tabulator .tabulator-tableholder::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+}
 
+.tabulator-workorders-page ::deep .tabulator .tabulator-tableholder::-webkit-scrollbar-track {
+    background: #edf2f6;
+}
+
+.tabulator-workorders-page ::deep .tabulator .tabulator-tableholder::-webkit-scrollbar-thumb {
+    border: 2px solid #edf2f6;
+    border-radius: 999px;
+    background: #8da2b2;
+}
+
+.tabulator-workorders-page ::deep .tabulator .tabulator-tableholder::-webkit-scrollbar-thumb:hover {
+    background: #71889a;
+}
+
+/* ---------- Identity editor and validation ---------- */
 .tabulator-workorders-page ::deep .uds-identity-editor {
     position: relative;
     box-sizing: border-box;
     width: 100%;
     height: 100%;
-    min-height: 38px;
+    min-height: 34px;
     overflow: visible;
     background: #ffffff;
 }
@@ -604,9 +726,9 @@
     box-sizing: border-box;
     width: 100%;
     height: 100%;
-    min-height: 38px;
+    min-height: 34px;
     margin: 0;
-    padding: 7px 56px 7px 9px;
+    padding: 5px 56px 5px 8px;
     border: 0;
     outline: 0;
     background: #ffffff;
@@ -638,30 +760,26 @@
     pointer-events: none;
 }
 
-.tabulator-workorders-page ::deep
-.uds-identity-editor.is-invalid .uds-identity-editor-input {
-    background: #ffffff;
+.tabulator-workorders-page ::deep .uds-identity-editor.is-invalid .uds-identity-editor-input {
     color: #9f1f17;
 }
 
-.tabulator-workorders-page ::deep
-.uds-identity-editor.is-invalid .uds-identity-editor-count {
+.tabulator-workorders-page ::deep .uds-identity-editor.is-invalid .uds-identity-editor-count {
     border-color: #f1a7a0;
     background: #fff1f0;
     color: #b42318;
 }
 
-.tabulator-workorders-page ::deep
-.uds-identity-editor.is-valid .uds-identity-editor-count {
+.tabulator-workorders-page ::deep .uds-identity-editor.is-valid .uds-identity-editor-count {
     border-color: #9dd6b4;
     background: #edf9f1;
     color: #157347;
 }
 
-.tabulator-workorders-page ::deep
-.tabulator-cell.tabulator-editing.uds-identity-cell-invalid {
+.tabulator-workorders-page ::deep .tabulator-cell.tabulator-editing.uds-identity-cell-invalid {
     background: #ffffff !important;
-    box-shadow: inset 0 0 0 2px #d92d20, 0 0 0 3px rgba(217, 45, 32, 0.11) !important;
+    box-shadow: inset 0 0 0 2px #d92d20,
+        0 0 0 3px rgba(217, 45, 32, 0.11) !important;
 }
 
 .tabulator-workorders-page .uds-identity-validation-popover {
@@ -676,7 +794,7 @@
     color: #8f1d15;
     direction: rtl;
     text-align: right;
-    font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+    font-family: inherit;
     font-size: 12px;
     font-weight: 700;
     line-height: 1.45;
@@ -684,155 +802,33 @@
     pointer-events: none;
 }
 
-    .tabulator-workorders-page .uds-identity-validation-popover::before {
-        content: "!";
-        position: absolute;
-        top: 50%;
-        left: 11px;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 17px;
-        height: 17px;
-        border-radius: 50%;
-        background: #d92d20;
-        color: #ffffff;
-        font-size: 11px;
-        font-weight: 900;
-        transform: translateY(-50%);
-    }
-
-    .tabulator-workorders-page .uds-identity-validation-popover[hidden] {
-        display: none !important;
-    }
-
-/* =========================================================
-   CENTRAL VALIDATION NAVIGATOR — COMPACT TOOLBAR
-   Separate from the grid so validation never changes table position.
-   ========================================================= */
-
-.validation-navigator {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    box-sizing: border-box;
-    width: min(100%, 760px);
-    min-height: 72px;
-    padding: 8px 10px;
-    border: 1px solid #e4a19a;
-    border-left: 4px solid #d92d20;
-    border-radius: 9px;
-    background: #fffafa;
-    color: #7f1d1d;
-    direction: rtl;
-    box-shadow: 0 4px 12px rgba(127, 29, 29, 0.06);
-}
-
-    .validation-navigator[hidden] {
-        display: none !important;
-    }
-
-.validation-navigator-summary {
-    display: flex;
-    align-items: center;
-    gap: 9px;
-    min-width: 0;
-}
-
-.validation-navigator-icon {
+.tabulator-workorders-page .uds-identity-validation-popover::before {
+    content: "!";
+    position: absolute;
+    top: 50%;
+    left: 11px;
     display: inline-flex;
-    flex: 0 0 auto;
     align-items: center;
     justify-content: center;
-    width: 22px;
-    height: 22px;
+    width: 17px;
+    height: 17px;
     border-radius: 50%;
     background: #d92d20;
     color: #ffffff;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 900;
+    transform: translateY(-50%);
 }
 
-.validation-navigator-copy {
-    display: grid;
-    gap: 1px;
-    min-width: 0;
-    text-align: right;
+.tabulator-workorders-page .uds-identity-validation-popover[hidden] {
+    display: none !important;
 }
 
-    .validation-navigator-copy strong {
-        color: #8f1d15;
-        font-size: 0.82rem;
-        font-weight: 800;
-        line-height: 1.25;
-    }
-
-    .validation-navigator-copy span {
-        overflow: hidden;
-        color: #a43a31;
-        font-size: 0.76rem;
-        font-weight: 650;
-        line-height: 1.35;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
-
-.validation-navigator-actions {
-    display: flex;
-    flex: 0 0 auto;
-    align-items: center;
-    gap: 6px;
-    direction: ltr;
-}
-
-.validation-navigator-button {
-    min-width: 58px;
-    height: 30px;
-    padding: 0 9px;
-    border: 1px solid #d88980;
-    border-radius: 7px;
-    background: #ffffff;
-    color: #8f1d15;
-    font-size: 0.75rem;
-    font-weight: 800;
-    cursor: pointer;
-}
-
-    .validation-navigator-button:hover:not(:disabled) {
-        border-color: #c43227;
-        background: #fff0ee;
-    }
-
-    .validation-navigator-button:disabled {
-        opacity: 0.45;
-        cursor: default;
-    }
-
-@media (max-width: 900px) {
-    .validation-navigator {
-        width: 100%;
-    }
-
-    .validation-navigator-copy span {
-        white-space: normal;
-    }
-}
-
-/* =========================================================
-   SIMPLE VALIDATION INDICATOR
-   Only the row warning icon and the top validation message are visible.
-   Invalid cells keep accessibility metadata but receive no custom color,
-   border, corner marker, animation, or current-error highlight.
-   ========================================================= */
-
-.tabulator-workorders-page ::deep
-.tabulator-row.uds-validation-error-row > .tabulator-cell:first-child {
+.tabulator-workorders-page ::deep .tabulator-row.uds-validation-error-row > .tabulator-cell:first-child {
     position: relative;
 }
 
-.tabulator-workorders-page ::deep
-.tabulator-row.uds-validation-error-row > .tabulator-cell:first-child::after {
+.tabulator-workorders-page ::deep .tabulator-row.uds-validation-error-row > .tabulator-cell:first-child::after {
     content: "!";
     position: absolute;
     top: 5px;
@@ -851,288 +847,51 @@
     pointer-events: none;
 }
 
-/* =========================================================
-   STEP 11B — STICKY PAGE CONTROLS WITHOUT RESIZING TABULATOR
-   Keeps the command area visible while document scrolling occurs.
-   The grid keeps its stable fixed height, so cell editing is unaffected.
-   ========================================================= */
-
-.work-orders-sticky-controls {
-    position: sticky;
-    top: 72px;
-    z-index: 100;
-    margin: -24px -30px 12px;
-    padding: 24px 30px 12px;
-    border-bottom: 1px solid rgba(193, 206, 217, 0.78);
-    background: #f4f7fb;
-    box-shadow: 0 8px 18px rgba(15, 42, 70, 0.055);
-}
-
-.work-orders-sticky-controls .work-order-toolbar-row {
-    margin-bottom: 0;
-}
-
-@media (max-width: 800px) {
-    .work-orders-sticky-controls {
-        position: static;
-        margin: 0 0 12px;
-        padding: 0;
-        border-bottom: 0;
-        background: transparent;
-        box-shadow: none;
+/* ---------- Responsive ---------- */
+@media (max-width: 1180px) {
+    .work-orders-open-summary {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
 
-/* =========================================================
-   STEP 11C — ONE SCROLLBAR: GRID ONLY
-   The browser document is locked by JavaScript on desktop.
-   Controls remain in normal flow, while Tabulator receives a stable
-   pixel height calculated once from the available viewport space.
-   ========================================================= */
-
-.work-orders-sticky-controls {
-    position: static;
-    top: auto;
-    z-index: auto;
-}
-
-.tabulator-workorders-page .tabulator-card {
-    overscroll-behavior: contain;
-}
-
-@media (hover: hover) and (pointer: fine) {
-    .tabulator-workorders-page {
-        min-height: 0;
-        padding-bottom: 14px;
-        overflow: hidden;
-    }
-}
-
-@media (max-width: 800px) {
-    .work-orders-open-summary,
-    .work-orders-selection-summary-bar {
-        grid-template-columns: repeat(2, minmax(135px, 1fr));
-    }
-}
-
-@media (max-width: 480px) {
-    .work-orders-open-summary,
-    .work-orders-selection-summary-bar {
-        grid-template-columns: 1fr;
-    }
-}
-
-/* =========================================================
-   PHASE 9.2A2 — CALM ENTERPRISE VISUAL POLISH
-   Visual-only adjustments. Business logic, calculations, filters,
-   sorting, keyboard behavior, save, and selection remain unchanged.
-   ========================================================= */
-
-.tabulator-workorders-page {
-    --ux-page: #f5f7fa;
-    --ux-card: #ffffff;
-    --ux-border: #dbe4eb;
-    --ux-border-strong: #c8d5df;
-    --ux-ink: #183047;
-    --ux-muted: #6d8192;
-    --ux-blue: #287da9;
-    --ux-blue-soft: #eaf4fa;
-    --ux-teal: #4c8b84;
-    --ux-gold: #b78a3c;
-    padding: 18px 26px 20px;
-}
-
-.page-header-row {
-    align-items: center;
-    gap: 18px;
-    margin-bottom: 12px;
-}
-
-.tabulator-workorders-page h1 {
-    font-size: 1.72rem;
-    letter-spacing: -0.02em;
-}
-
-.page-context-row {
-    margin-top: 5px;
-}
-
-.page-subtitle {
-    color: var(--ux-muted);
-    font-size: 0.84rem;
-}
-
-.page-actions-box {
-    min-width: 0;
-}
-
-.page-actions-buttons {
-    gap: 8px;
-}
-
-.page-action-button {
-    min-width: 96px;
-    height: 38px;
-    padding: 0 14px;
-    border-radius: 8px;
-    font-size: 0.82rem;
-}
-
-.page-action-button-secondary {
-    border-color: #b8c8d4;
-    background: rgba(255, 255, 255, 0.92);
-    color: #3b566b;
-}
-
-.page-action-button-secondary:hover {
-    border-color: #7f9aae;
-    background: #ffffff;
-}
-
-.page-action-button-copy {
-    border-color: #9ec9de;
-    background: #eaf5fa;
-    color: #17668e;
-    box-shadow: none;
-}
-
-.page-action-button-copy:hover {
-    border-color: #6faecc;
-    background: #dff0f8;
-    color: #105c81;
-    box-shadow: none;
-}
-
-.page-action-button-save {
-    border-color: #187ba7;
-    background: #1684b2;
-    color: #ffffff;
-    box-shadow: 0 5px 12px rgba(22, 132, 178, 0.16);
-}
-
-.page-action-button-save:hover {
-    background: #11769f;
-    box-shadow: 0 7px 16px rgba(22, 132, 178, 0.20);
-}
-
-.save-status {
-    min-height: 25px;
-    margin-top: 5px;
-    padding: 3px 10px;
-    border-color: #c7dce8;
-    background: #f1f8fc;
-    color: #376981;
-    font-size: 0.72rem;
-}
-
-.work-orders-open-summary {
-    gap: 10px;
-    min-height: 0;
-    margin-bottom: 10px;
-    padding: 0;
-    border: 0;
-    border-radius: 0;
-    background: transparent;
-    box-shadow: none;
-}
-
-.work-order-toolbar-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    min-height: 44px;
-    margin: 6px 0 9px;
-}
-
-.validation-navigator-slot {
-    flex: 1 1 auto;
-    min-height: 0;
-}
-
-.validation-navigator {
-    min-height: 48px;
-    padding: 7px 10px;
-}
-
-.work-order-search-box {
-    box-sizing: border-box;
-    display: grid;
-    grid-template-columns: auto minmax(170px, 1fr);
-    align-items: center;
-    gap: 8px;
-    flex: 0 0 320px;
-    width: 320px;
-    min-height: 42px;
-    padding: 5px 7px;
-    border-color: #b9cbd8;
-    border-radius: 9px;
-    background: #ffffff;
-    box-shadow: 0 2px 8px rgba(15, 42, 70, 0.045);
-}
-
-.work-order-search-label {
-    margin: 0;
-    color: #4d6c82;
-    font-size: 0.75rem;
-    white-space: nowrap;
-}
-
-.work-order-search-input {
-    height: 30px;
-    padding: 5px 10px;
-    border-color: #c3d2dd;
-    background: #fbfdff;
-    font-size: 0.85rem;
-    font-weight: 650;
-}
-
-.tabulator-workorders-page .tabulator-card {
-    border-color: var(--ux-border) !important;
-    border-radius: 11px !important;
-    box-shadow: 0 5px 16px rgba(15, 42, 70, 0.055) !important;
-}
-
-.tabulator-workorders-page ::deep .tabulator .tabulator-header,
-.tabulator-workorders-page ::deep .tabulator .tabulator-header .tabulator-col {
-    border-color: #dce5ec !important;
-    background: #f2f6f9 !important;
-}
-
-.tabulator-workorders-page ::deep .tabulator-row {
-    border-bottom-color: #e1e8ee !important;
-}
-
-.tabulator-workorders-page ::deep .tabulator-row:nth-child(even) {
-    background: #fbfdff !important;
-}
-
-.tabulator-workorders-page ::deep .tabulator-row:hover {
-    background: #f0f7fb !important;
-}
-
-.tabulator-workorders-page ::deep .tabulator-row .tabulator-cell {
-    border-right-color: #e1e8ee !important;
-}
-
-.tabulator-workorders-page ::deep .tabulator-cell.tabulator-range-selected,
-.tabulator-workorders-page ::deep .tabulator-cell.tabulator-selected,
-.tabulator-workorders-page ::deep .tabulator-cell.tabulator-range-only-cell-selected {
-    background: #e5f1f8 !important;
-}
-
-@media (max-width: 980px) {
+@media (max-width: 1120px) {
     .page-header-row {
         align-items: flex-start;
         flex-direction: column;
     }
 
+    .page-title-block {
+        display: block;
+    }
+
+    .page-context-row {
+        margin-top: 4px;
+        flex-wrap: wrap;
+    }
+
     .page-actions-box {
         width: 100%;
+        min-width: 0;
+        text-align: left;
     }
 
     .page-actions-buttons {
         justify-content: flex-start;
+    }
+}
+
+@media (max-width: 800px) {
+    .tabulator-workorders-page {
+        min-height: calc(100vh - 70px);
+        overflow: visible;
+    }
+
+    .work-orders-sticky-controls {
+        margin: 0 0 12px;
+        padding: 0;
+        border-bottom: 0;
+        background: transparent;
+        box-shadow: none;
     }
 
     .work-order-toolbar-row {
@@ -1140,946 +899,26 @@
         flex-direction: column-reverse;
     }
 
-    .work-order-search-box {
-        flex-basis: auto;
+    .work-order-search-box,
+    .validation-navigator {
         width: 100%;
     }
-}
 
-
-/* =========================================================
-   PHASE 9.2A4 — COMPACT DASHBOARD AND RESERVED SHEET FOOTER
-   The dashboard gives vertical space back to the sheet. The selected totals
-   use a normal-flow reserved footer so the last visible row is never covered.
-   ========================================================= */
-
-.work-orders-open-summary {
-    gap: 7px;
-    margin-bottom: 7px;
-}
-
-.work-order-toolbar-row {
-    min-height: 38px;
-    margin: 4px 0 6px;
-}
-
-.work-order-search-box {
-    min-height: 36px;
-    padding: 3px 6px;
-}
-
-.work-order-search-input {
-    height: 28px;
-}
-
-.work-orders-selection-summary-host {
-    box-sizing: border-box;
-    width: 100%;
-    min-height: 50px;
-    margin-top: 6px;
-}
-
-@media (hover: hover) and (pointer: fine) {
-    .tabulator-workorders-page {
-        padding-bottom: 8px;
-    }
-}
-
-/* =========================================================
-   PHASE 9.2A4-R1 — VIEWPORT GRID SHELL
-   The grid and Selected totals share one viewport-sized shell. The second
-   row is permanently reserved, so the footer is visible without covering
-   the last Tabulator row and without relying on document scrolling.
-   ========================================================= */
-
-.work-orders-grid-shell {
-    box-sizing: border-box;
-    display: grid;
-    grid-template-rows: minmax(0, 1fr) 50px;
-    gap: 6px;
-    width: 100%;
-    min-height: 0;
-    overflow: hidden;
-}
-
-.work-orders-grid-shell > .tabulator-card {
-    box-sizing: border-box;
-    min-height: 0;
-    height: 100%;
-    overflow: hidden;
-}
-
-.work-orders-grid-shell > .work-orders-selection-summary-host {
-    box-sizing: border-box;
-    display: flex;
-    align-items: stretch;
-    width: 100%;
-    min-height: 50px;
-    height: 50px;
-    margin: 0;
-    overflow: hidden;
-}
-
-@media (max-width: 600px) {
     .work-orders-grid-shell {
-        display: block;
-        height: auto !important;
+        margin-top: -10px;
         overflow: visible;
     }
-
-    .work-orders-grid-shell > .work-orders-selection-summary-host {
-        min-height: 0;
-        height: auto;
-        margin-top: 6px;
-        overflow: visible;
-    }
-}
-
-/* =========================================================
-   PHASE 9.2A5 — COMPACT TOP LAYOUT
-   Search and save status share the command header. The empty validation row
-   consumes no space, so the sheet starts immediately after the dashboard.
-   ========================================================= */
-
-.page-header-row {
-    align-items: flex-start;
-    margin-bottom: 7px;
-}
-
-.page-actions-box {
-    flex: 1 1 auto;
-    max-width: 980px;
-}
-
-.page-actions-meta-row {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 8px;
-    min-width: 0;
-    margin-top: 5px;
-}
-
-.page-actions-meta-row .save-status {
-    flex: 0 1 auto;
-    min-width: 0;
-    max-width: 100%;
-    margin-top: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.page-header-search-box {
-    display: grid;
-    grid-template-columns: auto minmax(150px, 210px);
-    align-items: center;
-    gap: 6px;
-    flex: 0 0 auto;
-    width: auto;
-    min-height: 30px;
-    padding: 2px 5px;
-    border-radius: 7px;
-    box-shadow: none;
-}
-
-.page-header-search-box .work-order-search-label {
-    margin: 0;
-    font-size: 0.68rem;
-}
-
-.page-header-search-box .work-order-search-input {
-    width: 210px;
-    height: 26px;
-    padding: 3px 8px;
-    font-size: 0.78rem;
-}
-
-.work-orders-open-summary {
-    margin-bottom: 4px;
-}
-
-.work-order-validation-row {
-    min-height: 0;
-    margin: 0;
-}
-
-.work-order-validation-row:has(.validation-navigator:not([hidden])) {
-    margin: 4px 0 6px;
-}
-
-.work-order-validation-row .validation-navigator {
-    min-height: 44px;
-}
-
-@media (max-width: 1120px) {
-    .page-header-row {
-        flex-direction: column;
-    }
-
-    .page-actions-box {
-        width: 100%;
-        max-width: none;
-    }
-
-    .page-actions-buttons,
-    .page-actions-meta-row {
-        justify-content: flex-start;
-    }
-}
-
-@media (max-width: 720px) {
-    .page-actions-meta-row {
-        align-items: stretch;
-        flex-direction: column;
-    }
-
-    .page-header-search-box {
-        grid-template-columns: auto minmax(0, 1fr);
-        width: 100%;
-    }
-
-    .page-header-search-box .work-order-search-input {
-        width: 100%;
-    }
-}
-
-/* =========================================================
-   PHASE 9.2A7 — PROMINENT WORK-ORDER SEARCH
-   The search remains independent and occupies the far-right position below
-   the command buttons. The save status uses the remaining space to its left.
-   ========================================================= */
-
-.page-actions-meta-row .save-status {
-    flex: 1 1 auto;
-    order: 1;
-    text-align: right;
-}
-
-.page-header-search-box {
-    order: 2;
-    grid-template-columns: auto minmax(220px, 270px);
-    min-height: 34px;
-    padding: 3px 6px;
-    border: 1px solid #a9c8da;
-    border-radius: 8px;
-    background: #ffffff;
-    box-shadow: 0 1px 4px rgba(20, 62, 89, 0.06);
-}
-
-.page-header-search-box .work-order-search-label {
-    color: #244f6b;
-    font-size: 0.72rem;
-    font-weight: 700;
-    white-space: nowrap;
-}
-
-.page-header-search-box .work-order-search-input {
-    width: 270px;
-    height: 28px;
-    border-color: #bfd2de;
-    background: #fbfdfe;
-    font-size: 0.80rem;
-}
-
-.page-header-search-box .work-order-search-input:focus {
-    border-color: #2c86b4;
-    background: #ffffff;
-    box-shadow: 0 0 0 2px rgba(44, 134, 180, 0.12);
-}
-
-@media (max-width: 1120px) {
-    .page-actions-meta-row .save-status {
-        text-align: left;
-    }
-}
-
-@media (max-width: 720px) {
-    .page-actions-meta-row .save-status,
-    .page-header-search-box {
-        order: initial;
-    }
-
-    .page-header-search-box {
-        grid-template-columns: auto minmax(0, 1fr);
-    }
-
-    .page-header-search-box .work-order-search-input {
-        width: 100%;
-    }
-}
-
-/* =========================================================
-   PHASE 9.2A8 — SHEET-LOCAL WORK ORDER SEARCH
-   Search stays immediately above the sheet so it remains obvious during
-   day-to-day grid work. It is no longer mixed with the command header.
-   ========================================================= */
-
-.page-actions-meta-row {
-    justify-content: flex-end;
-}
-
-.page-actions-meta-row .save-status {
-    flex: 0 1 auto;
-    order: initial;
-    text-align: right;
-}
-
-.work-orders-sheet-toolbar {
-    box-sizing: border-box;
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    width: 100%;
-    min-height: 38px;
-    padding: 3px 8px 5px;
-    border-top: 1px solid #d9e4eb;
-    background: #f5f8fa;
-}
-
-.sheet-search-box {
-    box-sizing: border-box;
-    display: grid;
-    grid-template-columns: auto minmax(260px, 360px);
-    align-items: center;
-    gap: 8px;
-    width: auto;
-    min-height: 32px;
-    margin: 0;
-    padding: 3px 7px;
-    border: 1px solid #9fbfd2;
-    border-radius: 7px;
-    background: #ffffff;
-    box-shadow: 0 1px 3px rgba(20, 62, 89, 0.06);
-}
-
-.sheet-search-box .work-order-search-label {
-    margin: 0;
-    color: #183f59;
-    font-family: Tahoma, "Segoe UI", Arial, sans-serif;
-    font-size: 0.78rem;
-    font-weight: 700;
-    white-space: nowrap;
-}
-
-.sheet-search-box .work-order-search-input {
-    width: 360px;
-    height: 28px;
-    padding: 3px 9px;
-    border-color: #b8cedb;
-    background: #fbfdfe;
-    font-family: Tahoma, "Segoe UI", Arial, sans-serif;
-    font-size: 0.82rem;
-}
-
-.sheet-search-box .work-order-search-input:focus {
-    border-color: #2c86b4;
-    background: #ffffff;
-    box-shadow: 0 0 0 2px rgba(44, 134, 180, 0.12);
-}
-
-@media (max-width: 760px) {
-    .work-orders-sheet-toolbar {
-        padding-inline: 5px;
-    }
-
-    .sheet-search-box {
-        grid-template-columns: auto minmax(0, 1fr);
-        width: 100%;
-    }
-
-    .sheet-search-box .work-order-search-input {
-        width: 100%;
-    }
-}
-
-/* =========================================================
-   PHASE 9.2A13 — UNIFIED WORK ORDERS WORKSPACE
-   A cohesive compact workspace: the grid remains dominant, controls are
-   visually quiet, search is prominent above the sheet, and all active Basket
-   stages remain readable without a horizontal scrollbar.
-   ========================================================= */
-
-.tabulator-workorders-page {
-    --workspace-page: #f4f7fa;
-    --workspace-surface: #ffffff;
-    --workspace-header: #f0f5f8;
-    --workspace-line: #d8e3eb;
-    --workspace-line-soft: #e5ecf1;
-    --workspace-text: #173149;
-    --workspace-muted: #667c8e;
-    --workspace-blue: #247eae;
-    padding: 14px 22px 10px;
-    background: var(--workspace-page);
-}
-
-.page-header-row {
-    align-items: center;
-    gap: 16px;
-    margin-bottom: 8px;
-}
-
-.tabulator-workorders-page h1 {
-    font-size: 1.55rem;
-    line-height: 1.1;
-    letter-spacing: -0.015em;
-}
-
-.page-context-row {
-    gap: 10px;
-    margin-top: 4px;
-}
-
-.page-subtitle {
-    font-size: 0.78rem;
-}
-
-.page-actions-buttons {
-    gap: 7px;
-}
-
-.page-action-button {
-    min-width: 86px;
-    height: 35px;
-    padding: 0 12px;
-    border-radius: 7px;
-    font-size: 0.78rem;
-}
-
-.page-action-button-copy {
-    min-width: 132px;
-}
-
-.page-action-button-save {
-    min-width: 82px;
-}
-
-.save-status {
-    min-height: 23px;
-    margin-top: 4px;
-    padding: 2px 9px;
-    font-size: 0.68rem;
-}
-
-.work-year-selector {
-    min-height: 28px;
-    padding: 2px 4px 2px 8px;
-}
-
-.work-year-select {
-    height: 23px;
-}
-
-.work-orders-open-summary {
-    gap: 7px;
-    min-height: 0;
-    margin-bottom: 6px;
-    padding: 0;
-    border: 0;
-    background: transparent;
-    box-shadow: none;
-}
-
-.work-orders-sticky-controls {
-    margin-bottom: 4px;
-}
-
-.work-orders-sheet-toolbar {
-    min-height: 38px;
-    margin: 0;
-    padding: 3px 6px 4px;
-    border-top: 1px solid var(--workspace-line);
-    background: var(--workspace-page);
-}
-
-.sheet-search-box {
-    grid-template-columns: auto minmax(290px, 390px);
-    min-height: 32px;
-    padding: 2px 6px;
-    border-color: #abc5d6;
-    border-radius: 8px;
-    box-shadow: none;
-}
-
-.sheet-search-box .work-order-search-label {
-    color: #234f6b;
-    font-size: 0.76rem;
-    font-weight: 800;
-}
-
-.sheet-search-box .work-order-search-input {
-    width: 390px;
-    height: 28px;
-    padding: 3px 9px;
-    border-color: #bed1dd;
-    background: #ffffff;
-    font-size: 0.82rem;
-}
-
-.work-orders-grid-shell {
-    grid-template-rows: minmax(0, 1fr) 44px;
-    gap: 4px;
-}
-
-.work-orders-grid-shell > .work-orders-selection-summary-host {
-    min-height: 44px;
-    height: 44px;
-}
-
-.tabulator-workorders-page .tabulator-card {
-    border-color: var(--workspace-line) !important;
-    border-radius: 9px !important;
-    box-shadow: 0 3px 10px rgba(31, 61, 86, 0.045) !important;
-}
-
-.tabulator-workorders-page ::deep .tabulator {
-    font-size: 13.5px !important;
-}
-
-.tabulator-workorders-page ::deep .tabulator .tabulator-header {
-    min-height: 44px;
-    background: var(--workspace-header) !important;
-}
-
-.tabulator-workorders-page ::deep .tabulator .tabulator-header .tabulator-col {
-    min-height: 44px;
-    border-right-color: var(--workspace-line) !important;
-    background: var(--workspace-header) !important;
-}
-
-.tabulator-workorders-page ::deep .tabulator .tabulator-col .tabulator-col-content {
-    min-height: 44px;
-    padding: 0 31px 0 9px !important;
-}
-
-.tabulator-workorders-page ::deep .tabulator .tabulator-col-title {
-    font-size: 13px !important;
-}
-
-.tabulator-workorders-page ::deep .tabulator-row {
-    min-height: 35px !important;
-    border-bottom-color: var(--workspace-line-soft) !important;
-}
-
-.tabulator-workorders-page ::deep .tabulator-row:nth-child(even) {
-    background: #fbfcfe !important;
-}
-
-.tabulator-workorders-page ::deep .tabulator-row:hover {
-    background: #eef6fb !important;
-}
-
-.tabulator-workorders-page ::deep .tabulator-row .tabulator-cell {
-    min-height: 35px !important;
-    padding: 6px 8px !important;
-    border-right-color: var(--workspace-line-soft) !important;
-    font-size: 13.5px !important;
-    line-height: 22px !important;
-}
-
-.tabulator-workorders-page ::deep .tabulator-cell.tabulator-range-selected,
-.tabulator-workorders-page ::deep .tabulator-cell.tabulator-selected,
-.tabulator-workorders-page ::deep .tabulator-cell.tabulator-range-only-cell-selected {
-    background: #e3f0f8 !important;
-}
-
-@media (max-width: 1120px) {
-    .page-header-row {
-        align-items: flex-start;
-        flex-direction: column;
-    }
-
-    .page-actions-box {
-        width: 100%;
-    }
-
-    .page-actions-buttons {
-        justify-content: flex-start;
-    }
-}
-
-@media (max-width: 760px) {
-    .tabulator-workorders-page {
-        padding: 12px 10px 8px;
-    }
-
-    .sheet-search-box {
-        grid-template-columns: auto minmax(0, 1fr);
-        width: 100%;
-    }
-
-    .sheet-search-box .work-order-search-input {
-        width: 100%;
-    }
-}
-
-/* =========================================================
-   PHASE 9.2A14 — COMPACT WORKSPACE LAYOUT
-   Keep the sheet dominant: scope and year share the title line, the Basket
-   overview becomes a thin data rail, search uses one clear input border, and
-   the Selected footer remains reserved below the grid.
-   ========================================================= */
-
-.tabulator-workorders-page {
-    padding: 8px 18px 6px;
-}
-
-.page-header-row {
-    gap: 12px;
-    margin-bottom: 4px;
-}
-
-@media (min-width: 1121px) {
-    .page-title-block {
-        display: flex;
-        align-items: center;
-        gap: 14px;
-        flex-wrap: nowrap;
-    }
-
-    .page-title-block h1 {
-        flex: 0 0 auto;
-        margin: 0;
-    }
-
-    .page-context-row {
-        flex: 0 1 auto;
-        gap: 8px;
-        margin-top: 0;
-        flex-wrap: nowrap;
-    }
-}
-
-.tabulator-workorders-page h1 {
-    font-size: 1.45rem;
-}
-
-.page-subtitle {
-    font-size: 0.76rem;
-    white-space: nowrap;
-}
-
-.work-year-selector {
-    min-height: 27px;
-    padding: 1px 4px 1px 7px;
-}
-
-.work-year-select {
-    height: 22px;
-}
-
-.page-actions-buttons {
-    gap: 6px;
-}
-
-.page-action-button {
-    min-width: 82px;
-    height: 33px;
-    padding-inline: 11px;
-}
-
-.page-action-button-copy {
-    min-width: 128px;
-}
-
-.page-actions-meta-row {
-    margin-top: 3px;
-}
-
-.save-status {
-    min-height: 21px;
-    margin-top: 0;
-    padding: 1px 8px;
-    font-size: 0.66rem;
-}
-
-.work-orders-sticky-controls {
-    margin-bottom: 2px;
-}
-
-.work-orders-open-summary {
-    gap: 6px;
-    margin-bottom: 3px;
-}
-
-.work-order-validation-row:has(.validation-navigator:not([hidden])) {
-    margin: 3px 0 4px;
-}
-
-.work-orders-sheet-toolbar {
-    min-height: 34px;
-    padding: 1px 6px 2px;
-    border-top: 1px solid #d8e3eb;
-    background: #f4f7fa;
-}
-
-.sheet-search-box {
-    display: flex;
-    align-items: center;
-    gap: 9px;
-    width: auto;
-    min-height: 32px;
-    margin: 0;
-    padding: 0;
-    border: 0;
-    border-radius: 0;
-    background: transparent;
-    box-shadow: none;
-}
-
-.sheet-search-box .work-order-search-label {
-    margin: 0;
-    color: #183f59;
-    font-size: 0.80rem;
-    font-weight: 800;
-    white-space: nowrap;
-}
-
-.sheet-search-box .work-order-search-input {
-    box-sizing: border-box;
-    width: 420px;
-    height: 32px;
-    padding: 4px 11px;
-    border: 1px solid #9fbfd2;
-    border-radius: 7px;
-    background: #ffffff;
-    font-size: 0.84rem;
-    box-shadow: none;
-}
-
-.sheet-search-box .work-order-search-input:focus {
-    border-color: #2c86b4;
-    background: #ffffff;
-    box-shadow: 0 0 0 2px rgba(44, 134, 180, 0.12);
-}
-
-.work-orders-grid-shell {
-    grid-template-rows: minmax(0, 1fr) 42px;
-    gap: 3px;
-}
-
-.work-orders-grid-shell > .work-orders-selection-summary-host {
-    min-height: 42px;
-    height: 42px;
 }
 
 @media (max-width: 760px) {
     .tabulator-workorders-page {
         padding: 10px 8px 6px;
     }
-
-    .sheet-search-box {
-        display: grid;
-        grid-template-columns: auto minmax(0, 1fr);
-        width: 100%;
-    }
-
-    .sheet-search-box .work-order-search-input {
-        width: 100%;
-    }
 }
 
-/* =========================================================
-   PHASE 9.2A15 — FINAL WORKSPACE POLISH
-   One clear search field, calmer slate/blue table styling, and no loss of
-   the compact viewport established in A14.
-   ========================================================= */
-
-.tabulator-workorders-page {
-    --workspace-page: #f5f7fa;
-    --workspace-header: #edf2f6;
-    --workspace-line: #d7e1e9;
-    --workspace-line-soft: #e7edf2;
-    color: #1e3347;
-    font-family: "Segoe UI", Tahoma, Arial, sans-serif;
-}
-
-.work-orders-sticky-controls {
-    margin-bottom: 2px;
-}
-
-.work-orders-open-summary {
-    gap: 7px;
-    margin-bottom: 2px;
-}
-
-.work-orders-sheet-toolbar {
-    min-height: 37px;
-    padding: 2px 6px;
-    border-top: 0;
-    border-bottom: 1px solid var(--workspace-line);
-    background: transparent;
-}
-
-.sheet-search-box {
-    position: relative;
-    display: block;
-    width: min(430px, 100%);
-    min-height: 34px;
-    margin-inline-start: auto;
-    padding: 0;
-    border: 0;
-    border-radius: 0;
-    background: transparent;
-    box-shadow: none;
-}
-
-.sheet-search-box .work-order-search-label {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    margin: -1px;
-    padding: 0;
-    overflow: hidden;
-    clip: rect(0 0 0 0);
-    clip-path: inset(50%);
-    white-space: nowrap;
-}
-
-.sheet-search-box .work-order-search-input {
-    box-sizing: border-box;
-    width: 100%;
-    height: 34px;
-    padding: 5px 13px;
-    border: 1px solid #9fb8c9;
-    border-radius: 8px;
-    outline: 0;
-    background: #ffffff;
-    color: #173149;
-    font-family: Tahoma, "Segoe UI", Arial, sans-serif;
-    font-size: 0.86rem;
-    text-align: right;
-    direction: rtl;
-    box-shadow: none;
-}
-
-.sheet-search-box .work-order-search-input::placeholder {
-    color: #8092a2;
-    opacity: 1;
-}
-
-.sheet-search-box .work-order-search-input:hover {
-    border-color: #7fa6bd;
-}
-
-.sheet-search-box .work-order-search-input:focus {
-    border-color: #277da8;
-    background: #ffffff;
-    box-shadow: 0 0 0 2px rgba(39, 125, 168, 0.13);
-}
-
-.tabulator-workorders-page .tabulator-card {
-    border: 1px solid var(--workspace-line) !important;
-    border-radius: 8px !important;
-    background: #ffffff !important;
-    box-shadow: none !important;
-}
-
-.tabulator-workorders-page ::deep .tabulator {
-    color: #243b50 !important;
-    font-size: 13.25px !important;
-}
-
-.tabulator-workorders-page ::deep .tabulator .tabulator-header {
-    min-height: 42px !important;
-    border-bottom: 1px solid #cbd8e2 !important;
-    background: var(--workspace-header) !important;
-}
-
-.tabulator-workorders-page ::deep .tabulator .tabulator-header .tabulator-col {
-    min-height: 42px !important;
-    border-right-color: var(--workspace-line) !important;
-    background: var(--workspace-header) !important;
-}
-
-.tabulator-workorders-page ::deep .tabulator .tabulator-col .tabulator-col-content {
-    min-height: 42px !important;
-    padding: 0 31px 0 9px !important;
-}
-
-.tabulator-workorders-page ::deep .tabulator .tabulator-col-title {
-    color: #183247 !important;
-    font-size: 12.75px !important;
-    font-weight: 700 !important;
-}
-
-.tabulator-workorders-page ::deep .tabulator-row {
-    min-height: 34px !important;
-    border-bottom-color: var(--workspace-line-soft) !important;
-    background: #ffffff !important;
-}
-
-.tabulator-workorders-page ::deep .tabulator-row:nth-child(even) {
-    background: #f8fafc !important;
-}
-
-.tabulator-workorders-page ::deep .tabulator-row:hover {
-    background: #edf6fb !important;
-}
-
-.tabulator-workorders-page ::deep .tabulator-row .tabulator-cell {
-    min-height: 34px !important;
-    padding: 5px 8px !important;
-    border-right-color: var(--workspace-line-soft) !important;
-    color: #243b50 !important;
-    font-size: 13.25px !important;
-    line-height: 23px !important;
-}
-
-.tabulator-workorders-page ::deep .tabulator-cell.tabulator-range-selected,
-.tabulator-workorders-page ::deep .tabulator-cell.tabulator-selected,
-.tabulator-workorders-page ::deep .tabulator-cell.tabulator-range-only-cell-selected {
-    background: #deedf7 !important;
-    box-shadow: inset 0 0 0 1px #2f80b7 !important;
-}
-
-.work-orders-grid-shell {
-    grid-template-rows: minmax(0, 1fr) 42px;
-    gap: 3px;
-}
-
-.work-orders-grid-shell > .work-orders-selection-summary-host {
-    min-height: 42px;
-    height: 42px;
-}
-
-@media (max-width: 760px) {
-    .sheet-search-box {
-        width: 100%;
-    }
-}
-
-/* =========================================================
-   PHASE 9.2A16 — SEARCH POSITION + BASKET COLUMN CLARITY
-   Keep the accepted compact workspace, pin the search to the physical
-   right above the sheet, and add one compact Basket legend without
-   repeating labels inside every active stage.
-   ========================================================= */
-
-.work-orders-sheet-toolbar {
-    direction: ltr;
-    justify-content: flex-end;
-    min-height: 35px;
-    padding: 1px 6px 2px;
-}
-
-.sheet-search-box {
-    width: min(430px, 100%);
-    margin: 0 0 0 auto;
-    direction: rtl;
-}
-
-.sheet-search-box .work-order-search-input {
-    width: 100%;
-}
-
-@media (max-width: 760px) {
-    .work-orders-sheet-toolbar {
-        direction: rtl;
-    }
-
-    .sheet-search-box {
-        width: 100%;
-        margin: 0;
+@media (max-width: 600px) {
+    .work-orders-open-summary,
+    .work-orders-grid-shell .work-orders-selection-summary-bar {
+        grid-template-columns: 1fr;
     }
 }
