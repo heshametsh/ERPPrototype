@@ -485,3 +485,24 @@ The E2E database now contains 1,000 Work Orders per year for two years. Smoke an
 
 The automated platform now has an optional Observe mode and Full/Stress browser coverage for duplicate rejection, saved deletion, and Assignment Date year movement. Acceptance requires 11/11 SQL Server checks and 33/33 Stress browser checks. No production behavior changed.
 
+
+
+## 34. Phase 9.2D2 — Current Browser Verification and Deep Performance State
+
+This section supersedes older descriptions of an optional visual slowdown mode.
+The current E2E runner has no Observe option and no artificial Playwright delay.
+Headed mode is visible only and still uses `SlowMo = 0`.
+
+Functional `Stress` remains responsible for correctness and keeps diagnostic
+artifacts. Its timing fields are explicitly non-comparable and must not be used
+as the product performance baseline.
+
+The dedicated `Performance` suite is the quantitative path. Every independent
+run uses a fresh browser, disables timing trace, measures input-to-double-RAF
+inside Chromium, preserves the same page and year, traverses to the end region
+of the real 1,000 / 5,000 / 10,000-row dataset, verifies bounded Virtual DOM and
+clean sheet state, and writes raw samples plus P50/P95/heap data to JSON.
+
+Year changes in the functional journey now wait for the requested year, row
+count, known Work Order identity, absence of the old-year identity, and aggregate
+readiness. This removes the race where two years both contained 1,000 rows.

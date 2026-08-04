@@ -509,11 +509,27 @@ Phase 9.0B Full browser suite: PASS
 ERPPrototype automated verification: PASS
 ```
 
-## Phase 9.0C-R2 acceptance command
+## Current Phase 9.2D2 acceptance commands
+
+Functional correctness:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\ERPPrototype\Tools\Invoke-ERPTests.ps1 -Suite Stress -Observe
+powershell -ExecutionPolicy Bypass -File .\ERPPrototype\Tools\Invoke-ERPTests.ps1 -Suite Stress
 ```
 
-Required: Integration 11/11 PASS and Browser 33/33 PASS. Observe mode is visual evidence only; assertions remain identical to the normal Stress suite.
+Required: Integration 17/17 PASS and Browser 55/55 PASS. The run has no artificial Playwright delay.
+
+Neutral deep performance, one action and one dataset:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\ERPPrototype\Tools\Invoke-ERPPerformanceBaseline.ps1 -Action Arrow -RowsPerYear 1000 -Runs 5
+```
+
+Full pressure matrix:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\ERPPrototype\Tools\Invoke-ERPPerformanceMatrix.ps1
+```
+
+Quantitative acceptance must use the Performance JSON reports, not the diagnostic timing fields emitted by the functional Stress journey.
 

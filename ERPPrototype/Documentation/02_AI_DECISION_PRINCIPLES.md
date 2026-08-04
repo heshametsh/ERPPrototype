@@ -1,6 +1,6 @@
 ===========================================================
 AI DECISION PRINCIPLES
-Version: 1.4
+Version: 1.5
 Status: Approved
 ===========================================================
 
@@ -220,6 +220,26 @@ Additional rules:
 
 Simple example:
 Changing auto-scroll speed constants from 6 and 24 to 8 and 32 in one JavaScript file should be given as a direct manual edit. Adding the auto-scroll module, connecting it to the table lifecycle, and updating script loading across several files should be delivered as a ZIP patch.
+
+===========================================================
+PATCH ACCUMULATION AND PHASE CLOSURE RULE — ESSENTIAL
+===========================================================
+
+- Never create or stack a new patch merely to make a failing test pass.
+- First classify the failure from evidence as one of: application defect, test-harness defect, timing/readiness defect, invalid assertion, environment defect, or genuine performance regression.
+- Fix or replace the existing responsible path whenever possible; do not add another helper, wait, override, compatibility branch, or duplicated code path beside an obsolete one.
+- A passing test is required, but it is not sufficient evidence that the resulting code is maintainable.
+- Before closing any patch-heavy phase, perform a consolidation review that:
+  - compares the final implementation with the phase baseline;
+  - measures the net change in file size, function count, and complexity;
+  - removes dead code, duplicate helpers, temporary diagnostics, obsolete waits, and superseded compatibility paths;
+  - confirms one clear owner and one active path for each responsibility;
+  - reruns the complete required regression suite after cleanup;
+  - documents the final net change and any remaining technical debt.
+- Phase 9.2D2 must not be closed until the performance-test code and all D2/R1/R2 corrections receive this size-and-complexity review and are consolidated into one clean final implementation.
+
+Simple example:
+If a performance test fails because it reads the wrong active-cell state, replace that incorrect reader with the authoritative Tabulator range reader. Do not keep the old reader and add a second fallback merely so the test becomes green.
 
 ===========================================================
 CHANGE IMPACT RULE

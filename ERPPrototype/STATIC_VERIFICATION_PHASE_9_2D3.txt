@@ -1,0 +1,13 @@
+Phase 9.2D3 static verification
+Date: 2026-08-04
+
+PASS: node --check wwwroot/js/tabulatorTest.js
+PASS: node --check wwwroot/js/tabulatorInteractions.js
+PASS: node --check wwwroot/js/tabulatorLifecycle.js
+PASS: no remaining arrowUpCorrectionFramesRemaining references
+PASS: device-pixel alignment simulation for DPR 0.7, 0.8, 0.9, 1.0, 1.1, 1.25, 1.5, 1.75, 2.0
+PASS: ArrowUp correction simulation ignores 1px boundary noise
+PASS: ArrowUp correction simulation performs one aligned write for a full-row hidden gap
+NOT RUN: dotnet build (SDK unavailable in artifact environment)
+NOT RUN: Playwright Stress suite (browser/runtime unavailable in artifact environment)
+NOT RUN: headed Zoom Matrix (must be judged on the user's actual machine)

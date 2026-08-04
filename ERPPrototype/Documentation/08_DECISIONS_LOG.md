@@ -248,3 +248,20 @@
 **Business example:** opening another year should only read the employee's department and return rows in sheet order. It must not instantiate save rules or alter any work order.
 
 **Constraint:** R1 preserves query filters, projection, ordering, performance stage names, and the existing page call. No save method, validation rule, transaction boundary, uniqueness scope, or database schema is changed.
+
+## DEC-026 — No test-green patch stacking; Phase 9.2D2 requires consolidation before closure
+
+- **Date:** 2026-08-04
+- **Status:** Accepted by user
+- **Decision:** لا يتم إنشاء أو تكديس Patch جديد لمجرد جعل الاختبار ينجح. لا تُغلق Phase 9.2D2 قبل مراجعة حجم وتعقيد الكود الناتج، حذف التكرار والمسارات القديمة والمؤقتة، وتوحيد التعديلات في تنفيذ نهائي نظيف.
+- **Reason:** نجاح الاختبار وحده قد يخفي تضخمًا في الكود أو Helpers وWaits وFallbacks متكررة، فيجعل الاختبارات نفسها أصعب في الصيانة وأقل موثوقية.
+- **Required evidence before closure:**
+  - مقارنة صافي الأسطر والدوال والتعقيد مع بداية Phase 9.2D2.
+  - تصنيف كل فشل من الأدلة قبل أي تعديل جديد.
+  - مسار واحد واضح لقراءة الخلية النشطة، انتظار جاهزية السنة، والتمرير الافتراضي.
+  - حذف Dead Code والـtemporary diagnostics والـobsolete waits والـfallbacks غير اللازمة.
+  - إعادة Stress والـPerformance baseline المطلوبين بعد التنظيف.
+  - توثيق صافي التغيير والدين الفني المتبقي.
+- **Constraint:** لا يُقبل Patch إضافي كطبقة فوق الحل السابق إذا كان استبدال المسار الخاطئ أو تبسيطه ممكنًا.
+- **Simple example:** إذا ثبت أن الاختبار يقرأ موضع الخلية من State قديم، يُستبدل هذا القارئ بالقارئ الصحيح من Tabulator بدل إبقائه وإضافة قارئ احتياطي ثانٍ.
+

@@ -139,7 +139,21 @@ powershell -ExecutionPolicy Bypass -File .\ERPPrototype\Tools\Invoke-ERPTests.ps
 - لا تُرسل ملفات `bin` أو `obj` أو `.vs` أو `*.user` أو ملفات تنفيذ ومكتبات مبنية.
 - استخدم `Tools/New-CleanProjectArchive.ps1` عند تجهيز المشروع للرفع.
 
-### Current candidate: Phase 9.0C-R2
+### Current candidate: Phase 9.2D2
 
-Close current-sheet automation with optional Observe mode plus browser checks for duplicate rejection, saved deletion, and Assignment Date movement between years. Accept only after 11/11 integration and 33/33 Stress browser checks.
+- Observe mode and every artificial Playwright delay were removed.
+- Functional Stress remains a 55-check correctness journey and no longer claims
+  to be the quantitative performance baseline.
+- Year switching now waits for the requested dataset identity, count, and
+  aggregate readiness before scrolling.
+- The neutral Performance suite traverses the same sheet to its end region and
+  compares cold versus long-session input-to-paint latency.
+- A full headless performance matrix is available for Arrow, Enter, and Wheel
+  with 1,000, 5,000, and 10,000 rows per year.
 
+Acceptance order:
+
+1. `Invoke-ERPTests.ps1 -Suite Stress` must return Integration 17/17 and Browser 55/55.
+2. Run the 1,000-row Arrow baseline and inspect its JSON.
+3. Run Enter and Wheel separately.
+4. Expand to 5,000 and 10,000 rows, or run the full matrix.

@@ -1,7 +1,6 @@
 [CmdletBinding()]
 param(
     [switch]$Headed,
-    [switch]$Observe,
     [switch]$KeepDatabase,
 
     [ValidateSet('Smoke', 'Full', 'Stress')]
@@ -45,7 +44,7 @@ if (-not $SkipIntegration -and -not (Test-Path $integrationProject)) {
 Write-Host 'ERPPrototype automated verification' -ForegroundColor Green
 Write-Host "Project: $projectRoot"
 Write-Host "Browser suite: $Suite"
-Write-Host "Browser mode: $(if ($Observe) { 'Observe (visible and slowed)' } elseif ($Headed) { 'Headed' } else { 'Headless' })"
+Write-Host "Browser mode: $(if ($Headed) { 'Headed/visible/no-slowmo' } else { 'Headless/no-slowmo' })"
 Write-Host 'Browser dataset: 1,000 rows per year (2,000 seeded rows total)'
 
 if (-not $SkipIntegration) {
@@ -91,10 +90,7 @@ $browserArguments = @(
     '--suite', $Suite.ToLowerInvariant()
 )
 
-if ($Observe) {
-    $browserArguments += '--observe'
-}
-elseif ($Headed) {
+if ($Headed) {
     $browserArguments += '--headed'
 }
 
