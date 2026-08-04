@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.Json;
 using ERPPrototype.Data;
 using ERPPrototype.Data.Entities;
 
@@ -12,13 +13,20 @@ public partial class WorkOrders
     {
         var dirtyRows = saveDelta.DirtyRows ?? [];
         var deletedRows = saveDelta.DeletedRows ?? [];
+        var customColumns = saveDelta.CustomColumns ?? [];
+        var customColumnsChanged = saveDelta.CustomColumnsChanged;
 
-        if (dirtyRows.Count == 0 && deletedRows.Count == 0)
+        if (
+            dirtyRows.Count == 0 &&
+            deletedRows.Count == 0 &&
+            !customColumnsChanged)
         {
             return new SaveRequestPreparation
             {
                 DirtyRows = dirtyRows,
-                DeletedRows = deletedRows
+                DeletedRows = deletedRows,
+                CustomColumns = customColumns,
+                CustomColumnsChanged = customColumnsChanged
             };
         }
 
@@ -46,10 +54,18 @@ public partial class WorkOrders
 
         foreach (var row in dirtyRows)
         {
-            var changedFields =
+            var rawChangedFields = row.ChangedFields ?? [];
+            var changedFields = new HashSet<string>(
                 WorkOrderFieldRegistry.NormalizeChangedFields(
-                    row.ChangedFields,
-                    defaultToAll: true);
+                    rawChangedFields,
+                    defaultToAll: rawChangedFields.Count == 0),
+                StringComparer.Ordinal);
+
+            if (rawChangedFields.Any(field =>
+                field?.StartsWith("custom_", StringComparison.Ordinal) == true))
+            {
+                changedFields.Add(WorkOrderFieldRegistry.CustomValues);
+            }
 
             if (!TryParseAssignmentDate(
                     row.AssignmentDate,
@@ -118,7 +134,10 @@ public partial class WorkOrders
                 PartialAmount = partialAmount,
                 Busket = row.Basket ?? string.Empty,
                 Status = row.Status ?? string.Empty,
-                Notes = row.Notes
+                Notes = row.Notes,
+                CustomValuesJson = BuildCustomValuesJson(
+                    row,
+                    customColumns)
             };
 
             if (row.Id <= 0)
@@ -156,6 +175,8 @@ public partial class WorkOrders
         {
             DirtyRows = dirtyRows,
             DeletedRows = deletedRows,
+            CustomColumns = customColumns,
+            CustomColumnsChanged = customColumnsChanged,
             Request = new PreparedWorkOrderSaveRequest
             {
                 DirtyRows = dirtyRows,
@@ -164,7 +185,9 @@ public partial class WorkOrders
                 DeletedWorkOrders = deletedWorkOrders,
                 AddedRowMappings = addedRowMappings,
                 MovedToOtherYearsCount = movedToOtherYearsCount,
-                DestinationYears = destinationYears
+                DestinationYears = destinationYears,
+                CustomColumns = customColumns,
+                CustomColumnsChanged = customColumnsChanged
             }
         };
     }
@@ -180,7 +203,38 @@ public partial class WorkOrders
             string.IsNullOrWhiteSpace(row.PartialAmount) &&
             string.IsNullOrWhiteSpace(row.Basket) &&
             string.IsNullOrWhiteSpace(row.Status) &&
-            string.IsNullOrWhiteSpace(row.Notes);
+            string.IsNullOrWhiteSpace(row.Notes) &&
+            !row.CustomFields.Values.Any(value =>
+                !string.IsNullOrWhiteSpace(
+                    value.ValueKind == JsonValueKind.String
+                        ? value.GetString()
+                        : value.ToString()));
+    }
+
+    private static string BuildCustomValuesJson(
+        TabulatorWorkOrderRow row,
+        IReadOnlyCollection<CustomColumnDefinitionInput> customColumns)
+    {
+        var values = new Dictionary<string, string>(StringComparer.Ordinal);
+
+        foreach (var column in customColumns)
+        {
+            if (!row.CustomFields.TryGetValue(column.FieldKey, out var rawValue))
+            {
+                continue;
+            }
+
+            var value = rawValue.ValueKind == JsonValueKind.String
+                ? rawValue.GetString() ?? string.Empty
+                : rawValue.ToString();
+
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                values[column.FieldKey] = value;
+            }
+        }
+
+        return JsonSerializer.Serialize(values);
     }
 
     private static bool TryParseAssignmentDate(
@@ -283,11 +337,15 @@ public partial class WorkOrders
     {
         public List<TabulatorWorkOrderRow> DirtyRows { get; init; } = [];
         public List<TabulatorDeletedRow> DeletedRows { get; init; } = [];
+        public List<CustomColumnDefinitionInput> CustomColumns { get; init; } = [];
+        public bool CustomColumnsChanged { get; init; }
         public PreparedWorkOrderSaveRequest? Request { get; init; }
         public string? ValidationMessage { get; init; }
 
         public bool HasChanges =>
-            DirtyRows.Count > 0 || DeletedRows.Count > 0;
+            DirtyRows.Count > 0 ||
+            DeletedRows.Count > 0 ||
+            CustomColumnsChanged;
     }
 
     private sealed class PreparedWorkOrderSaveRequest
@@ -299,6 +357,8 @@ public partial class WorkOrders
         public List<PendingAddedRowMapping> AddedRowMappings { get; init; } = [];
         public int MovedToOtherYearsCount { get; init; }
         public HashSet<int> DestinationYears { get; init; } = [];
+        public List<CustomColumnDefinitionInput> CustomColumns { get; init; } = [];
+        public bool CustomColumnsChanged { get; init; }
     }
 
     private sealed class TabulatorSaveDelta
@@ -309,6 +369,8 @@ public partial class WorkOrders
 
         public List<TabulatorWorkOrderRow>? DirtyRows { get; set; }
         public List<TabulatorDeletedRow>? DeletedRows { get; set; }
+        public List<CustomColumnDefinitionInput>? CustomColumns { get; set; }
+        public bool CustomColumnsChanged { get; set; }
     }
 
     private sealed class TabulatorDeletedRow

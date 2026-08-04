@@ -16,6 +16,9 @@ public class ApplicationDbContext(
 
     public DbSet<WorkOrder> WorkOrders => Set<WorkOrder>();
 
+    public DbSet<CustomColumnDefinition> CustomColumnDefinitions =>
+        Set<CustomColumnDefinition>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
@@ -68,6 +71,73 @@ public class ApplicationDbContext(
             {
                 department.BranchId,
                 department.DepartmentTypeId
+            })
+            .IsUnique();
+        });
+
+
+        builder.Entity<CustomColumnDefinition>(entity =>
+        {
+            entity.ToTable(
+                "CustomColumnDefinitions",
+                tableBuilder =>
+                {
+                    tableBuilder.HasCheckConstraint(
+                        "CK_CustomColumnDefinitions_DataType",
+                        "[DataType] >= 1 AND [DataType] <= 4");
+
+                    tableBuilder.HasCheckConstraint(
+                        "CK_CustomColumnDefinitions_LayoutOrder",
+                        "[LayoutOrder] > 0");
+                });
+
+            entity.HasKey(column => column.Id);
+
+            entity.Property(column => column.FieldKey)
+                .IsUnicode(false)
+                .HasMaxLength(40)
+                .IsRequired();
+
+            entity.Property(column => column.Name)
+                .HasMaxLength(150)
+                .IsRequired();
+
+            entity.Property(column => column.DataType)
+                .IsRequired();
+
+            entity.Property(column => column.LayoutOrder)
+                .IsRequired();
+
+            entity.Property(column => column.CreatedBy)
+                .HasMaxLength(450)
+                .IsRequired();
+
+            entity.Property(column => column.RowVersion)
+                .IsRowVersion();
+
+            entity.HasOne(column => column.Department)
+                .WithMany(department => department.CustomColumnDefinitions)
+                .HasForeignKey(column => column.DepartmentId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasIndex(column => new
+            {
+                column.DepartmentId,
+                column.FieldKey
+            })
+            .IsUnique();
+
+            entity.HasIndex(column => new
+            {
+                column.DepartmentId,
+                column.Name
+            })
+            .IsUnique();
+
+            entity.HasIndex(column => new
+            {
+                column.DepartmentId,
+                column.LayoutOrder
             })
             .IsUnique();
         });
@@ -135,6 +205,11 @@ public class ApplicationDbContext(
 
             entity.Property(workOrder => workOrder.Notes)
                 .HasMaxLength(1000);
+
+            entity.Property(workOrder => workOrder.CustomValuesJson)
+                .HasColumnType("nvarchar(max)")
+                .HasDefaultValue("{}")
+                .IsRequired();
 
             entity.Property(workOrder => workOrder.RowVersion)
                 .IsRowVersion();

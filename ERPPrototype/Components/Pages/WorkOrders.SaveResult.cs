@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.Json;
 using ERPPrototype.Data;
 
 namespace ERPPrototype.Components.Pages;
@@ -158,6 +159,9 @@ public partial class WorkOrders
             result.SavedRecords ??
             Array.Empty<WorkOrderSavedRecord>();
 
+        var savedCustomColumns =
+            result.SavedCustomColumns?.ToList() ?? [];
+
         var savedRowMappings = request.AddedRowMappings
             .Select(mapping =>
                 new TabulatorSavedRowMapping
@@ -240,6 +244,8 @@ public partial class WorkOrders
         var savedCount =
             request.DirtyRows.Count +
             request.DeletedWorkOrders.Count;
+        var addedCustomColumnCount =
+            request.CustomColumns.Count(column => column.Id <= 0);
 
         string statusMessage;
 
@@ -252,6 +258,17 @@ public partial class WorkOrders
 
             statusMessage =
                 $"تم حفظ {savedCount} صف بنجاح، وتم توزيع {request.MovedToOtherYearsCount} صف حسب سنة تاريخ الإسناد إلى: {destinationYearsText}.";
+        }
+        else if (savedCount > 0 && addedCustomColumnCount > 0)
+        {
+            statusMessage =
+                $"تم حفظ {savedCount} صف وإضافة {addedCustomColumnCount} عمود بنجاح.";
+        }
+        else if (addedCustomColumnCount > 0)
+        {
+            statusMessage = addedCustomColumnCount == 1
+                ? "تم إضافة العمود وحفظه بنجاح."
+                : $"تم إضافة {addedCustomColumnCount} أعمدة وحفظها بنجاح.";
         }
         else
         {
@@ -266,6 +283,7 @@ public partial class WorkOrders
             RemovedRowIds = removedRowIds,
             AvailableWorkYears = updatedAvailableWorkYears,
             Rows = mergedRows,
+            CustomColumns = savedCustomColumns,
             StatusMessage = statusMessage
         };
     }
@@ -303,7 +321,13 @@ public partial class WorkOrders
             Status = record.Status,
             Notes = record.Notes ?? string.Empty,
             RowVersion = Convert.ToBase64String(
-                record.RowVersion)
+                record.RowVersion),
+            CustomFields = CustomColumnService
+                .DeserializeValues(record.CustomValuesJson)
+                .ToDictionary(
+                    pair => pair.Key,
+                    pair => JsonSerializer.SerializeToElement(pair.Value),
+                    StringComparer.Ordinal)
         };
 
     private static List<TabulatorWorkOrderRow> MergeRowsAfterSave(
@@ -339,6 +363,7 @@ public partial class WorkOrders
         public HashSet<int> RemovedRowIds { get; init; } = [];
         public List<int> AvailableWorkYears { get; init; } = [];
         public List<TabulatorWorkOrderRow> Rows { get; init; } = [];
+        public List<CustomColumnDefinitionData> CustomColumns { get; init; } = [];
         public string StatusMessage { get; init; } = string.Empty;
     }
 

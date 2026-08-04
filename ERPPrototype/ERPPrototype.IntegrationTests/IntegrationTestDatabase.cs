@@ -3,6 +3,7 @@ using ERPPrototype.Data.Entities;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -60,6 +61,28 @@ internal sealed class IntegrationTestDatabase : IAsyncDisposable
     public string EmployeeAId { get; }
 
     public string EmployeeBId { get; }
+
+    public WorkOrderService CreateServiceWithInterceptors(
+        params IInterceptor[] interceptors)
+    {
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseApplicationServiceProvider(identityApplicationServices)
+            .UseSqlServer(ConnectionString)
+            .AddInterceptors(interceptors)
+            .Options;
+
+        var factory = new TestDbContextFactory(options);
+
+        var queryService = new WorkOrderQueryService(
+            factory,
+            NullLogger<WorkOrderQueryService>.Instance);
+
+        return new WorkOrderService(
+            factory,
+            queryService,
+            new WorkOrderSavePlanBuilder(),
+            NullLogger<WorkOrderService>.Instance);
+    }
 
     public static async Task<IntegrationTestDatabase> CreateAsync(
         bool keepDatabase,
@@ -299,6 +322,7 @@ internal sealed class IntegrationTestDatabase : IAsyncDisposable
             Busket = source.Busket,
             Status = source.Status,
             Notes = source.Notes,
+            CustomValuesJson = source.CustomValuesJson,
             RowVersion = source.RowVersion.ToArray(),
             DepartmentId = source.DepartmentId,
             CreatedAt = source.CreatedAt,

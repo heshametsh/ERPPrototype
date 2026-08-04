@@ -14,4 +14,7 @@ public sealed class Department
 
     public ICollection<WorkOrder> WorkOrders { get; set; }
         = new List<WorkOrder>();
+
+    public ICollection<CustomColumnDefinition> CustomColumnDefinitions { get; set; }
+        = new List<CustomColumnDefinition>();
 }

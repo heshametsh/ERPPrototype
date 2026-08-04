@@ -19,6 +19,7 @@ public static class WorkOrderFieldRegistry
     public const string Basket = "basket";
     public const string Status = "status";
     public const string Notes = "notes";
+    public const string CustomValues = "customValues";
 
     public static readonly IReadOnlySet<string> EditableFields =
         new HashSet<string>(StringComparer.Ordinal)
@@ -31,7 +32,8 @@ public static class WorkOrderFieldRegistry
             PartialAmount,
             Basket,
             Status,
-            Notes
+            Notes,
+            CustomValues
         };
 
     public static readonly IReadOnlySet<string> IdentityFields =

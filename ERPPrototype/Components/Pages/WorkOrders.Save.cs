@@ -179,6 +179,8 @@ public partial class WorkOrders
                     request.AddedWorkOrders,
                     request.ChangedWorkOrders,
                     request.DeletedWorkOrders,
+                    request.CustomColumns,
+                    request.CustomColumnsChanged,
                     performanceStages: serverPerformanceStages);
 
             foreach (var stage in serverPerformanceStages)
@@ -245,6 +247,7 @@ public partial class WorkOrders
                 preparedResult.AvailableWorkYears;
 
             Rows = preparedResult.Rows;
+            CustomColumns = preparedResult.CustomColumns;
 
             AddSavePerformanceStage(
                 savePerformanceStages,
@@ -269,6 +272,11 @@ public partial class WorkOrders
                 preparedResult.SavedRowsInCurrentYear,
                 preparedResult.SavedRowMappings,
                 preparedResult.RemovedRowIds.ToList());
+
+            await JSRuntime.InvokeVoidAsync(
+                "tabulatorTest.acceptSavedCustomColumns",
+                TableId,
+                preparedResult.CustomColumns);
 
             AddSavePerformanceStage(
                 savePerformanceStages,

@@ -68,12 +68,33 @@ public sealed class WorkOrderService(
             cancellationToken,
             performanceStages);
 
+    public Task<WorkOrderSaveResult> SaveChangesAsync(
+        string userId,
+        int workYear,
+        IEnumerable<WorkOrder> addedRecords,
+        IEnumerable<WorkOrderChangeSet> changedRecords,
+        IEnumerable<WorkOrder> deletedRecords,
+        CancellationToken cancellationToken = default,
+        ICollection<WorkOrderServicePerformanceStage>? performanceStages = null) =>
+        SaveChangesAsync(
+            userId,
+            workYear,
+            addedRecords,
+            changedRecords,
+            deletedRecords,
+            customColumns: [],
+            customColumnsChanged: false,
+            cancellationToken: cancellationToken,
+            performanceStages: performanceStages);
+
     public async Task<WorkOrderSaveResult> SaveChangesAsync(
         string userId,
         int workYear,
         IEnumerable<WorkOrder> addedRecords,
         IEnumerable<WorkOrderChangeSet> changedRecords,
         IEnumerable<WorkOrder> deletedRecords,
+        IReadOnlyCollection<CustomColumnDefinitionInput> customColumns,
+        bool customColumnsChanged,
         CancellationToken cancellationToken = default,
         ICollection<WorkOrderServicePerformanceStage>? performanceStages = null)
     {
@@ -162,6 +183,51 @@ public sealed class WorkOrderService(
 
         try
         {
+            var customColumnsStartedAt = Stopwatch.GetTimestamp();
+
+            var customColumnPreparation =
+                await CustomColumnService.PrepareDefinitionsAsync(
+                    dbContext,
+                    departmentId,
+                    userId,
+                    customColumns,
+                    customColumnsChanged,
+                    cancellationToken);
+
+            if (!customColumnPreparation.Succeeded)
+            {
+                return WorkOrderSaveResult.ValidationFailure(
+                    customColumnPreparation.ErrorMessage);
+            }
+
+            var customColumnDefinitions =
+                customColumnPreparation.Definitions;
+
+            var customValuesError =
+                CustomColumnService.NormalizeWorkOrderValues(
+                    newRecords,
+                    existingChangedRecords,
+                    customColumnDefinitions);
+
+            if (!string.IsNullOrWhiteSpace(customValuesError))
+            {
+                return WorkOrderSaveResult.ValidationFailure(
+                    customValuesError);
+            }
+
+            RecordPerformanceStage(
+                performanceStages,
+                "save.server.custom-columns-prepare",
+                customColumnsStartedAt,
+                new
+                {
+                    ExistingAndAddedColumns =
+                        customColumnDefinitions.Count,
+                    AddedColumns =
+                        customColumnPreparation.AddedDefinitions.Count,
+                    ConfigurationChanged = customColumnsChanged
+                });
+
             var duplicateScopeStartedAt = Stopwatch.GetTimestamp();
 
             /*
@@ -358,24 +424,47 @@ public sealed class WorkOrderService(
 
             var displayOrderQueryStartedAt = Stopwatch.GetTimestamp();
 
-            var nextAppendDisplayOrders = destinationYears.Count == 0
-                ? new Dictionary<int, long>()
-                : await dbContext.WorkOrders
-                    .AsNoTracking()
-                    .Where(workOrder =>
-                        workOrder.DepartmentId == departmentId &&
-                        destinationYears.Contains(workOrder.WorkYear))
-                    .GroupBy(workOrder => workOrder.WorkYear)
-                    .Select(group => new
-                    {
-                        WorkYear = group.Key,
-                        MaximumDisplayOrder = group.Max(workOrder =>
-                            workOrder.DisplayOrder)
-                    })
-                    .ToDictionaryAsync(
-                        item => item.WorkYear,
-                        item => item.MaximumDisplayOrder,
-                        cancellationToken);
+            var nextAppendDisplayOrders =
+                await LoadAppendDisplayOrdersForUpdateAsync(
+                    dbContext,
+                    departmentId,
+                    destinationYears,
+                    cancellationToken);
+
+            var requestedDisplayOrders = newRecords
+                .Select(workOrder => new
+                {
+                    WorkYear = WorkOrderSavePlanBuilder.ResolveTargetWorkYear(
+                        workYear,
+                        workOrder.AssignmentDate),
+                    workOrder.DisplayOrder
+                })
+                .Where(item =>
+                    item.WorkYear == workYear &&
+                    item.DisplayOrder > 0)
+                .Select(item => item.DisplayOrder)
+                .Distinct()
+                .ToList();
+
+            var occupiedRequestedDisplayOrders =
+                requestedDisplayOrders.Count == 0
+                    ? new HashSet<(int WorkYear, long DisplayOrder)>()
+                    : (await dbContext.WorkOrders
+                        .AsNoTracking()
+                        .Where(workOrder =>
+                            workOrder.DepartmentId == departmentId &&
+                            workOrder.WorkYear == workYear &&
+                            requestedDisplayOrders.Contains(
+                                workOrder.DisplayOrder))
+                        .Select(workOrder => new
+                        {
+                            workOrder.WorkYear,
+                            workOrder.DisplayOrder
+                        })
+                        .ToListAsync(cancellationToken))
+                    .Select(item =>
+                        (item.WorkYear, item.DisplayOrder))
+                    .ToHashSet();
 
             RecordPerformanceStage(
                 performanceStages,
@@ -592,9 +681,19 @@ public sealed class WorkOrderService(
                 // A row whose assignment date belongs to another year is
                 // appended to that year's sheet instead of reusing a position
                 // that came from the currently open sheet.
+                var requestedDisplayOrder = newRecord.DisplayOrder;
+                var requestedOrderKey =
+                    (destinationYear, requestedDisplayOrder);
+
+                var requestedOrderIsOccupied =
+                    requestedDisplayOrder > 0 &&
+                    occupiedRequestedDisplayOrders.Contains(
+                        requestedOrderKey);
+
                 if (
                     destinationYear != workYear ||
-                    newRecord.DisplayOrder <= 0)
+                    requestedDisplayOrder <= 0 ||
+                    requestedOrderIsOccupied)
                 {
                     newRecord.DisplayOrder =
                         TakeNextDisplayOrder(destinationYear);
@@ -603,8 +702,11 @@ public sealed class WorkOrderService(
                 {
                     nextAppendDisplayOrders[destinationYear] = Math.Max(
                         nextAppendDisplayOrders[destinationYear],
-                        newRecord.DisplayOrder);
+                        requestedDisplayOrder);
                 }
+
+                occupiedRequestedDisplayOrders.Add(
+                    (destinationYear, newRecord.DisplayOrder));
 
                 newRecord.CreatedAt = utcNow;
                 newRecord.CreatedBy = userId;
@@ -658,6 +760,12 @@ public sealed class WorkOrderService(
                 .OrderBy(id => id)
                 .ToList();
 
+            var savedCustomColumns = customColumnDefinitions
+                .OrderBy(column => column.LayoutOrder)
+                .ThenBy(column => column.Id)
+                .Select(CustomColumnService.MapDefinition)
+                .ToList();
+
             RecordPerformanceStage(
                 performanceStages,
                 "save.server.map-result",
@@ -682,7 +790,8 @@ public sealed class WorkOrderService(
 
             return WorkOrderSaveResult.Success(
                 savedRecords,
-                deletedRecordIds);
+                deletedRecordIds,
+                savedCustomColumns);
         }
         catch (DbUpdateConcurrencyException exception)
         {
@@ -717,6 +826,13 @@ public sealed class WorkOrderService(
 
             if (IsUniqueConstraintViolation(exception))
             {
+                if (exception.Entries.Any(entry =>
+                    entry.Entity is CustomColumnDefinition))
+                {
+                    return WorkOrderSaveResult.ValidationFailure(
+                        "A custom column with the same name or position already exists in this department. Refresh the sheet and try again.");
+                }
+
                 return WorkOrderSaveResult.DuplicateFailure(
                     "The same Work Order Number and Work Type already exist in the company.");
             }
@@ -724,6 +840,46 @@ public sealed class WorkOrderService(
             return WorkOrderSaveResult.DatabaseFailure(
                 "The changes could not be saved. Check for duplicate, linked, or invalid values.");
         }
+    }
+
+    private static async Task<Dictionary<int, long>>
+        LoadAppendDisplayOrdersForUpdateAsync(
+            ApplicationDbContext dbContext,
+            int departmentId,
+            IReadOnlyCollection<int> destinationYears,
+            CancellationToken cancellationToken)
+    {
+        var displayOrders = new Dictionary<int, long>(
+            destinationYears.Count);
+
+        /*
+         * DisplayOrder allocation is a read-then-insert operation. Without a
+         * range lock, two concurrent saves can read the same MAX value and
+         * allocate the same append position. UPDLOCK + HOLDLOCK keeps the
+         * department/year key range locked until the surrounding transaction
+         * commits. Sorting the years gives multi-year saves one deterministic
+         * lock order and reduces deadlock risk.
+         */
+        foreach (var destinationYear in destinationYears.Order())
+        {
+            var maximumDisplayOrders = await dbContext.Database
+                .SqlQuery<long>($"""
+                    SELECT
+                        COALESCE(
+                            MAX([DisplayOrder]),
+                            CAST(0 AS bigint)) AS [Value]
+                    FROM [WorkOrders] WITH (UPDLOCK, HOLDLOCK)
+                    WHERE
+                        [DepartmentId] = {departmentId} AND
+                        [WorkYear] = {destinationYear}
+                    """)
+                .ToListAsync(cancellationToken);
+
+            displayOrders[destinationYear] =
+                maximumDisplayOrders.Single();
+        }
+
+        return displayOrders;
     }
 
     private static void RecordPerformanceStage(
@@ -754,6 +910,7 @@ public sealed class WorkOrderService(
             workOrder.Busket,
             workOrder.Status,
             workOrder.Notes,
+            workOrder.CustomValuesJson,
             workOrder.RowVersion);
 
     public static bool IsCompletelyBlank(WorkOrder workOrder) =>
@@ -810,6 +967,11 @@ public sealed class WorkOrderService(
         {
             target.Notes = source.Notes;
         }
+
+        if (changedFields.Contains(WorkOrderFieldRegistry.CustomValues))
+        {
+            target.CustomValuesJson = source.CustomValuesJson;
+        }
     }
 
     private static bool IsUniqueConstraintViolation(
@@ -837,6 +999,7 @@ public sealed record WorkOrderSheetData(
     string DepartmentName,
     int WorkYear,
     List<int> AvailableYears,
+    List<CustomColumnDefinitionData> CustomColumns,
     List<WorkOrderSheetRow> WorkOrders);
 
 public sealed record WorkOrderSheetRow(
@@ -850,6 +1013,7 @@ public sealed record WorkOrderSheetRow(
     string Busket,
     string Status,
     string? Notes,
+    string CustomValuesJson,
     byte[] RowVersion);
 
 public enum WorkOrderSaveFailureType
@@ -874,6 +1038,7 @@ public sealed record WorkOrderSavedRecord(
     string Busket,
     string Status,
     string? Notes,
+    string CustomValuesJson,
     byte[] RowVersion);
 
 public sealed record WorkOrderDuplicateConflict(
@@ -899,17 +1064,20 @@ public sealed record WorkOrderSaveResult(
     int? WorkOrderId = null,
     IReadOnlyList<WorkOrderSavedRecord>? SavedRecords = null,
     IReadOnlyList<int>? DeletedRecordIds = null,
-    IReadOnlyList<WorkOrderDuplicateConflict>? DuplicateConflicts = null)
+    IReadOnlyList<WorkOrderDuplicateConflict>? DuplicateConflicts = null,
+    IReadOnlyList<CustomColumnDefinitionData>? SavedCustomColumns = null)
 {
     public static WorkOrderSaveResult Success(
         IReadOnlyList<WorkOrderSavedRecord> savedRecords,
-        IReadOnlyList<int> deletedRecordIds) =>
+        IReadOnlyList<int> deletedRecordIds,
+        IReadOnlyList<CustomColumnDefinitionData>? savedCustomColumns = null) =>
         new(
             true,
             WorkOrderSaveFailureType.None,
             string.Empty,
             SavedRecords: savedRecords,
-            DeletedRecordIds: deletedRecordIds);
+            DeletedRecordIds: deletedRecordIds,
+            SavedCustomColumns: savedCustomColumns);
 
     public static WorkOrderSaveResult ValidationFailure(
         string message) =>

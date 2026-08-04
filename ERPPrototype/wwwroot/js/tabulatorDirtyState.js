@@ -366,7 +366,8 @@
     
             return (
                 state.dirtyRowIds.size > 0 ||
-                state.deletedOriginalRowIds.size > 0
+                state.deletedOriginalRowIds.size > 0 ||
+                state.customColumnsChanged === true
             );
         },
 

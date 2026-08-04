@@ -131,6 +131,67 @@ namespace ERPPrototype.Migrations
                     b.ToTable("Branches", (string)null);
                 });
 
+            modelBuilder.Entity("ERPPrototype.Data.Entities.CustomColumnDefinition", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<int>("DataType")
+                        .HasColumnType("int");
+
+                    b.Property<int>("DepartmentId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("FieldKey")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(40)");
+
+                    b.Property<long>("LayoutOrder")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DepartmentId", "FieldKey")
+                        .IsUnique();
+
+                    b.HasIndex("DepartmentId", "LayoutOrder")
+                        .IsUnique();
+
+                    b.HasIndex("DepartmentId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("CustomColumnDefinitions", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_CustomColumnDefinitions_DataType", "[DataType] >= 1 AND [DataType] <= 4");
+
+                            t.HasCheckConstraint("CK_CustomColumnDefinitions_LayoutOrder", "[LayoutOrder] > 0");
+                        });
+                });
+
             modelBuilder.Entity("ERPPrototype.Data.Entities.Department", b =>
                 {
                     b.Property<int>("Id")
@@ -205,6 +266,12 @@ namespace ERPPrototype.Migrations
 
                     b.Property<long>("DisplayOrder")
                         .HasColumnType("bigint");
+
+                    b.Property<string>("CustomValuesJson")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("nvarchar(max)")
+                        .HasDefaultValue("{}");
 
                     b.Property<string>("Notes")
                         .HasMaxLength(1000)
@@ -444,6 +511,17 @@ namespace ERPPrototype.Migrations
                     b.Navigation("Department");
                 });
 
+            modelBuilder.Entity("ERPPrototype.Data.Entities.CustomColumnDefinition", b =>
+                {
+                    b.HasOne("ERPPrototype.Data.Entities.Department", "Department")
+                        .WithMany("CustomColumnDefinitions")
+                        .HasForeignKey("DepartmentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Department");
+                });
+
             modelBuilder.Entity("ERPPrototype.Data.Entities.Department", b =>
                 {
                     b.HasOne("ERPPrototype.Data.Entities.Branch", "Branch")
@@ -583,6 +661,8 @@ namespace ERPPrototype.Migrations
 
             modelBuilder.Entity("ERPPrototype.Data.Entities.Department", b =>
                 {
+                    b.Navigation("CustomColumnDefinitions");
+
                     b.Navigation("WorkOrders");
                 });
 

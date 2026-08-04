@@ -330,21 +330,19 @@ internal sealed class WorkOrdersPage(IPage page)
                 }
 
                 /*
-                 * A year reload can finish its data work before the compact
-                 * basket dashboard finishes its final height correction.
-                 * That correction preserves the old viewport and may reset a
-                 * test scroll to row 1. Wait through several paint frames,
-                 * then verify the requested row is really rendered inside the
-                 * live holder. If a late layout restore starts, Playwright
-                 * retries the scroll after the lifecycle becomes idle.
+                 * scrollToRow can resolve before later callbacks in the same
+                 * paint restore the old viewport. Cross the paint-to-task
+                 * boundary twice before accepting the rendered row.
                  */
-                await new Promise(resolve =>
-                    window.requestAnimationFrame(() =>
+                const waitForCompletedPaint = () =>
+                    new Promise(resolve =>
                         window.requestAnimationFrame(() =>
-                            window.requestAnimationFrame(resolve)
+                            window.setTimeout(resolve, 0)
                         )
-                    )
-                );
+                    );
+
+                await waitForCompletedPaint();
+                await waitForCompletedPaint();
 
                 const currentTable =
                     testApi?.tables?.[args.tableId];
@@ -812,114 +810,116 @@ internal sealed class WorkOrdersPage(IPage page)
         string field,
         bool doubleClick)
     {
-        const int maximumAttempts = 3;
-        const int actionTimeoutMs = 5_000;
+        await ScrollToRowAsync(rowId);
 
-        PlaywrightException? lastError = null;
+        var activated = await page.EvaluateAsync<bool>(
+            """
+            args => {
+                const api = window.tabulatorTest;
+                const table = api?.tables?.[args.tableId];
+                const state = api?.states?.[args.tableId];
+                const holder = table?.element?.querySelector(
+                    '.tabulator-tableholder'
+                );
+                const row = table?.getRow(args.rowId);
+                const cell = row?.getCell(args.field);
+                const element = cell?.getElement?.();
 
-        for (var attempt = 1; attempt <= maximumAttempts; attempt += 1)
-        {
-            await ScrollToRowAsync(rowId);
+                if (
+                    !state ||
+                    !holder ||
+                    !cell ||
+                    !element ||
+                    element === false ||
+                    !element.isConnected
+                ) {
+                    return false;
+                }
 
-            var targetToken = $"e2e-cell-action-{Guid.NewGuid():N}";
+                const holderBounds =
+                    holder.getBoundingClientRect();
+                const cellBounds =
+                    element.getBoundingClientRect();
 
-            var targetIsReady = await page.EvaluateAsync<bool>(
-                """
-                args => {
-                    const table =
-                        window.tabulatorTest?.tables?.[args.tableId];
-                    const holder = table?.element?.querySelector(
-                        '.tabulator-tableholder'
+                if (
+                    cellBounds.bottom <= holderBounds.top + 1 ||
+                    cellBounds.top >= holderBounds.bottom - 1
+                ) {
+                    return false;
+                }
+
+                const eventOptions = {
+                    bubbles: true,
+                    cancelable: true,
+                    composed: true,
+                    view: window,
+                    button: 0,
+                    buttons: 1,
+                    clientX:
+                        cellBounds.left + (cellBounds.width / 2),
+                    clientY:
+                        cellBounds.top + (cellBounds.height / 2)
+                };
+
+                element.focus({ preventScroll: true });
+                element.dispatchEvent(
+                    new MouseEvent('mousedown', eventOptions)
+                );
+
+                if (args.doubleClick) {
+                    cell.edit();
+
+                    return Boolean(
+                        element.isConnected &&
+                        element.classList.contains(
+                            'tabulator-editing'
+                        ) &&
+                        element.querySelector(
+                            "input:not([type='hidden']), textarea, select"
+                        )
                     );
-                    const row = table?.getRow(args.rowId);
-                    const cell = row?.getCell(args.field);
-                    const element = cell?.getElement?.();
-
-                    if (
-                        !holder ||
-                        !cell ||
-                        !element ||
-                        element === false ||
-                        !element.isConnected
-                    ) {
-                        return false;
-                    }
-
-                    const holderBounds =
-                        holder.getBoundingClientRect();
-                    const cellBounds =
-                        element.getBoundingClientRect();
-
-                    if (
-                        cellBounds.bottom <= holderBounds.top + 1 ||
-                        cellBounds.top >= holderBounds.bottom - 1
-                    ) {
-                        return false;
-                    }
-
-                    element.setAttribute(
-                        'data-e2e-cell-action-token',
-                        args.targetToken
-                    );
-
-                    return true;
                 }
-                """,
-                new
-                {
-                    tableId = TableId,
-                    rowId,
-                    field,
-                    targetToken
-                });
 
-            if (!targetIsReady)
-            {
-                continue;
-            }
-
-            var targetCell = page.Locator(
-                $"[data-e2e-cell-action-token='{targetToken}']");
-
-            try
-            {
-                await targetCell.WaitForAsync(
-                    new LocatorWaitForOptions
-                    {
-                        State = WaitForSelectorState.Visible,
-                        Timeout = actionTimeoutMs
-                    });
-
-                if (doubleClick)
-                {
-                    await targetCell.DblClickAsync(
-                        new LocatorDblClickOptions
+                element.dispatchEvent(
+                    new MouseEvent(
+                        'mouseup',
                         {
-                            Timeout = actionTimeoutMs
-                        });
-                }
-                else
-                {
-                    await targetCell.ClickAsync(
-                        new LocatorClickOptions
+                            ...eventOptions,
+                            buttons: 0
+                        }
+                    )
+                );
+                element.dispatchEvent(
+                    new MouseEvent(
+                        'click',
                         {
-                            Timeout = actionTimeoutMs
-                        });
-                }
+                            ...eventOptions,
+                            buttons: 0,
+                            detail: 1
+                        }
+                    )
+                );
 
-                return;
+                return Boolean(
+                    state.isActive &&
+                    String(state.activeCell?.rowId ?? '') ===
+                        String(args.rowId) &&
+                    state.activeCell?.field === args.field
+                );
             }
-            catch (PlaywrightException error)
-                when (attempt < maximumAttempts)
+            """,
+            new
             {
-                lastError = error;
-            }
-        }
+                tableId = TableId,
+                rowId,
+                field,
+                doubleClick
+            });
 
-        throw new InvalidOperationException(
+        E2ETestAssert.True(
+            activated,
             $"Could not activate field '{field}' on row Id {rowId} " +
-            "after the virtualized row became stable.",
-            lastError);
+            "after the virtualized viewport became stable.");
     }
 
     public async Task ReloadAndWaitAsync()

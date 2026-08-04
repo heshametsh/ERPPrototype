@@ -80,7 +80,19 @@ internal static class IntegrationTestRunner
                 integrationTests.AddUpdateDeleteReturnConsistentResultAsync),
             (
                 "Database failure rolls back the whole save",
-                integrationTests.DatabaseFailureRollsBackWholeSaveAsync)
+                integrationTests.DatabaseFailureRollsBackWholeSaveAsync),
+            (
+                "Blank Status remains valid and persists as blank",
+                integrationTests.BlankStatusIsAcceptedAndPersistedAsync),
+            (
+                "Custom columns persist across years and remain department-scoped",
+                integrationTests.CustomColumnsPersistAcrossYearsAndRemainDepartmentScopedAsync),
+            (
+                "Custom Number rejects decimals atomically",
+                integrationTests.DecimalCustomNumberIsRejectedAtomicallyAsync),
+            (
+                "Concurrent appends receive distinct DisplayOrder values",
+                integrationTests.ConcurrentAppendsReceiveDistinctDisplayOrdersAsync)
         };
 
         if (includeStress)
@@ -115,17 +127,13 @@ internal static class IntegrationTestRunner
         if (failures.Count == 0)
         {
             Console.WriteLine(
-                includeStress
-                    ? "Phase 9.1A SQL Server financial safety net: PASS"
-                    : "Phase 8.8-R2 automated save safety net: PASS");
+                "Phase 9.3A custom-column foundation gate: PASS");
 
             return 0;
         }
 
         Console.WriteLine(
-            includeStress
-                ? "Phase 9.1A SQL Server financial safety net: FAIL"
-                : "Phase 8.8-R2 automated save safety net: FAIL");
+            "Phase 9.3A custom-column foundation gate: FAIL");
 
         foreach (var failure in failures)
         {

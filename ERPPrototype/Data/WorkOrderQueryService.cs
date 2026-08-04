@@ -133,6 +133,23 @@ public sealed class WorkOrderQueryService(
             .OrderByDescending(year => year)
             .ToList();
 
+        var customColumnsStartedAt = Stopwatch.GetTimestamp();
+
+        var customColumns = await CustomColumnService.LoadDefinitionsAsync(
+            dbContext,
+            userScope.DepartmentId,
+            cancellationToken);
+
+        RecordPerformanceStage(
+            performanceStages,
+            "open.server.custom-columns-query",
+            customColumnsStartedAt,
+            new
+            {
+                DepartmentId = userScope.DepartmentId,
+                Columns = customColumns.Count
+            });
+
         var rowsStopwatch = Stopwatch.StartNew();
         var rowsStartedAt = Stopwatch.GetTimestamp();
 
@@ -154,6 +171,7 @@ public sealed class WorkOrderQueryService(
                 workOrder.Busket,
                 workOrder.Status,
                 workOrder.Notes,
+                workOrder.CustomValuesJson,
                 workOrder.RowVersion))
             .ToListAsync(cancellationToken);
 
@@ -202,6 +220,7 @@ public sealed class WorkOrderQueryService(
             userScope.DepartmentName,
             workYear,
             availableYears,
+            customColumns,
             workOrders);
     }
 

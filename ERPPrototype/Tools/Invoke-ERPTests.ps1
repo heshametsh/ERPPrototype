@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
     [switch]$Headed,
+    [switch]$Observe,
     [switch]$KeepDatabase,
 
     [ValidateSet('Smoke', 'Full', 'Stress')]
@@ -44,7 +45,7 @@ if (-not $SkipIntegration -and -not (Test-Path $integrationProject)) {
 Write-Host 'ERPPrototype automated verification' -ForegroundColor Green
 Write-Host "Project: $projectRoot"
 Write-Host "Browser suite: $Suite"
-Write-Host "Browser mode: $(if ($Headed) { 'Headed/visible/no-slowmo' } else { 'Headless/no-slowmo' })"
+Write-Host "Browser mode: $(if ($Observe) { 'Observe (visible and slowed)' } elseif ($Headed) { 'Headed' } else { 'Headless' })"
 Write-Host 'Browser dataset: 1,000 rows per year (2,000 seeded rows total)'
 
 if (-not $SkipIntegration) {
@@ -71,11 +72,11 @@ if (-not $SkipIntegration) {
         '--no-build'
     )
 
-    $integrationTitle = 'Running the 16 SQL Server save and financial safety checks'
+    $integrationTitle = 'Running the 18 SQL Server save, financial, and stabilization checks'
 
     if ($Suite -eq 'Stress') {
         $integrationArguments += @('--', '--stress')
-        $integrationTitle = 'Running 16 core SQL Server checks plus the 1,000-row batch stress check'
+        $integrationTitle = 'Running 18 core SQL Server checks plus the 1,000-row batch stress check'
     }
 
     Invoke-DotNetStep -Title $integrationTitle -Arguments $integrationArguments
@@ -90,7 +91,10 @@ $browserArguments = @(
     '--suite', $Suite.ToLowerInvariant()
 )
 
-if ($Headed) {
+if ($Observe) {
+    $browserArguments += '--observe'
+}
+elseif ($Headed) {
     $browserArguments += '--headed'
 }
 
@@ -110,10 +114,10 @@ $integrationSummary = if ($SkipIntegration) {
     'Integration tests: skipped'
 }
 elseif ($Suite -eq 'Stress') {
-    'Integration tests: 17/17 PASS (includes 1,000-row add/update/delete)'
+    'Integration tests: 19/19 PASS (includes 1,000-row add/update/delete)'
 }
 else {
-    'Integration tests: 16/16 PASS'
+    'Integration tests: 18/18 PASS'
 }
 
 Write-Host "`nERPPrototype automated verification: PASS" -ForegroundColor Green

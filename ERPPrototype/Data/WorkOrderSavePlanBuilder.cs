@@ -141,7 +141,8 @@ public sealed class WorkOrderSavePlanBuilder
             workOrder.PartialAmount is null &&
             string.IsNullOrWhiteSpace(workOrder.Busket) &&
             string.IsNullOrWhiteSpace(workOrder.Status) &&
-            string.IsNullOrWhiteSpace(workOrder.Notes);
+            string.IsNullOrWhiteSpace(workOrder.Notes) &&
+            !CustomColumnService.HasAnyValue(workOrder.CustomValuesJson);
     }
 
     public static int ResolveTargetWorkYear(
@@ -191,6 +192,14 @@ public sealed class WorkOrderSavePlanBuilder
             workOrder.Notes = string.IsNullOrWhiteSpace(workOrder.Notes)
                 ? null
                 : workOrder.Notes.Trim();
+        }
+
+        if (fields.Contains(WorkOrderFieldRegistry.CustomValues))
+        {
+            workOrder.CustomValuesJson =
+                string.IsNullOrWhiteSpace(workOrder.CustomValuesJson)
+                    ? "{}"
+                    : workOrder.CustomValuesJson;
         }
     }
 

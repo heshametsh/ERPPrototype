@@ -37,6 +37,7 @@ public partial class WorkOrders
 
     private List<int> AvailableWorkYears = [DateTime.Now.Year];
     private List<TabulatorWorkOrderRow> Rows = [];
+    private List<CustomColumnDefinitionData> CustomColumns = [];
 
     protected override async Task OnInitializedAsync()
     {
@@ -186,6 +187,7 @@ public partial class WorkOrders
                 TableId,
                 Rows,
                 WorkOrderBuskets.All,
+                CustomColumns,
                 new
                 {
                     MeasurementId = PageOpenMeasurementId,
@@ -341,6 +343,7 @@ public partial class WorkOrders
         DepartmentName = sheet.DepartmentName;
         SelectedWorkYear = sheet.WorkYear;
         AvailableWorkYears = sheet.AvailableYears;
+        CustomColumns = sheet.CustomColumns;
         Rows = MapRows(sheet.WorkOrders);
     }
 
@@ -379,7 +382,14 @@ public partial class WorkOrders
                     Status = workOrder.Status,
                     Notes = workOrder.Notes ?? string.Empty,
                     RowVersion = Convert.ToBase64String(
-                        workOrder.RowVersion)
+                        workOrder.RowVersion),
+                    CustomFields = CustomColumnService
+                        .DeserializeValues(workOrder.CustomValuesJson)
+                        .ToDictionary(
+                            pair => pair.Key,
+                            pair => JsonSerializer.SerializeToElement(
+                                pair.Value),
+                            StringComparer.Ordinal)
                 })
             .ToList();
     }
@@ -470,6 +480,11 @@ public partial class WorkOrders
         public string Status { get; set; } = string.Empty;
         public string Notes { get; set; } = string.Empty;
         public string RowVersion { get; set; } = string.Empty;
+
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public Dictionary<string, JsonElement> CustomFields { get; set; } =
+            new(StringComparer.Ordinal);
+
         public List<string>? ChangedFields { get; set; }
     }
 }

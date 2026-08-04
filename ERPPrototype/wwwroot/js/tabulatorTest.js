@@ -48,6 +48,7 @@ window.tabulatorTest = {
         elementId,
         data,
         baskets,
+        customColumns,
         openContext = null
     ) {
         const openInitializationStartedAt =
@@ -76,6 +77,9 @@ window.tabulatorTest = {
 
         data = Array.isArray(data) ? data : [];
         baskets = Array.isArray(baskets) ? baskets : [];
+        customColumns = Array.isArray(customColumns)
+            ? customColumns
+            : [];
 
         data = data.map(
             row =>
@@ -91,10 +95,23 @@ window.tabulatorTest = {
             "basket"
         ]);
 
+        for (const customColumn of
+            this.cloneCustomColumns(customColumns)) {
+            this.registerCustomColumnField(customColumn);
+        }
+
         const state = this.createGridState(
             data,
             baskets
         );
+
+        this.initializeCustomColumnsState(
+            elementId,
+            state,
+            customColumns,
+            directTypingFields
+        );
+
         state.completedBasket = String(
             openContext?.completedBasket ?? ""
         ).trim();
@@ -208,7 +225,7 @@ window.tabulatorTest = {
                 );
             },
 
-            columns: [
+            columns: this.applyCustomColumns(elementId, [
                 {
                     title: "Work Order Number",
                     field: "workOrderNumber",
@@ -463,7 +480,7 @@ window.tabulatorTest = {
                             );
                     }
                 }
-            ]
+            ], customColumns)
         });
 
         this.tables[elementId] = table;
@@ -482,6 +499,10 @@ window.tabulatorTest = {
             );
 
             window.tabulatorTest.bindHeaderFilterSelectionGuards(
+                elementId
+            );
+
+            window.tabulatorTest.bindCustomColumnHeaderMenu(
                 elementId
             );
 
@@ -571,8 +592,11 @@ window.tabulatorTest = {
         const deletedCount =
             state?.deletedOriginalRowIds?.size ?? 0;
 
+        const customConfigurationCount =
+            state?.customColumnsChanged === true ? 1 : 0;
+
         const unsavedCount =
-            dirtyCount + deletedCount;
+            dirtyCount + deletedCount + customConfigurationCount;
 
         const errorCount =
             state?.validationErrors?.size ?? 0;
@@ -636,9 +660,15 @@ window.tabulatorTest = {
         const deletedRows =
             await this.getDeletedRows(elementId);
 
+        const customColumnsState =
+            this.getCustomColumnsSaveState(elementId);
+
         const json = JSON.stringify({
             dirtyRows: dirtyRows,
-            deletedRows: deletedRows
+            deletedRows: deletedRows,
+            customColumns: customColumnsState.customColumns,
+            customColumnsChanged:
+                customColumnsState.customColumnsChanged
         });
 
         const bytes =

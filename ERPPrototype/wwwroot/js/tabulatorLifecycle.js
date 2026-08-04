@@ -343,6 +343,7 @@
 
             window.tabulatorFilters?.closeActivePopup?.(elementId);
             window.tabulatorRangeAutoScroll?.detach?.(elementId);
+            this.disposeCustomColumnsUi?.(elementId, state);
             this.resetAggregatesUi?.(elementId);
 
             this.detachLifecycleEventHandlers(table, state);

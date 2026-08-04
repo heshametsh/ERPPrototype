@@ -1225,6 +1225,23 @@
                 return;
             }
 
+            if (transaction.kind === "custom-column") {
+                await this.applyCustomColumnTransaction(
+                    elementId,
+                    transaction,
+                    "undo"
+                );
+
+                state.redoStack.push(transaction);
+
+                this.setStatus(
+                    elementId,
+                    `تم التراجع عن: ${transaction.label}.`
+                );
+
+                return;
+            }
+
             if (transaction.kind === "structure") {
                 await this.applyStructureTransaction(
                     elementId,
@@ -1309,6 +1326,23 @@
                 state.undoStack.push(
                     transaction
                 );
+
+                this.setStatus(
+                    elementId,
+                    `تمت إعادة: ${transaction.label}.`
+                );
+
+                return;
+            }
+
+            if (transaction.kind === "custom-column") {
+                await this.applyCustomColumnTransaction(
+                    elementId,
+                    transaction,
+                    "redo"
+                );
+
+                state.undoStack.push(transaction);
 
                 this.setStatus(
                     elementId,
