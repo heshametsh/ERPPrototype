@@ -1048,9 +1048,21 @@ window.tabulatorTest = {
             return true;
         }
 
+        /*
+         * At non-100% zoom, Math.ceil can over-scroll by a fractional
+         * physical pixel and Tabulator then snaps back. Round down to the
+         * physical-pixel grid so the correction never overshoots.
+         */
+        const dpr = Math.max(
+            Number(window.devicePixelRatio) || 1,
+            0.1
+        );
+        const alignedHiddenPixels =
+            Math.floor(hiddenPixels * dpr) / dpr;
+
         holder.scrollTop = Math.max(
             0,
-            holder.scrollTop - Math.ceil(hiddenPixels)
+            holder.scrollTop - alignedHiddenPixels
         );
 
         return true;
