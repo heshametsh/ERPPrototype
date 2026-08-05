@@ -13,9 +13,7 @@ internal sealed class WorkOrderSavePlanBuilderTests
             -3001,
             " ٨١٠٠٠٠٠١٣ ",
             " ۴۱۳ ",
-            $" {WorkOrderBuskets.InProgress} ",
-            "  تحت التنفيذ  ",
-            "  normalized notes  ");
+            $" {WorkOrderBuskets.InProgress} ");
 
         var result = builder.Build(
             2026,
@@ -44,16 +42,6 @@ internal sealed class WorkOrderSavePlanBuilderTests
             planned.Busket,
             "Basket whitespace was not normalized.");
 
-        TestAssert.Equal(
-            "تحت التنفيذ",
-            planned.Status,
-            "Status whitespace was not normalized.");
-
-        TestAssert.Equal(
-            "normalized notes",
-            planned.Notes,
-            "Notes whitespace was not normalized.");
-
         return Task.CompletedTask;
     }
 
@@ -68,33 +56,26 @@ internal sealed class WorkOrderSavePlanBuilderTests
             0,
             "810000014",
             "414",
-            WorkOrderBuskets.InProgress,
-            "تحت التنفيذ",
-            "zero-one");
+            WorkOrderBuskets.InProgress);
 
         var zeroIdTwo = CreateNewRecord(
             0,
             "810000015",
             "415",
-            WorkOrderBuskets.InProgress,
-            "تحت التنفيذ",
-            "zero-two");
+            WorkOrderBuskets.InProgress);
 
         var temporaryFirst = CreateNewRecord(
             -3016,
             "810000016",
             "416",
-            WorkOrderBuskets.InProgress,
-            "تحت التنفيذ",
-            "temporary-first");
+            WorkOrderBuskets.InProgress);
 
         var temporaryLast = CreateNewRecord(
             -3016,
             "810000016",
             "416",
-            WorkOrderBuskets.InProgress,
-            "تحت التنفيذ",
-            "temporary-last");
+            WorkOrderBuskets.InProgress);
+        temporaryLast.WorkOrderValue = 130_000m;
 
         var result = builder.Build(
             2026,
@@ -126,13 +107,14 @@ internal sealed class WorkOrderSavePlanBuilderTests
             "Distinct Id 0 rows must all be preserved.");
 
         TestAssert.Equal(
-            "temporary-last",
-            result.Plan.NewRecords.Single(record => record.Id == -3016).Notes,
+            (decimal?)130_000m,
+            result.Plan.NewRecords
+                .Single(record => record.Id == -3016)
+                .WorkOrderValue,
             "The latest version of a repeated negative temporary Id was not used.");
 
         return Task.CompletedTask;
     }
-
 
     public Task NormalizesAndValidatesFinancialAmountsAsync()
     {
@@ -140,9 +122,7 @@ internal sealed class WorkOrderSavePlanBuilderTests
             -3019,
             "810000019",
             "419",
-            WorkOrderBuskets.InProgress,
-            "تحت التنفيذ",
-            "financial-normalization");
+            WorkOrderBuskets.InProgress);
         record.WorkOrderValue = 1_250_000.565m;
         record.PartialAmount = 250_000.255m;
 
@@ -184,9 +164,7 @@ internal sealed class WorkOrderSavePlanBuilderTests
             -3020,
             "810000020",
             "420",
-            WorkOrderBuskets.InProgress,
-            "تحت التنفيذ",
-            "missing-value");
+            WorkOrderBuskets.InProgress);
         missingValue.WorkOrderValue = null;
 
         var missingResult = builder.Build(
@@ -203,9 +181,7 @@ internal sealed class WorkOrderSavePlanBuilderTests
             -3022,
             "810000025",
             "425",
-            WorkOrderBuskets.InProgress,
-            "تحت التنفيذ",
-            "zero-value");
+            WorkOrderBuskets.InProgress);
         zeroValue.WorkOrderValue = 0m;
 
         var zeroValueResult = builder.Build(
@@ -222,9 +198,7 @@ internal sealed class WorkOrderSavePlanBuilderTests
             -3023,
             "810000026",
             "426",
-            WorkOrderBuskets.InProgress,
-            "تحت التنفيذ",
-            "zero-partial");
+            WorkOrderBuskets.InProgress);
         zeroPartial.PartialAmount = 0m;
 
         var zeroPartialResult = builder.Build(
@@ -241,9 +215,7 @@ internal sealed class WorkOrderSavePlanBuilderTests
             -3021,
             "810000021",
             "421",
-            WorkOrderBuskets.InProgress,
-            "تحت التنفيذ",
-            "partial-above-value");
+            WorkOrderBuskets.InProgress);
         excessivePartial.WorkOrderValue = 100_000m;
         excessivePartial.PartialAmount = 100_000.01m;
 
@@ -266,15 +238,15 @@ internal sealed class WorkOrderSavePlanBuilderTests
         return Task.CompletedTask;
     }
 
-    public Task UnrelatedLegacyEditDoesNotRunFinancialRulesAsync()
+    public Task UnrelatedNonFinancialEditDoesNotRunFinancialRulesAsync()
     {
-        var legacy = CreateExistingRecord(
+        var record = CreateExistingRecord(
             3027,
             "810000027",
             "427");
-        legacy.WorkOrderValue = null;
-        legacy.PartialAmount = null;
-        legacy.Notes = "legacy-note-change";
+        record.WorkOrderValue = null;
+        record.PartialAmount = null;
+        record.AssignmentDate = new DateTime(2026, 6, 15);
 
         var result = builder.Build(
             2026,
@@ -282,17 +254,17 @@ internal sealed class WorkOrderSavePlanBuilderTests
             changedRecords:
             [
                 new WorkOrderChangeSet(
-                    legacy,
+                    record,
                     new HashSet<string>(StringComparer.Ordinal)
                     {
-                        WorkOrderFieldRegistry.Notes
+                        WorkOrderFieldRegistry.AssignmentDate
                     })
             ],
             deletedRecords: []);
 
         TestAssert.True(
             result.Succeeded,
-            "An unrelated Notes edit incorrectly ran financial validation for a legacy row.");
+            "An unrelated nonfinancial edit incorrectly ran financial validation for a legacy row.");
 
         return Task.CompletedTask;
     }
@@ -365,9 +337,7 @@ internal sealed class WorkOrderSavePlanBuilderTests
         int id,
         string workOrderNumber,
         string workTypeCode,
-        string basket,
-        string status,
-        string? notes) =>
+        string basket) =>
         new()
         {
             Id = id,
@@ -378,9 +348,7 @@ internal sealed class WorkOrderSavePlanBuilderTests
             AssignmentDate = null,
             WorkOrderValue = 125_000m,
             PartialAmount = null,
-            Busket = basket,
-            Status = status,
-            Notes = notes
+            Busket = basket
         };
 
     private static WorkOrder CreateExistingRecord(
@@ -398,8 +366,6 @@ internal sealed class WorkOrderSavePlanBuilderTests
             WorkOrderValue = 125_000m,
             PartialAmount = null,
             Busket = WorkOrderBuskets.InProgress,
-            Status = "تحت التنفيذ",
-            Notes = null,
             RowVersion = new byte[8]
         };
 
@@ -415,8 +381,6 @@ internal sealed class WorkOrderSavePlanBuilderTests
             WorkOrderValue = source.WorkOrderValue,
             PartialAmount = source.PartialAmount,
             Busket = source.Busket,
-            Status = source.Status,
-            Notes = source.Notes,
             RowVersion = source.RowVersion.ToArray()
         };
 }

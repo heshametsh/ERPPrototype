@@ -150,6 +150,24 @@ public sealed class WorkOrderQueryService(
                 Columns = customColumns.Count
             });
 
+        var columnLayoutsStartedAt = Stopwatch.GetTimestamp();
+
+        var columnLayouts =
+            await DepartmentColumnLayoutService.LoadLayoutsAsync(
+                dbContext,
+                userScope.DepartmentId,
+                cancellationToken);
+
+        RecordPerformanceStage(
+            performanceStages,
+            "open.server.column-layouts-query",
+            columnLayoutsStartedAt,
+            new
+            {
+                DepartmentId = userScope.DepartmentId,
+                Layouts = columnLayouts.Count
+            });
+
         var rowsStopwatch = Stopwatch.StartNew();
         var rowsStartedAt = Stopwatch.GetTimestamp();
 
@@ -169,8 +187,6 @@ public sealed class WorkOrderQueryService(
                 workOrder.WorkOrderValue,
                 workOrder.PartialAmount,
                 workOrder.Busket,
-                workOrder.Status,
-                workOrder.Notes,
                 workOrder.CustomValuesJson,
                 workOrder.RowVersion))
             .ToListAsync(cancellationToken);
@@ -221,6 +237,7 @@ public sealed class WorkOrderQueryService(
             workYear,
             availableYears,
             customColumns,
+            columnLayouts,
             workOrders);
     }
 

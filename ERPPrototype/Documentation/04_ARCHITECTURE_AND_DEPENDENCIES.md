@@ -284,7 +284,7 @@ Successful Save result
 
 `tabulatorDirtyState.js` does not decide validation, uniqueness, authorization, year routing, database persistence, Arabic messages, or how Undo/Redo values are applied. It records the resulting data state only.
 
-**Work example:** Clipboard/History may restore 4,950 Notes values, but it does not manually maintain a second unsaved-row list. It applies the values, then Dirty State compares the affected field against the accepted baseline and decides which rows remain unsaved.
+**Work example:** Clipboard/History may restore 4,950 custom-column values, but it does not manually maintain a second unsaved-row list. It applies the values, then Dirty State compares the affected field against the accepted baseline and decides which rows remain unsaved.
 
 
 ## Phase 8.8-R1 Read/Write Boundary
@@ -350,4 +350,4 @@ Browser save request
 
 The builder has no DbContext, SQL query, transaction, logger, or UI dependency. It may reject an invalid request, but it cannot declare a work-order identity globally unique or persist a row.
 
-**Work example:** a Notes-only edit is grouped and normalized by the builder. The service then confirms the employee owns the department and applies the update using the database RowVersion inside the existing transaction.
+**Work example:** a Basket-only edit is grouped and normalized by the builder. The service then confirms the employee owns the department and applies the update using the database RowVersion inside the existing transaction.

@@ -534,22 +534,49 @@
 
 .tabulator-workorders-page ::deep .tabulator .tabulator-col .tabulator-col-content {
     min-height: 42px !important;
-    padding: 0 31px 0 9px !important;
+    padding: 0 9px !important;
 }
 
 .tabulator-workorders-page ::deep .tabulator .tabulator-col-title-holder {
     display: flex;
     align-items: center;
+    justify-content: flex-start;
+    gap: 4px;
+    min-width: 0;
     min-height: 42px;
+    overflow: hidden;
 }
 
 .tabulator-workorders-page ::deep .tabulator .tabulator-col-title {
+    display: inline-flex;
+    flex: 0 1 auto;
+    align-items: center;
+    gap: 4px;
+    width: auto !important;
+    min-width: 0;
+    padding-right: 0 !important;
     overflow: hidden;
     color: #243f53 !important;
     font-size: 12.75px !important;
     font-weight: 750 !important;
+    white-space: nowrap;
+}
+
+.tabulator-workorders-page ::deep .tabulator .tabulator-col-title-text {
+    min-width: 0;
+    overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.tabulator-workorders-page ::deep .tabulator .tabulator-col-sorter {
+    position: static !important;
+    display: inline-flex !important;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    width: 13px !important;
+    margin: 0 0 0 1px !important;
 }
 
 .tabulator-workorders-page ::deep .tabulator .tabulator-col .tabulator-arrow {
@@ -613,28 +640,26 @@
     text-align: left;
 }
 
-.tabulator-workorders-page ::deep .tabulator-cell[tabulator-field="basket"],
-.tabulator-workorders-page ::deep .tabulator-cell[tabulator-field="status"],
-.tabulator-workorders-page ::deep .tabulator-cell[tabulator-field="notes"] {
+.tabulator-workorders-page ::deep .tabulator-cell[tabulator-field="basket"] {
     direction: rtl;
     text-align: right;
 }
 
 /* Header popup/filter button */
 .tabulator-workorders-page ::deep .tabulator-header-popup-button {
-    position: absolute !important;
-    top: 50% !important;
-    right: 7px !important;
+    position: static !important;
     display: inline-flex !important;
+    flex: 0 0 auto;
     align-items: center;
     justify-content: center;
-    width: 22px !important;
-    height: 22px !important;
-    padding: 3px !important;
+    width: 19px !important;
+    height: 19px !important;
+    margin: 0 !important;
+    padding: 2px !important;
     border: 1px solid transparent;
     border-radius: 5px;
     color: #678497 !important;
-    transform: translateY(-50%) !important;
+    transform: none !important;
 }
 
 .tabulator-workorders-page ::deep .tabulator-header-popup-button:hover {

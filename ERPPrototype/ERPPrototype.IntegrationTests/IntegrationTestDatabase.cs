@@ -192,13 +192,15 @@ internal sealed class IntegrationTestDatabase : IAsyncDisposable
         string workOrderNumber,
         string workTypeCode,
         int workYear,
-        string? notes,
+        string scenarioTag,
         DateTime? assignmentDate = null,
         long? displayOrder = null,
         decimal workOrderValue = 125_000m,
         decimal? partialAmount = null,
         CancellationToken cancellationToken = default)
     {
+        _ = scenarioTag;
+
         await using var dbContext =
             await Factory.CreateDbContextAsync(cancellationToken);
 
@@ -218,8 +220,6 @@ internal sealed class IntegrationTestDatabase : IAsyncDisposable
             WorkOrderValue = workOrderValue,
             PartialAmount = partialAmount,
             Busket = WorkOrderBuskets.InProgress,
-            Status = "تحت التنفيذ",
-            Notes = notes,
             CreatedAt = DateTime.UtcNow,
             CreatedBy = createdBy
         };
@@ -246,6 +246,27 @@ internal sealed class IntegrationTestDatabase : IAsyncDisposable
         return workOrder is null
             ? null
             : Clone(workOrder);
+    }
+
+    public async Task<int> CountLegacyWorkOrderColumnsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = new SqlConnection(ConnectionString);
+        await connection.OpenAsync(cancellationToken);
+
+        await using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT COUNT(*)
+            FROM sys.columns AS [column]
+            INNER JOIN sys.tables AS [table]
+                ON [column].[object_id] = [table].[object_id]
+            WHERE [table].[name] = N'WorkOrders'
+              AND [column].[name] IN (N'Status', N'Notes');
+            """;
+
+        return Convert.ToInt32(
+            await command.ExecuteScalarAsync(cancellationToken));
     }
 
     public async Task<int> CountIdentityAsync(
@@ -275,9 +296,9 @@ internal sealed class IntegrationTestDatabase : IAsyncDisposable
             cancellationToken);
     }
 
-    public async Task UpdateNotesDirectlyAsync(
+    public async Task UpdateBasketDirectlyAsync(
         int id,
-        string notes,
+        string basket,
         CancellationToken cancellationToken = default)
     {
         await using var dbContext =
@@ -286,7 +307,7 @@ internal sealed class IntegrationTestDatabase : IAsyncDisposable
         var workOrder = await dbContext.WorkOrders
             .SingleAsync(item => item.Id == id, cancellationToken);
 
-        workOrder.Notes = notes;
+        workOrder.Busket = basket;
         workOrder.UpdatedAt = DateTime.UtcNow;
         workOrder.UpdatedBy = "integration-direct-update";
 
@@ -302,8 +323,11 @@ internal sealed class IntegrationTestDatabase : IAsyncDisposable
         await dbContext.Database.ExecuteSqlRawAsync(
             """
             ALTER TABLE [dbo].[WorkOrders]
-            ADD CONSTRAINT [CK_WorkOrders_IntegrationTest_RejectMagicNotes]
-            CHECK ([Notes] IS NULL OR [Notes] <> N'__FORCE_DB_FAILURE__');
+            ADD CONSTRAINT [CK_WorkOrders_IntegrationTest_RejectEngineeringBasket]
+            CHECK (
+                [WorkOrderNumber] <> N'810000009' OR
+                [Busket] <> N'سلة الهندسة'
+            );
             """,
             cancellationToken);
     }
@@ -320,8 +344,6 @@ internal sealed class IntegrationTestDatabase : IAsyncDisposable
             WorkOrderValue = source.WorkOrderValue,
             PartialAmount = source.PartialAmount,
             Busket = source.Busket,
-            Status = source.Status,
-            Notes = source.Notes,
             CustomValuesJson = source.CustomValuesJson,
             RowVersion = source.RowVersion.ToArray(),
             DepartmentId = source.DepartmentId,

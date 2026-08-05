@@ -94,9 +94,11 @@ Visible operational fields:
 - Work Order Number
 - Work Type
 - Assignment Date
+- Work Order Value
+- Partial Amount
+- Remaining Amount (calculated)
 - Basket
-- Status
-- Notes
+- Department custom columns (`Text`, `Money`, `Date`, whole `Number`)
 
 Hidden/system fields:
 
@@ -115,8 +117,6 @@ Database rules:
 - The database Unique Index is currently company-wide on Work Order Number + Work Type.
 - Department deletion is restricted.
 - RowVersion is used for optimistic concurrency.
-- Notes max 1,000 characters.
-- Status max 150 characters.
 - Basket is required and must be one of the configured values.
 
 ## 6. Work-Order Loading
@@ -297,9 +297,9 @@ Implemented in the current patch:
 - Global identity validation runs only for new rows or rows whose identity fields changed.
 - Core field keys and server dependency sets are centralized in `WorkOrderFieldRegistry`.
 
-Practical example: changing Notes in 4,952 rows still saves 4,952 values, but it does not rewrite the other columns or execute the global Work Order Number + Work Type duplicate query.
+Practical example: changing a custom Text column in 4,952 rows still saves 4,952 values, but it does not rewrite the other columns or execute the global Work Order Number + Work Type duplicate query.
 
-Not implemented yet: user-created custom columns, their database storage, layout ownership, permissions, and filter-definition UI. Phase 8.5 is the foundation that allows those fields to register by stable key later.
+Phase 9.3A now implements department-owned custom columns with stable field keys and Text/Money/Date/whole-Number values. Phase 9.3B adds department-owned persisted widths for core and custom fields. Rename/delete/type conversion and dedicated custom-column header filters remain later work.
 
 
 ## 18. Phase 8.6-R1 — Lifecycle Ownership Extraction
@@ -350,7 +350,7 @@ A new partial component file, `Components/Pages/WorkOrders.Save.cs`, owns the co
 
 No business or runtime change is intended. The method and its private save-only helpers are byte-for-byte equivalent after extraction.
 
-Practical example: editing Notes in one order, pasting a full column, moving an order to another year, or adding a temporary row all still follow the same verified workflow. The difference is that developers now find that workflow in one file instead of mixing it with year loading and grid disposal.
+Practical example: editing Basket in one order, pasting a custom column, moving an order to another year, or adding a temporary row all still follow the same verified workflow. The difference is that developers now find that workflow in one file instead of mixing it with year loading and grid disposal.
 
 ## 21. Phase 8.7-R2 — Save Request and Result Boundaries
 
@@ -362,7 +362,7 @@ The verified save journey remains coordinated by `Components/Pages/WorkOrders.Sa
 
 No service contract, JavaScript API, field-level rule, year-routing rule, message, or performance-stage name is intentionally changed.
 
-Practical example: when the employee pastes Notes into 4,950 orders, request preparation says “4,950 existing rows changed in Notes.” After the service returns, result preparation says “no visible values need rewriting; refresh only the internal row versions and show the success message.” The button workflow coordinates those two facts without rebuilding either one itself.
+Practical example: when the employee pastes a custom Text value into 4,950 orders, request preparation says “4,950 existing rows changed in the custom field.” After the service returns, result preparation says “no visible values need rewriting; refresh only the internal row versions and show the success message.” The button workflow coordinates those two facts without rebuilding either one itself.
 
 
 
@@ -379,7 +379,7 @@ The module now owns original snapshots, `dirtyRowIds`, `changedFieldsByRow`, `de
 
 `tabulatorLifecycle.js` still owns when a grid instance is created or destroyed, but asks Dirty State to construct the change-tracking portion of that instance. `tabulatorTest.js` still coordinates streamed Save and applies server row mutations, but asks Dirty State to replace the comparison baseline and clear unsaved sets.
 
-Practical example: changing Notes marks one row with `changedFields = ["notes"]`. Undoing back to the stored text removes that row from Dirty State. Saving successfully replaces the old row version with the server row version and clears the unsaved count.
+Practical example: changing Basket marks one row with `changedFields = ["basket"]`. Undoing back to the stored text removes that row from Dirty State. Saving successfully replaces the old row version with the server row version and clears the unsaved count.
 
 
 ## 23. Phase 8.8-R1 — Read Query Service
@@ -506,3 +506,15 @@ clean sheet state, and writes raw samples plus P50/P95/heap data to JSON.
 Year changes in the functional journey now wait for the requested year, row
 count, known Work Order identity, absence of the old-year identity, and aggregate
 readiness. This removes the race where two years both contained 1,000 rows.
+
+
+## 30. Phase 9.3A–9.3D — Custom Columns, Layouts, Lifecycle, and Legacy-Field Removal
+
+- A Department Employee can insert a custom column before or after any data-column Header.
+- Types are exactly Text, Money, Date, and whole Number; there is no Dropdown type.
+- Definitions and positions belong to the department and appear in all its years.
+- Column widths are stored separately by DepartmentId + FieldKey and use the normal explicit Save action.
+- Width changes support mouse drag, Undo/Redo, Refresh, and year switching. There is no exact-width entry dialog.
+- Header text, filter, and sort controls remain adjacent; long titles ellipsize before pushing controls away.
+- Custom columns support rename, empty-only type conversion, transactional deletion across department years, and Undo/Redo before Save.
+- Legacy `Status` and `Notes` fields were removed from the entity, schema, grid, filters, save pipeline, and tests in Phase 9.3D. Existing values in those database columns are intentionally deleted by the migration.

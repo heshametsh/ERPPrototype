@@ -162,6 +162,9 @@ public partial class WorkOrders
         var savedCustomColumns =
             result.SavedCustomColumns?.ToList() ?? [];
 
+        var savedColumnLayouts =
+            result.SavedColumnLayouts?.ToList() ?? [];
+
         var savedRowMappings = request.AddedRowMappings
             .Select(mapping =>
                 new TabulatorSavedRowMapping
@@ -244,8 +247,10 @@ public partial class WorkOrders
         var savedCount =
             request.DirtyRows.Count +
             request.DeletedWorkOrders.Count;
-        var addedCustomColumnCount =
-            request.CustomColumns.Count(column => column.Id <= 0);
+        var addedCustomColumnCount = request.CustomColumns.Count(column =>
+            column.Id <= 0 && !column.IsDeleted);
+        var deletedCustomColumnCount = request.CustomColumns.Count(column =>
+            column.Id > 0 && column.IsDeleted);
 
         string statusMessage;
 
@@ -270,6 +275,26 @@ public partial class WorkOrders
                 ? "تم إضافة العمود وحفظه بنجاح."
                 : $"تم إضافة {addedCustomColumnCount} أعمدة وحفظها بنجاح.";
         }
+        else if (request.CustomColumnsChanged && savedCount > 0)
+        {
+            statusMessage =
+                $"تم حفظ {savedCount} صف وتعديلات الأعمدة بنجاح.";
+        }
+        else if (request.CustomColumnsChanged)
+        {
+            statusMessage = deletedCustomColumnCount > 0
+                ? "تم حذف العمود المخصص وقيمه وحفظ التعديل بنجاح."
+                : "تم حفظ تعديلات الأعمدة المخصصة بنجاح.";
+        }
+        else if (request.ColumnLayoutsChanged && savedCount > 0)
+        {
+            statusMessage =
+                $"تم حفظ {savedCount} صف وعرض الأعمدة بنجاح.";
+        }
+        else if (request.ColumnLayoutsChanged)
+        {
+            statusMessage = "تم حفظ عرض الأعمدة بنجاح.";
+        }
         else
         {
             statusMessage =
@@ -284,6 +309,7 @@ public partial class WorkOrders
             AvailableWorkYears = updatedAvailableWorkYears,
             Rows = mergedRows,
             CustomColumns = savedCustomColumns,
+            ColumnLayouts = savedColumnLayouts,
             StatusMessage = statusMessage
         };
     }
@@ -318,8 +344,6 @@ public partial class WorkOrders
                     record.WorkOrderValue,
                     record.PartialAmount)),
             Basket = record.Busket,
-            Status = record.Status,
-            Notes = record.Notes ?? string.Empty,
             RowVersion = Convert.ToBase64String(
                 record.RowVersion),
             CustomFields = CustomColumnService
@@ -364,6 +388,7 @@ public partial class WorkOrders
         public List<int> AvailableWorkYears { get; init; } = [];
         public List<TabulatorWorkOrderRow> Rows { get; init; } = [];
         public List<CustomColumnDefinitionData> CustomColumns { get; init; } = [];
+        public List<DepartmentColumnLayoutData> ColumnLayouts { get; init; } = [];
         public string StatusMessage { get; init; } = string.Empty;
     }
 

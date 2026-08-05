@@ -49,6 +49,7 @@ window.tabulatorTest = {
         data,
         baskets,
         customColumns,
+        columnLayouts,
         openContext = null
     ) {
         const openInitializationStartedAt =
@@ -80,6 +81,9 @@ window.tabulatorTest = {
         customColumns = Array.isArray(customColumns)
             ? customColumns
             : [];
+        columnLayouts = Array.isArray(columnLayouts)
+            ? columnLayouts
+            : [];
 
         data = data.map(
             row =>
@@ -110,6 +114,10 @@ window.tabulatorTest = {
             state,
             customColumns,
             directTypingFields
+        );
+        this.initializeColumnLayoutsState(
+            state,
+            columnLayouts
         );
 
         state.completedBasket = String(
@@ -225,7 +233,8 @@ window.tabulatorTest = {
                 );
             },
 
-            columns: this.applyCustomColumns(elementId, [
+            columns: this.applyColumnLayouts(state,
+                this.applyCustomColumns(elementId, [
                 {
                     title: "Work Order Number",
                     field: "workOrderNumber",
@@ -422,65 +431,7 @@ window.tabulatorTest = {
                             );
                     }
                 },
-                {
-                    title: "Status",
-                    field: "status",
-                    editor: "input",
-                    headerSort: false,
-                    minWidth: 180,
-                    widthGrow: 1,
-                    headerHozAlign: "left",
-
-                    headerPopupIcon:
-                        window.tabulatorFilters.icon(
-                            "Filter Status"
-                        ),
-
-                    headerPopup: function (
-                        event,
-                        column,
-                        onRendered
-                    ) {
-                        return window.tabulatorFilters
-                            .createValuePopup(
-                                window.tabulatorTest,
-                                elementId,
-                                column,
-                                onRendered,
-                                "status"
-                            );
-                    }
-                },
-                {
-                    title: "Notes",
-                    field: "notes",
-                    editor: "input",
-                    headerSort: false,
-                    minWidth: 310,
-                    widthGrow: 2,
-                    headerHozAlign: "left",
-
-                    headerPopupIcon:
-                        window.tabulatorFilters.icon(
-                            "Filter Notes"
-                        ),
-
-                    headerPopup: function (
-                        event,
-                        column,
-                        onRendered
-                    ) {
-                        return window.tabulatorFilters
-                            .createValuePopup(
-                                window.tabulatorTest,
-                                elementId,
-                                column,
-                                onRendered,
-                                "notes"
-                            );
-                    }
-                }
-            ], customColumns)
+            ], customColumns))
         });
 
         this.tables[elementId] = table;
@@ -499,6 +450,14 @@ window.tabulatorTest = {
             );
 
             window.tabulatorTest.bindHeaderFilterSelectionGuards(
+                elementId
+            );
+
+            window.tabulatorTest.initializeColumnLayoutRuntime(
+                elementId
+            );
+
+            window.tabulatorTest.bindColumnLayoutInteractions(
                 elementId
             );
 
@@ -595,8 +554,14 @@ window.tabulatorTest = {
         const customConfigurationCount =
             state?.customColumnsChanged === true ? 1 : 0;
 
+        const columnLayoutConfigurationCount =
+            state?.columnLayoutsChanged === true ? 1 : 0;
+
         const unsavedCount =
-            dirtyCount + deletedCount + customConfigurationCount;
+            dirtyCount +
+            deletedCount +
+            customConfigurationCount +
+            columnLayoutConfigurationCount;
 
         const errorCount =
             state?.validationErrors?.size ?? 0;
@@ -662,13 +627,18 @@ window.tabulatorTest = {
 
         const customColumnsState =
             this.getCustomColumnsSaveState(elementId);
+        const columnLayoutsState =
+            this.getColumnLayoutsSaveState(elementId);
 
         const json = JSON.stringify({
             dirtyRows: dirtyRows,
             deletedRows: deletedRows,
             customColumns: customColumnsState.customColumns,
             customColumnsChanged:
-                customColumnsState.customColumnsChanged
+                customColumnsState.customColumnsChanged,
+            columnLayouts: columnLayoutsState.columnLayouts,
+            columnLayoutsChanged:
+                columnLayoutsState.columnLayoutsChanged
         });
 
         const bytes =
@@ -1225,8 +1195,6 @@ window.tabulatorTest = {
         clone.partialAmount = rowData?.partialAmount ?? "";
         clone.remainingAmount = rowData?.remainingAmount ?? "";
         clone.basket = rowData?.basket ?? "";
-        clone.status = rowData?.status ?? "";
-        clone.notes = rowData?.notes ?? "";
         clone.rowVersion = Array.isArray(rowData?.rowVersion)
             ? Array.from(rowData.rowVersion)
             : rowData?.rowVersion ?? "";

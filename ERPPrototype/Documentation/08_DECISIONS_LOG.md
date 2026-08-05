@@ -222,7 +222,7 @@
 
 **Reason:** after R1 proved the complete save journey still works, the next safest boundary is to separate “what will be saved?” from “what did the server decide and what must the employee see?” This makes duplicate, concurrency, moved-year, and temporary-row logic reviewable without mixing them with stream reading and loading-state cleanup.
 
-**Business example:** changing Notes in one row produces a changed-row request. A duplicate failure produces cell marks and a failure message. These are different decisions and must not be hidden inside one long button method.
+**Business example:** changing Basket in one row produces a changed-row request. A duplicate failure produces cell marks and a failure message. These are different decisions and must not be hidden inside one long button method.
 
 **Constraint:** R2 does not change the service contract, global identity rule, year movement, row-version protection, Arabic messages, JavaScript calls, or performance stage names. Browser dirty-state extraction remains a later step after R2 runtime regression.
 
@@ -234,7 +234,7 @@
 
 **Reason:** the same unsaved-state collections were being read or mutated from initialization, field edits, structural operations, Undo/Redo, Save streaming, and Save reconciliation. A single owner makes it reviewable whether the screen, Save request, and unsaved count describe the same data.
 
-**Business example:** after changing Notes and then undoing to the stored text, the order must stop appearing as unsaved. After a successful Save, the server row version—not the pre-save browser version—must become the new comparison baseline.
+**Business example:** after changing Basket and then undoing to the stored value, the order must stop appearing as unsaved. After a successful Save, the server row version—not the pre-save browser version—must become the new comparison baseline.
 
 **Constraint:** R3 does not change field definitions, validation, uniqueness, year routing, service calls, database writes, Arabic messages, Undo/Redo algorithms, or performance-stage names. It does not add autosave or persistence for Undo history across refresh.
 
@@ -265,3 +265,23 @@
 - **Constraint:** لا يُقبل Patch إضافي كطبقة فوق الحل السابق إذا كان استبدال المسار الخاطئ أو تبسيطه ممكنًا.
 - **Simple example:** إذا ثبت أن الاختبار يقرأ موضع الخلية من State قديم، يُستبدل هذا القارئ بالقارئ الصحيح من Tabulator بدل إبقائه وإضافة قارئ احتياطي ثانٍ.
 
+
+
+## DEC-027 — Persist column widths by department, not by year or user
+
+- **Date:** 2026-08-04
+- **Status:** Accepted by user
+- **Decision:** Core and custom Work Orders column widths are saved by `DepartmentId + FieldKey`, shared across every year of that department. Width changes require the existing Save button and participate in Undo/Redo before Save.
+- **Header rule:** title, filter icon, and sort icon form one adjacent group. Long titles ellipsize so controls do not move to the far edge or disappear.
+- **Reason:** the same department sheet must keep one familiar layout while still allowing the employee to make narrow or wide columns without wasting horizontal space.
+- **Constraint:** this step changes width only. Custom-column creation still asks for name and type; rename/delete/type conversion remain separate features.
+
+
+## DEC-028 — Remove legacy Status and Notes fields
+
+- **Date:** 2026-08-05
+- **Status:** Accepted by user
+- **Decision:** `Status` and `Notes` are removed completely from Work Orders. They are not converted into custom columns. The migration drops both database columns and intentionally deletes their existing values.
+- **Protected columns:** Work Order Number, Work Type, Assignment Date, Work Order Value, Partial Amount, Remaining Amount, and Basket only.
+- **Reason:** every non-core business field should be created explicitly through the department custom-column system rather than retaining two special legacy fields.
+- **Constraint:** no compatibility alias or hidden fallback remains in the entity, DTOs, save pipeline, grid columns, filters, validation, tests, or current documentation. A department may later create its own custom Text column with any suitable name.

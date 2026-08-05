@@ -9,10 +9,10 @@ namespace ERPPrototype.IntegrationTests;
 internal sealed class WorkOrderSaveIntegrationTests(
     IntegrationTestDatabase database)
 {
-    private static readonly IReadOnlySet<string> NotesOnly =
+    private static readonly IReadOnlySet<string> BasketOnly =
         new HashSet<string>(StringComparer.Ordinal)
         {
-            WorkOrderFieldRegistry.Notes
+            WorkOrderFieldRegistry.Basket
         };
 
     private static readonly IReadOnlySet<string> AssignmentDateOnly =
@@ -46,7 +46,7 @@ internal sealed class WorkOrderSaveIntegrationTests(
 
         var attemptedChange = IntegrationTestDatabase.Clone(
             foreignWorkOrder);
-        attemptedChange.Notes = "unauthorized-change";
+        attemptedChange.Busket = WorkOrderBuskets.InspectionBusket;
 
         var result = await database.Service.SaveChangesAsync(
             database.EmployeeAId,
@@ -56,7 +56,7 @@ internal sealed class WorkOrderSaveIntegrationTests(
             [
                 new WorkOrderChangeSet(
                     attemptedChange,
-                    NotesOnly)
+                    BasketOnly)
             ],
             deletedRecords: []);
 
@@ -78,8 +78,8 @@ internal sealed class WorkOrderSaveIntegrationTests(
             "The foreign work order disappeared unexpectedly.");
 
         TestAssert.Equal(
-            "foreign-original",
-            stored!.Notes,
+            WorkOrderBuskets.InProgress,
+            stored!.Busket,
             "The foreign work order was modified despite the scope check.");
     }
 
@@ -146,11 +146,11 @@ internal sealed class WorkOrderSaveIntegrationTests(
 
         var staleAttempt = IntegrationTestDatabase.Clone(original);
 
-        await database.UpdateNotesDirectlyAsync(
+        await database.UpdateBasketDirectlyAsync(
             original.Id,
-            "changed-by-another-session");
+            WorkOrderBuskets.EngineeringBusket);
 
-        staleAttempt.Notes = "stale-user-change";
+        staleAttempt.Busket = WorkOrderBuskets.InspectionBusket;
 
         var result = await database.Service.SaveChangesAsync(
             database.EmployeeAId,
@@ -160,7 +160,7 @@ internal sealed class WorkOrderSaveIntegrationTests(
             [
                 new WorkOrderChangeSet(
                     staleAttempt,
-                    NotesOnly)
+                    BasketOnly)
             ],
             deletedRecords: []);
 
@@ -180,8 +180,8 @@ internal sealed class WorkOrderSaveIntegrationTests(
             "The concurrently changed work order disappeared.");
 
         TestAssert.Equal(
-            "changed-by-another-session",
-            stored!.Notes,
+            WorkOrderBuskets.EngineeringBusket,
+            stored!.Busket,
             "The stale update overwrote the newer database value.");
     }
 
@@ -349,8 +349,6 @@ internal sealed class WorkOrderSaveIntegrationTests(
                 WorkOrderValue = 100_000m,
                 PartialAmount = 100_000.01m,
                 Busket = WorkOrderBuskets.InProgress,
-                Status = "تحت التنفيذ",
-                Notes = "direct-database-constraint",
                 CreatedAt = DateTime.UtcNow,
                 CreatedBy = database.EmployeeAId
             });
@@ -395,7 +393,7 @@ internal sealed class WorkOrderSaveIntegrationTests(
             "before-delete");
 
         var updateAttempt = IntegrationTestDatabase.Clone(updateTarget);
-        updateAttempt.Notes = "after-update";
+        updateAttempt.Busket = WorkOrderBuskets.InspectionBusket;
 
         var deleteAttempt = IntegrationTestDatabase.Clone(deleteTarget);
 
@@ -414,7 +412,7 @@ internal sealed class WorkOrderSaveIntegrationTests(
             [
                 new WorkOrderChangeSet(
                     updateAttempt,
-                    NotesOnly)
+                    BasketOnly)
             ],
             deletedRecords: [deleteAttempt]);
 
@@ -440,8 +438,8 @@ internal sealed class WorkOrderSaveIntegrationTests(
             "The updated work order disappeared.");
 
         TestAssert.Equal(
-            "after-update",
-            storedUpdate!.Notes,
+            WorkOrderBuskets.InspectionBusket,
+            storedUpdate!.Busket,
             "The changed work order was not updated.");
 
         TestAssert.True(
@@ -491,10 +489,10 @@ internal sealed class WorkOrderSaveIntegrationTests(
         await database.InstallForcedFailureConstraintAsync();
 
         var firstAttempt = IntegrationTestDatabase.Clone(firstTarget);
-        firstAttempt.Notes = "this-change-must-roll-back";
+        firstAttempt.Busket = WorkOrderBuskets.InspectionBusket;
 
         var failingAttempt = IntegrationTestDatabase.Clone(failingTarget);
-        failingAttempt.Notes = "__FORCE_DB_FAILURE__";
+        failingAttempt.Busket = WorkOrderBuskets.EngineeringBusket;
 
         var addedDuringFailedSave = CreateNewRecord(
             -2012,
@@ -509,8 +507,8 @@ internal sealed class WorkOrderSaveIntegrationTests(
             addedRecords: [addedDuringFailedSave],
             changedRecords:
             [
-                new WorkOrderChangeSet(firstAttempt, NotesOnly),
-                new WorkOrderChangeSet(failingAttempt, NotesOnly)
+                new WorkOrderChangeSet(firstAttempt, BasketOnly),
+                new WorkOrderChangeSet(failingAttempt, BasketOnly)
             ],
             deletedRecords: []);
 
@@ -534,13 +532,13 @@ internal sealed class WorkOrderSaveIntegrationTests(
             "The second rollback target disappeared.");
 
         TestAssert.Equal(
-            "rollback-first-original",
-            storedFirst!.Notes,
+            WorkOrderBuskets.InProgress,
+            storedFirst!.Busket,
             "The first update was committed despite the later failure.");
 
         TestAssert.Equal(
-            "rollback-second-original",
-            storedFailing!.Notes,
+            WorkOrderBuskets.InProgress,
+            storedFailing!.Busket,
             "The failing update left a partial database value.");
 
         TestAssert.Equal(
@@ -551,43 +549,12 @@ internal sealed class WorkOrderSaveIntegrationTests(
             "The new row was committed despite the failed transaction.");
     }
 
-    public async Task BlankStatusIsAcceptedAndPersistedAsync()
+    public async Task LegacyStatusAndNotesColumnsAreRemovedAsync()
     {
-        var addedRecord = CreateNewRecord(
-            -2025,
-            "810000025",
-            "425",
-            2026,
-            "blank-status-policy");
-
-        addedRecord.Status = string.Empty;
-
-        var result = await database.Service.SaveChangesAsync(
-            database.EmployeeAId,
-            2026,
-            addedRecords: [addedRecord],
-            changedRecords: Array.Empty<WorkOrderChangeSet>(),
-            deletedRecords: []);
-
-        TestAssert.True(
-            result.Succeeded,
-            $"Saving a work order with blank Status failed: {result.ErrorMessage}");
-
-        var savedRecord = result.SavedRecords!
-            .Single(record =>
-                record.WorkOrderNumber == "810000025" &&
-                record.WorkTypeCode == "425");
-
-        var stored = await database.ReadWorkOrderAsync(savedRecord.Id);
-
-        TestAssert.NotNull(
-            stored,
-            "The work order with blank Status was not persisted.");
-
         TestAssert.Equal(
-            string.Empty,
-            stored!.Status,
-            "Blank Status was replaced with an unexpected value.");
+            0,
+            await database.CountLegacyWorkOrderColumnsAsync(),
+            "The legacy Status or Notes column still exists in WorkOrders.");
     }
 
     public async Task CustomColumnsPersistAcrossYearsAndRemainDepartmentScopedAsync()
@@ -607,7 +574,7 @@ internal sealed class WorkOrderSaveIntegrationTests(
             new(
                 0,
                 "custom_11111111111111111111111111111111",
-                "Permit Notes",
+                "Permit Reference",
                 "Text",
                 2_500_000_000_000L),
             new(
@@ -816,6 +783,574 @@ internal sealed class WorkOrderSaveIntegrationTests(
             "The custom column definition was persisted even though its row value failed validation.");
     }
 
+    public async Task CustomColumnRenameAndEmptyTypeChangePersistAsync()
+    {
+        const int workYear = 2026;
+        const string fieldKey =
+            "custom_66666666666666666666666666666666";
+
+        var sheet = await database.Service.LoadSheetAsync(
+            database.EmployeeAId,
+            workYear);
+
+        TestAssert.NotNull(
+            sheet,
+            "The sheet could not be loaded before adding the empty custom column.");
+
+        var withNewColumn = sheet!.CustomColumns
+            .Select(ToCustomColumnInput)
+            .Append(new CustomColumnDefinitionInput(
+                0,
+                fieldKey,
+                "Temporary Text",
+                "Text",
+                1_500_000_000_000L))
+            .ToList();
+
+        var addResult = await database.Service.SaveChangesAsync(
+            database.EmployeeAId,
+            workYear,
+            addedRecords: [],
+            changedRecords: Array.Empty<WorkOrderChangeSet>(),
+            deletedRecords: [],
+            customColumns: withNewColumn,
+            customColumnsChanged: true);
+
+        TestAssert.True(
+            addResult.Succeeded,
+            $"Adding the empty custom column failed: {addResult.ErrorMessage}");
+
+        var savedColumn = addResult.SavedCustomColumns!
+            .Single(column => column.FieldKey == fieldKey);
+
+        TestAssert.False(
+            savedColumn.HasStoredValues,
+            "A newly added empty custom column was marked as containing values.");
+
+        var renamedAndRetyped = addResult.SavedCustomColumns!
+            .Select(column => new CustomColumnDefinitionInput(
+                column.Id,
+                column.FieldKey,
+                column.FieldKey == fieldKey
+                    ? "Permit Count"
+                    : column.Name,
+                column.FieldKey == fieldKey
+                    ? "Number"
+                    : column.DataType,
+                column.LayoutOrder,
+                column.RowVersion))
+            .ToList();
+
+        var updateResult = await database.Service.SaveChangesAsync(
+            database.EmployeeAId,
+            workYear,
+            addedRecords: [],
+            changedRecords: Array.Empty<WorkOrderChangeSet>(),
+            deletedRecords: [],
+            customColumns: renamedAndRetyped,
+            customColumnsChanged: true);
+
+        TestAssert.True(
+            updateResult.Succeeded,
+            $"Renaming and retyping the empty custom column failed: {updateResult.ErrorMessage}");
+
+        var updatedColumn = updateResult.SavedCustomColumns!
+            .Single(column => column.FieldKey == fieldKey);
+
+        TestAssert.Equal(
+            "Permit Count",
+            updatedColumn.Name,
+            "The custom column rename was not persisted.");
+
+        TestAssert.Equal(
+            "Number",
+            updatedColumn.DataType,
+            "The empty custom column type change was not persisted.");
+
+        var otherYear = await database.Service.LoadSheetAsync(
+            database.EmployeeAId,
+            2025);
+
+        TestAssert.NotNull(
+            otherYear,
+            "The other-year sheet could not be loaded after the custom column update.");
+
+        TestAssert.True(
+            otherYear!.CustomColumns.Any(column =>
+                column.FieldKey == fieldKey &&
+                column.Name == "Permit Count" &&
+                column.DataType == "Number"),
+            "The renamed custom column did not remain consistent across years.");
+    }
+
+    public async Task CustomColumnTypeChangeIsRejectedAfterValuesExistAsync()
+    {
+        const int workYear = 2026;
+        const string fieldKey =
+            "custom_77777777777777777777777777777777";
+
+        var original = await database.SeedWorkOrderAsync(
+            database.DepartmentAId,
+            database.EmployeeAId,
+            "810000031",
+            "431",
+            workYear,
+            "custom-type-lock");
+
+        var sheet = await database.Service.LoadSheetAsync(
+            database.EmployeeAId,
+            workYear);
+
+        TestAssert.NotNull(
+            sheet,
+            "The sheet could not be loaded before custom type-lock validation.");
+
+        var columns = sheet!.CustomColumns
+            .Select(ToCustomColumnInput)
+            .Append(new CustomColumnDefinitionInput(
+                0,
+                fieldKey,
+                "Locked Text",
+                "Text",
+                4_500_000_000_000L))
+            .ToList();
+        var changed = IntegrationTestDatabase.Clone(original);
+        changed.CustomValuesJson = JsonSerializer.Serialize(
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                [fieldKey] = "12"
+            });
+
+        var initialSave = await database.Service.SaveChangesAsync(
+            database.EmployeeAId,
+            workYear,
+            addedRecords: [],
+            changedRecords:
+            [
+                new WorkOrderChangeSet(
+                    changed,
+                    CustomValuesOnly)
+            ],
+            deletedRecords: [],
+            customColumns: columns,
+            customColumnsChanged: true);
+
+        TestAssert.True(
+            initialSave.Succeeded,
+            $"Saving the populated custom column failed: {initialSave.ErrorMessage}");
+
+        var populatedColumn = initialSave.SavedCustomColumns!
+            .Single(column => column.FieldKey == fieldKey);
+
+        TestAssert.True(
+            populatedColumn.HasStoredValues,
+            "The saved custom column was not marked as containing values.");
+
+        var attemptedTypeChange = initialSave.SavedCustomColumns!
+            .Select(column => new CustomColumnDefinitionInput(
+                column.Id,
+                column.FieldKey,
+                column.Name,
+                column.FieldKey == fieldKey
+                    ? "Number"
+                    : column.DataType,
+                column.LayoutOrder,
+                column.RowVersion))
+            .ToList();
+
+        var rejected = await database.Service.SaveChangesAsync(
+            database.EmployeeAId,
+            workYear,
+            addedRecords: [],
+            changedRecords: Array.Empty<WorkOrderChangeSet>(),
+            deletedRecords: [],
+            customColumns: attemptedTypeChange,
+            customColumnsChanged: true);
+
+        TestAssert.False(
+            rejected.Succeeded,
+            "A populated custom column was allowed to change type.");
+
+        TestAssert.Equal(
+            WorkOrderSaveFailureType.Validation,
+            rejected.FailureType,
+            "A populated custom-column type change should be a validation failure.");
+
+        var reloaded = await database.Service.LoadSheetAsync(
+            database.EmployeeAId,
+            workYear);
+
+        TestAssert.NotNull(
+            reloaded,
+            "The sheet could not be reloaded after the rejected type change.");
+
+        TestAssert.Equal(
+            "Text",
+            reloaded!.CustomColumns
+                .Single(column => column.FieldKey == fieldKey)
+                .DataType,
+            "The rejected type change partially modified the definition.");
+
+        var stored = await database.ReadWorkOrderAsync(original.Id);
+        var storedValues = CustomColumnService.DeserializeValues(
+            stored!.CustomValuesJson);
+
+        TestAssert.Equal(
+            "12",
+            storedValues[fieldKey],
+            "The rejected type change modified the saved custom value.");
+    }
+
+    public async Task CustomColumnDeletionRemovesValuesAcrossDepartmentYearsAsync()
+    {
+        const string fieldKey =
+            "custom_88888888888888888888888888888888";
+
+        var currentYearOrder = await database.SeedWorkOrderAsync(
+            database.DepartmentAId,
+            database.EmployeeAId,
+            "810000032",
+            "432",
+            2026,
+            "custom-delete-current-year");
+        var previousYearOrder = await database.SeedWorkOrderAsync(
+            database.DepartmentAId,
+            database.EmployeeAId,
+            "810000033",
+            "433",
+            2025,
+            "custom-delete-previous-year");
+
+        var currentSheet = await database.Service.LoadSheetAsync(
+            database.EmployeeAId,
+            2026);
+
+        TestAssert.NotNull(
+            currentSheet,
+            "The current-year sheet could not be loaded before custom deletion.");
+
+        var columns = currentSheet!.CustomColumns
+            .Select(ToCustomColumnInput)
+            .Append(new CustomColumnDefinitionInput(
+                0,
+                fieldKey,
+                "Temporary Across Years",
+                "Text",
+                5_500_000_000_000L))
+            .ToList();
+        var currentChanged = IntegrationTestDatabase.Clone(currentYearOrder);
+        currentChanged.CustomValuesJson = JsonSerializer.Serialize(
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                [fieldKey] = "current"
+            });
+
+        var createResult = await database.Service.SaveChangesAsync(
+            database.EmployeeAId,
+            2026,
+            addedRecords: [],
+            changedRecords:
+            [
+                new WorkOrderChangeSet(
+                    currentChanged,
+                    CustomValuesOnly)
+            ],
+            deletedRecords: [],
+            customColumns: columns,
+            customColumnsChanged: true,
+            columnLayouts:
+            [
+                new DepartmentColumnLayoutInput(
+                    0,
+                    fieldKey,
+                    230)
+            ],
+            columnLayoutsChanged: true);
+
+        TestAssert.True(
+            createResult.Succeeded,
+            $"Creating the deletable custom column failed: {createResult.ErrorMessage}");
+
+        var previousSheet = await database.Service.LoadSheetAsync(
+            database.EmployeeAId,
+            2025);
+
+        TestAssert.NotNull(
+            previousSheet,
+            "The previous-year sheet could not be loaded before custom deletion.");
+
+        var previousChanged = IntegrationTestDatabase.Clone(previousYearOrder);
+        previousChanged.CustomValuesJson = JsonSerializer.Serialize(
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                [fieldKey] = "previous"
+            });
+
+        var previousSave = await database.Service.SaveChangesAsync(
+            database.EmployeeAId,
+            2025,
+            addedRecords: [],
+            changedRecords:
+            [
+                new WorkOrderChangeSet(
+                    previousChanged,
+                    CustomValuesOnly)
+            ],
+            deletedRecords: [],
+            customColumns: previousSheet!.CustomColumns
+                .Select(ToCustomColumnInput)
+                .ToList(),
+            customColumnsChanged: false,
+            columnLayouts: previousSheet.ColumnLayouts
+                .Select(layout => new DepartmentColumnLayoutInput(
+                    layout.Id,
+                    layout.FieldKey,
+                    layout.Width,
+                    layout.RowVersion))
+                .ToList(),
+            columnLayoutsChanged: false);
+
+        TestAssert.True(
+            previousSave.Succeeded,
+            $"Saving the previous-year custom value failed: {previousSave.ErrorMessage}");
+
+        var deleteInputs = createResult.SavedCustomColumns!
+            .Select(column => new CustomColumnDefinitionInput(
+                column.Id,
+                column.FieldKey,
+                column.Name,
+                column.DataType,
+                column.LayoutOrder,
+                column.RowVersion,
+                IsDeleted: column.FieldKey == fieldKey))
+            .ToList();
+
+        var deleteResult = await database.Service.SaveChangesAsync(
+            database.EmployeeAId,
+            2026,
+            addedRecords: [],
+            changedRecords: Array.Empty<WorkOrderChangeSet>(),
+            deletedRecords: [],
+            customColumns: deleteInputs,
+            customColumnsChanged: true,
+            columnLayouts: [],
+            columnLayoutsChanged: false);
+
+        TestAssert.True(
+            deleteResult.Succeeded,
+            $"Deleting the custom column failed: {deleteResult.ErrorMessage}");
+
+        TestAssert.False(
+            deleteResult.SavedCustomColumns!.Any(column =>
+                column.FieldKey == fieldKey),
+            "The deleted custom-column definition remained in the save result.");
+
+        TestAssert.False(
+            deleteResult.SavedColumnLayouts!.Any(layout =>
+                layout.FieldKey == fieldKey),
+            "The deleted custom column retained a saved width layout.");
+
+        var storedCurrent = await database.ReadWorkOrderAsync(
+            currentYearOrder.Id);
+        var storedPrevious = await database.ReadWorkOrderAsync(
+            previousYearOrder.Id);
+
+        TestAssert.False(
+            CustomColumnService.DeserializeValues(
+                storedCurrent!.CustomValuesJson)
+                .ContainsKey(fieldKey),
+            "Deleting the custom column did not remove its current-year value.");
+
+        TestAssert.False(
+            CustomColumnService.DeserializeValues(
+                storedPrevious!.CustomValuesJson)
+                .ContainsKey(fieldKey),
+            "Deleting the custom column did not remove its previous-year value.");
+
+        var currentAfterDelete = await database.Service.LoadSheetAsync(
+            database.EmployeeAId,
+            2026);
+        var previousAfterDelete = await database.Service.LoadSheetAsync(
+            database.EmployeeAId,
+            2025);
+
+        TestAssert.False(
+            currentAfterDelete!.CustomColumns.Any(column =>
+                column.FieldKey == fieldKey),
+            "The deleted custom column remained in the current-year sheet.");
+
+        TestAssert.False(
+            previousAfterDelete!.CustomColumns.Any(column =>
+                column.FieldKey == fieldKey),
+            "The deleted custom column remained in the previous-year sheet.");
+    }
+
+    private static CustomColumnDefinitionInput ToCustomColumnInput(
+        CustomColumnDefinitionData column) =>
+        new(
+            column.Id,
+            column.FieldKey,
+            column.Name,
+            column.DataType,
+            column.LayoutOrder,
+            column.RowVersion);
+
+    public async Task ColumnWidthsPersistAcrossYearsAndRemainDepartmentScopedAsync()
+    {
+        const int workYear = 2026;
+
+        var result = await database.Service.SaveChangesAsync(
+            database.EmployeeAId,
+            workYear,
+            addedRecords: [],
+            changedRecords: Array.Empty<WorkOrderChangeSet>(),
+            deletedRecords: [],
+            customColumns: [],
+            customColumnsChanged: false,
+            columnLayouts:
+            [
+                new DepartmentColumnLayoutInput(
+                    0,
+                    "workOrderNumber",
+                    240),
+                new DepartmentColumnLayoutInput(
+                    0,
+                    "basket",
+                    320)
+            ],
+            columnLayoutsChanged: true);
+
+        TestAssert.True(
+            result.Succeeded,
+            $"Saving column widths failed: {result.ErrorMessage}");
+
+        TestAssert.Equal(
+            2,
+            result.SavedColumnLayouts?.Count ?? 0,
+            "The save result did not return both column layouts.");
+
+        TestAssert.True(
+            result.SavedColumnLayouts!.All(layout =>
+                layout.Id > 0 &&
+                !string.IsNullOrWhiteSpace(layout.RowVersion)),
+            "Saved column layouts are missing database identities or RowVersions.");
+
+        var sameDepartmentOtherYear =
+            await database.Service.LoadSheetAsync(
+                database.EmployeeAId,
+                2025);
+
+        TestAssert.NotNull(
+            sameDepartmentOtherYear,
+            "The other-year sheet could not be loaded after saving widths.");
+
+        TestAssert.Equal(
+            240,
+            sameDepartmentOtherYear!.ColumnLayouts.Single(layout =>
+                layout.FieldKey == "workOrderNumber").Width,
+            "Work Order Number width did not persist across years.");
+
+        TestAssert.Equal(
+            320,
+            sameDepartmentOtherYear.ColumnLayouts.Single(layout =>
+                layout.FieldKey == "basket").Width,
+            "Basket width did not persist across years.");
+
+        var otherDepartmentSheet =
+            await database.Service.LoadSheetAsync(
+                database.EmployeeBId,
+                workYear);
+
+        TestAssert.NotNull(
+            otherDepartmentSheet,
+            "The comparison department sheet could not be loaded.");
+
+        TestAssert.Equal(
+            0,
+            otherDepartmentSheet!.ColumnLayouts.Count,
+            "Column widths leaked into another department.");
+    }
+
+    public async Task InvalidColumnWidthIsRejectedAtomicallyAsync()
+    {
+        const int workYear = 2026;
+
+        var sheetBeforeFailure = await database.Service.LoadSheetAsync(
+            database.EmployeeAId,
+            workYear);
+
+        TestAssert.NotNull(
+            sheetBeforeFailure,
+            "The sheet could not be loaded before width validation.");
+
+        var basketLayoutBeforeFailure = sheetBeforeFailure!.ColumnLayouts
+            .SingleOrDefault(layout => layout.FieldKey == "basket");
+
+        var addedRecord = CreateNewRecord(
+            -2031,
+            "810000034",
+            "434",
+            workYear,
+            "invalid-column-width");
+
+        var result = await database.Service.SaveChangesAsync(
+            database.EmployeeAId,
+            workYear,
+            addedRecords: [addedRecord],
+            changedRecords: Array.Empty<WorkOrderChangeSet>(),
+            deletedRecords: [],
+            customColumns: [],
+            customColumnsChanged: false,
+            columnLayouts:
+            [
+                new DepartmentColumnLayoutInput(
+                    0,
+                    "basket",
+                    DepartmentColumnLayoutService.MinimumWidth - 1)
+            ],
+            columnLayoutsChanged: true);
+
+        TestAssert.False(
+            result.Succeeded,
+            "A column width below the allowed minimum was accepted.");
+
+        TestAssert.Equal(
+            WorkOrderSaveFailureType.Validation,
+            result.FailureType,
+            "An invalid column width should return a validation failure.");
+
+        TestAssert.Equal(
+            0,
+            await database.CountIdentityAsync("810000034", "434"),
+            "The work order was partially persisted after width validation failed.");
+
+        var reloadedSheet = await database.Service.LoadSheetAsync(
+            database.EmployeeAId,
+            workYear);
+
+        TestAssert.NotNull(
+            reloadedSheet,
+            "The sheet could not be reloaded after width validation failed.");
+
+        var basketLayoutAfterFailure = reloadedSheet!.ColumnLayouts
+            .SingleOrDefault(layout => layout.FieldKey == "basket");
+
+        TestAssert.Equal(
+            basketLayoutBeforeFailure?.Id,
+            basketLayoutAfterFailure?.Id,
+            "The invalid width changed the persisted layout identity.");
+
+        TestAssert.Equal(
+            basketLayoutBeforeFailure?.Width,
+            basketLayoutAfterFailure?.Width,
+            "The invalid width was partially persisted.");
+
+        TestAssert.Equal(
+            basketLayoutBeforeFailure?.RowVersion,
+            basketLayoutAfterFailure?.RowVersion,
+            "The invalid width changed the persisted layout RowVersion.");
+    }
+
     public async Task ConcurrentAppendsReceiveDistinctDisplayOrdersAsync()
     {
         const int workYear = 2030;
@@ -929,7 +1464,7 @@ internal sealed class WorkOrderSaveIntegrationTests(
                         (830_000_000 + index).ToString("D9"),
                     workTypeCode: "401",
                     workYear: currentYear,
-                    notes: $"stress-add-{index:D4}"))
+                    scenarioTag: $"stress-add-{index:D4}"))
             .ToArray();
 
         var addStartedAt = Stopwatch.GetTimestamp();
@@ -962,11 +1497,11 @@ internal sealed class WorkOrderSaveIntegrationTests(
             .Select((saved, index) =>
             {
                 var record = MapSavedRecord(saved);
-                record.Notes = $"stress-update-{index + 1:D4}";
+                record.Busket = WorkOrderBuskets.InspectionBusket;
 
                 return new WorkOrderChangeSet(
                     record,
-                    NotesOnly);
+                    BasketOnly);
             })
             .ToArray();
 
@@ -1041,8 +1576,6 @@ internal sealed class WorkOrderSaveIntegrationTests(
             WorkOrderValue = saved.WorkOrderValue,
             PartialAmount = saved.PartialAmount,
             Busket = saved.Busket,
-            Status = saved.Status,
-            Notes = saved.Notes,
             CustomValuesJson = saved.CustomValuesJson,
             RowVersion = saved.RowVersion.ToArray()
         };
@@ -1052,7 +1585,7 @@ internal sealed class WorkOrderSaveIntegrationTests(
         string workOrderNumber,
         string workTypeCode,
         int workYear,
-        string notes) =>
+        string scenarioTag) =>
         new()
         {
             Id = temporaryId,
@@ -1064,7 +1597,6 @@ internal sealed class WorkOrderSaveIntegrationTests(
             WorkOrderValue = 125_000m,
             PartialAmount = null,
             Busket = WorkOrderBuskets.InProgress,
-            Status = "تحت التنفيذ",
-            Notes = notes
+            CreatedBy = scenarioTag
         };
 }

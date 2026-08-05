@@ -1,15 +1,17 @@
+using System.Data;
 using System.Globalization;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using ERPPrototype.Data.Entities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace ERPPrototype.Data;
 
 /// <summary>
 /// Owns department custom-column definitions and the typed values stored in
-/// each WorkOrder.CustomValuesJson document. Phase 9.3A supports creation only;
-/// rename, delete, type changes, and width changes remain separate operations.
+/// each WorkOrder.CustomValuesJson document. The service validates create,
+/// rename, empty-column type changes, and transactional deletion.
 /// </summary>
 public static partial class CustomColumnService
 {
@@ -25,9 +27,7 @@ public static partial class CustomColumnService
             "Work Order Value",
             "Partial Amount",
             "Remaining Amount",
-            "Basket",
-            "Status",
-            "Notes"
+            "Basket"
         };
 
     private static readonly IReadOnlySet<long> CoreLayoutOrders =
@@ -39,9 +39,7 @@ public static partial class CustomColumnService
             4_000_000_000_000L,
             5_000_000_000_000L,
             6_000_000_000_000L,
-            7_000_000_000_000L,
-            8_000_000_000_000L,
-            9_000_000_000_000L
+            7_000_000_000_000L
         };
 
     public static async Task<List<CustomColumnDefinitionData>>
@@ -57,9 +55,90 @@ public static partial class CustomColumnService
             .ThenBy(column => column.Id)
             .ToListAsync(cancellationToken);
 
+        if (definitions.Count == 0)
+        {
+            return [];
+        }
+
+        var fieldsWithStoredValues =
+            await LoadFieldsWithStoredValuesAsync(
+                dbContext,
+                departmentId,
+                cancellationToken);
+
         return definitions
-            .Select(MapDefinition)
+            .Select(definition => MapDefinition(
+                definition,
+                fieldsWithStoredValues.Contains(definition.FieldKey)))
             .ToList();
+    }
+
+    public static async Task<HashSet<string>>
+        LoadFieldsWithStoredValuesAsync(
+            ApplicationDbContext dbContext,
+            int departmentId,
+            CancellationToken cancellationToken = default)
+    {
+        var result = new HashSet<string>(StringComparer.Ordinal);
+        var connection = dbContext.Database.GetDbConnection();
+        var shouldClose = connection.State != ConnectionState.Open;
+
+        if (shouldClose)
+        {
+            await connection.OpenAsync(cancellationToken);
+        }
+
+        try
+        {
+            await using var command = connection.CreateCommand();
+            command.Transaction = dbContext.Database.CurrentTransaction
+                ?.GetDbTransaction();
+            command.CommandText =
+                """
+                SELECT DISTINCT CAST([entry].[key] AS nvarchar(40))
+                FROM [WorkOrders] AS [workOrder]
+                CROSS APPLY OPENJSON(
+                    CASE
+                        WHEN ISJSON([workOrder].[CustomValuesJson]) = 1
+                            THEN [workOrder].[CustomValuesJson]
+                        ELSE N'{}'
+                    END) AS [entry]
+                WHERE [workOrder].[DepartmentId] = @departmentId
+                  AND NULLIF(
+                        LTRIM(RTRIM(CONVERT(nvarchar(max), [entry].[value]))),
+                        N'') IS NOT NULL;
+                """;
+
+            var parameter = command.CreateParameter();
+            parameter.ParameterName = "@departmentId";
+            parameter.Value = departmentId;
+            command.Parameters.Add(parameter);
+
+            await using var reader =
+                await command.ExecuteReaderAsync(cancellationToken);
+
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                if (!reader.IsDBNull(0))
+                {
+                    var fieldKey = reader.GetString(0).Trim();
+
+                    if (!string.IsNullOrWhiteSpace(fieldKey))
+                    {
+                        result.Add(fieldKey);
+                    }
+                }
+            }
+        }
+        finally
+        {
+            if (shouldClose)
+            {
+                await connection.CloseAsync();
+            }
+        }
+
+        return result;
     }
 
     public static async Task<CustomColumnPreparationResult>
@@ -87,19 +166,40 @@ public static partial class CustomColumnService
             .ThenBy(column => column.Id)
             .ToList();
 
+        var duplicateExistingId = incoming
+            .Where(column => column.Id > 0)
+            .GroupBy(column => column.Id)
+            .FirstOrDefault(group => group.Count() > 1);
+
+        if (duplicateExistingId is not null)
+        {
+            return CustomColumnPreparationResult.Failed(
+                "The same custom column was submitted more than once. Refresh the sheet and try again.");
+        }
+
         var existingById = existing.ToDictionary(column => column.Id);
         var incomingExistingById = incoming
             .Where(column => column.Id > 0)
-            .GroupBy(column => column.Id)
-            .ToDictionary(group => group.Key, group => group.Last());
+            .ToDictionary(column => column.Id);
 
         if (
             incomingExistingById.Count != existingById.Count ||
-            existingById.Keys.Any(id => !incomingExistingById.ContainsKey(id)))
+            incomingExistingById.Keys.Any(id => !existingById.ContainsKey(id)))
         {
             return CustomColumnPreparationResult.Failed(
                 "The custom-column layout changed in another session. Refresh the sheet and try again.");
         }
+
+        var names = new HashSet<string>(
+            ExistingColumnNames,
+            StringComparer.OrdinalIgnoreCase);
+        var fieldKeys = new HashSet<string>(StringComparer.Ordinal);
+        var layoutOrders = new HashSet<long>();
+        var activeDefinitions = new List<CustomColumnDefinition>();
+        var added = new List<CustomColumnDefinition>();
+        var deleted = new List<CustomColumnDefinition>();
+        HashSet<string>? fieldsWithStoredValues = null;
+        var utcNow = DateTime.UtcNow;
 
         foreach (var existingColumn in existing)
         {
@@ -107,55 +207,82 @@ public static partial class CustomColumnService
 
             if (
                 !string.Equals(
-                    incomingColumn.FieldKey,
+                    incomingColumn.FieldKey?.Trim(),
                     existingColumn.FieldKey,
                     StringComparison.Ordinal) ||
-                !string.Equals(
-                    incomingColumn.Name?.Trim(),
-                    existingColumn.Name,
-                    StringComparison.Ordinal) ||
-                !TryParseDataType(
-                    incomingColumn.DataType,
-                    out var incomingDataType) ||
-                incomingDataType != existingColumn.DataType ||
-                incomingColumn.LayoutOrder != existingColumn.LayoutOrder)
+                incomingColumn.LayoutOrder != existingColumn.LayoutOrder ||
+                !RowVersionMatches(
+                    incomingColumn.RowVersion,
+                    existingColumn.RowVersion))
             {
                 return CustomColumnPreparationResult.Failed(
-                    "Phase 9.3A allows adding custom columns only. Refresh the sheet before changing an existing column.");
+                    "A custom column was changed in another session. Refresh the sheet and try again.");
             }
+
+            if (incomingColumn.IsDeleted)
+            {
+                deleted.Add(existingColumn);
+                continue;
+            }
+
+            var name = incomingColumn.Name?.Trim() ?? string.Empty;
+
+            if (!TryValidateName(name, names, out var nameError))
+            {
+                return CustomColumnPreparationResult.Failed(nameError);
+            }
+
+            if (!TryParseDataType(incomingColumn.DataType, out var dataType))
+            {
+                return CustomColumnPreparationResult.Failed(
+                    "Select a valid custom column type: Text, Money, Date, or Number.");
+            }
+
+            if (dataType != existingColumn.DataType)
+            {
+                fieldsWithStoredValues ??=
+                    await LoadFieldsWithStoredValuesAsync(
+                        dbContext,
+                        departmentId,
+                        cancellationToken);
+
+                if (fieldsWithStoredValues.Contains(existingColumn.FieldKey))
+                {
+                    return CustomColumnPreparationResult.Failed(
+                        $"The type of custom column '{existingColumn.Name}' cannot be changed because it already contains saved values.");
+                }
+            }
+
+            if (!fieldKeys.Add(existingColumn.FieldKey))
+            {
+                return CustomColumnPreparationResult.Failed(
+                    "The same custom column was submitted more than once.");
+            }
+
+            if (!layoutOrders.Add(existingColumn.LayoutOrder))
+            {
+                return CustomColumnPreparationResult.Failed(
+                    "Two custom columns cannot occupy the same position.");
+            }
+
+            existingColumn.Name = name;
+            existingColumn.DataType = dataType;
+            activeDefinitions.Add(existingColumn);
         }
-
-        var names = new HashSet<string>(
-            ExistingColumnNames,
-            StringComparer.OrdinalIgnoreCase);
-
-        names.UnionWith(existing.Select(column => column.Name));
-
-        var fieldKeys = new HashSet<string>(
-            existing.Select(column => column.FieldKey),
-            StringComparer.Ordinal);
-
-        var layoutOrders = new HashSet<long>(
-            existing.Select(column => column.LayoutOrder));
-
-        var added = new List<CustomColumnDefinition>();
-        var utcNow = DateTime.UtcNow;
 
         foreach (var incomingColumn in incoming.Where(column => column.Id <= 0))
         {
+            if (incomingColumn.IsDeleted)
+            {
+                continue;
+            }
+
             var name = incomingColumn.Name?.Trim() ?? string.Empty;
             var fieldKey = incomingColumn.FieldKey?.Trim() ?? string.Empty;
 
-            if (string.IsNullOrWhiteSpace(name))
+            if (!TryValidateName(name, names, out var nameError))
             {
-                return CustomColumnPreparationResult.Failed(
-                    "Custom column name is required.");
-            }
-
-            if (name.Length > MaximumNameLength)
-            {
-                return CustomColumnPreparationResult.Failed(
-                    $"Custom column name cannot exceed {MaximumNameLength} characters.");
+                return CustomColumnPreparationResult.Failed(nameError);
             }
 
             if (!CustomFieldKeyPattern().IsMatch(fieldKey))
@@ -176,12 +303,6 @@ public static partial class CustomColumnService
             {
                 return CustomColumnPreparationResult.Failed(
                     "The custom column position is invalid.");
-            }
-
-            if (!names.Add(name))
-            {
-                return CustomColumnPreparationResult.Failed(
-                    $"A custom column named '{name}' already exists in this department.");
             }
 
             if (!fieldKeys.Add(fieldKey))
@@ -208,11 +329,118 @@ public static partial class CustomColumnService
             };
 
             dbContext.CustomColumnDefinitions.Add(entity);
-            existing.Add(entity);
+            activeDefinitions.Add(entity);
             added.Add(entity);
         }
 
-        return CustomColumnPreparationResult.Success(existing, added);
+        var deletedFieldKeys = deleted
+            .Select(column => column.FieldKey)
+            .ToHashSet(StringComparer.Ordinal);
+        var affectedWorkOrders = deletedFieldKeys.Count == 0
+            ? []
+            : await RemoveDeletedValuesAsync(
+                dbContext,
+                departmentId,
+                userId,
+                deletedFieldKeys,
+                cancellationToken);
+
+        if (deletedFieldKeys.Count > 0)
+        {
+            var layoutsToDelete = await dbContext.DepartmentColumnLayouts
+                .Where(layout =>
+                    layout.DepartmentId == departmentId &&
+                    deletedFieldKeys.Contains(layout.FieldKey))
+                .ToListAsync(cancellationToken);
+
+            dbContext.DepartmentColumnLayouts.RemoveRange(layoutsToDelete);
+            dbContext.CustomColumnDefinitions.RemoveRange(deleted);
+        }
+
+        return CustomColumnPreparationResult.Success(
+            activeDefinitions,
+            added,
+            deleted,
+            affectedWorkOrders);
+    }
+
+    private static bool TryValidateName(
+        string name,
+        ISet<string> usedNames,
+        out string errorMessage)
+    {
+        errorMessage = string.Empty;
+
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            errorMessage = "Custom column name is required.";
+            return false;
+        }
+
+        if (name.Length > MaximumNameLength)
+        {
+            errorMessage =
+                $"Custom column name cannot exceed {MaximumNameLength} characters.";
+            return false;
+        }
+
+        if (!usedNames.Add(name))
+        {
+            errorMessage =
+                $"A column named '{name}' already exists in this department.";
+            return false;
+        }
+
+        return true;
+    }
+
+    private static async Task<List<WorkOrder>> RemoveDeletedValuesAsync(
+        ApplicationDbContext dbContext,
+        int departmentId,
+        string userId,
+        IReadOnlySet<string> deletedFieldKeys,
+        CancellationToken cancellationToken)
+    {
+        var candidates = await dbContext.WorkOrders
+            .Where(workOrder =>
+                workOrder.DepartmentId == departmentId &&
+                workOrder.CustomValuesJson != "{}")
+            .ToListAsync(cancellationToken);
+        var affected = new List<WorkOrder>();
+        var utcNow = DateTime.UtcNow;
+
+        foreach (var workOrder in candidates)
+        {
+            var values = DeserializeValues(workOrder.CustomValuesJson)
+                .ToDictionary(
+                    entry => entry.Key,
+                    entry => entry.Value,
+                    StringComparer.Ordinal);
+            var changed = false;
+
+            foreach (var fieldKey in deletedFieldKeys)
+            {
+                changed |= values.Remove(fieldKey);
+            }
+
+            if (!changed)
+            {
+                continue;
+            }
+
+            workOrder.CustomValuesJson = JsonSerializer.Serialize(
+                values
+                    .OrderBy(entry => entry.Key, StringComparer.Ordinal)
+                    .ToDictionary(
+                        entry => entry.Key,
+                        entry => entry.Value,
+                        StringComparer.Ordinal));
+            workOrder.UpdatedAt = utcNow;
+            workOrder.UpdatedBy = userId;
+            affected.Add(workOrder);
+        }
+
+        return affected;
     }
 
     public static string? NormalizeWorkOrderValues(
@@ -349,14 +577,16 @@ public static partial class CustomColumnService
             !string.IsNullOrWhiteSpace(value));
 
     public static CustomColumnDefinitionData MapDefinition(
-        CustomColumnDefinition definition) =>
+        CustomColumnDefinition definition,
+        bool hasStoredValues = false) =>
         new(
             definition.Id,
             definition.FieldKey,
             definition.Name,
             definition.DataType.ToString(),
             definition.LayoutOrder,
-            Convert.ToBase64String(definition.RowVersion));
+            Convert.ToBase64String(definition.RowVersion),
+            hasStoredValues);
 
     private static bool TryNormalizeValue(
         CustomColumnDefinition definition,
@@ -445,6 +675,26 @@ public static partial class CustomColumnService
         }
     }
 
+
+    private static bool RowVersionMatches(string? encoded, byte[] current)
+    {
+        if (string.IsNullOrWhiteSpace(encoded))
+        {
+            return false;
+        }
+
+        try
+        {
+            return Convert.FromBase64String(encoded)
+                .AsSpan()
+                .SequenceEqual(current);
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
+    }
+
     private static bool TryParseDataType(
         string? value,
         out CustomColumnDataType dataType) =>
@@ -490,7 +740,8 @@ public sealed record CustomColumnDefinitionInput(
     string Name,
     string DataType,
     long LayoutOrder,
-    string RowVersion = "");
+    string RowVersion = "",
+    bool IsDeleted = false);
 
 public sealed record CustomColumnDefinitionData(
     int Id,
@@ -498,17 +749,22 @@ public sealed record CustomColumnDefinitionData(
     string Name,
     string DataType,
     long LayoutOrder,
-    string RowVersion);
+    string RowVersion,
+    bool HasStoredValues = false);
 
 public sealed record CustomColumnPreparationResult(
     bool Succeeded,
     string ErrorMessage,
     List<CustomColumnDefinition> Definitions,
-    List<CustomColumnDefinition> AddedDefinitions)
+    List<CustomColumnDefinition> AddedDefinitions,
+    List<CustomColumnDefinition> DeletedDefinitions,
+    List<WorkOrder> AffectedWorkOrders)
 {
     public static CustomColumnPreparationResult Success(
         IEnumerable<CustomColumnDefinition> definitions,
-        IEnumerable<CustomColumnDefinition>? addedDefinitions = null) =>
+        IEnumerable<CustomColumnDefinition>? addedDefinitions = null,
+        IEnumerable<CustomColumnDefinition>? deletedDefinitions = null,
+        IEnumerable<WorkOrder>? affectedWorkOrders = null) =>
         new(
             true,
             string.Empty,
@@ -518,8 +774,16 @@ public sealed record CustomColumnPreparationResult(
                 .ToList(),
             (addedDefinitions ?? [])
                 .OrderBy(column => column.LayoutOrder)
+                .ToList(),
+            (deletedDefinitions ?? [])
+                .OrderBy(column => column.LayoutOrder)
+                .ToList(),
+            (affectedWorkOrders ?? [])
+                .OrderBy(workOrder => workOrder.WorkYear)
+                .ThenBy(workOrder => workOrder.DisplayOrder)
+                .ThenBy(workOrder => workOrder.Id)
                 .ToList());
 
     public static CustomColumnPreparationResult Failed(string message) =>
-        new(false, message, [], []);
+        new(false, message, [], [], [], []);
 }

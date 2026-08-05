@@ -19,6 +19,9 @@ public class ApplicationDbContext(
     public DbSet<CustomColumnDefinition> CustomColumnDefinitions =>
         Set<CustomColumnDefinition>();
 
+    public DbSet<DepartmentColumnLayout> DepartmentColumnLayouts =>
+        Set<DepartmentColumnLayout>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
@@ -75,6 +78,46 @@ public class ApplicationDbContext(
             .IsUnique();
         });
 
+        builder.Entity<DepartmentColumnLayout>(entity =>
+        {
+            entity.ToTable(
+                "DepartmentColumnLayouts",
+                tableBuilder =>
+                {
+                    tableBuilder.HasCheckConstraint(
+                        "CK_DepartmentColumnLayouts_Width",
+                        "[Width] >= 45 AND [Width] <= 1000");
+                });
+
+            entity.HasKey(layout => layout.Id);
+
+            entity.Property(layout => layout.FieldKey)
+                .IsUnicode(false)
+                .HasMaxLength(40)
+                .IsRequired();
+
+            entity.Property(layout => layout.Width)
+                .IsRequired();
+
+            entity.Property(layout => layout.UpdatedBy)
+                .HasMaxLength(450)
+                .IsRequired();
+
+            entity.Property(layout => layout.RowVersion)
+                .IsRowVersion();
+
+            entity.HasOne(layout => layout.Department)
+                .WithMany(department => department.ColumnLayouts)
+                .HasForeignKey(layout => layout.DepartmentId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasIndex(layout => new
+            {
+                layout.DepartmentId,
+                layout.FieldKey
+            })
+            .IsUnique();
+        });
 
         builder.Entity<CustomColumnDefinition>(entity =>
         {
@@ -198,13 +241,6 @@ public class ApplicationDbContext(
             entity.Property(workOrder => workOrder.Busket)
                 .HasMaxLength(150)
                 .IsRequired();
-
-            entity.Property(workOrder => workOrder.Status)
-                .HasMaxLength(150)
-                .IsRequired();
-
-            entity.Property(workOrder => workOrder.Notes)
-                .HasMaxLength(1000);
 
             entity.Property(workOrder => workOrder.CustomValuesJson)
                 .HasColumnType("nvarchar(max)")

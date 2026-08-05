@@ -25,17 +25,6 @@ window.tabulatorFilters = {
             title: "Filter Basket",
             storageKey: "uds-basket-filter-size"
         },
-        status: {
-            stateKey: "statusValues",
-            title: "Filter Status",
-            storageKey: "uds-status-filter-size"
-        },
-        notes: {
-            stateKey: "notesValues",
-            title: "Filter Notes",
-            storageKey: "uds-notes-filter-size",
-            virtualThreshold: 250
-        },
         workOrderValue: {
             stateKey: "workOrderValueAmount",
             title: "Filter Work Order Value",
@@ -183,12 +172,6 @@ window.tabulatorFilters = {
             baskets: new Set(
                 filters.basketValues ?? []
             ),
-            statuses: new Set(
-                filters.statusValues ?? []
-            ),
-            notes: new Set(
-                filters.notesValues ?? []
-            ),
             workOrderValueAmount:
                 filters.workOrderValueAmount,
             partialAmountAmount:
@@ -257,27 +240,6 @@ window.tabulatorFilters = {
                 )
             );
 
-        const matchesStatus =
-            excludedField === "status" ||
-            prepared.statuses.size === 0 ||
-            prepared.statuses.has(
-                this.toFilterToken(
-                    host,
-                    "status",
-                    rowData.status
-                )
-            );
-
-        const matchesNotes =
-            excludedField === "notes" ||
-            prepared.notes.size === 0 ||
-            prepared.notes.has(
-                this.toFilterToken(
-                    host,
-                    "notes",
-                    rowData.notes
-                )
-            );
 
         const matchesWorkOrderValue =
             excludedField === "workOrderValue" ||
@@ -309,8 +271,6 @@ window.tabulatorFilters = {
             matchesWorkType &&
             matchesDate &&
             matchesBasket &&
-            matchesStatus &&
-            matchesNotes &&
             matchesWorkOrderValue &&
             matchesPartialAmount &&
             matchesRemainingAmount
@@ -2002,8 +1962,6 @@ window.tabulatorFilters = {
             (filters.workTypeCodes ?? []).length > 0 ||
             (filters.assignmentDates ?? []).length > 0 ||
             (filters.basketValues ?? []).length > 0 ||
-            (filters.statusValues ?? []).length > 0 ||
-            (filters.notesValues ?? []).length > 0 ||
             this.isAmountFilterActive(
                 filters.workOrderValueAmount
             ) ||

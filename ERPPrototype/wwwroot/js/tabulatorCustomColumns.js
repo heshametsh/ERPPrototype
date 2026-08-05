@@ -17,9 +17,7 @@
         workOrderValue: 4 * layoutStep,
         partialAmount: 5 * layoutStep,
         remainingAmount: 6 * layoutStep,
-        basket: 7 * layoutStep,
-        status: 8 * layoutStep,
-        notes: 9 * layoutStep
+        basket: 7 * layoutStep
     });
 
     const validTypes = new Set([
@@ -51,6 +49,11 @@
                 ) || 0,
                 rowVersion: String(
                     definition?.rowVersion ?? definition?.RowVersion ?? ""
+                ),
+                hasStoredValues: Boolean(
+                    definition?.hasStoredValues ??
+                    definition?.HasStoredValues ??
+                    false
                 )
             };
         },
@@ -76,6 +79,7 @@
 
             state.customColumns = normalized;
             state.originalCustomColumns = this.cloneCustomColumns(normalized);
+            state.deletedCustomColumns = [];
             state.customColumnsChanged = false;
             state.directTypingFields = directTypingFields;
             state.customColumnHeaderContextHandler = null;
@@ -354,11 +358,21 @@
 
         getCustomColumnsSaveState: function (elementId) {
             const state = this.states[elementId];
+            const active = this.cloneCustomColumns(
+                state?.customColumns ?? []
+            ).map(column => ({
+                ...column,
+                isDeleted: false
+            }));
+            const deleted = this.cloneCustomColumns(
+                state?.deletedCustomColumns ?? []
+            ).map(column => ({
+                ...column,
+                isDeleted: true
+            }));
 
             return {
-                customColumns: this.cloneCustomColumns(
-                    state?.customColumns ?? []
-                ),
+                customColumns: [...active, ...deleted],
                 customColumnsChanged:
                     state?.customColumnsChanged === true
             };
@@ -377,23 +391,68 @@
                 menu.className = "tabulator-column-context-menu";
                 menu.hidden = true;
 
-                const createButton = (text, position) => {
+                const createButton = (text, action, customOnly = false) => {
                     const button = document.createElement("button");
                     button.type = "button";
                     button.textContent = text;
-                    button.addEventListener("click", () => {
+                    button.dataset.action = action;
+                    button.dataset.customOnly = customOnly ? "true" : "false";
+                    button.addEventListener("click", async () => {
+                        const field = menu.dataset.field ?? "";
                         menu.hidden = true;
-                        this.openCustomColumnDialog(
-                            elementId,
-                            position
-                        );
+
+                        if (action === "insert-before") {
+                            this.openCustomColumnDialog(
+                                elementId,
+                                "before"
+                            );
+                        } else if (action === "insert-after") {
+                            this.openCustomColumnDialog(
+                                elementId,
+                                "after"
+                            );
+                        } else if (action === "properties") {
+                            this.openCustomColumnPropertiesDialog(
+                                elementId,
+                                field
+                            );
+                        } else if (action === "delete") {
+                            await this.requestDeleteCustomColumn(
+                                elementId,
+                                field
+                            );
+                        }
                     });
                     return button;
                 };
 
                 menu.append(
-                    createButton("Insert Column Before", "before"),
-                    createButton("Insert Column After", "after")
+                    createButton(
+                        "Insert Column Before",
+                        "insert-before"
+                    ),
+                    createButton(
+                        "Insert Column After",
+                        "insert-after"
+                    )
+                );
+
+                const separator = document.createElement("div");
+                separator.className =
+                    "tabulator-column-context-menu-separator";
+                separator.dataset.customOnly = "true";
+                menu.appendChild(separator);
+                menu.append(
+                    createButton(
+                        "Custom Column Properties",
+                        "properties",
+                        true
+                    ),
+                    createButton(
+                        "Delete Custom Column",
+                        "delete",
+                        true
+                    )
                 );
 
                 document.body.appendChild(menu);
@@ -490,6 +549,103 @@
 
                 document.body.appendChild(dialog);
             }
+
+            let propertiesDialog = document.getElementById(
+                `${elementId}-custom-column-properties-dialog`
+            );
+
+            if (!propertiesDialog) {
+                propertiesDialog = document.createElement("dialog");
+                propertiesDialog.id =
+                    `${elementId}-custom-column-properties-dialog`;
+                propertiesDialog.className =
+                    "tabulator-custom-column-dialog";
+                propertiesDialog.innerHTML = `
+                    <form method="dialog" class="tabulator-custom-column-form">
+                        <h2>Custom Column Properties</h2>
+
+                        <label>
+                            Column Name
+                            <input
+                                class="tabulator-custom-column-properties-name"
+                                maxlength="150"
+                                autocomplete="off"
+                                required />
+                        </label>
+
+                        <label>
+                            Column Type
+                            <select class="tabulator-custom-column-properties-type">
+                                <option value="Text">Text</option>
+                                <option value="Money">Money</option>
+                                <option value="Date">Date</option>
+                                <option value="Number">Number</option>
+                            </select>
+                        </label>
+
+                        <div class="tabulator-custom-column-type-note" hidden></div>
+                        <div class="tabulator-custom-column-error" hidden></div>
+
+                        <div class="tabulator-custom-column-actions">
+                            <button type="button" class="tabulator-custom-column-properties-cancel">
+                                Cancel
+                            </button>
+                            <button type="submit" class="tabulator-custom-column-confirm">
+                                Apply
+                            </button>
+                        </div>
+                    </form>
+                `;
+
+                propertiesDialog.querySelector(
+                    ".tabulator-custom-column-properties-cancel"
+                ).addEventListener(
+                    "click",
+                    () => propertiesDialog.close()
+                );
+
+                propertiesDialog.querySelector("form").addEventListener(
+                    "submit",
+                    async event => {
+                        event.preventDefault();
+
+                        const field =
+                            propertiesDialog.dataset.field ?? "";
+                        const name = propertiesDialog.querySelector(
+                            ".tabulator-custom-column-properties-name"
+                        ).value;
+                        const dataType = propertiesDialog.querySelector(
+                            ".tabulator-custom-column-properties-type"
+                        ).value;
+                        const errorElement = propertiesDialog.querySelector(
+                            ".tabulator-custom-column-error"
+                        );
+
+                        const result = await this.updateCustomColumn(
+                            elementId,
+                            field,
+                            name,
+                            dataType
+                        );
+
+                        if (!result.succeeded) {
+                            errorElement.textContent = result.message;
+                            errorElement.hidden = false;
+                            return;
+                        }
+
+                        propertiesDialog.close();
+                    }
+                );
+
+                propertiesDialog.addEventListener("click", event => {
+                    if (event.target === propertiesDialog) {
+                        propertiesDialog.close();
+                    }
+                });
+
+                document.body.appendChild(propertiesDialog);
+            }
         },
 
         ensureCustomColumnStyles: function () {
@@ -526,6 +682,11 @@
                 .tabulator-column-context-menu button:hover {
                     background: #eef7fc;
                     color: #0b5f95;
+                }
+                .tabulator-column-context-menu-separator {
+                    height: 1px;
+                    margin: 5px 4px;
+                    background: #d9e3ea;
                 }
                 .tabulator-custom-column-dialog {
                     width: min(420px, calc(100vw - 32px));
@@ -574,6 +735,14 @@
                 .tabulator-custom-column-form select:focus {
                     border-color: #0b78c7;
                     box-shadow: 0 0 0 3px rgba(11, 120, 199, .14);
+                }
+                .tabulator-custom-column-type-note {
+                    padding: 9px 11px;
+                    border: 1px solid #b9cad7;
+                    border-radius: 7px;
+                    color: #35566e;
+                    background: #f3f8fb;
+                    font-size: .86rem;
                 }
                 .tabulator-custom-column-error {
                     padding: 9px 11px;
@@ -634,7 +803,7 @@
                     header.getAttribute("tabulator-field") ?? ""
                 ).trim();
 
-                if (!field) {
+                if (!field || field === "rowNumber") {
                     return;
                 }
 
@@ -646,6 +815,17 @@
                 const menu = document.getElementById(
                     `${elementId}-column-menu`
                 );
+                const isCustomColumn = state.customColumns.some(column =>
+                    column.fieldKey === field
+                );
+
+                menu.dataset.field = field;
+
+                for (const item of menu.querySelectorAll(
+                    "[data-custom-only='true']"
+                )) {
+                    item.hidden = !isCustomColumn;
+                }
 
                 menu.style.left = `${Math.min(
                     event.clientX,
@@ -653,7 +833,7 @@
                 )}px`;
                 menu.style.top = `${Math.min(
                     event.clientY,
-                    window.innerHeight - 100
+                    window.innerHeight - 220
                 )}px`;
                 menu.hidden = false;
             };
@@ -708,6 +888,345 @@
 
             dialog.showModal();
             window.requestAnimationFrame(() => nameInput.focus());
+        },
+
+        openCustomColumnPropertiesDialog: function (
+            elementId,
+            fieldKey
+        ) {
+            const state = this.states[elementId];
+            const table = this.tables[elementId];
+            const dialog = document.getElementById(
+                `${elementId}-custom-column-properties-dialog`
+            );
+            const column = state?.customColumns?.find(item =>
+                item.fieldKey === fieldKey
+            );
+
+            if (!state || !table || !dialog || !column) {
+                return;
+            }
+
+            const nameInput = dialog.querySelector(
+                ".tabulator-custom-column-properties-name"
+            );
+            const typeInput = dialog.querySelector(
+                ".tabulator-custom-column-properties-type"
+            );
+            const noteElement = dialog.querySelector(
+                ".tabulator-custom-column-type-note"
+            );
+            const errorElement = dialog.querySelector(
+                ".tabulator-custom-column-error"
+            );
+            const hasCurrentValues = this.hasCurrentCustomColumnValues(
+                table,
+                fieldKey
+            );
+            const typeLocked =
+                column.hasStoredValues === true || hasCurrentValues;
+
+            dialog.dataset.field = fieldKey;
+            nameInput.value = column.name;
+            typeInput.value = column.dataType;
+            typeInput.disabled = typeLocked;
+            errorElement.hidden = true;
+            errorElement.textContent = "";
+            noteElement.hidden = !typeLocked;
+            noteElement.textContent = typeLocked
+                ? "Column Type cannot be changed because this column contains values."
+                : "Column Type can be changed only while the column is empty.";
+
+            dialog.showModal();
+            window.requestAnimationFrame(() => nameInput.focus());
+        },
+
+        hasCurrentCustomColumnValues: function (table, fieldKey) {
+            return (table?.getData?.() ?? []).some(row =>
+                String(row?.[fieldKey] ?? "").trim() !== ""
+            );
+        },
+
+        updateCustomColumn: async function (
+            elementId,
+            fieldKey,
+            name,
+            dataType
+        ) {
+            const state = this.states[elementId];
+            const table = this.tables[elementId];
+            const index = state?.customColumns?.findIndex(column =>
+                column.fieldKey === fieldKey
+            ) ?? -1;
+
+            if (!state || !table || index < 0) {
+                return {
+                    succeeded: false,
+                    message: "The custom column is no longer available."
+                };
+            }
+
+            const oldColumn = {
+                ...state.customColumns[index]
+            };
+            const normalizedName = String(name ?? "").trim();
+            const normalizedType = String(dataType ?? "").trim();
+
+            if (!normalizedName) {
+                return {
+                    succeeded: false,
+                    message: "Column Name is required."
+                };
+            }
+
+            if (normalizedName.length > 150) {
+                return {
+                    succeeded: false,
+                    message: "Column Name cannot exceed 150 characters."
+                };
+            }
+
+            if (!validTypes.has(normalizedType)) {
+                return {
+                    succeeded: false,
+                    message: "Select a valid Column Type."
+                };
+            }
+
+            const duplicateName = table.getColumns().some(column => {
+                if (column.getField() === fieldKey) {
+                    return false;
+                }
+
+                return String(column.getDefinition()?.title ?? "")
+                    .trim()
+                    .localeCompare(
+                        normalizedName,
+                        undefined,
+                        { sensitivity: "accent" }
+                    ) === 0;
+            });
+
+            if (duplicateName) {
+                return {
+                    succeeded: false,
+                    message: "A column with the same name already exists."
+                };
+            }
+
+            if (
+                normalizedType !== oldColumn.dataType &&
+                (
+                    oldColumn.hasStoredValues === true ||
+                    this.hasCurrentCustomColumnValues(table, fieldKey)
+                )
+            ) {
+                return {
+                    succeeded: false,
+                    message:
+                        "Column Type can be changed only while the column is empty."
+                };
+            }
+
+            const newColumn = {
+                ...oldColumn,
+                name: normalizedName,
+                dataType: normalizedType
+            };
+
+            if (
+                newColumn.name === oldColumn.name &&
+                newColumn.dataType === oldColumn.dataType
+            ) {
+                return { succeeded: true, message: "" };
+            }
+
+            state.customColumns[index] = newColumn;
+            this.unregisterCustomColumnField(fieldKey);
+            this.registerCustomColumnField(newColumn);
+            await this.rebuildCustomColumnInTable(
+                elementId,
+                newColumn
+            );
+            this.refreshCustomAmountAggregateFields(elementId);
+            this.refreshCustomColumnsChanged(elementId);
+            this.pushCustomColumnTransaction(elementId, {
+                action: "update",
+                label: `تعديل خصائص العمود ${oldColumn.name}`,
+                oldColumn: oldColumn,
+                newColumn: { ...newColumn }
+            });
+            this.scheduleAggregateRefresh?.(
+                elementId,
+                "custom-column-update"
+            );
+
+            this.setStatus(
+                elementId,
+                `تم تعديل العمود ${normalizedName}. اضغط Save لحفظ التعديل.`
+            );
+
+            return { succeeded: true, message: "" };
+        },
+
+        requestDeleteCustomColumn: async function (
+            elementId,
+            fieldKey
+        ) {
+            const state = this.states[elementId];
+            const column = state?.customColumns?.find(item =>
+                item.fieldKey === fieldKey
+            );
+
+            if (!column) {
+                return;
+            }
+
+            const confirmed = window.confirm(
+                `Delete custom column "${column.name}" and all its values ` +
+                "from every year in this department? " +
+                "The deletion will not be permanent until you press Save."
+            );
+
+            if (!confirmed) {
+                return;
+            }
+
+            await this.deleteCustomColumn(elementId, fieldKey);
+        },
+
+        deleteCustomColumn: async function (elementId, fieldKey) {
+            const state = this.states[elementId];
+            const index = state?.customColumns?.findIndex(column =>
+                column.fieldKey === fieldKey
+            ) ?? -1;
+
+            if (!state || index < 0) {
+                return;
+            }
+
+            const column = {
+                ...state.customColumns[index]
+            };
+            const layoutSnapshot = this.captureColumnLayoutSnapshot(
+                state,
+                fieldKey
+            );
+
+            state.customColumns.splice(index, 1);
+
+            if (column.id > 0 && !state.deletedCustomColumns.some(item =>
+                item.fieldKey === fieldKey)) {
+                state.deletedCustomColumns.push({ ...column });
+            }
+
+            state.directTypingFields?.delete?.(fieldKey);
+            this.unregisterCustomColumnField(fieldKey);
+            await this.removeCustomColumnFromTable(elementId, fieldKey);
+            this.refreshCustomAmountAggregateFields(elementId);
+            this.refreshCustomColumnsChanged(elementId);
+            this.pushCustomColumnTransaction(elementId, {
+                action: "delete",
+                label: `حذف العمود ${column.name}`,
+                column: column,
+                layout: layoutSnapshot.layout,
+                originalLayout: layoutSnapshot.originalLayout
+            });
+            this.scheduleAggregateRefresh?.(
+                elementId,
+                "custom-column-delete"
+            );
+
+            this.setStatus(
+                elementId,
+                `تم حذف العمود ${column.name}. اضغط Save لتأكيد الحذف.`
+            );
+        },
+
+        captureColumnLayoutSnapshot: function (state, fieldKey) {
+            const clone = layout => layout ? { ...layout } : null;
+
+            return {
+                layout: clone((state.columnLayouts ?? []).find(item =>
+                    item.fieldKey === fieldKey
+                )),
+                originalLayout: clone(
+                    (state.originalColumnLayouts ?? []).find(item =>
+                        item.fieldKey === fieldKey
+                    )
+                )
+            };
+        },
+
+        restoreColumnLayoutSnapshot: function (
+            elementId,
+            fieldKey,
+            layout,
+            originalLayout
+        ) {
+            const state = this.states[elementId];
+
+            if (!state) {
+                return;
+            }
+
+            state.columnLayouts = (state.columnLayouts ?? [])
+                .filter(item => item.fieldKey !== fieldKey);
+            state.originalColumnLayouts =
+                (state.originalColumnLayouts ?? [])
+                    .filter(item => item.fieldKey !== fieldKey);
+
+            if (layout) {
+                state.columnLayouts.push({ ...layout });
+            }
+
+            if (originalLayout) {
+                state.originalColumnLayouts.push({ ...originalLayout });
+            }
+
+            state.columnLayouts.sort((first, second) =>
+                first.fieldKey.localeCompare(second.fieldKey)
+            );
+            state.originalColumnLayouts.sort((first, second) =>
+                first.fieldKey.localeCompare(second.fieldKey)
+            );
+            this.refreshColumnLayoutsChanged(elementId);
+        },
+
+        rebuildCustomColumnInTable: async function (
+            elementId,
+            column
+        ) {
+            const table = this.tables[elementId];
+            const state = this.states[elementId];
+            const current = table?.getColumn(column.fieldKey);
+
+            if (!current) {
+                await this.addCustomColumnToTable(elementId, column);
+                return;
+            }
+
+            const currentWidth = this.normalizeColumnWidth(
+                current.getWidth()
+            );
+            const definition = {
+                ...this.applyColumnLayoutDefinition(
+                    elementId,
+                    this.createCustomTabulatorColumn(elementId, column)
+                ),
+                width: currentWidth
+            };
+
+            if (state) {
+                this.suppressProgrammaticColumnResize?.(
+                    state,
+                    column.fieldKey,
+                    currentWidth
+                );
+            }
+
+            await current.updateDefinition(definition);
+            this.arrangeColumnHeaderControls?.(elementId);
         },
 
         addCustomColumn: async function (
@@ -777,7 +1296,8 @@
                 name: normalizedName,
                 dataType: dataType,
                 layoutOrder: layoutOrder,
-                rowVersion: ""
+                rowVersion: "",
+                hasStoredValues: false
             };
 
             state.customColumns.push(column);
@@ -790,7 +1310,11 @@
             await this.addCustomColumnToTable(elementId, column);
             this.refreshCustomAmountAggregateFields(elementId);
             this.refreshCustomColumnsChanged(elementId);
-            this.pushCustomColumnTransaction(elementId, column);
+            this.pushCustomColumnTransaction(elementId, {
+                action: "add",
+                label: `إضافة العمود ${column.name}`,
+                column: { ...column }
+            });
             this.scheduleAggregateRefresh?.(
                 elementId,
                 "custom-column-add"
@@ -873,9 +1397,12 @@
                 Number(current.getDefinition()?.udsLayoutOrder) >
                 column.layoutOrder
             );
-            const definition = this.createCustomTabulatorColumn(
+            const definition = this.applyColumnLayoutDefinition(
                 elementId,
-                column
+                this.createCustomTabulatorColumn(
+                    elementId,
+                    column
+                )
             );
 
             if (nextColumn) {
@@ -887,6 +1414,11 @@
             } else {
                 await table.addColumn(definition, false);
             }
+
+            this.registerColumnLayoutForColumn(
+                elementId,
+                table.getColumn(column.fieldKey)
+            );
         },
 
         removeCustomColumnFromTable: async function (
@@ -899,20 +1431,23 @@
             if (column) {
                 await table.deleteColumn(fieldKey);
             }
+
+            this.unregisterColumnLayoutField(elementId, fieldKey);
         },
 
-        pushCustomColumnTransaction: function (elementId, column) {
+        pushCustomColumnTransaction: function (
+            elementId,
+            transaction
+        ) {
             const state = this.states[elementId];
 
-            if (!state) {
+            if (!state || !transaction?.action) {
                 return;
             }
 
             state.undoStack.push({
                 kind: "custom-column",
-                action: "add",
-                label: `إضافة العمود ${column.name}`,
-                column: { ...column }
+                ...transaction
             });
 
             if (state.undoStack.length > state.maxTransactions) {
@@ -928,38 +1463,92 @@
             direction
         ) {
             const state = this.states[elementId];
-            const column = this.normalizeCustomColumnDefinition(
-                transaction?.column
-            );
+            const action = String(transaction?.action ?? "");
 
-            if (!state || !column.fieldKey) {
+            if (!state || !action) {
                 return;
             }
 
-            const shouldAdd = direction === "redo";
+            if (action === "update") {
+                const source = direction === "undo"
+                    ? transaction.oldColumn
+                    : transaction.newColumn;
+                const column = this.normalizeCustomColumnDefinition(source);
+                const index = state.customColumns.findIndex(item =>
+                    item.fieldKey === column.fieldKey
+                );
 
-            if (shouldAdd) {
-                if (!state.customColumns.some(item =>
-                    item.fieldKey === column.fieldKey)) {
-                    state.customColumns.push(column);
-                    state.customColumns.sort((first, second) =>
-                        first.layoutOrder - second.layoutOrder
-                    );
+                if (index < 0 || !column.fieldKey) {
+                    return;
                 }
 
-                state.directTypingFields?.add?.(column.fieldKey);
-                this.registerCustomColumnField(column);
-                await this.addCustomColumnToTable(elementId, column);
-            } else {
-                state.customColumns = state.customColumns.filter(item =>
-                    item.fieldKey !== column.fieldKey
-                );
-                state.directTypingFields?.delete?.(column.fieldKey);
+                state.customColumns[index] = column;
                 this.unregisterCustomColumnField(column.fieldKey);
-                await this.removeCustomColumnFromTable(
+                this.registerCustomColumnField(column);
+                await this.rebuildCustomColumnInTable(
                     elementId,
-                    column.fieldKey
+                    column
                 );
+            } else {
+                const column = this.normalizeCustomColumnDefinition(
+                    transaction?.column
+                );
+
+                if (!column.fieldKey) {
+                    return;
+                }
+
+                const shouldAdd = action === "add"
+                    ? direction === "redo"
+                    : direction === "undo";
+
+                if (shouldAdd) {
+                    if (!state.customColumns.some(item =>
+                        item.fieldKey === column.fieldKey)) {
+                        state.customColumns.push(column);
+                        state.customColumns.sort((first, second) =>
+                            first.layoutOrder - second.layoutOrder
+                        );
+                    }
+
+                    state.deletedCustomColumns =
+                        (state.deletedCustomColumns ?? []).filter(item =>
+                            item.fieldKey !== column.fieldKey
+                        );
+                    state.directTypingFields?.add?.(column.fieldKey);
+                    this.registerCustomColumnField(column);
+                    await this.addCustomColumnToTable(elementId, column);
+
+                    if (action === "delete") {
+                        this.restoreColumnLayoutSnapshot(
+                            elementId,
+                            column.fieldKey,
+                            transaction.layout ?? null,
+                            transaction.originalLayout ?? null
+                        );
+                    }
+                } else {
+                    state.customColumns = state.customColumns.filter(item =>
+                        item.fieldKey !== column.fieldKey
+                    );
+
+                    if (
+                        action === "delete" &&
+                        column.id > 0 &&
+                        !state.deletedCustomColumns.some(item =>
+                            item.fieldKey === column.fieldKey
+                        )
+                    ) {
+                        state.deletedCustomColumns.push({ ...column });
+                    }
+
+                    state.directTypingFields?.delete?.(column.fieldKey);
+                    this.unregisterCustomColumnField(column.fieldKey);
+                    await this.removeCustomColumnFromTable(
+                        elementId,
+                        column.fieldKey
+                    );
+                }
             }
 
             this.refreshCustomAmountAggregateFields(elementId);
@@ -980,6 +1569,7 @@
             const normalized = this.cloneCustomColumns(columns);
             state.customColumns = normalized;
             state.originalCustomColumns = this.cloneCustomColumns(normalized);
+            state.deletedCustomColumns = [];
             state.customColumnsChanged = false;
 
             for (const column of normalized) {
@@ -1024,6 +1614,9 @@
             )?.remove();
             document.getElementById(
                 `${elementId}-custom-column-dialog`
+            )?.remove();
+            document.getElementById(
+                `${elementId}-custom-column-properties-dialog`
             )?.remove();
         }
     });

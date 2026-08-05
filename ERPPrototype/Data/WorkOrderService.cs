@@ -95,6 +95,8 @@ public sealed class WorkOrderService(
         IEnumerable<WorkOrder> deletedRecords,
         IReadOnlyCollection<CustomColumnDefinitionInput> customColumns,
         bool customColumnsChanged,
+        IReadOnlyCollection<DepartmentColumnLayoutInput>? columnLayouts = null,
+        bool columnLayoutsChanged = false,
         CancellationToken cancellationToken = default,
         ICollection<WorkOrderServicePerformanceStage>? performanceStages = null)
     {
@@ -203,6 +205,37 @@ public sealed class WorkOrderService(
             var customColumnDefinitions =
                 customColumnPreparation.Definitions;
 
+            var columnLayoutsStartedAt = Stopwatch.GetTimestamp();
+
+            var columnLayoutPreparation =
+                await DepartmentColumnLayoutService.PrepareLayoutsAsync(
+                    dbContext,
+                    departmentId,
+                    userId,
+                    columnLayouts,
+                    columnLayoutsChanged,
+                    customColumnDefinitions,
+                    cancellationToken);
+
+            if (!columnLayoutPreparation.Succeeded)
+            {
+                return WorkOrderSaveResult.ValidationFailure(
+                    columnLayoutPreparation.ErrorMessage);
+            }
+
+            var departmentColumnLayouts =
+                columnLayoutPreparation.Layouts;
+
+            RecordPerformanceStage(
+                performanceStages,
+                "save.server.column-layouts-prepare",
+                columnLayoutsStartedAt,
+                new
+                {
+                    Layouts = departmentColumnLayouts.Count,
+                    ConfigurationChanged = columnLayoutsChanged
+                });
+
             var customValuesError =
                 CustomColumnService.NormalizeWorkOrderValues(
                     newRecords,
@@ -225,6 +258,10 @@ public sealed class WorkOrderService(
                         customColumnDefinitions.Count,
                     AddedColumns =
                         customColumnPreparation.AddedDefinitions.Count,
+                    DeletedColumns =
+                        customColumnPreparation.DeletedDefinitions.Count,
+                    AffectedRows =
+                        customColumnPreparation.AffectedWorkOrders.Count,
                     ConfigurationChanged = customColumnsChanged
                 });
 
@@ -492,7 +529,9 @@ public sealed class WorkOrderService(
                 return nextDisplayOrder;
             }
 
-            var savedEntities = new List<WorkOrder>();
+            var savedEntities = customColumnPreparation.AffectedWorkOrders
+                .Where(workOrder => !deletedIds.Contains(workOrder.Id))
+                .ToList();
 
             if (deletedIds.Count > 0)
             {
@@ -741,6 +780,15 @@ public sealed class WorkOrderService(
                     DeletedRows = existingDeletedRecords.Count
                 });
 
+            var fieldsWithStoredValuesAfterSave =
+                customColumnDefinitions.Count == 0
+                    ? new HashSet<string>(StringComparer.Ordinal)
+                    : await CustomColumnService
+                        .LoadFieldsWithStoredValuesAsync(
+                            dbContext,
+                            departmentId,
+                            cancellationToken);
+
             var commitStartedAt = Stopwatch.GetTimestamp();
 
             await transaction.CommitAsync(cancellationToken);
@@ -753,6 +801,13 @@ public sealed class WorkOrderService(
             var mapResultStartedAt = Stopwatch.GetTimestamp();
 
             var savedRecords = savedEntities
+                .Where(entity =>
+                    dbContext.Entry(entity).State != EntityState.Deleted)
+                .GroupBy(entity => entity.Id)
+                .Select(group => group.Last())
+                .OrderBy(entity => entity.WorkYear)
+                .ThenBy(entity => entity.DisplayOrder)
+                .ThenBy(entity => entity.Id)
                 .Select(MapSavedRecord)
                 .ToList();
 
@@ -763,7 +818,15 @@ public sealed class WorkOrderService(
             var savedCustomColumns = customColumnDefinitions
                 .OrderBy(column => column.LayoutOrder)
                 .ThenBy(column => column.Id)
-                .Select(CustomColumnService.MapDefinition)
+                .Select(column => CustomColumnService.MapDefinition(
+                    column,
+                    fieldsWithStoredValuesAfterSave.Contains(
+                        column.FieldKey)))
+                .ToList();
+
+            var savedColumnLayouts = departmentColumnLayouts
+                .OrderBy(layout => layout.FieldKey)
+                .Select(DepartmentColumnLayoutService.MapLayout)
                 .ToList();
 
             RecordPerformanceStage(
@@ -791,7 +854,8 @@ public sealed class WorkOrderService(
             return WorkOrderSaveResult.Success(
                 savedRecords,
                 deletedRecordIds,
-                savedCustomColumns);
+                savedCustomColumns,
+                savedColumnLayouts);
         }
         catch (DbUpdateConcurrencyException exception)
         {
@@ -801,12 +865,32 @@ public sealed class WorkOrderService(
                 .Select(entry => entry.Entity)
                 .OfType<WorkOrder>()
                 .FirstOrDefault();
+            var conflictingColumnLayout = exception.Entries
+                .Select(entry => entry.Entity)
+                .OfType<DepartmentColumnLayout>()
+                .FirstOrDefault();
+            var conflictingCustomColumn = exception.Entries
+                .Select(entry => entry.Entity)
+                .OfType<CustomColumnDefinition>()
+                .FirstOrDefault();
 
             logger.LogWarning(
                 exception,
-                "A work-order concurrency conflict occurred for department {DepartmentId} and year {WorkYear}.",
+                "A save concurrency conflict occurred for department {DepartmentId} and year {WorkYear}.",
                 departmentId,
                 workYear);
+
+            if (conflictingColumnLayout is not null)
+            {
+                return WorkOrderSaveResult.ConcurrencyFailure(
+                    "A column width was changed by another session. Refresh the sheet and try again.");
+            }
+
+            if (conflictingCustomColumn is not null)
+            {
+                return WorkOrderSaveResult.ConcurrencyFailure(
+                    "A custom column was changed or deleted by another session. Refresh the sheet and try again.");
+            }
 
             return WorkOrderSaveResult.ConcurrencyFailure(
                 "The work order was changed, moved, or deleted by another session after the sheet was loaded.",
@@ -831,6 +915,13 @@ public sealed class WorkOrderService(
                 {
                     return WorkOrderSaveResult.ValidationFailure(
                         "A custom column with the same name or position already exists in this department. Refresh the sheet and try again.");
+                }
+
+                if (exception.Entries.Any(entry =>
+                    entry.Entity is DepartmentColumnLayout))
+                {
+                    return WorkOrderSaveResult.ValidationFailure(
+                        "A width for the same column was saved by another session. Refresh the sheet and try again.");
                 }
 
                 return WorkOrderSaveResult.DuplicateFailure(
@@ -908,8 +999,6 @@ public sealed class WorkOrderService(
             workOrder.WorkOrderValue,
             workOrder.PartialAmount,
             workOrder.Busket,
-            workOrder.Status,
-            workOrder.Notes,
             workOrder.CustomValuesJson,
             workOrder.RowVersion);
 
@@ -958,16 +1047,6 @@ public sealed class WorkOrderService(
             target.Busket = source.Busket;
         }
 
-        if (changedFields.Contains(WorkOrderFieldRegistry.Status))
-        {
-            target.Status = source.Status;
-        }
-
-        if (changedFields.Contains(WorkOrderFieldRegistry.Notes))
-        {
-            target.Notes = source.Notes;
-        }
-
         if (changedFields.Contains(WorkOrderFieldRegistry.CustomValues))
         {
             target.CustomValuesJson = source.CustomValuesJson;
@@ -1000,6 +1079,7 @@ public sealed record WorkOrderSheetData(
     int WorkYear,
     List<int> AvailableYears,
     List<CustomColumnDefinitionData> CustomColumns,
+    List<DepartmentColumnLayoutData> ColumnLayouts,
     List<WorkOrderSheetRow> WorkOrders);
 
 public sealed record WorkOrderSheetRow(
@@ -1011,8 +1091,6 @@ public sealed record WorkOrderSheetRow(
     decimal? WorkOrderValue,
     decimal? PartialAmount,
     string Busket,
-    string Status,
-    string? Notes,
     string CustomValuesJson,
     byte[] RowVersion);
 
@@ -1036,8 +1114,6 @@ public sealed record WorkOrderSavedRecord(
     decimal? WorkOrderValue,
     decimal? PartialAmount,
     string Busket,
-    string Status,
-    string? Notes,
     string CustomValuesJson,
     byte[] RowVersion);
 
@@ -1065,19 +1141,22 @@ public sealed record WorkOrderSaveResult(
     IReadOnlyList<WorkOrderSavedRecord>? SavedRecords = null,
     IReadOnlyList<int>? DeletedRecordIds = null,
     IReadOnlyList<WorkOrderDuplicateConflict>? DuplicateConflicts = null,
-    IReadOnlyList<CustomColumnDefinitionData>? SavedCustomColumns = null)
+    IReadOnlyList<CustomColumnDefinitionData>? SavedCustomColumns = null,
+    IReadOnlyList<DepartmentColumnLayoutData>? SavedColumnLayouts = null)
 {
     public static WorkOrderSaveResult Success(
         IReadOnlyList<WorkOrderSavedRecord> savedRecords,
         IReadOnlyList<int> deletedRecordIds,
-        IReadOnlyList<CustomColumnDefinitionData>? savedCustomColumns = null) =>
+        IReadOnlyList<CustomColumnDefinitionData>? savedCustomColumns = null,
+        IReadOnlyList<DepartmentColumnLayoutData>? savedColumnLayouts = null) =>
         new(
             true,
             WorkOrderSaveFailureType.None,
             string.Empty,
             SavedRecords: savedRecords,
             DeletedRecordIds: deletedRecordIds,
-            SavedCustomColumns: savedCustomColumns);
+            SavedCustomColumns: savedCustomColumns,
+            SavedColumnLayouts: savedColumnLayouts);
 
     public static WorkOrderSaveResult ValidationFailure(
         string message) =>

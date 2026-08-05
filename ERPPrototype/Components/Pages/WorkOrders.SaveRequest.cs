@@ -15,18 +15,23 @@ public partial class WorkOrders
         var deletedRows = saveDelta.DeletedRows ?? [];
         var customColumns = saveDelta.CustomColumns ?? [];
         var customColumnsChanged = saveDelta.CustomColumnsChanged;
+        var columnLayouts = saveDelta.ColumnLayouts ?? [];
+        var columnLayoutsChanged = saveDelta.ColumnLayoutsChanged;
 
         if (
             dirtyRows.Count == 0 &&
             deletedRows.Count == 0 &&
-            !customColumnsChanged)
+            !customColumnsChanged &&
+            !columnLayoutsChanged)
         {
             return new SaveRequestPreparation
             {
                 DirtyRows = dirtyRows,
                 DeletedRows = deletedRows,
                 CustomColumns = customColumns,
-                CustomColumnsChanged = customColumnsChanged
+                CustomColumnsChanged = customColumnsChanged,
+                ColumnLayouts = columnLayouts,
+                ColumnLayoutsChanged = columnLayoutsChanged
             };
         }
 
@@ -133,8 +138,6 @@ public partial class WorkOrders
                 WorkOrderValue = workOrderValue,
                 PartialAmount = partialAmount,
                 Busket = row.Basket ?? string.Empty,
-                Status = row.Status ?? string.Empty,
-                Notes = row.Notes,
                 CustomValuesJson = BuildCustomValuesJson(
                     row,
                     customColumns)
@@ -177,6 +180,8 @@ public partial class WorkOrders
             DeletedRows = deletedRows,
             CustomColumns = customColumns,
             CustomColumnsChanged = customColumnsChanged,
+            ColumnLayouts = columnLayouts,
+            ColumnLayoutsChanged = columnLayoutsChanged,
             Request = new PreparedWorkOrderSaveRequest
             {
                 DirtyRows = dirtyRows,
@@ -187,7 +192,9 @@ public partial class WorkOrders
                 MovedToOtherYearsCount = movedToOtherYearsCount,
                 DestinationYears = destinationYears,
                 CustomColumns = customColumns,
-                CustomColumnsChanged = customColumnsChanged
+                CustomColumnsChanged = customColumnsChanged,
+                ColumnLayouts = columnLayouts,
+                ColumnLayoutsChanged = columnLayoutsChanged
             }
         };
     }
@@ -202,8 +209,6 @@ public partial class WorkOrders
             string.IsNullOrWhiteSpace(row.WorkOrderValue) &&
             string.IsNullOrWhiteSpace(row.PartialAmount) &&
             string.IsNullOrWhiteSpace(row.Basket) &&
-            string.IsNullOrWhiteSpace(row.Status) &&
-            string.IsNullOrWhiteSpace(row.Notes) &&
             !row.CustomFields.Values.Any(value =>
                 !string.IsNullOrWhiteSpace(
                     value.ValueKind == JsonValueKind.String
@@ -217,7 +222,7 @@ public partial class WorkOrders
     {
         var values = new Dictionary<string, string>(StringComparer.Ordinal);
 
-        foreach (var column in customColumns)
+        foreach (var column in customColumns.Where(column => !column.IsDeleted))
         {
             if (!row.CustomFields.TryGetValue(column.FieldKey, out var rawValue))
             {
@@ -339,13 +344,16 @@ public partial class WorkOrders
         public List<TabulatorDeletedRow> DeletedRows { get; init; } = [];
         public List<CustomColumnDefinitionInput> CustomColumns { get; init; } = [];
         public bool CustomColumnsChanged { get; init; }
+        public List<DepartmentColumnLayoutInput> ColumnLayouts { get; init; } = [];
+        public bool ColumnLayoutsChanged { get; init; }
         public PreparedWorkOrderSaveRequest? Request { get; init; }
         public string? ValidationMessage { get; init; }
 
         public bool HasChanges =>
             DirtyRows.Count > 0 ||
             DeletedRows.Count > 0 ||
-            CustomColumnsChanged;
+            CustomColumnsChanged ||
+            ColumnLayoutsChanged;
     }
 
     private sealed class PreparedWorkOrderSaveRequest
@@ -359,6 +367,8 @@ public partial class WorkOrders
         public HashSet<int> DestinationYears { get; init; } = [];
         public List<CustomColumnDefinitionInput> CustomColumns { get; init; } = [];
         public bool CustomColumnsChanged { get; init; }
+        public List<DepartmentColumnLayoutInput> ColumnLayouts { get; init; } = [];
+        public bool ColumnLayoutsChanged { get; init; }
     }
 
     private sealed class TabulatorSaveDelta
@@ -371,6 +381,8 @@ public partial class WorkOrders
         public List<TabulatorDeletedRow>? DeletedRows { get; set; }
         public List<CustomColumnDefinitionInput>? CustomColumns { get; set; }
         public bool CustomColumnsChanged { get; set; }
+        public List<DepartmentColumnLayoutInput>? ColumnLayouts { get; set; }
+        public bool ColumnLayoutsChanged { get; set; }
     }
 
     private sealed class TabulatorDeletedRow

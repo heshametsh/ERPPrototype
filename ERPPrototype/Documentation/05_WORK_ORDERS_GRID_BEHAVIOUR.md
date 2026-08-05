@@ -20,9 +20,11 @@
 | Work Order Number | Exactly 9 digits |
 | Work Type | Exactly 3 digits |
 | Assignment Date | `DD/MM/YYYY`, blank allowed |
+| Work Order Value | Required positive money value |
+| Partial Amount | Optional positive money value, not above Work Order Value |
+| Remaining Amount | Calculated, read-only |
 | Basket | Required from fixed list |
-| Status | Free text, max 150 |
-| Notes | Free text, max 1,000 |
+| Custom columns | Optional `Text`, `Money`, `Date`, or whole `Number`; department-scoped |
 
 System fields مثل Id وWorkYear وDisplayOrder وRowVersion لا تظهر للمستخدم.
 
@@ -83,7 +85,6 @@ Client validation provides immediate feedback:
 - exact digit lengths.
 - date format.
 - Basket list.
-- status/notes lengths.
 - duplicate identity index.
 - validation navigator with Previous/Next.
 
@@ -206,4 +207,16 @@ E6C يحفظ هوية الصف نفسه، مثل حفظ رقم المنزل بد
 - Only validators and cross-field rules that depend on those keys run.
 - Saving an existing row updates only its changed fields. New rows still validate and save all required fields.
 
-Example: pasting a second Notes column into 4,952 rows changes 4,952 values, but the identity rule does not run because neither Work Order Number nor Work Type changed. Changing Work Type in one row does run the identity rule for that row.
+Example: pasting a custom Text column into 4,952 rows changes 4,952 values, but the identity rule does not run because neither Work Order Number nor Work Type changed. Changing Work Type in one row does run the identity rule for that row.
+
+
+## 18. Department Column Layout Contract — Phase 9.3B
+
+- Right-click on a data-column Header exposes `Insert Column Before` and `Insert Column After`.
+- Dragging the Header edge changes width locally; Save is required to persist it. There is no numeric-width entry option.
+- Valid width is 45–1000 px.
+- Undo/Redo includes unsaved width changes.
+- One department's widths apply to all its years and never leak into another department.
+- Header title, filter icon, and sort icon stay directly adjacent. Extra horizontal space remains after that group.
+- When width is insufficient, the title uses an ellipsis; icons remain visible.
+- The row-number Header is not a saved data-column layout.

@@ -38,6 +38,7 @@ public partial class WorkOrders
     private List<int> AvailableWorkYears = [DateTime.Now.Year];
     private List<TabulatorWorkOrderRow> Rows = [];
     private List<CustomColumnDefinitionData> CustomColumns = [];
+    private List<DepartmentColumnLayoutData> ColumnLayouts = [];
 
     protected override async Task OnInitializedAsync()
     {
@@ -188,6 +189,7 @@ public partial class WorkOrders
                 Rows,
                 WorkOrderBuskets.All,
                 CustomColumns,
+                ColumnLayouts,
                 new
                 {
                     MeasurementId = PageOpenMeasurementId,
@@ -344,6 +346,7 @@ public partial class WorkOrders
         SelectedWorkYear = sheet.WorkYear;
         AvailableWorkYears = sheet.AvailableYears;
         CustomColumns = sheet.CustomColumns;
+        ColumnLayouts = sheet.ColumnLayouts;
         Rows = MapRows(sheet.WorkOrders);
     }
 
@@ -379,8 +382,6 @@ public partial class WorkOrders
                             workOrder.WorkOrderValue,
                             workOrder.PartialAmount)),
                     Basket = workOrder.Busket,
-                    Status = workOrder.Status,
-                    Notes = workOrder.Notes ?? string.Empty,
                     RowVersion = Convert.ToBase64String(
                         workOrder.RowVersion),
                     CustomFields = CustomColumnService
@@ -477,8 +478,6 @@ public partial class WorkOrders
         public string PartialAmount { get; set; } = string.Empty;
         public string RemainingAmount { get; set; } = string.Empty;
         public string Basket { get; set; } = string.Empty;
-        public string Status { get; set; } = string.Empty;
-        public string Notes { get; set; } = string.Empty;
         public string RowVersion { get; set; } = string.Empty;
 
         [System.Text.Json.Serialization.JsonExtensionData]

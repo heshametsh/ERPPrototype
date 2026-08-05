@@ -17,8 +17,6 @@ public static class WorkOrderFieldRegistry
     public const string WorkOrderValue = "workOrderValue";
     public const string PartialAmount = "partialAmount";
     public const string Basket = "basket";
-    public const string Status = "status";
-    public const string Notes = "notes";
     public const string CustomValues = "customValues";
 
     public static readonly IReadOnlySet<string> EditableFields =
@@ -31,8 +29,6 @@ public static class WorkOrderFieldRegistry
             WorkOrderValue,
             PartialAmount,
             Basket,
-            Status,
-            Notes,
             CustomValues
         };
 

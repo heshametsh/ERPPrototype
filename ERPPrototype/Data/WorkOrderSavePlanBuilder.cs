@@ -140,8 +140,6 @@ public sealed class WorkOrderSavePlanBuilder
             workOrder.WorkOrderValue is null &&
             workOrder.PartialAmount is null &&
             string.IsNullOrWhiteSpace(workOrder.Busket) &&
-            string.IsNullOrWhiteSpace(workOrder.Status) &&
-            string.IsNullOrWhiteSpace(workOrder.Notes) &&
             !CustomColumnService.HasAnyValue(workOrder.CustomValuesJson);
     }
 
@@ -181,18 +179,6 @@ public sealed class WorkOrderSavePlanBuilder
                 workOrder.Busket?.Trim() ?? string.Empty;
         }
 
-        if (fields.Contains(WorkOrderFieldRegistry.Status))
-        {
-            workOrder.Status =
-                workOrder.Status?.Trim() ?? string.Empty;
-        }
-
-        if (fields.Contains(WorkOrderFieldRegistry.Notes))
-        {
-            workOrder.Notes = string.IsNullOrWhiteSpace(workOrder.Notes)
-                ? null
-                : workOrder.Notes.Trim();
-        }
 
         if (fields.Contains(WorkOrderFieldRegistry.CustomValues))
         {
@@ -309,19 +295,6 @@ public sealed class WorkOrderSavePlanBuilder
             return $"Assignment Date year must be between {MinimumWorkYear} and {MaximumWorkYear}.";
         }
 
-        if (
-            fields.Contains(WorkOrderFieldRegistry.Status) &&
-            workOrder.Status?.Length > 150)
-        {
-            return "Status cannot exceed 150 characters.";
-        }
-
-        if (
-            fields.Contains(WorkOrderFieldRegistry.Notes) &&
-            workOrder.Notes?.Length > 1000)
-        {
-            return "Notes cannot exceed 1000 characters.";
-        }
 
         return null;
     }

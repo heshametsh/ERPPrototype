@@ -343,6 +343,7 @@
 
             window.tabulatorFilters?.closeActivePopup?.(elementId);
             window.tabulatorRangeAutoScroll?.detach?.(elementId);
+            this.disposeColumnLayoutsUi?.(elementId, state);
             this.disposeCustomColumnsUi?.(elementId, state);
             this.resetAggregatesUi?.(elementId);
 
@@ -479,8 +480,6 @@
                     workTypeCodes: [],
                     assignmentDates: [],
                     basketValues: [],
-                    statusValues: [],
-                    notesValues: [],
                     workOrderValueAmount: null,
                     partialAmountAmount: null,
                     remainingAmountAmount: null

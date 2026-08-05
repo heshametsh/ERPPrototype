@@ -95,9 +95,7 @@
                 "assignmentDate",
                 "workOrderValue",
                 "partialAmount",
-                "basket",
-                "status",
-                "notes"
+                "basket"
             ];
 
             return fallbackContentFields.some(field =>

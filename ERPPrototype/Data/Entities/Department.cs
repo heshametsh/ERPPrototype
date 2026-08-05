@@ -1,4 +1,4 @@
-﻿namespace ERPPrototype.Data.Entities;
+namespace ERPPrototype.Data.Entities;
 
 public sealed class Department
 {
@@ -17,4 +17,7 @@ public sealed class Department
 
     public ICollection<CustomColumnDefinition> CustomColumnDefinitions { get; set; }
         = new List<CustomColumnDefinition>();
+
+    public ICollection<DepartmentColumnLayout> ColumnLayouts { get; set; }
+        = new List<DepartmentColumnLayout>();
 }

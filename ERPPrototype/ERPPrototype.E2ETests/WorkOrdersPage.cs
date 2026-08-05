@@ -2028,8 +2028,8 @@ internal sealed class WorkOrdersPage(IPage page)
 
                 await table.scrollToRow(startRow, 'top', true);
 
-                const startCell = startRow.getCell('notes');
-                const endCell = endRow.getCell('notes');
+                const startCell = startRow.getCell('basket');
+                const endCell = endRow.getCell('basket');
 
                 if (!startCell || !endCell) {
                     return false;

@@ -126,7 +126,7 @@ powershell -ExecutionPolicy Bypass -File .\ERPPrototype\Tools\Invoke-ERPTests.ps
 
 1. إكمال شيت أوامر العمل: الأعمدة المالية والإجماليات.
 2. الفلاتر والترتيب وحفظ أحجام الأعمدة.
-3. الأعمدة المخصصة والملاحظات الطويلة وتسريع Auto-scroll.
+3. استكمال الأعمدة المخصصة والنصوص الطويلة وتسريع Auto-scroll.
 4. صلاحيات وتجربة BranchManager وProjectManager.
 5. إدارة حسابات الفرع.
 6. Excel Import/Export، ثم المستودع والفواتير.

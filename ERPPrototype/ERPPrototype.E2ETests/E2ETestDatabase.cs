@@ -209,7 +209,6 @@ internal sealed class E2ETestDatabase : IAsyncDisposable
             department.Id,
             currentYear,
             workOrderBase: 920_000_000,
-            notePrefix: "Phase 9 current-year browser row",
             rowsPerYear);
 
         var previousRows = CreateYearRows(
@@ -217,7 +216,6 @@ internal sealed class E2ETestDatabase : IAsyncDisposable
             department.Id,
             previousYear,
             workOrderBase: 921_000_000,
-            notePrefix: "Phase 9 previous-year browser row",
             rowsPerYear);
 
         dbContext.WorkOrders.AddRange(currentRows);
@@ -242,9 +240,7 @@ internal sealed class E2ETestDatabase : IAsyncDisposable
             CurrentYearFirstWorkOrderNumber: currentFirst.WorkOrderNumber,
             CurrentYearMiddleRowId: currentMiddle.Id,
             CurrentYearMiddleWorkOrderNumber: currentMiddle.WorkOrderNumber,
-            CurrentYearFirstNote: currentFirst.Notes ?? string.Empty,
-            CurrentYearMiddleNote: currentMiddle.Notes ?? string.Empty,
-            CurrentYearLastNote: currentLast.Notes ?? string.Empty,
+            CurrentYearMiddleWorkTypeCode: currentMiddle.WorkTypeCode,
             CurrentYearLastRowId: currentLast.Id,
             CurrentYearLastWorkOrderNumber: currentLast.WorkOrderNumber,
             PreviousYearFirstWorkOrderNumber: previousFirst.WorkOrderNumber,
@@ -257,17 +253,9 @@ internal sealed class E2ETestDatabase : IAsyncDisposable
         int departmentId,
         int year,
         int workOrderBase,
-        string notePrefix,
         int rowsPerYear)
     {
         var workTypeCodes = new[] { "401", "402", "801", "802" };
-        var statusValues = new[]
-        {
-            "تحت التنفيذ",
-            "مراجعة",
-            "متوقف",
-            string.Empty
-        };
         var rows = new List<WorkOrder>(rowsPerYear);
 
         for (var index = 1; index <= rowsPerYear; index++)
@@ -300,9 +288,6 @@ internal sealed class E2ETestDatabase : IAsyncDisposable
                     WorkOrderValue = workOrderValue,
                     PartialAmount = partialAmount,
                     Busket = WorkOrderBuskets.InProgress,
-                    Status =
-                        statusValues[(index - 1) % statusValues.Length],
-                    Notes = $"{notePrefix} {index:D4}",
                     DepartmentId = departmentId,
                     CreatedAt = DateTime.UtcNow.AddTicks(index),
                     CreatedBy = employeeId
@@ -348,9 +333,7 @@ internal sealed record E2ESeedData(
     string CurrentYearFirstWorkOrderNumber,
     int CurrentYearMiddleRowId,
     string CurrentYearMiddleWorkOrderNumber,
-    string CurrentYearFirstNote,
-    string CurrentYearMiddleNote,
-    string CurrentYearLastNote,
+    string CurrentYearMiddleWorkTypeCode,
     int CurrentYearLastRowId,
     string CurrentYearLastWorkOrderNumber,
     string PreviousYearFirstWorkOrderNumber,

@@ -1,7 +1,7 @@
 # Phase 9.3A — Custom Columns Foundation
 
 **Date:** 2026-08-04  
-**Status:** Candidate — requires local Build, SQL Server Integration tests, and one manual UI pass.
+**Status:** Approved — local Build, migration, 20/20 Integration tests, and manual UI test passed.
 
 ## User-visible result
 

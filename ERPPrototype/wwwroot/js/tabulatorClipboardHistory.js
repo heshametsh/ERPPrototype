@@ -796,15 +796,6 @@
                         filters?.basketValues ?? []
                     ),
 
-                statusValues:
-                    Array.from(
-                        filters?.statusValues ?? []
-                    ),
-
-                notesValues:
-                    Array.from(
-                        filters?.notesValues ?? []
-                    ),
 
                 workOrderValueAmount:
                     window.tabulatorFilters.cloneAmountFilter(
@@ -1242,6 +1233,23 @@
                 return;
             }
 
+            if (transaction.kind === "column-layout") {
+                await this.applyColumnLayoutTransaction(
+                    elementId,
+                    transaction,
+                    "undo"
+                );
+
+                state.redoStack.push(transaction);
+
+                this.setStatus(
+                    elementId,
+                    `تم التراجع عن: ${transaction.label}.`
+                );
+
+                return;
+            }
+
             if (transaction.kind === "structure") {
                 await this.applyStructureTransaction(
                     elementId,
@@ -1337,6 +1345,23 @@
 
             if (transaction.kind === "custom-column") {
                 await this.applyCustomColumnTransaction(
+                    elementId,
+                    transaction,
+                    "redo"
+                );
+
+                state.undoStack.push(transaction);
+
+                this.setStatus(
+                    elementId,
+                    `تمت إعادة: ${transaction.label}.`
+                );
+
+                return;
+            }
+
+            if (transaction.kind === "column-layout") {
+                await this.applyColumnLayoutTransaction(
                     elementId,
                     transaction,
                     "redo"

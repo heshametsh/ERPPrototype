@@ -144,9 +144,7 @@
             workOrderValue: 3,
             partialAmount: 4,
             remainingAmount: 5,
-            basket: 6,
-            status: 7,
-            notes: 8
+            basket: 6
         },
 
         validationFieldLabels: {
@@ -156,9 +154,7 @@
             workOrderValue: "قيمة أمر العمل",
             partialAmount: "المبلغ الجزئي",
             remainingAmount: "المبلغ المتبقي",
-            basket: "السلة",
-            status: "الحالة",
-            notes: "الملاحظات"
+            basket: "السلة"
         },
 
         getValidationCellKey: function (rowId, field) {
@@ -2448,41 +2444,5 @@
                 }
             ]
         },
-        {
-            key: "status",
-            label: "الحالة",
-            order: 80,
-            normalize: function (value) {
-                return String(value ?? "");
-            },
-            validators: [
-                function (value) {
-                    return String(value ?? "").length <= 150
-                        ? null
-                        : {
-                            code: "max_length",
-                            message: "الحالة لا يمكن أن تتجاوز 150 حرفًا."
-                        };
-                }
-            ]
-        },
-        {
-            key: "notes",
-            label: "الملاحظات",
-            order: 90,
-            normalize: function (value) {
-                return String(value ?? "");
-            },
-            validators: [
-                function (value) {
-                    return String(value ?? "").length <= 1000
-                        ? null
-                        : {
-                            code: "max_length",
-                            message: "الملاحظات لا يمكن أن تتجاوز 1000 حرف."
-                        };
-                }
-            ]
-        }
     ]);
 })();

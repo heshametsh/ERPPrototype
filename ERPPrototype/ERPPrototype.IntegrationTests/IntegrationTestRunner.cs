@@ -46,8 +46,8 @@ internal static class IntegrationTestRunner
                 "Save plan rejects missing or inconsistent financial amounts",
                 planTests.RejectsInvalidFinancialAmountsAsync),
             (
-                "Unrelated legacy edits do not execute financial rules",
-                planTests.UnrelatedLegacyEditDoesNotRunFinancialRulesAsync),
+                "Unrelated nonfinancial edits do not execute financial rules",
+                planTests.UnrelatedNonFinancialEditDoesNotRunFinancialRulesAsync),
             (
                 "Save plan rejects changed and deleted overlap",
                 planTests.RejectsChangedAndDeletedSameRecordAsync),
@@ -82,14 +82,29 @@ internal static class IntegrationTestRunner
                 "Database failure rolls back the whole save",
                 integrationTests.DatabaseFailureRollsBackWholeSaveAsync),
             (
-                "Blank Status remains valid and persists as blank",
-                integrationTests.BlankStatusIsAcceptedAndPersistedAsync),
+                "Legacy Status and Notes columns are removed",
+                integrationTests.LegacyStatusAndNotesColumnsAreRemovedAsync),
             (
                 "Custom columns persist across years and remain department-scoped",
                 integrationTests.CustomColumnsPersistAcrossYearsAndRemainDepartmentScopedAsync),
             (
                 "Custom Number rejects decimals atomically",
                 integrationTests.DecimalCustomNumberIsRejectedAtomicallyAsync),
+            (
+                "Custom column rename and empty type change persist",
+                integrationTests.CustomColumnRenameAndEmptyTypeChangePersistAsync),
+            (
+                "Custom column type change is rejected after values exist",
+                integrationTests.CustomColumnTypeChangeIsRejectedAfterValuesExistAsync),
+            (
+                "Custom column deletion removes values across department years",
+                integrationTests.CustomColumnDeletionRemovesValuesAcrossDepartmentYearsAsync),
+            (
+                "Column widths persist across years and remain department-scoped",
+                integrationTests.ColumnWidthsPersistAcrossYearsAndRemainDepartmentScopedAsync),
+            (
+                "Invalid column width is rejected atomically",
+                integrationTests.InvalidColumnWidthIsRejectedAtomicallyAsync),
             (
                 "Concurrent appends receive distinct DisplayOrder values",
                 integrationTests.ConcurrentAppendsReceiveDistinctDisplayOrdersAsync)
@@ -127,13 +142,13 @@ internal static class IntegrationTestRunner
         if (failures.Count == 0)
         {
             Console.WriteLine(
-                "Phase 9.3A custom-column foundation gate: PASS");
+                "Phase 9.3D legacy-column removal gate: PASS");
 
             return 0;
         }
 
         Console.WriteLine(
-            "Phase 9.3A custom-column foundation gate: FAIL");
+            "Phase 9.3D legacy-column removal gate: FAIL");
 
         foreach (var failure in failures)
         {

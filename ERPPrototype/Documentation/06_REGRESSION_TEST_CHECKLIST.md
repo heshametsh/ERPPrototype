@@ -71,7 +71,7 @@
 - [ ] Arabic digits تتحول بصورة صحيحة.
 - [ ] Invalid date يظهر خطأ.
 - [ ] Basket خارج القائمة يُرفض.
-- [ ] Notes أكبر من الحد تُرفض.
+- [ ] Custom Text أكبر من 250 حرفًا يُرفض.
 - [ ] Duplicate pair يظهر خطأ واضح.
 - [ ] Previous/Next validation ينتقلان للخلية الصحيحة.
 
@@ -201,7 +201,7 @@ Decision: Accept / Roll back / Investigate
 - [ ] Clear a full selected column, then Undo and Redo.
 - [ ] Edit Work Order Number or Work Type in one row; identity validation runs and a real duplicate is blocked.
 - [ ] Edit Assignment Date into another year; only then does the row move to that year after save.
-- [ ] Edit Notes only; Work Order Number, Work Type, date, basket, status, order, and row identity remain unchanged after refresh.
+- [ ] Edit Basket only; Work Order Number, Work Type, date, amounts, order, and row identity remain unchanged after refresh.
 - [ ] Insert a new row; all required new-row rules still run.
 - [ ] Confirm no `tabulatorFieldChanges` load error or unexpected Console error.
 
@@ -238,7 +238,7 @@ Decision: Accept / Roll back / Investigate
 
 - [ ] Open a year with thousands of rows; ArrowDown and ArrowUp each move one cell per press.
 - [ ] Enter quick typing in a text/input column, then use all four arrows; movement and edit commit remain unchanged.
-- [ ] Double-click a Notes/Status cell; Left/Right move inside the text instead of leaving the editor.
+- [ ] Double-click a custom Text cell; Left/Right move inside the text instead of leaving the editor.
 - [ ] Select one cell and press Delete/Backspace; the cell clears once and Undo restores it once.
 - [ ] Select a multi-row range; Copy and Paste run once and create one Undo transaction.
 - [ ] Right-click an unselected cell; the real range is created and one context menu opens.
@@ -259,7 +259,7 @@ Decision: Accept / Roll back / Investigate
 Run from the accepted `Phase8.6-R2-Stable` behaviour after applying R1.
 
 1. Open a year and press Save without editing. Confirm the sheet reports that there are no changes.
-2. Edit Notes in one existing work order, Save, refresh, and confirm only the intended value persisted.
+2. Edit Basket in one existing work order, Save, refresh, and confirm only the intended value persisted.
 3. Change `(WorkOrderNumber + WorkTypeCode)` to an existing global pair. Confirm Save is rejected and the conflicting cells are selected.
 4. Change the same pair to a unique value. Confirm Save succeeds and persists after refresh.
 5. Change Assignment Date to another year. Confirm the row leaves the current sheet and appears in the destination year after Save.
@@ -278,7 +278,7 @@ Acceptance: all business outcomes, messages, browser calls, and measured stage n
 Run from the accepted `Phase8.7-R1-Stable` behaviour after applying R2.
 
 1. Press Save without changes. Confirm the same “no changes” message and no service save call.
-2. Edit Notes in one saved order, Save, refresh, and confirm the intended value and row version persist.
+2. Edit Basket in one saved order, Save, refresh, and confirm the intended value and row version persist.
 3. Enter a globally duplicated `(WorkOrderNumber + WorkTypeCode)`. Confirm the same two cells are marked and the same Arabic duplicate message appears once.
 4. Enter a unique pair after the duplicate failure and confirm Save succeeds.
 5. Change Assignment Date to another year. Confirm request preparation counts one moved row and result preparation removes it from the current sheet and adds the destination year.
@@ -301,8 +301,8 @@ Acceptance: the employee sees the same outcomes as R1; only internal ownership i
 Run from accepted `Phase8.7-R2-Stable` after applying R3.
 
 1. Open the current year and confirm the status starts with zero unsaved rows.
-2. Edit Notes in one saved order. Confirm the unsaved count becomes one; Save and refresh confirm persistence and the count returns to zero.
-3. Edit Notes, then Undo back to the exact saved value before Save. Confirm the unsaved count returns to zero and Save reports no changes.
+2. Edit Basket in one saved order. Confirm the unsaved count becomes one; Save and refresh confirm persistence and the count returns to zero.
+3. Edit Basket, then Undo back to the exact saved value before Save. Confirm the unsaved count returns to zero and Save reports no changes.
 4. Edit two different fields in one row. Confirm Save sends that row once with both changed field keys. Undo only one field and confirm the other field remains unsaved.
 5. Paste a small range, Undo, and Redo. Confirm the unsaved row count and saved result match the visible values after each step.
 6. Paste a full non-identity column, Save, and confirm `identityCheckRows: 0`, no duplicate query, and the unsaved count becomes zero without changing year.
@@ -316,7 +316,7 @@ Run from accepted `Phase8.7-R2-Stable` after applying R3.
 
 Acceptance: visible values, changed-field scope, Undo/Redo, delete tracking, Save requests, and post-Save zero state match R2. The refactor changes ownership only.
 
-**Work example:** change Notes and Status in one order, then Undo Status only. The sheet must report one unsaved row and Save only Notes; it must not send Status or lose the Notes change.
+**Work example:** change Basket and a custom Text value in one order, then Undo Basket only. The sheet must report one unsaved row and Save only the custom Text value; it must not resend Basket or lose the remaining change.
 
 
 ## V. Phase 8.8-R1 — Work Order Read Query Extraction
@@ -329,14 +329,14 @@ Run from accepted `Phase8.7-Stable` after applying R1.
 4. Confirm the performance report still contains `open.server.create-db-context`, `open.server.scope-query`, `open.server.available-years-query`, `open.server.rows-query`, and `open.server.total`.
 5. Compare three repeated large-year opens with the accepted 4,949-row range (about 208–244 ms in the latest focused test). Investigate only if repeatable opens exceed the 1,750 ms regression limit.
 6. Use search/filter, arrows, Copy/Paste, right-click, and resize after changing year. Read extraction must not disturb browser behavior.
-7. Edit Notes in one existing row and Save. Refresh and confirm persistence; this proves the unchanged `WorkOrderService` facade still reaches the save implementation.
+7. Edit Basket in one existing row and Save. Refresh and confirm persistence; this proves the unchanged `WorkOrderService` facade still reaches the save implementation.
 8. Change Assignment Date to another year and Save when a safe test row is available. Confirm year routing remains transactional and unchanged.
 9. Add and save one row when safe. Confirm duplicate scope and temporary Id mapping remain unchanged.
 10. Confirm Console and server logs contain no DI resolution error for `WorkOrderQueryService`, no red JavaScript error, and no duplicate grid initialization.
 
 Acceptance: read results and `open.server.*` measurements match Phase 8.7, while every save rule remains unchanged.
 
-**Work example:** opening 2025 reads 2025 rows through Query Service; editing a 2025 Notes cell and saving still uses the existing save transaction.
+**Work example:** opening 2025 reads 2025 rows through Query Service; editing a 2025 Basket cell and saving still uses the existing save transaction.
 
 
 ## W. Phase 8.8-R2A — SQL Server Save Integration Safety Net
