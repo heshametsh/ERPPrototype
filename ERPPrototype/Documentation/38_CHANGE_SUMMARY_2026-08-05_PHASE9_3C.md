@@ -3,6 +3,8 @@
 **Date:** 2026-08-05  
 **Status:** Accepted — Release Build PASS and SQL Server Integration 25/25 PASS.
 
+> **Superseded in Phase 9.3E:** Custom-column type conversion was removed completely. A type is now immutable after creation; the properties dialog supports rename only. The rename and deletion parts of this phase remain active.
+
 ## User-visible result
 
 - A Department Employee can rename a custom column from its Header context menu.

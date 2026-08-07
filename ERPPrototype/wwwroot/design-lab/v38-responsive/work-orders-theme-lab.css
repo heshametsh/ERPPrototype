@@ -1,0 +1,5114 @@
+:root {
+    color-scheme: light;
+    --navy-950: #032b5f;
+    --navy-900: #074a86;
+    --blue-700: #0068b5;
+    --blue-600: #008bcb;
+    --blue-500: #00a9d6;
+    --sky-400: #4bc4e8;
+    --sky-200: #cfedfa;
+    --ice-100: #eaf7fc;
+    --ice-50: #f7fcfe;
+    --surface: #ffffff;
+    --page: #f4f8fb;
+    --border: #d5e2ec;
+    --border-strong: #b8cedd;
+    --text: #15324a;
+    --muted: #667b8f;
+    --shadow: 0 10px 28px rgba(3, 43, 95, 0.08);
+    --shadow-soft: 0 4px 16px rgba(3, 43, 95, 0.06);
+}
+
+
+/* Hybrid Balanced: Energy brand + Fluent surfaces + Atlassian interactions. */
+html[data-theme="hybrid-balanced"] {
+    --navy-950: #06305f;
+    --navy-900: #074b8a;
+    --blue-700: #0c66e4;
+    --blue-600: #1687d9;
+    --blue-500: #22a9dc;
+    --sky-400: #62c7ea;
+    --sky-200: #cdeef9;
+    --ice-100: #eaf6fb;
+    --ice-50: #f7fbfd;
+    --surface: #ffffff;
+    --page: #f5f8fb;
+    --border: #d8e2eb;
+    --border-strong: #b9ccdc;
+    --text: #172b4d;
+    --muted: #5f7083;
+    --shadow: 0 8px 24px rgba(7, 75, 138, .08);
+    --shadow-soft: 0 2px 9px rgba(7, 75, 138, .07);
+}
+
+/* Hybrid Soft: more Fluent restraint, still carrying Energy cyan and Atlassian clarity. */
+html[data-theme="hybrid-soft"] {
+    --navy-950: #103a5d;
+    --navy-900: #125c96;
+    --blue-700: #176fc1;
+    --blue-600: #2d8ed6;
+    --blue-500: #45a9dc;
+    --sky-400: #78c7e8;
+    --sky-200: #d6eef8;
+    --ice-100: #edf6fa;
+    --ice-50: #f8fbfc;
+    --surface: #ffffff;
+    --page: #f6f7f8;
+    --border: #d5dade;
+    --border-strong: #bac5cd;
+    --text: #243447;
+    --muted: #65717d;
+    --shadow: 0 7px 20px rgba(15, 59, 95, .07);
+    --shadow-soft: 0 2px 7px rgba(15, 59, 95, .06);
+}
+
+/* Hybrid Clear: more Atlassian interaction contrast, softened by Fluent and Energy accents. */
+html[data-theme="hybrid-clear"] {
+    --navy-950: #0a2f61;
+    --navy-900: #093f7f;
+    --blue-700: #0c66e4;
+    --blue-600: #1d7afc;
+    --blue-500: #2f9ee9;
+    --sky-400: #64c3e7;
+    --sky-200: #cce9f8;
+    --ice-100: #e9f3fb;
+    --ice-50: #f7f9fc;
+    --surface: #ffffff;
+    --page: #f5f7fa;
+    --border: #d7dce3;
+    --border-strong: #afc0d3;
+    --text: #172b4d;
+    --muted: #626f86;
+    --shadow: 0 8px 24px rgba(9, 50, 108, .08);
+    --shadow-soft: 0 2px 8px rgba(9, 50, 108, .065);
+}
+
+/* Microsoft Fluent-inspired: neutral surfaces, restrained brand blue, soft depth. */
+html[data-theme="fluent"] {
+    --navy-950: #0f3b5f;
+    --navy-900: #115ea3;
+    --blue-700: #0f6cbd;
+    --blue-600: #2886de;
+    --blue-500: #479ef5;
+    --sky-400: #62abf5;
+    --sky-200: #cfe4fa;
+    --ice-100: #ebf3fc;
+    --ice-50: #f5f9fd;
+    --page: #f5f5f5;
+    --border: #d1d1d1;
+    --border-strong: #b5b5b5;
+    --text: #242424;
+    --muted: #616161;
+    --shadow: 0 8px 22px rgba(0, 0, 0, .08);
+    --shadow-soft: 0 2px 8px rgba(0, 0, 0, .07);
+}
+
+/* SAP Fiori-inspired: calm enterprise blue, flat hierarchy, light shell. */
+html[data-theme="fiori"] {
+    --navy-950: #12344d;
+    --navy-900: #0854a0;
+    --blue-700: #0a6ed1;
+    --blue-600: #0070f2;
+    --blue-500: #1b90ff;
+    --sky-400: #52b5ff;
+    --sky-200: #d1efff;
+    --ice-100: #edf7ff;
+    --ice-50: #f8fbfd;
+    --page: #f5f6f7;
+    --border: #d9d9d9;
+    --border-strong: #a8b3bd;
+    --text: #1d2d3e;
+    --muted: #556b7b;
+    --shadow: 0 6px 18px rgba(30, 64, 87, .07);
+    --shadow-soft: 0 1px 5px rgba(30, 64, 87, .08);
+}
+
+/* IBM Carbon-inspired: crisp contrast, cobalt actions, dense-data precision. */
+html[data-theme="carbon"] {
+    --navy-950: #161616;
+    --navy-900: #262626;
+    --blue-700: #0f62fe;
+    --blue-600: #4589ff;
+    --blue-500: #78a9ff;
+    --sky-400: #a6c8ff;
+    --sky-200: #d0e2ff;
+    --ice-100: #edf5ff;
+    --ice-50: #f7faff;
+    --page: #f4f4f4;
+    --border: #c6c6c6;
+    --border-strong: #8d8d8d;
+    --text: #161616;
+    --muted: #525252;
+    --shadow: 0 5px 16px rgba(0, 0, 0, .08);
+    --shadow-soft: 0 1px 4px rgba(0, 0, 0, .08);
+}
+
+/* Atlassian-inspired: friendly brand blue, clear layers, softer interaction states. */
+html[data-theme="atlassian"] {
+    --navy-950: #172b4d;
+    --navy-900: #09326c;
+    --blue-700: #0c66e4;
+    --blue-600: #1d7afc;
+    --blue-500: #579dff;
+    --sky-400: #85b8ff;
+    --sky-200: #cce0ff;
+    --ice-100: #e9f2ff;
+    --ice-50: #f7f9fc;
+    --page: #f7f8f9;
+    --border: #dcdfe4;
+    --border-strong: #b7c5d8;
+    --text: #172b4d;
+    --muted: #626f86;
+    --shadow: 0 8px 24px rgba(9, 50, 108, .09);
+    --shadow-soft: 0 2px 8px rgba(9, 50, 108, .07);
+}
+
+* { box-sizing: border-box; }
+
+html, body { margin: 0; min-width: 1180px; min-height: 100%; }
+
+body {
+    background:
+        radial-gradient(circle at 93% 7%, color-mix(in srgb, var(--sky-200) 45%, transparent), transparent 24%),
+        var(--page);
+    color: var(--text);
+    font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+    font-size: 14px;
+}
+
+button, input, select { font: inherit; }
+button { cursor: pointer; }
+svg { width: 1.15em; height: 1.15em; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.svg-sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
+
+.lab-panel {
+    position: fixed;
+    right: 18px;
+    bottom: 18px;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    padding: 11px 12px 11px 16px;
+    border: 1px solid var(--border-strong);
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: 0 15px 38px rgba(4, 42, 92, 0.18);
+    backdrop-filter: blur(18px);
+    direction: rtl;
+}
+
+.lab-panel > div:first-child { display: flex; flex-direction: column; line-height: 1.2; }
+.lab-panel strong { color: var(--navy-950); font-size: 0.82rem; }
+.lab-panel span { margin-top: 3px; color: var(--muted); font-size: 0.68rem; }
+.palette-switcher { display: flex; gap: 6px; }
+.palette-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 34px;
+    padding: 0 10px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: #fff;
+    color: var(--text);
+    font-size: 0.73rem;
+    font-weight: 700;
+}
+.palette-button:hover { border-color: var(--blue-500); background: var(--ice-50); }
+.palette-button.is-active { border-color: var(--blue-600); background: var(--ice-100); color: var(--blue-700); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--blue-500) 20%, transparent); }
+.palette-dot { width: 12px; height: 12px; margin: 0; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(255,255,255,.55); }
+.palette-dot-energy { background: linear-gradient(135deg, #032b5f, #0068b5 55%, #4bc4e8); }
+.palette-dot-fluent { background: linear-gradient(135deg, #0f3b5f, #0f6cbd 55%, #62abf5); }
+.palette-dot-fiori { background: linear-gradient(135deg, #12344d, #0a6ed1 55%, #52b5ff); }
+.palette-dot-carbon { background: linear-gradient(135deg, #161616, #0f62fe 55%, #a6c8ff); }
+.palette-dot-atlassian { background: linear-gradient(135deg, #172b4d, #0c66e4 55%, #85b8ff); }
+
+.palette-dot-hybrid-balanced { background: linear-gradient(135deg, #06305f 0%, #0c66e4 52%, #62c7ea 100%); }
+.palette-dot-hybrid-soft { background: linear-gradient(135deg, #103a5d 0%, #176fc1 52%, #78c7e8 100%); }
+.palette-dot-hybrid-clear { background: linear-gradient(135deg, #0a2f61 0%, #1d7afc 52%, #64c3e7 100%); }
+
+
+.application-shell { min-height: 100vh; }
+
+.topbar {
+    position: relative;
+    display: flex;
+    align-items: center;
+    min-height: 76px;
+    padding: 0 32px;
+    overflow: hidden;
+    background: linear-gradient(105deg, var(--navy-950) 0%, var(--navy-900) 48%, var(--blue-700) 100%);
+    color: #fff;
+    box-shadow: 0 7px 26px rgba(3, 37, 82, 0.2);
+    direction: ltr;
+}
+
+.topbar-wave {
+    position: absolute;
+    right: -5%;
+    top: -75px;
+    width: 58%;
+    height: 160px;
+    border-radius: 50%;
+    border: 28px solid color-mix(in srgb, var(--sky-400) 27%, transparent);
+    opacity: .7;
+    transform: rotate(-5deg);
+    pointer-events: none;
+}
+
+.brand-zone, .account-zone, .main-nav { position: relative; z-index: 1; }
+.brand-zone { display: flex; align-items: center; min-width: 320px; gap: 14px; }
+.brand-symbol {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 58px;
+    height: 58px;
+    padding-bottom: 0;
+    border: 1px solid rgba(255,255,255,.22);
+    border-radius: 16px;
+    background: linear-gradient(145deg, rgba(255,255,255,.16), rgba(255,255,255,.06));
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.14), 0 10px 24px rgba(0, 22, 54, .18);
+    overflow: hidden;
+}
+.brand-symbol strong { font-size: 1.65rem; line-height: .85; letter-spacing: -2px; }
+.brand-symbol-wo::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,.15) 0%, rgba(255,255,255,0) 52%);
+    pointer-events: none;
+}
+.brand-monogram {
+    position: relative;
+    z-index: 1;
+    font-size: 1.28rem;
+    font-weight: 900;
+    line-height: 1;
+    letter-spacing: -.06em;
+    color: #ffffff;
+}
+.brand-monogram-sub {
+    position: absolute;
+    right: 8px;
+    bottom: 7px;
+    z-index: 1;
+    font-size: .49rem;
+    font-weight: 800;
+    letter-spacing: .12em;
+    color: rgba(255,255,255,.76);
+}
+.brand-copy-wo strong { letter-spacing: .01em; }
+.brand-copy-wo span { letter-spacing: .02em; }
+.brand-copy { display: flex; flex-direction: column; direction: ltr; min-width: 0; }
+.brand-copy strong { font-size: 1.24rem; font-weight: 820; }
+.brand-copy span { margin-top: 3px; color: rgba(255,255,255,.74); font-size: .75rem; }
+
+.main-nav { display: flex; align-items: center; gap: 7px; margin-left: 28px; direction: rtl; }
+.nav-item { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 16px; border-radius: 12px; color: rgba(255,255,255,.86); font-weight: 760; text-decoration: none; }
+.nav-item:hover { background: rgba(255,255,255,.09); color: #fff; }
+.nav-item.active { background: linear-gradient(135deg, var(--blue-600), var(--blue-500)); color: white; box-shadow: 0 9px 23px rgba(0, 113, 214, .28); }
+
+.account-zone { display: flex; align-items: center; gap: 12px; margin-left: auto; direction: rtl; }
+.logout-button { display: inline-flex; align-items: center; gap: 8px; min-height: 42px; padding: 0 17px; border: 1px solid rgba(255,255,255,.68); border-radius: 10px; background: rgba(255,255,255,.05); color: #fff; font-weight: 700; }
+.logout-button:hover { background: rgba(255,255,255,.14); }
+.account-copy { display: flex; flex-direction: column; min-width: 105px; line-height: 1.12; }
+.account-copy span { color: rgba(255,255,255,.7); font-size: .68rem; }
+.account-copy strong { margin-top: 4px; direction: ltr; font-size: .83rem; }
+.avatar { display: flex; align-items: center; justify-content: center; width: 42px; height: 42px; border: 1px solid rgba(255,255,255,.28); border-radius: 50%; background: linear-gradient(135deg, var(--blue-500), var(--sky-400)); color: #fff; font-weight: 800; }
+
+.page-content { position: relative; max-width: 1900px; margin: 0 auto; padding: 22px 34px 28px; }
+.page-content::before {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    left: -5%;
+    bottom: -130px;
+    width: 52%;
+    height: 190px;
+    border-radius: 50%;
+    border: 34px solid color-mix(in srgb, var(--sky-200) 45%, transparent);
+    transform: rotate(7deg);
+}
+
+.page-heading-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; direction: ltr; }
+.title-area { display: flex; align-items: center; gap: 12px; direction: ltr; }
+.title-area h1 { margin: 0; color: var(--navy-950); font-size: 1.72rem; letter-spacing: -.6px; }
+.scope-label { color: var(--blue-700); font-size: .78rem; font-weight: 700; direction: rtl; }
+.year-control { display: flex; align-items: center; min-height: 39px; margin-left: 8px; border: 1px solid var(--border-strong); border-radius: 9px; background: #fff; overflow: hidden; box-shadow: var(--shadow-soft); }
+.year-control span { padding: 0 10px; color: var(--blue-700); font-size: .75rem; font-weight: 700; }
+.year-control select { min-height: 37px; padding: 0 30px 0 11px; border: 0; border-left: 1px solid var(--border); outline: none; background: #fff; color: var(--navy-950); font-weight: 750; }
+.actions-area { display: flex; flex-direction: column; align-items: flex-end; gap: 7px; direction: rtl; }
+.action-buttons { display: flex; flex-wrap: nowrap; gap: 8px; direction: ltr; }
+.button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 40px; padding: 0 14px; border-radius: 9px; font-size: .79rem; font-weight: 700; }
+.button-secondary { border: 1px solid var(--border-strong); background: white; color: var(--blue-700); box-shadow: 0 2px 7px rgba(13, 64, 115, .035); }
+.button-secondary:hover { border-color: var(--blue-500); background: var(--ice-50); }
+.button-primary { border: 1px solid transparent; background: linear-gradient(135deg, var(--blue-700), var(--blue-500)); color: white; box-shadow: 0 8px 18px color-mix(in srgb, var(--blue-600) 25%, transparent); }
+.button-primary:hover { filter: brightness(1.05); }
+.unsaved-note { display: flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 99px; background: var(--ice-100); color: var(--blue-700); font-size: .67rem; font-weight: 650; }
+.unsaved-note span { display: inline-flex; align-items: center; justify-content: center; width: 15px; height: 15px; border: 1px solid var(--sky-400); border-radius: 50%; font-size: .58rem; }
+
+.kpi-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-top: 20px; direction: ltr; }
+.kpi-card { position: relative; display: flex; align-items: center; min-height: 91px; padding: 16px 18px; overflow: hidden; border: 1px solid var(--border); border-radius: 14px; background: linear-gradient(120deg, #fff 0%, color-mix(in srgb, var(--ice-100) 42%, white) 100%); box-shadow: var(--shadow-soft); }
+.kpi-card::after { content: ""; position: absolute; right: -38px; top: -56px; width: 130px; height: 130px; border: 21px solid var(--accent-soft); border-radius: 50%; opacity: .48; }
+.kpi-card > div:last-child { display: flex; flex: 1; flex-direction: column; min-width: 0; padding-left: 15px; direction: ltr; }
+.kpi-card span { color: var(--text); font-size: .74rem; font-weight: 700; }
+.kpi-card strong { margin-top: 6px; color: var(--accent); font-size: 1.38rem; line-height: 1; letter-spacing: .1px; white-space: nowrap; }
+.kpi-card i { display: block; width: 96px; height: 4px; margin-top: 11px; border-radius: 999px; background: linear-gradient(90deg, var(--accent), var(--accent-soft)); }
+.metric-icon { position: relative; z-index: 1; display: flex; align-items: center; justify-content: center; width: 52px; height: 52px; flex: 0 0 52px; border-radius: 14px; background: linear-gradient(145deg, var(--accent), var(--accent-alt)); color: white; box-shadow: 0 10px 22px color-mix(in srgb, var(--accent) 25%, transparent); }
+.metric-icon svg { width: 26px; height: 26px; }
+.kpi-card-one { --accent: var(--navy-900); --accent-alt: var(--blue-700); --accent-soft: var(--sky-200); }
+.kpi-card-two { --accent: var(--blue-700); --accent-alt: var(--blue-500); --accent-soft: color-mix(in srgb, var(--sky-400) 60%, white); }
+.kpi-card-three { --accent: var(--blue-600); --accent-alt: var(--sky-400); --accent-soft: var(--sky-200); }
+.kpi-card-four { --accent: var(--blue-500); --accent-alt: var(--sky-400); --accent-soft: var(--ice-100); }
+
+.basket-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-top: 14px; direction: ltr; }
+.basket-card { --basket-accent: var(--blue-700); position: relative; min-height: 116px; overflow: hidden; border: 1px solid var(--border); border-radius: 12px; background: white; box-shadow: var(--shadow-soft); direction: rtl; }
+.basket-card::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, var(--basket-accent), color-mix(in srgb, var(--basket-accent) 35%, white)); }
+.basket-card header { display: flex; align-items: center; gap: 8px; min-height: 38px; padding: 0 12px; border-bottom: 1px solid var(--border); background: linear-gradient(90deg, color-mix(in srgb, var(--basket-accent) 6%, white), #fff); color: var(--basket-accent); font-size: .76rem; }
+.basket-marker { width: 9px; height: 9px; border-radius: 50%; background: var(--basket-accent); box-shadow: 0 0 0 5px color-mix(in srgb, var(--basket-accent) 10%, transparent); }
+.basket-columns, .basket-row { display: grid; grid-template-columns: 1.35fr .55fr 1.15fr; gap: 8px; align-items: center; padding: 6px 13px 0; font-size: .69rem; }
+.basket-columns { color: var(--muted); font-weight: 700; }
+.basket-row strong, .basket-row b { color: var(--navy-900); font-size: .72rem; }
+.basket-row b { direction: ltr; text-align: right; }
+.basket-one { --basket-accent: var(--navy-900); }
+.basket-two { --basket-accent: var(--blue-700); }
+.basket-three { --basket-accent: var(--blue-600); }
+.basket-four { --basket-accent: var(--blue-500); }
+
+.sheet-section { margin-top: 14px; }
+.sheet-toolbar { display: flex; align-items: center; justify-content: space-between; min-height: 42px; gap: 16px; direction: ltr; }
+.sheet-label { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: .72rem; font-weight: 650; }
+.status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--sky-400); box-shadow: 0 0 0 4px color-mix(in srgb, var(--sky-400) 15%, transparent); }
+.search-group { display: flex; align-items: center; gap: 8px; direction: rtl; }
+.search-box { display: flex; align-items: center; width: 320px; min-height: 38px; padding: 0 11px; border: 1px solid var(--border-strong); border-radius: 9px; background: white; color: var(--muted); box-shadow: var(--shadow-soft); }
+.search-box svg { flex: 0 0 auto; }
+.search-box input { width: 100%; height: 36px; padding: 0 9px; border: 0; outline: 0; background: transparent; color: var(--text); text-align: right; }
+.search-group > button { min-height: 38px; padding: 0 14px; border: 1px solid var(--border-strong); border-radius: 9px; background: white; color: var(--blue-700); font-weight: 700; }
+.search-group > button:hover { border-color: var(--blue-500); background: var(--ice-50); }
+
+.table-shell { overflow: hidden; border: 1px solid var(--border); border-radius: 11px; background: white; box-shadow: var(--shadow); }
+table { width: 100%; border-collapse: collapse; table-layout: fixed; direction: ltr; font-size: .68rem; }
+thead { background: linear-gradient(100deg, var(--navy-900), var(--blue-700) 55%, var(--blue-600)); color: white; }
+th { height: 33px; padding: 0 7px; border-right: 1px solid rgba(255,255,255,.19); text-align: center; font-weight: 700; white-space: nowrap; }
+th:nth-child(1) { width: 45px; }
+th:nth-child(2) { width: 155px; }
+th:nth-child(3) { width: 100px; }
+th:nth-child(4) { width: 150px; }
+th:nth-child(5), th:nth-child(6), th:nth-child(7) { width: 145px; }
+th:nth-child(8) { width: 130px; }
+th:nth-child(9) { width: 100px; }
+th:nth-child(10) { width: 70px; }
+th:nth-child(11) { width: 80px; }
+th:nth-child(12) { width: 190px; }
+td { height: 28px; padding: 0 8px; border-right: 1px solid #e4ebf2; border-bottom: 1px solid #e4ebf2; color: #334d69; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+tbody tr:nth-child(even) { background: color-mix(in srgb, var(--ice-50) 50%, white); }
+tbody tr:hover { background: var(--ice-100); }
+.link-cell { color: var(--blue-700); font-weight: 700; }
+.selected-cell { position: relative; background: color-mix(in srgb, var(--sky-200) 35%, white) !important; outline: 2px solid var(--blue-500); outline-offset: -2px; }
+.selected-cell::after { content: ""; position: absolute; right: -1px; bottom: -1px; width: 5px; height: 5px; background: var(--blue-600); }
+
+.selection-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: 13px; overflow: hidden; border: 1px solid var(--border); border-radius: 12px; background: white; box-shadow: var(--shadow-soft); direction: ltr; }
+.selection-summary article { --summary-accent: var(--blue-700); display: flex; align-items: center; min-height: 67px; gap: 12px; padding: 10px 17px; border-right: 1px solid var(--border); background: linear-gradient(115deg, #fff, color-mix(in srgb, var(--ice-100) 50%, white)); }
+.selection-summary article:nth-child(2) { --summary-accent: var(--blue-600); }
+.selection-summary article:nth-child(3) { --summary-accent: var(--blue-500); }
+.selection-summary article:nth-child(4) { --summary-accent: var(--sky-400); border-right: 0; }
+.summary-icon { display: flex; align-items: center; justify-content: center; width: 39px; height: 39px; border: 1px solid color-mix(in srgb, var(--summary-accent) 25%, white); border-radius: 11px; background: color-mix(in srgb, var(--summary-accent) 8%, white); color: var(--summary-accent); }
+.selection-summary article > div { display: flex; flex-direction: column; direction: ltr; }
+.selection-summary span { color: var(--muted); font-size: .7rem; font-weight: 650; }
+.selection-summary strong { margin-top: 5px; color: var(--navy-900); font-size: 1.05rem; }
+
+@media (max-width: 1450px) {
+    body { font-size: 13px; }
+    .page-content { padding-left: 24px; padding-right: 24px; }
+    .button { padding-left: 10px; padding-right: 10px; }
+    .kpi-card strong { font-size: 1.18rem; }
+}
+
+
+/* =========================================================
+   Compact sheet-first layout experiment
+   Isolated design lab only — does not affect the real grid.
+   Approximate desktop ratio:
+   Header 8% · Heading + totals 18% · Baskets 14% · Sheet 60%
+   ========================================================= */
+
+html,
+body {
+    width: 100%;
+    height: 100%;
+    min-height: 100%;
+    overflow: hidden;
+}
+
+body { min-width: 1180px; }
+
+.layout-readout {
+    color: var(--blue-700);
+    direction: ltr;
+    font-size: .64rem;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.application-shell {
+    display: grid;
+    grid-template-rows: clamp(56px, 7.5vh, 68px) minmax(0, 1fr);
+    width: 100%;
+    height: 100vh;
+    min-height: 0;
+}
+
+.topbar {
+    min-height: 0;
+    height: 100%;
+    padding: 0 24px;
+    box-shadow: 0 4px 16px rgba(3, 37, 82, .17);
+}
+.topbar-wave { top: -102px; height: 156px; opacity: .46; }
+.brand-zone { min-width: 236px; gap: 11px; }
+.brand-symbol { width: 46px; height: 38px; }
+.brand-symbol strong { font-size: 1.35rem; }
+.brand-wing { top: 5px; width: 23px; height: 13px; }
+.brand-copy strong { font-size: 1rem; }
+.brand-copy span { margin-top: 1px; font-size: .65rem; }
+.main-nav { margin-left: 24px; }
+.nav-item { min-height: 34px; gap: 6px; padding: 0 13px; border-radius: 8px; font-size: .76rem; }
+.account-zone { gap: 9px; }
+.logout-button { min-height: 34px; padding: 0 12px; border-radius: 8px; font-size: .74rem; }
+.account-copy { min-width: 88px; }
+.account-copy span { font-size: .59rem; }
+.account-copy strong { margin-top: 2px; font-size: .73rem; }
+.avatar { width: 34px; height: 34px; font-size: .78rem; }
+
+.page-content {
+    display: grid;
+    grid-template-rows: minmax(136px, 18vh) minmax(98px, 14vh) minmax(0, 1fr);
+    gap: 8px;
+    width: 100%;
+    height: 100%;
+    max-width: 1920px;
+    min-height: 0;
+    padding: 8px 24px;
+    overflow: hidden;
+}
+.page-content::before { bottom: -158px; opacity: .55; }
+.overview-zone { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 7px; min-height: 0; }
+.page-heading-row { align-items: center; min-height: 43px; gap: 16px; }
+.title-area { gap: 9px; }
+.title-area h1 { font-size: 1.34rem; }
+.scope-label { font-size: .69rem; }
+.year-control { min-height: 32px; margin-left: 3px; border-radius: 8px; }
+.year-control span { padding: 0 8px; font-size: .68rem; }
+.year-control select { min-height: 30px; padding: 0 25px 0 9px; font-size: .73rem; }
+.actions-area { gap: 4px; }
+.action-buttons { gap: 6px; }
+.button { min-height: 33px; gap: 5px; padding: 0 10px; border-radius: 8px; font-size: .69rem; }
+.unsaved-note { padding: 2px 7px; font-size: .59rem; }
+.unsaved-note span { width: 13px; height: 13px; font-size: .52rem; }
+
+.kpi-grid { min-height: 0; height: 100%; gap: 10px; margin-top: 0; }
+.kpi-card { min-height: 0; height: 100%; padding: 10px 13px; border-radius: 11px; }
+.kpi-card::after { right: -48px; top: -66px; width: 120px; height: 120px; border-width: 18px; }
+.kpi-card > div:last-child { padding-left: 10px; }
+.kpi-card span { font-size: .66rem; }
+.kpi-card strong { margin-top: 4px; font-size: clamp(1rem, 1.18vw, 1.25rem); }
+.kpi-card i { width: 74px; height: 3px; margin-top: 7px; }
+.metric-icon { width: 43px; height: 43px; flex-basis: 43px; border-radius: 11px; }
+.metric-icon svg { width: 21px; height: 21px; }
+
+.basket-grid { min-height: 0; height: 100%; gap: 10px; margin-top: 0; }
+.basket-card { min-height: 0; height: 100%; border-radius: 10px; }
+.basket-card header { min-height: 31px; padding: 0 10px; font-size: .68rem; }
+.basket-marker { width: 7px; height: 7px; box-shadow: 0 0 0 4px color-mix(in srgb, var(--basket-accent) 10%, transparent); }
+.basket-columns,
+.basket-row { grid-template-columns: 1.27fr .48fr 1.12fr; gap: 6px; padding: 4px 10px 0; font-size: .6rem; }
+.basket-row strong,
+.basket-row b { font-size: .64rem; }
+
+.sheet-zone { display: grid; grid-template-rows: minmax(0, 1fr) auto; gap: 6px; min-height: 0; overflow: hidden; }
+.sheet-section { display: grid; grid-template-rows: 34px minmax(0, 1fr); min-height: 0; margin-top: 0; }
+.sheet-toolbar { min-height: 34px; }
+.search-box { width: 286px; min-height: 31px; border-radius: 8px; }
+.search-box input { height: 29px; font-size: .68rem; }
+.search-group > button { min-height: 31px; padding: 0 11px; border-radius: 8px; font-size: .68rem; }
+.table-shell { min-height: 0; height: 100%; overflow: auto; border-radius: 9px; }
+.table-shell table { min-height: 100%; }
+th { position: sticky; top: 0; z-index: 2; height: 31px; }
+td { height: 27px; }
+
+.selection-summary { min-height: 0; margin-top: 0; border-radius: 9px; }
+.selection-summary article { min-height: 48px; gap: 9px; padding: 6px 13px; }
+.summary-icon { width: 32px; height: 32px; border-radius: 9px; }
+.selection-summary span { font-size: .61rem; }
+.selection-summary strong { margin-top: 2px; font-size: .88rem; }
+
+.lab-panel { right: 12px; bottom: 10px; gap: 10px; padding: 8px 9px 8px 12px; border-radius: 13px; }
+.palette-button { min-height: 29px; padding: 0 8px; font-size: .66rem; }
+
+@media (max-height: 780px) {
+    .application-shell { grid-template-rows: 54px minmax(0, 1fr); }
+    .page-content { grid-template-rows: 137px 102px minmax(0, 1fr); gap: 6px; padding-top: 6px; padding-bottom: 6px; }
+    .selection-summary article { min-height: 42px; }
+}
+
+/* =========================================================
+   Sheet-focus refinement v3 — user review 2026-08-06
+   Isolated lab only. No real Work Orders / Tabulator files.
+   Goals:
+   - Slightly smaller top bar.
+   - Shorter totals area.
+   - Stronger Remaining Amount emphasis (blue family only).
+   - Larger basket typography.
+   - Larger, clearer grid typography.
+   ========================================================= */
+
+.application-shell {
+    grid-template-rows: clamp(48px, 6.2vh, 56px) minmax(0, 1fr);
+}
+
+.topbar {
+    padding-inline: 20px;
+}
+.topbar-wave {
+    top: -112px;
+    height: 150px;
+    opacity: .38;
+}
+.brand-zone {
+    min-width: 210px;
+    gap: 9px;
+}
+.brand-symbol {
+    width: 41px;
+    height: 34px;
+}
+.brand-symbol strong { font-size: 1.2rem; }
+.brand-wing {
+    top: 4px;
+    width: 21px;
+    height: 11px;
+}
+.brand-copy strong { font-size: .91rem; }
+.brand-copy span { font-size: .59rem; }
+.main-nav {
+    margin-left: 18px;
+    gap: 5px;
+}
+.nav-item {
+    min-height: 31px;
+    padding-inline: 11px;
+    font-size: .7rem;
+}
+.account-zone { gap: 7px; }
+.logout-button {
+    min-height: 31px;
+    padding-inline: 11px;
+    font-size: .68rem;
+}
+.account-copy { min-width: 80px; }
+.account-copy span { font-size: .54rem; }
+.account-copy strong { font-size: .68rem; }
+.avatar {
+    width: 31px;
+    height: 31px;
+    font-size: .7rem;
+}
+
+.page-content {
+    grid-template-rows:
+        clamp(116px, 14.5vh, 138px)
+        clamp(110px, 15vh, 132px)
+        minmax(0, 1fr);
+    gap: 7px;
+    padding-top: 7px;
+    padding-bottom: 7px;
+}
+
+.overview-zone {
+    grid-template-rows: 38px minmax(0, 1fr);
+    gap: 5px;
+}
+.page-heading-row { min-height: 38px; }
+.title-area h1 { font-size: 1.27rem; }
+
+.kpi-grid { gap: 9px; }
+.kpi-card {
+    padding: 7px 12px;
+    border-radius: 10px;
+}
+.kpi-card::after {
+    right: -43px;
+    top: -58px;
+    width: 105px;
+    height: 105px;
+    border-width: 15px;
+    opacity: .38;
+}
+.kpi-card > div:last-child { padding-left: 9px; }
+.kpi-card span { font-size: .67rem; }
+.kpi-card strong {
+    margin-top: 3px;
+    font-size: clamp(1.02rem, 1.16vw, 1.24rem);
+}
+.kpi-card i {
+    width: 66px;
+    margin-top: 6px;
+}
+.metric-icon {
+    width: 39px;
+    height: 39px;
+    flex-basis: 39px;
+    border-radius: 10px;
+}
+.metric-icon svg {
+    width: 19px;
+    height: 19px;
+}
+
+/* Remaining Amount is intentionally the strongest financial card. */
+.kpi-card-four {
+    border-color: color-mix(in srgb, var(--sky-400) 55%, var(--border));
+    background:
+        linear-gradient(115deg,
+            color-mix(in srgb, var(--ice-100) 72%, white) 0%,
+            color-mix(in srgb, var(--sky-200) 50%, white) 100%);
+    box-shadow:
+        0 7px 20px color-mix(in srgb, var(--blue-500) 11%, transparent),
+        inset 4px 0 0 var(--blue-500);
+}
+.kpi-card-four span {
+    color: var(--navy-900);
+    font-weight: 800;
+}
+.kpi-card-four strong {
+    color: var(--blue-700);
+    font-size: clamp(1.1rem, 1.28vw, 1.34rem);
+    font-weight: 850;
+}
+.kpi-card-four i {
+    width: 86px;
+    height: 4px;
+}
+
+.basket-grid { gap: 9px; }
+.basket-card {
+    display: flex;
+    flex-direction: column;
+}
+.basket-card header {
+    min-height: 34px;
+    padding-inline: 12px;
+    font-size: .8rem;
+    font-weight: 800;
+}
+.basket-marker {
+    width: 8px;
+    height: 8px;
+}
+.basket-columns,
+.basket-row {
+    grid-template-columns: 1.25fr .45fr 1.2fr;
+    gap: 7px;
+    padding: 6px 12px 0;
+}
+.basket-columns {
+    font-size: .67rem;
+    font-weight: 800;
+}
+.basket-row strong,
+.basket-row b {
+    font-size: .75rem;
+    line-height: 1.25;
+}
+.basket-row strong { font-weight: 750; }
+.basket-row b { font-weight: 800; }
+
+.sheet-section {
+    grid-template-rows: 33px minmax(0, 1fr);
+}
+.sheet-toolbar { min-height: 33px; }
+.sheet-label { font-size: .68rem; }
+.table-shell table {
+    font-size: .75rem;
+}
+th {
+    height: 32px;
+    padding-inline: 7px;
+    font-size: .72rem;
+    font-weight: 800;
+}
+td {
+    height: 29px;
+    padding-inline: 8px;
+    color: #284764;
+    font-size: .74rem;
+    font-weight: 500;
+}
+.link-cell {
+    font-weight: 800;
+}
+
+@media (max-height: 780px) {
+    .application-shell {
+        grid-template-rows: 47px minmax(0, 1fr);
+    }
+    .page-content {
+        grid-template-rows: 112px 108px minmax(0, 1fr);
+    }
+    .basket-card header { min-height: 31px; }
+    .basket-row strong,
+    .basket-row b { font-size: .71rem; }
+    .table-shell table { font-size: .71rem; }
+    td { height: 27px; font-size: .7rem; }
+}
+
+/* =========================================================
+   Sheet-focus refinement v4 — user review 2026-08-06
+   Isolated lab only. No real Work Orders / Tabulator files.
+   Changes:
+   - Add breathing room below the top header.
+   - Reduce totals/KPI height and return space to the sheet.
+   - Restore the original balanced blue palette treatment.
+   ========================================================= */
+
+/* Clear visual separation between the global header and the page action row. */
+.page-content {
+    grid-template-rows:
+        clamp(100px, 12vh, 110px)
+        clamp(110px, 15vh, 132px)
+        minmax(0, 1fr);
+    gap: 8px;
+    padding-top: 14px;
+}
+
+.overview-zone {
+    grid-template-rows: 36px minmax(0, 1fr);
+    gap: 4px;
+}
+
+.page-heading-row {
+    min-height: 36px;
+}
+
+/* Shorter KPI cards: same information, less empty vertical space. */
+.kpi-grid {
+    gap: 9px;
+}
+
+.kpi-card {
+    min-height: 0;
+    padding: 5px 12px;
+}
+
+.kpi-card::after {
+    right: -46px;
+    top: -63px;
+    width: 100px;
+    height: 100px;
+    border-width: 14px;
+    opacity: .34;
+}
+
+.kpi-card span {
+    font-size: .65rem;
+}
+
+.kpi-card strong {
+    margin-top: 2px;
+    font-size: clamp(.98rem, 1.1vw, 1.18rem);
+}
+
+.kpi-card i {
+    width: 62px;
+    height: 3px;
+    margin-top: 5px;
+}
+
+.metric-icon {
+    width: 36px;
+    height: 36px;
+    flex-basis: 36px;
+    border-radius: 9px;
+}
+
+.metric-icon svg {
+    width: 18px;
+    height: 18px;
+}
+
+/* Restore the original first-experiment treatment for Remaining Amount. */
+.kpi-card-four {
+    border-color: var(--border);
+    background: linear-gradient(120deg, #fff 0%, color-mix(in srgb, var(--ice-100) 42%, white) 100%);
+    box-shadow: var(--shadow-soft);
+}
+
+.kpi-card-four span {
+    color: var(--text);
+    font-weight: 700;
+}
+
+.kpi-card-four strong {
+    color: var(--accent);
+    font-size: clamp(.98rem, 1.1vw, 1.18rem);
+    font-weight: 700;
+}
+
+.kpi-card-four i {
+    width: 62px;
+    height: 3px;
+}
+
+@media (max-height: 780px) {
+    .page-content {
+        grid-template-rows: 98px 108px minmax(0, 1fr);
+        padding-top: 11px;
+    }
+}
+
+
+/* =========================================================
+   Design-system palette trials v5 — 2026-08-06
+   Color-only experiments. Layout stays identical to approved v4.
+   ========================================================= */
+
+.theme-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+}
+.theme-description {
+    max-width: 330px;
+    margin: 0 !important;
+    color: var(--muted) !important;
+    font-size: .61rem !important;
+    line-height: 1.25;
+    text-align: right;
+    white-space: normal;
+}
+.palette-switcher { flex-wrap: wrap; justify-content: flex-end; }
+.lab-panel { max-width: calc(100vw - 24px); }
+
+/* Energy Wave — closest to the electricity-company visual language. */
+html[data-theme="energy"] .topbar {
+    background: linear-gradient(104deg, #032b5f 0%, #005a9c 58%, #007fb9 100%);
+}
+html[data-theme="energy"] .topbar-wave {
+    border-color: color-mix(in srgb, #4bc4e8 34%, transparent);
+}
+html[data-theme="energy"] .kpi-card:nth-child(1) { background: linear-gradient(115deg, #fff 0%, #f1f8fc 100%); }
+html[data-theme="energy"] .kpi-card:nth-child(2) { background: linear-gradient(115deg, #fff 0%, #eef8fd 100%); }
+html[data-theme="energy"] .kpi-card:nth-child(3) { background: linear-gradient(115deg, #fff 0%, #eaf8fd 100%); }
+html[data-theme="energy"] .kpi-card:nth-child(4) { background: linear-gradient(115deg, #fff 0%, #e8f7fb 100%); }
+
+/* Fluent Air — soft neutral canvas and subtle elevation. */
+html[data-theme="fluent"] .topbar {
+    background: linear-gradient(104deg, #0f3b5f 0%, #115ea3 58%, #0f6cbd 100%);
+}
+html[data-theme="fluent"] .topbar-wave { opacity: .25; }
+html[data-theme="fluent"] .kpi-card,
+html[data-theme="fluent"] .basket-card,
+html[data-theme="fluent"] .selection-summary,
+html[data-theme="fluent"] .table-shell { border-color: #d9d9d9; }
+html[data-theme="fluent"] .kpi-card { background: #fff; }
+html[data-theme="fluent"] .metric-icon { box-shadow: 0 4px 12px color-mix(in srgb, var(--accent) 18%, transparent); }
+html[data-theme="fluent"] thead { background: linear-gradient(100deg, #115ea3, #0f6cbd 58%, #2886de); }
+
+/* Fiori Horizon — light shell and flatter enterprise surfaces. */
+html[data-theme="fiori"] .topbar {
+    background: #ffffff;
+    color: var(--text);
+    border-bottom: 3px solid var(--blue-700);
+    box-shadow: 0 3px 12px rgba(29, 45, 62, .10);
+}
+html[data-theme="fiori"] .topbar-wave { display: none; }
+html[data-theme="fiori"] .brand-symbol { border-right-color: var(--border); color: var(--blue-700); }
+html[data-theme="fiori"] .brand-wing-one { background: var(--navy-950); }
+html[data-theme="fiori"] .brand-wing-two { background: var(--blue-500); }
+html[data-theme="fiori"] .brand-copy span,
+html[data-theme="fiori"] .account-copy span { color: var(--muted); }
+html[data-theme="fiori"] .nav-item { color: var(--text); }
+html[data-theme="fiori"] .nav-item:hover { background: var(--ice-100); color: var(--blue-700); }
+html[data-theme="fiori"] .nav-item.active { background: var(--blue-700); color: #fff; box-shadow: none; }
+html[data-theme="fiori"] .logout-button { border-color: var(--blue-700); background: #fff; color: var(--blue-700); }
+html[data-theme="fiori"] .logout-button:hover { background: var(--ice-100); }
+html[data-theme="fiori"] .account-copy strong { color: var(--text); }
+html[data-theme="fiori"] .avatar { border-color: var(--border); }
+html[data-theme="fiori"] .kpi-card,
+html[data-theme="fiori"] .basket-card,
+html[data-theme="fiori"] .selection-summary,
+html[data-theme="fiori"] .table-shell { box-shadow: var(--shadow-soft); }
+html[data-theme="fiori"] .kpi-card { background: #fff; border-radius: 8px; }
+html[data-theme="fiori"] .basket-card,
+html[data-theme="fiori"] .table-shell,
+html[data-theme="fiori"] .selection-summary { border-radius: 8px; }
+html[data-theme="fiori"] thead { background: #0854a0; }
+
+/* Carbon Precision — sharper geometry and stronger data contrast. */
+html[data-theme="carbon"] .topbar {
+    background: linear-gradient(102deg, #161616 0%, #262626 38%, #001d6c 100%);
+    box-shadow: none;
+}
+html[data-theme="carbon"] .topbar-wave { display: none; }
+html[data-theme="carbon"] .kpi-card,
+html[data-theme="carbon"] .basket-card,
+html[data-theme="carbon"] .table-shell,
+html[data-theme="carbon"] .selection-summary,
+html[data-theme="carbon"] .button,
+html[data-theme="carbon"] .year-control,
+html[data-theme="carbon"] .search-box,
+html[data-theme="carbon"] .search-group > button { border-radius: 2px; box-shadow: none; }
+html[data-theme="carbon"] .metric-icon,
+html[data-theme="carbon"] .summary-icon { border-radius: 2px; box-shadow: none; }
+html[data-theme="carbon"] .kpi-card { background: #fff; }
+html[data-theme="carbon"] .basket-card header { background: #f4f4f4; }
+html[data-theme="carbon"] thead { background: #161616; }
+html[data-theme="carbon"] tbody tr:nth-child(even) { background: #f4f4f4; }
+html[data-theme="carbon"] .selected-cell { background: #d0e2ff !important; outline-color: #0f62fe; }
+
+/* Atlassian Clear — friendlier surfaces and highly visible interaction blue. */
+html[data-theme="atlassian"] .topbar {
+    background: linear-gradient(104deg, #172b4d 0%, #09326c 50%, #0c66e4 100%);
+}
+html[data-theme="atlassian"] .topbar-wave { opacity: .3; }
+html[data-theme="atlassian"] .kpi-card,
+html[data-theme="atlassian"] .basket-card,
+html[data-theme="atlassian"] .selection-summary { border-color: #dcdfe4; }
+html[data-theme="atlassian"] .kpi-card { background: linear-gradient(115deg, #fff, #f7f9fc); }
+html[data-theme="atlassian"] .nav-item.active,
+html[data-theme="atlassian"] .button-primary { background: #0c66e4; }
+html[data-theme="atlassian"] thead { background: linear-gradient(100deg, #09326c, #0c66e4 72%); }
+html[data-theme="atlassian"] tbody tr:hover { background: #e9f2ff; }
+
+
+
+/* =========================================================
+   Three-way hybrid trials v6 — Energy + Fluent + Atlassian
+   Same approved layout; only color hierarchy and interaction styling vary.
+   ========================================================= */
+
+html[data-theme^="hybrid-"] body {
+    background:
+        radial-gradient(circle at 93% 5%, color-mix(in srgb, var(--sky-200) 38%, transparent), transparent 24%),
+        var(--page);
+}
+
+html[data-theme^="hybrid-"] .topbar {
+    background: linear-gradient(104deg, var(--navy-950) 0%, var(--navy-900) 55%, var(--blue-700) 100%);
+    box-shadow: 0 5px 18px rgba(6, 48, 95, .18);
+}
+html[data-theme^="hybrid-"] .topbar-wave {
+    border-color: color-mix(in srgb, var(--sky-400) 30%, transparent);
+    opacity: .42;
+}
+html[data-theme^="hybrid-"] .nav-item.active,
+html[data-theme^="hybrid-"] .button-primary {
+    background: linear-gradient(135deg, var(--blue-700), var(--blue-600));
+    box-shadow: 0 6px 16px color-mix(in srgb, var(--blue-700) 26%, transparent);
+}
+html[data-theme^="hybrid-"] .button-secondary {
+    background: rgba(255,255,255,.98);
+    border-color: var(--border-strong);
+    color: var(--navy-900);
+}
+html[data-theme^="hybrid-"] .button-secondary:hover {
+    border-color: var(--blue-600);
+    background: var(--ice-50);
+}
+html[data-theme^="hybrid-"] .kpi-card,
+html[data-theme^="hybrid-"] .basket-card,
+html[data-theme^="hybrid-"] .table-shell,
+html[data-theme^="hybrid-"] .selection-summary {
+    border-color: var(--border);
+    box-shadow: var(--shadow-soft);
+}
+html[data-theme^="hybrid-"] .kpi-card {
+    background: linear-gradient(115deg, #ffffff 0%, color-mix(in srgb, var(--ice-100) 58%, #ffffff) 100%);
+}
+html[data-theme^="hybrid-"] .kpi-card-one { --accent: var(--navy-900); --accent-alt: var(--blue-700); --accent-soft: var(--sky-200); }
+html[data-theme^="hybrid-"] .kpi-card-two { --accent: var(--blue-700); --accent-alt: var(--blue-600); --accent-soft: color-mix(in srgb, var(--sky-400) 48%, white); }
+html[data-theme^="hybrid-"] .kpi-card-three { --accent: var(--blue-600); --accent-alt: var(--blue-500); --accent-soft: var(--sky-200); }
+html[data-theme^="hybrid-"] .kpi-card-four {
+    --accent: var(--blue-700);
+    --accent-alt: var(--sky-400);
+    --accent-soft: color-mix(in srgb, var(--sky-200) 74%, white);
+    border-color: color-mix(in srgb, var(--blue-600) 34%, var(--border));
+    background: linear-gradient(115deg, #ffffff 0%, color-mix(in srgb, var(--sky-200) 42%, white) 100%);
+}
+html[data-theme^="hybrid-"] .metric-icon {
+    box-shadow: 0 5px 13px color-mix(in srgb, var(--accent) 19%, transparent);
+}
+html[data-theme^="hybrid-"] .basket-card header {
+    background: linear-gradient(90deg, color-mix(in srgb, var(--basket-accent) 8%, white), #fff 78%);
+}
+html[data-theme^="hybrid-"] thead {
+    background: linear-gradient(100deg, var(--navy-900), var(--blue-700) 68%, var(--blue-600));
+}
+html[data-theme^="hybrid-"] tbody tr:hover {
+    background: var(--ice-100);
+}
+html[data-theme^="hybrid-"] .selected-cell {
+    background: color-mix(in srgb, var(--sky-200) 62%, white) !important;
+    outline-color: var(--blue-600);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--blue-600) 30%, transparent);
+}
+html[data-theme^="hybrid-"] .link-cell {
+    color: var(--blue-700);
+}
+html[data-theme^="hybrid-"] .selection-summary article {
+    background: linear-gradient(115deg, #fff, color-mix(in srgb, var(--ice-100) 48%, white));
+}
+
+/* Balanced: strongest overall blend and recommended starting point. */
+html[data-theme="hybrid-balanced"] .topbar {
+    background: linear-gradient(104deg, #06305f 0%, #07548f 52%, #0c66e4 78%, #1599cf 100%);
+}
+html[data-theme="hybrid-balanced"] .kpi-card:nth-child(1) { background: linear-gradient(115deg, #fff, #f1f7fb); }
+html[data-theme="hybrid-balanced"] .kpi-card:nth-child(2) { background: linear-gradient(115deg, #fff, #eef6fc); }
+html[data-theme="hybrid-balanced"] .kpi-card:nth-child(3) { background: linear-gradient(115deg, #fff, #ebf7fb); }
+html[data-theme="hybrid-balanced"] .kpi-card:nth-child(4) { background: linear-gradient(115deg, #fff, #e6f5fb); }
+
+/* Soft: Fluent-led, calmer for long daily use. */
+html[data-theme="hybrid-soft"] .topbar {
+    background: linear-gradient(104deg, #103a5d 0%, #125c96 58%, #176fc1 100%);
+}
+html[data-theme="hybrid-soft"] .topbar-wave { opacity: .24; }
+html[data-theme="hybrid-soft"] .kpi-card { background: #fff; }
+html[data-theme="hybrid-soft"] thead { background: linear-gradient(100deg, #125c96, #176fc1 72%, #2d8ed6); }
+html[data-theme="hybrid-soft"] .kpi-card-four { background: #f3f9fc; }
+
+/* Clear: Atlassian-led, strongest active and selection states. */
+html[data-theme="hybrid-clear"] .topbar {
+    background: linear-gradient(104deg, #0a2f61 0%, #093f7f 48%, #0c66e4 100%);
+}
+html[data-theme="hybrid-clear"] .topbar-wave { opacity: .34; }
+html[data-theme="hybrid-clear"] .nav-item.active,
+html[data-theme="hybrid-clear"] .button-primary { background: #0c66e4; }
+html[data-theme="hybrid-clear"] thead { background: linear-gradient(100deg, #093f7f, #0c66e4 72%); }
+html[data-theme="hybrid-clear"] tbody tr:hover { background: #e9f2ff; }
+html[data-theme="hybrid-clear"] .selected-cell { background: #dcecff !important; outline-color: #0c66e4; }
+
+
+/* =========================================================
+   Energy Companion v7 — independent companion identity
+   Inspired by the same energy ecosystem without copying it.
+   Key goals:
+   - Navy-to-azure shell with a restrained turquoise edge.
+   - FATRA-like calm data rows and light header treatment.
+   - White enterprise surfaces with clear blue interactions.
+   ========================================================= */
+
+html[data-theme="energy-companion"] {
+    --navy-950: #06265a;
+    --navy-900: #073f82;
+    --blue-700: #0768c9;
+    --blue-600: #078ddb;
+    --blue-500: #16a7dd;
+    --sky-400: #42c7df;
+    --sky-200: #cceff5;
+    --ice-100: #eaf6f9;
+    --ice-50: #f7fafc;
+    --surface: #ffffff;
+    --page: #f3f6f9;
+    --border: #d8e1ea;
+    --border-strong: #b9c9d8;
+    --text: #1f3554;
+    --muted: #697d91;
+    --shadow: 0 7px 22px rgba(6, 38, 90, .075);
+    --shadow-soft: 0 2px 8px rgba(6, 38, 90, .055);
+}
+
+.palette-dot-energy-companion {
+    background: linear-gradient(135deg, #06265a 0%, #0768c9 48%, #16a7dd 76%, #42c7df 100%);
+}
+
+html[data-theme="energy-companion"] body {
+    background:
+        linear-gradient(180deg, rgba(229, 242, 249, .58) 0, rgba(243, 246, 249, 0) 145px),
+        var(--page);
+}
+
+html[data-theme="energy-companion"] .topbar {
+    background:
+        linear-gradient(104deg, #05275d 0%, #073f82 42%, #0768c9 76%, #089bcf 100%);
+    box-shadow: 0 4px 15px rgba(5, 39, 93, .20);
+}
+
+html[data-theme="energy-companion"] .topbar::after {
+    content: "";
+    position: absolute;
+    inset: auto -3% -15px 42%;
+    height: 34px;
+    border-radius: 50% 50% 0 0;
+    background: linear-gradient(90deg, transparent 0%, rgba(66, 199, 223, .10) 28%, rgba(66, 199, 223, .30) 100%);
+    transform: rotate(-1.5deg);
+    pointer-events: none;
+}
+
+html[data-theme="energy-companion"] .topbar-wave {
+    top: -118px;
+    right: -3%;
+    width: 55%;
+    height: 158px;
+    border-width: 24px;
+    border-color: rgba(82, 210, 224, .24);
+    opacity: .68;
+}
+
+html[data-theme="energy-companion"] .brand-wing-one {
+    background: #ffffff;
+}
+html[data-theme="energy-companion"] .brand-wing-two {
+    background: linear-gradient(135deg, #0f9fdf, #24d2c9);
+}
+html[data-theme="energy-companion"] .avatar {
+    background: linear-gradient(145deg, #0c82d7, #39c7dc);
+}
+
+html[data-theme="energy-companion"] .nav-item.active,
+html[data-theme="energy-companion"] .button-primary {
+    background: linear-gradient(135deg, #0877d5 0%, #079ed1 100%);
+    box-shadow: 0 5px 14px rgba(7, 119, 213, .24);
+}
+
+html[data-theme="energy-companion"] .button-secondary {
+    border-color: #c6d4e1;
+    color: #174b83;
+    box-shadow: none;
+}
+html[data-theme="energy-companion"] .button-secondary:hover,
+html[data-theme="energy-companion"] .search-group > button:hover {
+    border-color: #54b9dc;
+    background: #edf8fb;
+}
+
+/* KPIs: white surfaces, limited color, no poster-like blocks. */
+html[data-theme="energy-companion"] .kpi-card {
+    border-color: #d5e1ea;
+    background: #ffffff;
+    box-shadow: 0 3px 12px rgba(6, 38, 90, .055);
+}
+html[data-theme="energy-companion"] .kpi-card::after {
+    border-color: color-mix(in srgb, var(--accent-soft) 72%, white);
+    opacity: .30;
+}
+html[data-theme="energy-companion"] .kpi-card::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 3px;
+    background: linear-gradient(180deg, var(--accent), var(--accent-alt));
+}
+html[data-theme="energy-companion"] .metric-icon {
+    border-radius: 9px;
+    box-shadow: 0 4px 10px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+html[data-theme="energy-companion"] .kpi-card strong {
+    color: #0a589f;
+}
+html[data-theme="energy-companion"] .kpi-card-four {
+    border-color: #b9dae7;
+    background: linear-gradient(110deg, #ffffff 0%, #f0f9fb 100%);
+}
+html[data-theme="energy-companion"] .kpi-card-four strong {
+    color: #087eaf;
+}
+
+/* Baskets: institutional panels, clearer type, quiet row separators. */
+html[data-theme="energy-companion"] .basket-card {
+    border-color: #d5dee7;
+    background: #ffffff;
+    box-shadow: 0 2px 8px rgba(6, 38, 90, .05);
+}
+html[data-theme="energy-companion"] .basket-card::before {
+    height: 2px;
+    background: linear-gradient(90deg, #0b61ae, #2bbbd5);
+}
+html[data-theme="energy-companion"] .basket-card header {
+    border-bottom-color: #dce4ec;
+    background: #eef2f6;
+    color: #21446f;
+}
+html[data-theme="energy-companion"] .basket-marker {
+    background: #119dcc;
+    box-shadow: 0 0 0 4px rgba(17, 157, 204, .10);
+}
+html[data-theme="energy-companion"] .basket-row + .basket-row {
+    margin-top: 4px;
+    padding-top: 5px;
+    border-top: 1px solid #e7edf2;
+}
+html[data-theme="energy-companion"] .basket-row strong,
+html[data-theme="energy-companion"] .basket-row b {
+    color: #23476f;
+}
+
+/* Grid: deliberately close in feeling to calm enterprise request tables. */
+html[data-theme="energy-companion"] .table-shell {
+    border-color: #cfd9e3;
+    border-radius: 7px;
+    box-shadow: 0 3px 12px rgba(6, 38, 90, .055);
+}
+html[data-theme="energy-companion"] thead {
+    background: #e5eaf0;
+    color: #263d5d;
+    box-shadow: inset 0 -1px 0 #bdc9d5;
+}
+html[data-theme="energy-companion"] th {
+    border-right-color: #cbd4de;
+    color: #263d5d;
+    font-weight: 800;
+}
+html[data-theme="energy-companion"] td {
+    border-right-color: #e6ebf0;
+    border-bottom-color: #dce3e9;
+    background: #ffffff;
+    color: #314c69;
+}
+html[data-theme="energy-companion"] tbody tr:nth-child(even),
+html[data-theme="energy-companion"] tbody tr:nth-child(odd) {
+    background: #ffffff;
+}
+html[data-theme="energy-companion"] tbody tr:hover td {
+    background: #eef8fc;
+}
+html[data-theme="energy-companion"] .link-cell {
+    color: #075fae;
+}
+html[data-theme="energy-companion"] .selected-cell {
+    background: #e0f5fb !important;
+    outline-color: #079ed1;
+}
+html[data-theme="energy-companion"] .selected-cell::after {
+    background: #079ed1;
+}
+
+html[data-theme="energy-companion"] .sheet-toolbar {
+    border-bottom: 1px solid #dce4ec;
+}
+html[data-theme="energy-companion"] .status-dot {
+    background: #20b9d3;
+    box-shadow: 0 0 0 4px rgba(32, 185, 211, .13);
+}
+html[data-theme="energy-companion"] .search-box {
+    border-color: #c7d3df;
+    box-shadow: none;
+}
+
+html[data-theme="energy-companion"] .selection-summary {
+    border-color: #d3dde6;
+    box-shadow: 0 2px 8px rgba(6, 38, 90, .05);
+}
+html[data-theme="energy-companion"] .selection-summary article {
+    background: linear-gradient(115deg, #ffffff, #f5f9fb);
+}
+html[data-theme="energy-companion"] .summary-icon {
+    background: #eef8fb;
+    color: #087fbd;
+}
+
+
+/* =========================================================
+   Energy Companion focused refinements v8 — 2026-08-06
+   Three-way decision only: current / calm / clear.
+   Layout and component sizes remain identical to approved v7.
+   ========================================================= */
+
+html[data-theme="energy-calm"] {
+    --navy-950: #0a315b;
+    --navy-900: #124f7d;
+    --blue-700: #176da9;
+    --blue-600: #2587bd;
+    --blue-500: #3aa2ca;
+    --sky-400: #75bfd8;
+    --sky-200: #d9edf4;
+    --ice-100: #eef6f9;
+    --ice-50: #f8fbfc;
+    --surface: #ffffff;
+    --page: #f4f6f8;
+    --border: #d9e0e6;
+    --border-strong: #becbd5;
+    --text: #263d55;
+    --muted: #66798a;
+    --shadow: 0 6px 18px rgba(10, 49, 91, .065);
+    --shadow-soft: 0 2px 7px rgba(10, 49, 91, .05);
+}
+
+html[data-theme="energy-clear"] {
+    --navy-950: #052a60;
+    --navy-900: #064682;
+    --blue-700: #056bc5;
+    --blue-600: #078fd4;
+    --blue-500: #16a8d8;
+    --sky-400: #40bfd9;
+    --sky-200: #cdebf3;
+    --ice-100: #e9f5f9;
+    --ice-50: #f6fafc;
+    --surface: #ffffff;
+    --page: #f2f5f8;
+    --border: #ced9e3;
+    --border-strong: #aebfce;
+    --text: #182f4a;
+    --muted: #596e82;
+    --shadow: 0 7px 20px rgba(5, 42, 96, .08);
+    --shadow-soft: 0 2px 8px rgba(5, 42, 96, .06);
+}
+
+.palette-dot-energy-calm {
+    background: linear-gradient(135deg, #0a315b 0%, #176da9 52%, #75bfd8 100%);
+}
+.palette-dot-energy-clear {
+    background: linear-gradient(135deg, #052a60 0%, #056bc5 50%, #40bfd9 100%);
+}
+
+html[data-theme="energy-calm"] body,
+html[data-theme="energy-clear"] body {
+    background:
+        linear-gradient(180deg, color-mix(in srgb, var(--sky-200) 35%, transparent) 0, transparent 140px),
+        var(--page);
+}
+
+/* Calm: quieter brand shell and long-session reading comfort. */
+html[data-theme="energy-calm"] .topbar {
+    background: linear-gradient(104deg, #092f5a 0%, #104d7b 52%, #1977a8 82%, #258db2 100%);
+    box-shadow: 0 4px 13px rgba(9, 47, 90, .17);
+}
+html[data-theme="energy-calm"] .topbar::after {
+    content: "";
+    position: absolute;
+    inset: auto -3% -15px 42%;
+    height: 32px;
+    border-radius: 50% 50% 0 0;
+    background: linear-gradient(90deg, transparent, rgba(117, 191, 216, .14));
+    pointer-events: none;
+}
+html[data-theme="energy-calm"] .topbar-wave {
+    border-color: rgba(117, 191, 216, .16);
+    opacity: .42;
+}
+html[data-theme="energy-calm"] .brand-wing-two,
+html[data-theme="energy-calm"] .avatar {
+    background: linear-gradient(145deg, #2587bd, #75bfd8);
+}
+html[data-theme="energy-calm"] .nav-item.active,
+html[data-theme="energy-calm"] .button-primary {
+    background: linear-gradient(135deg, #176da9, #2587bd);
+    box-shadow: 0 4px 12px rgba(23, 109, 169, .20);
+}
+html[data-theme="energy-calm"] .kpi-card {
+    border-color: #d9e1e7;
+    background: #ffffff;
+    box-shadow: 0 2px 8px rgba(10, 49, 91, .045);
+}
+html[data-theme="energy-calm"] .kpi-card::after { opacity: .14; transform: scale(.86); }
+html[data-theme="energy-calm"] .kpi-card strong { color: #174f7d; }
+html[data-theme="energy-calm"] .kpi-card-four {
+    border-color: #c8dce5;
+    background: #fbfdfe;
+}
+html[data-theme="energy-calm"] .kpi-card-four strong { color: #176d96; }
+html[data-theme="energy-calm"] .basket-card header {
+    background: #f0f3f6;
+    color: #294966;
+}
+html[data-theme="energy-calm"] .basket-card::before {
+    background: linear-gradient(90deg, #176da9, #75bfd8);
+}
+html[data-theme="energy-calm"] thead {
+    background: #e7ebef;
+    color: #293f58;
+}
+html[data-theme="energy-calm"] th { color: #293f58; border-right-color: #ccd5dd; }
+html[data-theme="energy-calm"] td { color: #324b63; border-bottom-color: #dde4ea; }
+html[data-theme="energy-calm"] .link-cell { color: #145e97; }
+html[data-theme="energy-calm"] tbody tr:hover td { background: #f0f7fa; }
+html[data-theme="energy-calm"] .selected-cell {
+    background: #e6f4f8 !important;
+    outline-color: #2587bd;
+}
+
+/* Clear: stronger information hierarchy without changing geometry. */
+html[data-theme="energy-clear"] .topbar {
+    background: linear-gradient(104deg, #052a60 0%, #064682 44%, #056bc5 78%, #088dbf 100%);
+    box-shadow: 0 4px 15px rgba(5, 42, 96, .21);
+}
+html[data-theme="energy-clear"] .topbar::after {
+    content: "";
+    position: absolute;
+    inset: auto -3% -15px 42%;
+    height: 34px;
+    border-radius: 50% 50% 0 0;
+    background: linear-gradient(90deg, transparent 0%, rgba(64, 191, 217, .20) 100%);
+    pointer-events: none;
+}
+html[data-theme="energy-clear"] .topbar-wave {
+    border-color: rgba(64, 191, 217, .22);
+    opacity: .56;
+}
+html[data-theme="energy-clear"] .brand-wing-two,
+html[data-theme="energy-clear"] .avatar {
+    background: linear-gradient(145deg, #078fd4, #40bfd9);
+}
+html[data-theme="energy-clear"] .nav-item.active,
+html[data-theme="energy-clear"] .button-primary {
+    background: linear-gradient(135deg, #056bc5, #078fd4);
+    box-shadow: 0 5px 14px rgba(5, 107, 197, .24);
+}
+html[data-theme="energy-clear"] .kpi-card {
+    border-color: #cfdae4;
+    background: #ffffff;
+}
+html[data-theme="energy-clear"] .kpi-card::after { opacity: .20; transform: scale(.90); }
+html[data-theme="energy-clear"] .kpi-card span { color: #263d56; }
+html[data-theme="energy-clear"] .kpi-card strong { color: #075ca8; font-weight: 800; }
+html[data-theme="energy-clear"] .kpi-card-four {
+    border-color: #a9d4e2;
+    background: linear-gradient(110deg, #fff, #f3fafc);
+    box-shadow: inset 3px 0 0 #16a8d8, var(--shadow-soft);
+}
+html[data-theme="energy-clear"] .kpi-card-four strong { color: #067da9; }
+html[data-theme="energy-clear"] .basket-card {
+    border-color: #cfd9e2;
+}
+html[data-theme="energy-clear"] .basket-card header {
+    background: #eaf0f5;
+    color: #173f68;
+    font-weight: 850;
+}
+html[data-theme="energy-clear"] .basket-columns { color: #516a80; }
+html[data-theme="energy-clear"] .basket-row strong,
+html[data-theme="energy-clear"] .basket-row b { color: #173f68; font-weight: 850; }
+html[data-theme="energy-clear"] .basket-card::before {
+    background: linear-gradient(90deg, #056bc5, #40bfd9);
+}
+html[data-theme="energy-clear"] .table-shell { border-color: #bfcddb; }
+html[data-theme="energy-clear"] thead {
+    background: #dde5ec;
+    color: #17344f;
+    box-shadow: inset 0 -1px 0 #aebfce;
+}
+html[data-theme="energy-clear"] th {
+    color: #17344f;
+    border-right-color: #bfcbd6;
+    font-weight: 850;
+}
+html[data-theme="energy-clear"] td {
+    color: #243f59;
+    border-right-color: #dde5ec;
+    border-bottom-color: #d3dde6;
+    font-weight: 550;
+}
+html[data-theme="energy-clear"] .link-cell { color: #075ca8; font-weight: 850; }
+html[data-theme="energy-clear"] tbody tr:hover td { background: #eaf6fa; }
+html[data-theme="energy-clear"] .selected-cell {
+    background: #d9f1f7 !important;
+    outline: 2px solid #078fd4;
+    box-shadow: inset 0 0 0 1px rgba(7, 143, 212, .18);
+}
+html[data-theme="energy-clear"] .selection-summary span { color: #50677d; }
+html[data-theme="energy-clear"] .selection-summary strong { color: #123f70; font-weight: 850; }
+
+
+/* =========================================================
+   Energy Companion v9 — focused usability refinement
+   Isolated design lab only. No real Work Orders / Tabulator files.
+   - FATRA-inspired calm row hierarchy without copying its UI.
+   - Prominent work-order search.
+   - Save-state message in the same action row.
+   - Reduced basket height and more sheet space.
+   ========================================================= */
+
+html[data-theme="energy-v9"] {
+    --navy-950: #052a60;
+    --navy-900: #07467e;
+    --blue-700: #0868bd;
+    --blue-600: #078ed0;
+    --blue-500: #19a8d3;
+    --sky-400: #4bbbd5;
+    --sky-200: #cdeaf1;
+    --ice-100: #eaf4f8;
+    --ice-50: #f7fafc;
+    --surface: #ffffff;
+    --page: #f3f6f8;
+    --border: #d3dde5;
+    --border-strong: #b8c7d3;
+    --text: #18324d;
+    --muted: #617488;
+    --shadow: 0 6px 18px rgba(5, 42, 96, .07);
+    --shadow-soft: 0 2px 7px rgba(5, 42, 96, .055);
+}
+
+.palette-dot-energy-v9 {
+    background: linear-gradient(135deg, #052a60 0%, #0868bd 48%, #4bbbd5 100%);
+}
+
+html[data-theme="energy-v9"] body {
+    background:
+        linear-gradient(180deg, rgba(205, 234, 241, .34) 0, transparent 132px),
+        var(--page);
+}
+
+html[data-theme="energy-v9"] .topbar {
+    background: linear-gradient(104deg, #052a60 0%, #07467e 46%, #0868bd 78%, #1598bd 100%);
+    box-shadow: 0 4px 14px rgba(5, 42, 96, .20);
+}
+
+html[data-theme="energy-v9"] .topbar::after {
+    content: "";
+    position: absolute;
+    inset: auto -3% -15px 43%;
+    height: 33px;
+    border-radius: 50% 50% 0 0;
+    background: linear-gradient(90deg, transparent, rgba(75, 187, 213, .18));
+    pointer-events: none;
+}
+
+html[data-theme="energy-v9"] .topbar-wave {
+    border-color: rgba(75, 187, 213, .20);
+    opacity: .48;
+}
+
+html[data-theme="energy-v9"] .brand-wing-two,
+html[data-theme="energy-v9"] .avatar {
+    background: linear-gradient(145deg, #078ed0, #4bbbd5);
+}
+
+html[data-theme="energy-v9"] .nav-item.active,
+html[data-theme="energy-v9"] .button-primary {
+    background: linear-gradient(135deg, #0868bd, #078ed0);
+    box-shadow: 0 5px 14px rgba(8, 104, 189, .23);
+}
+
+/* Give the message and actions one deliberate horizontal rhythm. */
+.actions-area {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.action-row {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    width: 100%;
+    min-width: 0;
+    direction: ltr;
+}
+
+.system-message {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    max-width: 290px;
+    min-height: 31px;
+    padding: 0 10px;
+    overflow: hidden;
+    border: 1px solid #c5dce6;
+    border-radius: 8px;
+    background: #eff8fb;
+    color: #315b72;
+    direction: rtl;
+    white-space: nowrap;
+}
+
+.system-message strong,
+.system-message > span:last-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.system-message strong {
+    color: #0b5f8d;
+    font-size: .64rem;
+    font-weight: 850;
+}
+
+.system-message > span:last-child {
+    color: #647d8d;
+    font-size: .59rem;
+    font-weight: 650;
+}
+
+.message-dot {
+    width: 7px;
+    height: 7px;
+    flex: 0 0 7px;
+    border-radius: 50%;
+    background: #19a8d3;
+    box-shadow: 0 0 0 4px rgba(25, 168, 211, .12);
+}
+
+/* Baskets become denser; the recovered space goes to the grid. */
+.page-content {
+    grid-template-rows:
+        clamp(100px, 12vh, 110px)
+        clamp(88px, 12vh, 110px)
+        minmax(0, 1fr);
+}
+
+.basket-card header {
+    min-height: 31px;
+}
+
+.basket-columns,
+.basket-row {
+    padding-top: 4px;
+}
+
+.basket-row + .basket-row {
+    margin-top: 2px;
+    padding-top: 4px;
+}
+
+/* KPI decoration stays subordinate to the numbers. */
+html[data-theme="energy-v9"] .kpi-card {
+    border-color: #d3dde5;
+    background: #ffffff;
+    box-shadow: 0 2px 7px rgba(5, 42, 96, .05);
+}
+
+html[data-theme="energy-v9"] .kpi-card::after {
+    opacity: .12;
+    transform: scale(.82);
+}
+
+html[data-theme="energy-v9"] .kpi-card span {
+    color: #32495f;
+}
+
+html[data-theme="energy-v9"] .kpi-card strong {
+    color: #075ca8;
+    font-weight: 820;
+}
+
+html[data-theme="energy-v9"] .kpi-card-four {
+    border-color: #b9d7e2;
+    background: #fbfdfe;
+    box-shadow: inset 3px 0 0 #19a8d3, 0 2px 7px rgba(5, 42, 96, .05);
+}
+
+html[data-theme="energy-v9"] .kpi-card-four strong {
+    color: #087b9e;
+}
+
+/* Prominent search workbench without adding a new page row. */
+.sheet-section {
+    grid-template-rows: 41px minmax(0, 1fr);
+}
+
+.sheet-toolbar {
+    min-height: 41px;
+    padding: 4px 0 5px;
+    border-bottom: 0;
+}
+
+.sheet-label {
+    font-size: .7rem;
+}
+
+.sheet-label strong {
+    color: #294b67;
+    font-weight: 850;
+}
+
+.search-group {
+    gap: 7px;
+    min-width: 560px;
+    padding: 4px 5px 4px 9px;
+    border: 1px solid #c9d7e2;
+    border-radius: 9px;
+    background: #f7fafc;
+    box-shadow: 0 2px 7px rgba(5, 42, 96, .045);
+}
+
+.search-caption {
+    padding-inline: 5px;
+    color: #375a75;
+    font-size: .62rem;
+    font-weight: 850;
+    white-space: nowrap;
+}
+
+.search-box {
+    width: 350px;
+    min-height: 32px;
+    border-color: #b9c9d6;
+    background: #ffffff;
+    box-shadow: inset 0 1px 2px rgba(5, 42, 96, .025);
+}
+
+.search-box:focus-within {
+    border-color: #078ed0;
+    box-shadow: 0 0 0 3px rgba(7, 142, 208, .10);
+}
+
+.search-box input {
+    height: 30px;
+    color: #193a56;
+    font-size: .7rem;
+}
+
+.search-group > button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-width: 120px;
+    min-height: 32px;
+    padding-inline: 12px;
+    border-color: #0868bd;
+    background: #0868bd;
+    color: #ffffff;
+    box-shadow: 0 4px 10px rgba(8, 104, 189, .16);
+}
+
+.search-group > button:hover {
+    border-color: #075ca8;
+    background: #075ca8;
+}
+
+/* FATRA-inspired table calmness: neutral header, quiet alternating rows, blue only for action. */
+html[data-theme="energy-v9"] .table-shell {
+    border-color: #c8d3dd;
+    border-radius: 6px;
+    box-shadow: 0 3px 11px rgba(5, 42, 96, .05);
+}
+
+html[data-theme="energy-v9"] thead {
+    background: #e7ebef;
+    color: #213b55;
+    box-shadow: inset 0 -1px 0 #b9c6d1;
+}
+
+html[data-theme="energy-v9"] th {
+    height: 33px;
+    border-right-color: #c3cdd6;
+    color: #213b55;
+    font-size: .74rem;
+    font-weight: 850;
+}
+
+html[data-theme="energy-v9"] td {
+    height: 31px;
+    border-right-color: #e0e6eb;
+    border-bottom-color: #d9e0e6;
+    background: #ffffff;
+    color: #304c65;
+    font-size: .76rem;
+    font-weight: 540;
+}
+
+html[data-theme="energy-v9"] tbody tr:nth-child(even) td {
+    background: #fbfcfd;
+}
+
+html[data-theme="energy-v9"] tbody tr:hover td {
+    background: #edf7fb;
+}
+
+html[data-theme="energy-v9"] .link-cell {
+    color: #075fae;
+    font-weight: 820;
+}
+
+html[data-theme="energy-v9"] .custom-text-cell {
+    color: #405a71;
+    font-weight: 560;
+}
+
+html[data-theme="energy-v9"] .selected-cell {
+    background: #e1f3f8 !important;
+    outline: 2px solid #078ed0;
+    box-shadow: inset 0 0 0 1px rgba(7, 142, 208, .14);
+}
+
+html[data-theme="energy-v9"] .selected-cell::after {
+    background: #078ed0;
+}
+
+/* Selection totals: slightly stronger grouping, still compact. */
+html[data-theme="energy-v9"] .selection-summary {
+    border-color: #cbd8e2;
+    background: #f9fbfc;
+    box-shadow: 0 2px 7px rgba(5, 42, 96, .05);
+}
+
+html[data-theme="energy-v9"] .selection-summary article {
+    border-right-color: #d7e0e7;
+    background: linear-gradient(115deg, #ffffff, #f2f8fb);
+}
+
+html[data-theme="energy-v9"] .selection-summary span {
+    color: #5b7185;
+}
+
+html[data-theme="energy-v9"] .selection-summary strong {
+    color: #123f70;
+    font-weight: 850;
+}
+
+html[data-theme="energy-v9"] .summary-icon {
+    background: #eaf6fa;
+    color: #087fb2;
+}
+
+@media (max-width: 1450px) {
+    .system-message { max-width: 220px; }
+    .search-group { min-width: 500px; }
+    .search-box { width: 300px; }
+}
+
+@media (max-height: 780px) {
+    .page-content {
+        grid-template-rows: 98px 90px minmax(0, 1fr);
+    }
+    .sheet-section { grid-template-rows: 37px minmax(0, 1fr); }
+    .sheet-toolbar { min-height: 37px; padding-block: 2px 3px; }
+    html[data-theme="energy-v9"] td { height: 28px; font-size: .72rem; }
+}
+
+/* =========================================================
+   Energy usability v10 — reviewed visual change
+   Isolated lab only. No real Work Orders / Tabulator files.
+   Clear, deliberately visible changes from v9:
+   - Larger, readable save-state message in the action row.
+   - Search promoted into a proper sheet workbench.
+   - FATRA-inspired neutral data table with stronger typography.
+   - Slightly less basket height; reclaimed space goes to the sheet.
+   ========================================================= */
+
+html[data-theme="energy-v10"] {
+    --navy-950: #052a60;
+    --navy-900: #07467e;
+    --blue-700: #0868bd;
+    --blue-600: #078ed0;
+    --blue-500: #19a8d3;
+    --sky-400: #4bbbd5;
+    --sky-200: #cdeaf1;
+    --ice-100: #eaf4f8;
+    --ice-50: #f7fafc;
+    --surface: #ffffff;
+    --page: #f3f6f8;
+    --border: #d3dde5;
+    --border-strong: #b8c7d3;
+    --text: #18324d;
+    --muted: #617488;
+    --shadow: 0 6px 18px rgba(5, 42, 96, .07);
+    --shadow-soft: 0 2px 7px rgba(5, 42, 96, .055);
+}
+
+.palette-dot-energy-v10 {
+    background: linear-gradient(135deg, #052a60 0%, #0a76c7 48%, #55c0d8 100%);
+}
+
+html[data-theme="energy-v10"] body {
+    background:
+        linear-gradient(180deg, rgba(205, 234, 241, .31) 0, transparent 128px),
+        var(--page);
+}
+
+html[data-theme="energy-v10"] .topbar {
+    background: linear-gradient(104deg, #052a60 0%, #07467e 46%, #0868bd 79%, #1598bd 100%);
+    box-shadow: 0 4px 14px rgba(5, 42, 96, .20);
+}
+
+html[data-theme="energy-v10"] .topbar::after {
+    content: "";
+    position: absolute;
+    inset: auto -3% -15px 43%;
+    height: 33px;
+    border-radius: 50% 50% 0 0;
+    background: linear-gradient(90deg, transparent, rgba(75, 187, 213, .17));
+    pointer-events: none;
+}
+
+html[data-theme="energy-v10"] .topbar-wave {
+    border-color: rgba(75, 187, 213, .19);
+    opacity: .46;
+}
+
+html[data-theme="energy-v10"] .brand-wing-two,
+html[data-theme="energy-v10"] .avatar {
+    background: linear-gradient(145deg, #078ed0, #4bbbd5);
+}
+
+html[data-theme="energy-v10"] .nav-item.active,
+html[data-theme="energy-v10"] .button-primary {
+    background: linear-gradient(135deg, #0868bd, #078ed0);
+    box-shadow: 0 5px 14px rgba(8, 104, 189, .23);
+}
+
+html[data-theme="energy-v10"] .page-content {
+    grid-template-rows:
+        clamp(100px, 12vh, 108px)
+        clamp(80px, 11vh, 98px)
+        minmax(0, 1fr);
+}
+
+/* Action row: message remains in the same row, but now has real visual weight. */
+html[data-theme="energy-v10"] .page-heading-row {
+    gap: 18px;
+}
+
+html[data-theme="energy-v10"] .actions-area {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+html[data-theme="energy-v10"] .action-row {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 11px;
+    width: 100%;
+    min-width: 0;
+    direction: ltr;
+}
+
+html[data-theme="energy-v10"] .system-message {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    flex: 0 0 auto;
+    min-width: 228px;
+    min-height: 33px;
+    padding: 0 13px;
+    border: 1px solid #b9d8e5;
+    border-radius: 9px;
+    background: linear-gradient(90deg, #f3fbfd, #e8f6fa);
+    color: #154f70;
+    box-shadow: inset 3px 0 0 #19a8d3;
+    direction: rtl;
+    white-space: nowrap;
+}
+
+html[data-theme="energy-v10"] .system-message strong {
+    color: #0b577d;
+    font-size: .72rem;
+    font-weight: 850;
+    overflow: visible;
+    text-overflow: clip;
+}
+
+html[data-theme="energy-v10"] .message-dot {
+    width: 8px;
+    height: 8px;
+    flex: 0 0 8px;
+    border-radius: 50%;
+    background: #19a8d3;
+    box-shadow: 0 0 0 4px rgba(25, 168, 211, .13);
+}
+
+html[data-theme="energy-v10"] .action-buttons {
+    gap: 6px;
+}
+
+html[data-theme="energy-v10"] .button {
+    padding-inline: 10px;
+}
+
+/* KPI surfaces remain quiet and secondary to the sheet. */
+html[data-theme="energy-v10"] .kpi-card {
+    border-color: #d3dde5;
+    background: #ffffff;
+    box-shadow: 0 2px 7px rgba(5, 42, 96, .05);
+}
+
+html[data-theme="energy-v10"] .kpi-card::after {
+    opacity: .09;
+    transform: scale(.76);
+}
+
+html[data-theme="energy-v10"] .kpi-card span {
+    color: #32495f;
+}
+
+html[data-theme="energy-v10"] .kpi-card strong {
+    color: #075ca8;
+    font-weight: 820;
+}
+
+html[data-theme="energy-v10"] .kpi-card-four {
+    border-color: #b9d7e2;
+    background: #fbfdfe;
+    box-shadow: inset 3px 0 0 #19a8d3, 0 2px 7px rgba(5, 42, 96, .05);
+}
+
+html[data-theme="energy-v10"] .kpi-card-four strong {
+    color: #087b9e;
+}
+
+/* Slightly denser baskets; typography is retained. */
+html[data-theme="energy-v10"] .basket-card header {
+    min-height: 30px;
+}
+
+html[data-theme="energy-v10"] .basket-columns,
+html[data-theme="energy-v10"] .basket-row {
+    padding-top: 3px;
+}
+
+html[data-theme="energy-v10"] .basket-row + .basket-row {
+    margin-top: 1px;
+    padding-top: 3px;
+}
+
+/* Search gets a real toolbar presence rather than looking attached to the edge. */
+html[data-theme="energy-v10"] .sheet-section {
+    grid-template-rows: 44px minmax(0, 1fr);
+}
+
+html[data-theme="energy-v10"] .sheet-toolbar {
+    min-height: 44px;
+    padding: 5px 0 6px;
+    border-bottom: 0;
+    gap: 18px;
+}
+
+html[data-theme="energy-v10"] .sheet-label {
+    min-width: 220px;
+    color: #536b80;
+    font-size: .72rem;
+}
+
+html[data-theme="energy-v10"] .sheet-label strong {
+    color: #294b67;
+    font-weight: 850;
+}
+
+html[data-theme="energy-v10"] .search-group {
+    display: flex;
+    align-items: stretch;
+    gap: 8px;
+    width: min(650px, 52vw);
+    min-width: 540px;
+    padding: 5px;
+    border: 1px solid #c4d4df;
+    border-radius: 10px;
+    background: #f7fafc;
+    box-shadow: 0 3px 9px rgba(5, 42, 96, .055);
+    direction: rtl;
+}
+
+html[data-theme="energy-v10"] .search-box {
+    flex: 1 1 auto;
+    width: auto;
+    min-height: 34px;
+    border-color: #b4c7d5;
+    border-radius: 8px;
+    background: #ffffff;
+    box-shadow: inset 0 1px 2px rgba(5, 42, 96, .025);
+}
+
+html[data-theme="energy-v10"] .search-box:focus-within {
+    border-color: #078ed0;
+    box-shadow: 0 0 0 3px rgba(7, 142, 208, .11);
+}
+
+html[data-theme="energy-v10"] .search-box input {
+    height: 32px;
+    color: #193a56;
+    font-size: .75rem;
+    font-weight: 600;
+}
+
+html[data-theme="energy-v10"] .search-box input::placeholder {
+    color: #7a8d9e;
+    opacity: 1;
+}
+
+html[data-theme="energy-v10"] .search-group > button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    flex: 0 0 96px;
+    min-height: 34px;
+    padding-inline: 13px;
+    border: 1px solid #0868bd;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #0868bd, #078ed0);
+    color: #ffffff;
+    font-size: .72rem;
+    font-weight: 820;
+    box-shadow: 0 4px 10px rgba(8, 104, 189, .17);
+}
+
+html[data-theme="energy-v10"] .search-group > button:hover {
+    border-color: #075ca8;
+    background: linear-gradient(135deg, #075ca8, #087ebd);
+}
+
+/* FATRA-inspired hierarchy: neutral header, dark readable text, subtle row rhythm. */
+html[data-theme="energy-v10"] .table-shell {
+    border-color: #bfcbd5;
+    border-radius: 5px;
+    box-shadow: 0 3px 11px rgba(5, 42, 96, .05);
+}
+
+html[data-theme="energy-v10"] table {
+    font-size: .80rem;
+}
+
+html[data-theme="energy-v10"] thead {
+    background: #e6ebf1;
+    color: #203c57;
+    box-shadow: inset 0 -2px 0 #aebdca;
+}
+
+html[data-theme="energy-v10"] th {
+    height: 36px;
+    padding-inline: 9px;
+    border-right-color: #bdc9d4;
+    color: #203c57;
+    font-size: .79rem;
+    font-weight: 850;
+    letter-spacing: .01em;
+}
+
+html[data-theme="energy-v10"] td {
+    height: 33px;
+    padding-inline: 9px;
+    border-right-color: #dce3e9;
+    border-bottom-color: #d6dee5;
+    background: #ffffff;
+    color: #2b465f;
+    font-size: .80rem;
+    font-weight: 560;
+}
+
+html[data-theme="energy-v10"] tbody tr:nth-child(even) td {
+    background: #f8fafc;
+}
+
+html[data-theme="energy-v10"] tbody tr:hover td {
+    background: #eef7fb;
+}
+
+html[data-theme="energy-v10"] .link-cell {
+    color: #075fae;
+    font-weight: 800;
+}
+
+html[data-theme="energy-v10"] .custom-text-cell {
+    color: #344f67;
+    font-weight: 560;
+}
+
+html[data-theme="energy-v10"] .selected-cell {
+    position: relative;
+    background: #f0fbfe !important;
+    outline: 2px solid #0799d3;
+    outline-offset: -2px;
+    box-shadow: inset 0 0 0 1px rgba(7, 153, 211, .12);
+}
+
+html[data-theme="energy-v10"] .selected-cell::after {
+    background: #0799d3;
+}
+
+html[data-theme="energy-v10"] .selection-summary {
+    border-color: #c8d6e0;
+    background: #f7fafc;
+    box-shadow: 0 2px 7px rgba(5, 42, 96, .05);
+}
+
+html[data-theme="energy-v10"] .selection-summary article {
+    border-right-color: #d4dee6;
+    background: linear-gradient(115deg, #ffffff, #eef7fa);
+}
+
+html[data-theme="energy-v10"] .selection-summary span {
+    color: #526b80;
+}
+
+html[data-theme="energy-v10"] .selection-summary strong {
+    color: #123f70;
+    font-weight: 850;
+}
+
+html[data-theme="energy-v10"] .summary-icon {
+    background: #e6f5f9;
+    color: #087fb2;
+}
+
+@media (max-width: 1450px) {
+    html[data-theme="energy-v10"] .system-message {
+        min-width: 190px;
+        padding-inline: 10px;
+    }
+
+    html[data-theme="energy-v10"] .system-message strong {
+        font-size: .66rem;
+    }
+
+    html[data-theme="energy-v10"] .search-group {
+        width: min(560px, 48vw);
+        min-width: 470px;
+    }
+}
+
+@media (max-height: 780px) {
+    html[data-theme="energy-v10"] .page-content {
+        grid-template-rows: 96px 82px minmax(0, 1fr);
+    }
+
+    html[data-theme="energy-v10"] .sheet-section {
+        grid-template-rows: 40px minmax(0, 1fr);
+    }
+
+    html[data-theme="energy-v10"] .sheet-toolbar {
+        min-height: 40px;
+        padding-block: 3px 4px;
+    }
+
+    html[data-theme="energy-v10"] th {
+        height: 33px;
+        font-size: .75rem;
+    }
+
+    html[data-theme="energy-v10"] td {
+        height: 29px;
+        font-size: .75rem;
+    }
+}
+
+/* =========================================================
+   Energy usability v11 — table, search and message fidelity
+   Isolated lab only. No real Work Orders / Tabulator files.
+   - The lab now mirrors the existing application's real status-message format.
+   - Only the visual container is being explored; message generation is untouched.
+   ========================================================= */
+
+html[data-theme="energy-v11"] {
+    --navy-950: #052a60;
+    --navy-900: #07467e;
+    --blue-700: #0868bd;
+    --blue-600: #078ed0;
+    --blue-500: #19a8d3;
+    --sky-400: #4bbbd5;
+    --sky-200: #cdeaf1;
+    --ice-100: #eaf4f8;
+    --ice-50: #f7fafc;
+    --surface: #ffffff;
+    --page: #f3f6f8;
+    --border: #d3dde5;
+    --border-strong: #b8c7d3;
+    --text: #18324d;
+    --muted: #617488;
+    --gold-700: #8a6824;
+    --gold-600: #b58a32;
+    --gold-300: #e4c77f;
+    --gold-100: #fff7e4;
+    --shadow: 0 6px 18px rgba(5, 42, 96, .07);
+    --shadow-soft: 0 2px 7px rgba(5, 42, 96, .055);
+}
+
+.palette-dot-energy-v11 {
+    background: linear-gradient(135deg, #052a60 0%, #0a76c7 47%, #55c0d8 73%, #b58a32 100%);
+}
+
+html[data-theme="energy-v11"] body {
+    background:
+        linear-gradient(180deg, rgba(205, 234, 241, .31) 0, transparent 128px),
+        var(--page);
+}
+
+html[data-theme="energy-v11"] .topbar {
+    background: linear-gradient(104deg, #052a60 0%, #07467e 46%, #0868bd 79%, #1598bd 100%);
+    box-shadow: 0 4px 14px rgba(5, 42, 96, .20);
+}
+
+html[data-theme="energy-v11"] .topbar::after {
+    content: "";
+    position: absolute;
+    inset: auto -3% -15px 43%;
+    height: 33px;
+    border-radius: 50% 50% 0 0;
+    background: linear-gradient(90deg, transparent, rgba(75, 187, 213, .17));
+    pointer-events: none;
+}
+
+html[data-theme="energy-v11"] .topbar-wave {
+    border-color: rgba(75, 187, 213, .19);
+    opacity: .46;
+}
+
+html[data-theme="energy-v11"] .brand-wing-two,
+html[data-theme="energy-v11"] .avatar {
+    background: linear-gradient(145deg, #078ed0, #4bbbd5);
+}
+
+html[data-theme="energy-v11"] .nav-item.active,
+html[data-theme="energy-v11"] .button-primary {
+    background: linear-gradient(135deg, #0868bd, #078ed0);
+    box-shadow: 0 5px 14px rgba(8, 104, 189, .23);
+}
+
+html[data-theme="energy-v11"] .page-content {
+    grid-template-rows:
+        clamp(100px, 12vh, 108px)
+        clamp(76px, 10.5vh, 94px)
+        minmax(0, 1fr);
+}
+
+/* Preserve the actual application message; change presentation only. */
+html[data-theme="energy-v11"] .page-heading-row {
+    gap: 16px;
+}
+
+html[data-theme="energy-v11"] .actions-area {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+html[data-theme="energy-v11"] .action-row {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 9px;
+    width: 100%;
+    min-width: 0;
+    direction: ltr;
+}
+
+html[data-theme="energy-v11"] .system-message {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1 1 360px;
+    min-width: 260px;
+    max-width: 480px;
+    min-height: 33px;
+    padding: 0 12px;
+    border: 1px solid #b9d8e5;
+    border-radius: 9px;
+    background: linear-gradient(90deg, #f3fbfd, #e8f6fa);
+    color: #154f70;
+    box-shadow: inset 3px 0 0 #19a8d3;
+    direction: rtl;
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+html[data-theme="energy-v11"] .system-message strong {
+    min-width: 0;
+    overflow: hidden;
+    color: #0b577d;
+    font-size: .69rem;
+    font-weight: 820;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+html[data-theme="energy-v11"] .message-dot {
+    width: 8px;
+    height: 8px;
+    flex: 0 0 8px;
+    border-radius: 50%;
+    background: #19a8d3;
+    box-shadow: 0 0 0 4px rgba(25, 168, 211, .13);
+}
+
+html[data-theme="energy-v11"] .action-buttons { gap: 6px; }
+html[data-theme="energy-v11"] .button { padding-inline: 9px; }
+
+/* Quieter KPI treatment. */
+html[data-theme="energy-v11"] .kpi-card {
+    border-color: #d3dde5;
+    background: #ffffff;
+    box-shadow: 0 2px 7px rgba(5, 42, 96, .05);
+}
+
+html[data-theme="energy-v11"] .kpi-card::after {
+    opacity: .055;
+    transform: scale(.70);
+}
+
+html[data-theme="energy-v11"] .kpi-card span { color: #32495f; }
+html[data-theme="energy-v11"] .kpi-card strong { color: #075ca8; font-weight: 820; }
+
+/* Muted champagne gold: a restrained financial accent that still fits the blue identity. */
+html[data-theme="energy-v11"] .kpi-card-four {
+    border-color: #dfcfaa;
+    background: linear-gradient(115deg, #ffffff 0%, #fffaf0 100%);
+    box-shadow: inset 3px 0 0 var(--gold-600), 0 2px 7px rgba(5, 42, 96, .05);
+}
+
+html[data-theme="energy-v11"] .kpi-card-four .metric-icon {
+    background: linear-gradient(145deg, #c69a3b, #a97d26);
+    box-shadow: 0 5px 12px rgba(181, 138, 50, .18);
+}
+
+html[data-theme="energy-v11"] .kpi-card-four strong { color: var(--gold-700); }
+html[data-theme="energy-v11"] .kpi-card-four i { background: var(--gold-600); }
+
+/* Slight basket compression while keeping current readable type sizes. */
+html[data-theme="energy-v11"] .basket-card header { min-height: 29px; }
+html[data-theme="energy-v11"] .basket-columns,
+html[data-theme="energy-v11"] .basket-row { padding-top: 2px; }
+html[data-theme="energy-v11"] .basket-row + .basket-row { margin-top: 0; padding-top: 2px; }
+
+/* Search is one premium control with no separate button. */
+html[data-theme="energy-v11"] .sheet-section {
+    grid-template-rows: 43px minmax(0, 1fr);
+}
+
+html[data-theme="energy-v11"] .sheet-toolbar {
+    min-height: 43px;
+    padding: 5px 0 5px;
+    border-bottom: 0;
+    gap: 18px;
+}
+
+html[data-theme="energy-v11"] .sheet-label {
+    min-width: 220px;
+    color: #536b80;
+    font-size: .72rem;
+}
+
+html[data-theme="energy-v11"] .sheet-label strong { color: #294b67; font-weight: 850; }
+
+html[data-theme="energy-v11"] .search-group {
+    display: block;
+    width: min(610px, 49vw);
+    min-width: 470px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+}
+
+html[data-theme="energy-v11"] .search-group > button { display: none; }
+
+html[data-theme="energy-v11"] .search-box {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-height: 38px;
+    padding: 0 12px;
+    border: 1px solid #aebfcb;
+    border-radius: 12px;
+    background:
+        linear-gradient(#ffffff, #ffffff) padding-box,
+        linear-gradient(105deg, #8db6cc, #33a9cf 58%, #0b69b5) border-box;
+    color: #0b69a0;
+    box-shadow:
+        0 4px 12px rgba(5, 42, 96, .07),
+        inset 0 1px 2px rgba(5, 42, 96, .025);
+    transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
+}
+
+html[data-theme="energy-v11"] .search-box svg {
+    width: 18px;
+    height: 18px;
+    flex: 0 0 18px;
+    stroke-width: 2.1;
+}
+
+html[data-theme="energy-v11"] .search-box:focus-within {
+    border-color: transparent;
+    box-shadow:
+        0 0 0 4px rgba(7, 142, 208, .11),
+        0 6px 16px rgba(5, 42, 96, .09);
+    transform: translateY(-1px);
+}
+
+html[data-theme="energy-v11"] .search-box input {
+    height: 36px;
+    color: #193a56;
+    font-size: .76rem;
+    font-weight: 650;
+}
+
+html[data-theme="energy-v11"] .search-box input::placeholder {
+    color: #72879a;
+    opacity: 1;
+}
+
+html[data-theme="energy-v11"] .search-hint {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 43px;
+    height: 22px;
+    padding: 0 7px;
+    border: 1px solid #d3dee6;
+    border-radius: 6px;
+    background: #f5f8fa;
+    color: #718496;
+    direction: ltr;
+    font-size: .58rem;
+    font-weight: 800;
+    letter-spacing: .03em;
+}
+
+/* FATRA-like table rhythm: one body color, horizontal rules, very quiet vertical separators. */
+html[data-theme="energy-v11"] .table-shell {
+    border-color: #becbd5;
+    border-radius: 5px;
+    box-shadow: 0 3px 11px rgba(5, 42, 96, .05);
+}
+
+html[data-theme="energy-v11"] table { font-size: .80rem; }
+
+html[data-theme="energy-v11"] thead {
+    background: #e5ebf1;
+    color: #203c57;
+    box-shadow: inset 0 -2px 0 #aebdca;
+}
+
+html[data-theme="energy-v11"] th {
+    height: 36px;
+    padding-inline: 9px;
+    border-right-color: rgba(166, 181, 194, .34);
+    color: #203c57;
+    font-size: .79rem;
+    font-weight: 850;
+    letter-spacing: .01em;
+}
+
+html[data-theme="energy-v11"] td {
+    height: 33px;
+    padding-inline: 9px;
+    border-right-color: rgba(196, 207, 216, .20);
+    border-bottom-color: #d3dde5;
+    background: #fbfcfe;
+    color: #2a455e;
+    font-size: .80rem;
+    font-weight: 560;
+}
+
+/* Explicitly remove zebra striping: every work order uses one calm surface color. */
+html[data-theme="energy-v11"] tbody tr:nth-child(even) td,
+html[data-theme="energy-v11"] tbody tr:nth-child(odd) td {
+    background: #fbfcfe;
+}
+
+html[data-theme="energy-v11"] tbody tr:hover td { background: #f0f7fb; }
+
+/* One consistent corporate blue for all work-order numbers. */
+html[data-theme="energy-v11"] .link-cell {
+    color: #0b5d92;
+    font-weight: 820;
+}
+
+html[data-theme="energy-v11"] .custom-text-cell {
+    color: #344f67;
+    font-weight: 560;
+}
+
+/* Remaining Amount is accented, not flooded with color. */
+html[data-theme="energy-v11"] th.remaining-column {
+    position: sticky;
+    color: #71561f;
+    box-shadow:
+        inset 0 -3px 0 var(--gold-600),
+        inset 0 -2px 0 #aebdca;
+}
+
+html[data-theme="energy-v11"] td.remaining-column {
+    color: #71561f;
+    font-weight: 720;
+}
+
+/* Only the active cell gets strong selection; the whole row stays calm. */
+html[data-theme="energy-v11"] .selected-cell {
+    position: relative;
+    background: #f4fbfd !important;
+    outline: 2px solid #0799d3;
+    outline-offset: -2px;
+    box-shadow: inset 0 0 0 1px rgba(7, 153, 211, .09);
+}
+
+html[data-theme="energy-v11"] .selected-cell::after { background: #0799d3; }
+
+html[data-theme="energy-v11"] .selection-summary {
+    border-color: #c8d6e0;
+    background: #f7fafc;
+    box-shadow: 0 2px 7px rgba(5, 42, 96, .05);
+}
+
+html[data-theme="energy-v11"] .selection-summary article {
+    border-right-color: #d4dee6;
+    background: linear-gradient(115deg, #ffffff, #eef7fa);
+}
+
+html[data-theme="energy-v11"] .selection-summary span { color: #526b80; }
+html[data-theme="energy-v11"] .selection-summary strong { color: #123f70; font-weight: 850; }
+html[data-theme="energy-v11"] .selection-summary article:last-child .summary-icon {
+    background: var(--gold-100);
+    color: var(--gold-700);
+}
+html[data-theme="energy-v11"] .selection-summary article:last-child strong { color: var(--gold-700); }
+
+@media (max-width: 1450px) {
+    html[data-theme="energy-v11"] .system-message {
+        flex-basis: 250px;
+        min-width: 210px;
+        max-width: 330px;
+        padding-inline: 9px;
+    }
+
+    html[data-theme="energy-v11"] .system-message strong { font-size: .63rem; }
+
+    html[data-theme="energy-v11"] .search-group {
+        width: min(520px, 47vw);
+        min-width: 420px;
+    }
+}
+
+@media (max-height: 780px) {
+    html[data-theme="energy-v11"] .page-content {
+        grid-template-rows: 96px 78px minmax(0, 1fr);
+    }
+
+    html[data-theme="energy-v11"] .sheet-section {
+        grid-template-rows: 40px minmax(0, 1fr);
+    }
+
+    html[data-theme="energy-v11"] .sheet-toolbar {
+        min-height: 40px;
+        padding-block: 3px;
+    }
+
+    html[data-theme="energy-v11"] th { height: 33px; font-size: .75rem; }
+    html[data-theme="energy-v11"] td { height: 29px; font-size: .75rem; }
+}
+
+/* =========================================================
+   Energy usability v12 — FATRA-density grid and restrained gold
+   Isolated lab only. No real Work Orders / Tabulator files.
+   ========================================================= */
+
+html[data-theme^="energy-v12-"] {
+    --navy-950: #052a60;
+    --navy-900: #07467e;
+    --blue-700: #0868bd;
+    --blue-600: #078ed0;
+    --blue-500: #19a8d3;
+    --sky-400: #4bbbd5;
+    --sky-200: #cdeaf1;
+    --ice-100: #eaf4f8;
+    --ice-50: #f7fafc;
+    --surface: #ffffff;
+    --page: #f3f6f8;
+    --border: #d5dde5;
+    --border-strong: #bcc8d3;
+    --text: #3b536d;
+    --muted: #65788b;
+    --gold-700: #85631e;
+    --gold-600: #b58a32;
+    --gold-300: #e1c67d;
+    --gold-100: #fff8e9;
+    --grid-text: #405874;
+    --grid-head-bg: #e9eef3;
+    --grid-head-text: #2c4058;
+    --grid-line: #d5dde5;
+    --grid-vline: rgba(181, 193, 204, .16);
+    --shadow: 0 6px 18px rgba(5, 42, 96, .07);
+    --shadow-soft: 0 2px 7px rgba(5, 42, 96, .055);
+}
+
+.palette-dot-v12-number {
+    background: linear-gradient(135deg, #052a60 0%, #0a76c7 58%, #b58a32 100%);
+}
+.palette-dot-v12-icon {
+    background: linear-gradient(135deg, #052a60 0%, #b58a32 45%, #078ed0 100%);
+}
+
+html[data-theme^="energy-v12-"] body {
+    background: linear-gradient(180deg, rgba(205, 234, 241, .28) 0, transparent 128px), var(--page);
+}
+html[data-theme^="energy-v12-"] .topbar {
+    background: linear-gradient(104deg, #052a60 0%, #07467e 46%, #0868bd 79%, #1598bd 100%);
+    box-shadow: 0 4px 14px rgba(5, 42, 96, .20);
+}
+html[data-theme^="energy-v12-"] .topbar::after {
+    content: "";
+    position: absolute;
+    inset: auto -3% -15px 43%;
+    height: 33px;
+    border-radius: 50% 50% 0 0;
+    background: linear-gradient(90deg, transparent, rgba(75, 187, 213, .17));
+    pointer-events: none;
+}
+html[data-theme^="energy-v12-"] .topbar-wave { border-color: rgba(75, 187, 213, .19); opacity: .46; }
+html[data-theme^="energy-v12-"] .brand-wing-two,
+html[data-theme^="energy-v12-"] .avatar { background: linear-gradient(145deg, #078ed0, #4bbbd5); }
+html[data-theme^="energy-v12-"] .nav-item.active,
+html[data-theme^="energy-v12-"] .button-primary {
+    background: linear-gradient(135deg, #0868bd, #078ed0);
+    box-shadow: 0 5px 14px rgba(8, 104, 189, .23);
+}
+
+html[data-theme^="energy-v12-"] .page-content {
+    grid-template-rows: clamp(100px, 12vh, 108px) clamp(72px, 9.6vh, 86px) minmax(0, 1fr);
+}
+html[data-theme^="energy-v12-"] .page-heading-row { gap: 16px; }
+html[data-theme^="energy-v12-"] .actions-area { flex: 1 1 auto; min-width: 0; }
+html[data-theme^="energy-v12-"] .action-row {
+    display: flex; align-items: center; justify-content: flex-end; gap: 9px; width: 100%; min-width: 0; direction: ltr;
+}
+html[data-theme^="energy-v12-"] .system-message {
+    display: inline-flex; align-items: center; gap: 8px; flex: 1 1 360px; min-width: 260px; max-width: 480px;
+    min-height: 33px; padding: 0 12px; border: 1px solid #b9d8e5; border-radius: 9px;
+    background: linear-gradient(90deg, #f3fbfd, #e8f6fa); color: #154f70;
+    box-shadow: inset 3px 0 0 #19a8d3; direction: rtl; white-space: nowrap; overflow: hidden;
+}
+html[data-theme^="energy-v12-"] .system-message strong {
+    min-width: 0; overflow: hidden; color: #0b577d; font-size: .69rem; font-weight: 820;
+    text-overflow: ellipsis; white-space: nowrap;
+}
+html[data-theme^="energy-v12-"] .message-dot {
+    width: 8px; height: 8px; flex: 0 0 8px; border-radius: 50%; background: #19a8d3;
+    box-shadow: 0 0 0 4px rgba(25, 168, 211, .13);
+}
+html[data-theme^="energy-v12-"] .action-buttons { gap: 6px; }
+html[data-theme^="energy-v12-"] .button { padding-inline: 9px; }
+
+html[data-theme^="energy-v12-"] .kpi-card {
+    border-color: #d3dde5; background: #fff; box-shadow: 0 2px 7px rgba(5, 42, 96, .05);
+}
+html[data-theme^="energy-v12-"] .kpi-card::after { opacity: .045; transform: scale(.66); }
+html[data-theme^="energy-v12-"] .kpi-card span { color: #32495f; }
+html[data-theme^="energy-v12-"] .kpi-card strong { color: #075ca8; font-weight: 820; }
+html[data-theme^="energy-v12-"] .kpi-card-four {
+    border-color: #dfcfaa; background: linear-gradient(115deg, #fff 0%, #fffaf0 100%);
+    box-shadow: inset 3px 0 0 var(--gold-600), 0 2px 7px rgba(5, 42, 96, .05);
+}
+html[data-theme^="energy-v12-"] .kpi-card-four i { background: var(--gold-600); }
+
+/* Variant A: icon remains blue; only the financial value is gold. */
+html[data-theme="energy-v12-gold-number"] .kpi-card-four .metric-icon {
+    background: linear-gradient(145deg, #078ed0, #4bbbd5);
+    box-shadow: 0 5px 12px rgba(7, 142, 208, .17);
+}
+html[data-theme="energy-v12-gold-number"] .kpi-card-four strong { color: var(--gold-700); }
+
+/* Variant B: icon is gold; value remains corporate blue. */
+html[data-theme="energy-v12-gold-icon"] .kpi-card-four .metric-icon {
+    background: linear-gradient(145deg, #c69a3b, #a97d26);
+    box-shadow: 0 5px 12px rgba(181, 138, 50, .18);
+}
+html[data-theme="energy-v12-gold-icon"] .kpi-card-four strong { color: #075ca8; }
+
+html[data-theme^="energy-v12-"] .basket-card header { min-height: 28px; }
+html[data-theme^="energy-v12-"] .basket-columns,
+html[data-theme^="energy-v12-"] .basket-row { padding-top: 1px; }
+html[data-theme^="energy-v12-"] .basket-row + .basket-row { margin-top: 0; padding-top: 1px; }
+
+/* Search: one refined field, intentionally no button, icon, or keyboard hint. */
+html[data-theme^="energy-v12-"] .sheet-section { grid-template-rows: 37px minmax(0, 1fr); }
+html[data-theme^="energy-v12-"] .sheet-toolbar {
+    min-height: 37px; padding: 2px 0 3px; border-bottom: 0; gap: 18px;
+}
+html[data-theme^="energy-v12-"] .sheet-label { min-width: 220px; color: #536b80; font-size: .72rem; }
+html[data-theme^="energy-v12-"] .sheet-label strong { color: #294b67; font-weight: 850; }
+html[data-theme^="energy-v12-"] .search-group {
+    display: block; width: min(610px, 49vw); min-width: 470px; padding: 0; border: 0; background: transparent; box-shadow: none;
+}
+html[data-theme^="energy-v12-"] .search-group > button,
+html[data-theme^="energy-v12-"] .search-box svg,
+html[data-theme^="energy-v12-"] .search-hint { display: none !important; }
+html[data-theme^="energy-v12-"] .search-box {
+    display: flex; align-items: center; width: 100%; min-height: 34px; padding: 0 15px;
+    border: 1px solid transparent; border-radius: 11px;
+    background: linear-gradient(#fff, #fff) padding-box,
+                linear-gradient(105deg, #aebfcb, #54b7d3 58%, #0b69b5) border-box;
+    box-shadow: 0 3px 10px rgba(5, 42, 96, .065), inset 0 1px 2px rgba(5, 42, 96, .025);
+    transition: box-shadow .15s ease, transform .15s ease;
+}
+html[data-theme^="energy-v12-"] .search-box:focus-within {
+    box-shadow: 0 0 0 4px rgba(7, 142, 208, .10), 0 5px 14px rgba(5, 42, 96, .085);
+    transform: translateY(-1px);
+}
+html[data-theme^="energy-v12-"] .search-box input {
+    width: 100%; height: 32px; padding: 0; border: 0; outline: 0; background: transparent;
+    color: #304962; font-size: .76rem; font-weight: 650; text-align: right;
+}
+html[data-theme^="energy-v12-"] .search-box input::placeholder { color: #6e8194; opacity: 1; }
+
+/* FATRA-style data density: uniform text color, compact rows, calm neutral head. */
+html[data-theme^="energy-v12-"] .table-shell {
+    border-color: #c1ccd6; border-radius: 4px; box-shadow: 0 3px 10px rgba(5, 42, 96, .045);
+}
+html[data-theme^="energy-v12-"] table { font-size: .72rem; }
+html[data-theme^="energy-v12-"] thead {
+    background: var(--grid-head-bg); color: var(--grid-head-text); box-shadow: inset 0 -1px 0 #aebbc7;
+}
+html[data-theme^="energy-v12-"] th {
+    height: 31px; padding-inline: 8px; border-right-color: rgba(161, 174, 186, .22);
+    color: var(--grid-head-text); font-size: .72rem; font-weight: 820; letter-spacing: 0;
+}
+html[data-theme^="energy-v12-"] td {
+    height: 25px; padding-inline: 8px; border-right-color: var(--grid-vline); border-bottom-color: var(--grid-line);
+    background: #fff; color: var(--grid-text); font-size: .71rem; font-weight: 560; line-height: 1.05;
+}
+html[data-theme^="energy-v12-"] tbody tr:nth-child(even) td,
+html[data-theme^="energy-v12-"] tbody tr:nth-child(odd) td { background: #fff; }
+html[data-theme^="energy-v12-"] tbody tr:hover td { background: #f3f8fb; }
+
+/* One data color across all work-order rows, including the order number. */
+html[data-theme^="energy-v12-"] .link-cell,
+html[data-theme^="energy-v12-"] .custom-text-cell,
+html[data-theme^="energy-v12-"] td.remaining-column {
+    color: var(--grid-text); font-weight: 600;
+}
+html[data-theme^="energy-v12-"] .link-cell { font-weight: 720; }
+
+/* No gold inside the sheet; the financial accent belongs only to totals. */
+html[data-theme^="energy-v12-"] th.remaining-column {
+    position: static; color: var(--grid-head-text); box-shadow: none;
+}
+
+html[data-theme^="energy-v12-"] .selected-cell {
+    position: relative; background: #f6fbfd !important; outline: 2px solid #078ed0; outline-offset: -2px;
+    box-shadow: inset 0 0 0 1px rgba(7, 142, 208, .07);
+}
+html[data-theme^="energy-v12-"] .selected-cell::after { background: #078ed0; }
+
+html[data-theme^="energy-v12-"] .selection-summary {
+    border-color: #c8d6e0; background: #f7fafc; box-shadow: 0 2px 7px rgba(5, 42, 96, .05);
+}
+html[data-theme^="energy-v12-"] .selection-summary article {
+    border-right-color: #d4dee6; background: linear-gradient(115deg, #fff, #eef7fa);
+}
+html[data-theme^="energy-v12-"] .selection-summary span { color: #526b80; }
+html[data-theme^="energy-v12-"] .selection-summary strong { color: #123f70; font-weight: 850; }
+html[data-theme^="energy-v12-"] .selection-summary article:last-child .summary-icon {
+    background: #eaf4f8; color: #0868bd;
+}
+html[data-theme^="energy-v12-"] .selection-summary article:last-child strong { color: #123f70; }
+
+@media (max-width: 1450px) {
+    html[data-theme^="energy-v12-"] .system-message {
+        flex-basis: 250px; min-width: 210px; max-width: 330px; padding-inline: 9px;
+    }
+    html[data-theme^="energy-v12-"] .system-message strong { font-size: .63rem; }
+    html[data-theme^="energy-v12-"] .search-group { width: min(520px, 47vw); min-width: 420px; }
+}
+
+@media (max-height: 780px) {
+    html[data-theme^="energy-v12-"] .page-content {
+        grid-template-rows: 94px 69px minmax(0, 1fr);
+    }
+    html[data-theme^="energy-v12-"] .sheet-section { grid-template-rows: 34px minmax(0, 1fr); }
+    html[data-theme^="energy-v12-"] .sheet-toolbar { min-height: 34px; padding-block: 1px; }
+    html[data-theme^="energy-v12-"] th { height: 28px; font-size: .68rem; }
+    html[data-theme^="energy-v12-"] td { height: 23px; font-size: .68rem; }
+}
+
+
+/* =========================================================
+   v14 — corrected hierarchy after v13 rollback
+   Base: v12. Keep four totals and four basket cards.
+   Purpose: structured alignment and breathing room without
+   collapsing the screen into one dense summary slab.
+   ========================================================= */
+html[data-theme="energy-v20"] {
+    --grid-text: #405874;
+    --grid-head-bg: #edf2f6;
+    --grid-head-text: #263f58;
+    --grid-line: #d4dee7;
+    --grid-vline: rgba(186, 198, 209, .34);
+}
+
+html[data-theme="energy-v20"] .topbar {
+    background: linear-gradient(104deg, #052a60 0%, #07467e 46%, #0868bd 79%, #1598bd 100%);
+    box-shadow: 0 4px 14px rgba(5, 42, 96, .20);
+}
+html[data-theme="energy-v20"] .topbar-wave { border-color: rgba(75, 187, 213, .19); opacity: .46; }
+html[data-theme="energy-v20"] .avatar { background: linear-gradient(145deg, #078ed0, #4bbbd5); }
+html[data-theme="energy-v20"] .brand-symbol-wo {
+    background: linear-gradient(145deg, rgba(80, 206, 236, .32), rgba(7, 142, 208, .26));
+    border-color: rgba(255,255,255,.18);
+}
+html[data-theme="energy-v20"] .nav-item.active,
+html[data-theme="energy-v20"] .button-primary {
+    background: linear-gradient(135deg, #0868bd, #078ed0);
+    box-shadow: 0 5px 14px rgba(8, 104, 189, .23);
+}
+
+/* Deliberate section rhythm: visible separation, not merged panels. */
+html[data-theme="energy-v20"] .page-content {
+    grid-template-rows: clamp(98px, 11.8vh, 106px) clamp(82px, 9.5vh, 90px) minmax(0, 1fr);
+    gap: 10px;
+}
+html[data-theme="energy-v20"] .overview-zone { gap: 8px; }
+html[data-theme="energy-v20"] .page-heading-row { gap: 18px; }
+html[data-theme="energy-v20"] .actions-area { flex: 1 1 auto; min-width: 0; }
+html[data-theme="energy-v20"] .action-row {
+    display: flex; align-items: center; justify-content: flex-end; gap: 9px;
+    width: 100%; min-width: 0; direction: ltr;
+}
+html[data-theme="energy-v20"] .system-message {
+    display: inline-flex; align-items: center; gap: 8px; flex: 1 1 360px;
+    min-width: 260px; max-width: 480px; min-height: 33px; padding: 0 12px;
+    border: 1px solid #b9d8e5; border-radius: 9px;
+    background: linear-gradient(90deg, #f3fbfd, #e8f6fa); color: #154f70;
+    box-shadow: inset 3px 0 0 #19a8d3; direction: rtl;
+    white-space: nowrap; overflow: hidden;
+}
+html[data-theme="energy-v20"] .system-message strong {
+    min-width: 0; overflow: hidden; color: #0b577d; font-size: .69rem;
+    font-weight: 820; text-overflow: ellipsis; white-space: nowrap;
+}
+html[data-theme="energy-v20"] .message-dot {
+    width: 8px; height: 8px; flex: 0 0 8px; border-radius: 50%;
+    background: #19a8d3; box-shadow: 0 0 0 4px rgba(25,168,211,.13);
+}
+html[data-theme="energy-v20"] .action-buttons { gap: 6px; }
+html[data-theme="energy-v20"] .button { padding-inline: 9px; }
+
+/* Totals stay as four clear cards; Remaining uses gold icon only. */
+html[data-theme="energy-v20"] .kpi-card {
+    border-color: #d3dde5; background: #fff;
+    box-shadow: 0 2px 7px rgba(5,42,96,.05);
+}
+html[data-theme="energy-v20"] .kpi-card::after { opacity: .035; transform: scale(.62); }
+html[data-theme="energy-v20"] .kpi-card span { color: #32495f; }
+html[data-theme="energy-v20"] .kpi-card strong { color: #075ca8; font-weight: 820; }
+html[data-theme="energy-v20"] .kpi-card-four {
+    border-color: #dfcfaa;
+    background: linear-gradient(115deg, #fff 0%, #fffcf5 100%);
+    box-shadow: inset 3px 0 0 #b58a32, 0 2px 7px rgba(5,42,96,.05);
+}
+html[data-theme="energy-v20"] .kpi-card-four .metric-icon {
+    background: linear-gradient(145deg, #c69a3b, #a97d26);
+    box-shadow: 0 5px 12px rgba(181,138,50,.18);
+}
+html[data-theme="energy-v20"] .kpi-card-four strong { color: #075ca8; }
+html[data-theme="energy-v20"] .kpi-card-four i { background: #b58a32; }
+
+/* Four separate basket cards with an actual internal grid. */
+html[data-theme="energy-v20"] .basket-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px; margin-top: 0; min-height: 0; height: 100%;
+}
+html[data-theme="energy-v20"] .basket-card {
+    display: grid; grid-template-rows: 30px minmax(0, 1fr);
+    min-height: 0; height: 100%; border-radius: 10px;
+    border-color: #d5e0e8; box-shadow: 0 2px 7px rgba(5,42,96,.045);
+}
+html[data-theme="energy-v20"] .basket-card header {
+    min-height: 30px; padding: 0 12px; font-size: .75rem; font-weight: 820;
+    background: linear-gradient(90deg, color-mix(in srgb, var(--basket-accent) 5%, white), #fff);
+}
+html[data-theme="energy-v20"] .basket-marker { width: 7px; height: 7px; }
+html[data-theme="energy-v20"] .basket-body {
+    display: grid; grid-auto-rows: minmax(0, auto); align-content: start;
+    min-height: 0; padding: 4px 12px 6px;
+}
+html[data-theme="energy-v20"] .basket-columns,
+html[data-theme="energy-v20"] .basket-row {
+    display: grid;
+    grid-template-columns: minmax(118px, 1.35fr) 48px minmax(108px, 1fr);
+    column-gap: 10px; align-items: center; padding: 0;
+}
+html[data-theme="energy-v20"] .basket-columns {
+    min-height: 19px; padding-bottom: 3px;
+    border-bottom: 1px solid #edf2f5;
+    color: #687f93; font-size: .65rem; font-weight: 780;
+}
+html[data-theme="energy-v20"] .basket-row {
+    min-height: 21px; padding-top: 3px; color: #203f5f;
+}
+html[data-theme="energy-v20"] .basket-row + .basket-row {
+    margin-top: 0; padding-top: 3px; border-top: 1px solid #f1f4f6;
+}
+html[data-theme="energy-v20"] .basket-columns > :first-child,
+html[data-theme="energy-v20"] .basket-row > :first-child { text-align: right; }
+html[data-theme="energy-v20"] .basket-columns > :nth-child(2),
+html[data-theme="energy-v20"] .basket-row > :nth-child(2) { text-align: center; }
+html[data-theme="energy-v20"] .basket-columns > :nth-child(3) { text-align: left; }
+html[data-theme="energy-v20"] .basket-row > :nth-child(3) {
+    text-align: left; direction: ltr; font-variant-numeric: tabular-nums;
+}
+html[data-theme="energy-v20"] .basket-row strong,
+html[data-theme="energy-v20"] .basket-row b {
+    color: #173c62; font-size: .69rem; line-height: 1.1;
+}
+html[data-theme="energy-v20"] .basket-row strong {
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 720;
+}
+html[data-theme="energy-v20"] .basket-row b { font-weight: 780; }
+
+/* Search stays a single premium field. */
+html[data-theme="energy-v20"] .sheet-section { grid-template-rows: 37px minmax(0, 1fr); }
+html[data-theme="energy-v20"] .sheet-toolbar {
+    min-height: 37px; padding: 2px 0 3px; border-bottom: 0; gap: 18px;
+}
+html[data-theme="energy-v20"] .sheet-label { min-width: 220px; color: #536b80; font-size: .72rem; }
+html[data-theme="energy-v20"] .sheet-label strong { color: #294b67; font-weight: 850; }
+html[data-theme="energy-v20"] .search-group {
+    display: block; width: min(610px, 49vw); min-width: 470px;
+    padding: 0; border: 0; background: transparent; box-shadow: none;
+}
+html[data-theme="energy-v20"] .search-group > button,
+html[data-theme="energy-v20"] .search-box svg,
+html[data-theme="energy-v20"] .search-hint { display: none !important; }
+html[data-theme="energy-v20"] .search-box {
+    display: flex; align-items: center; width: 100%; min-height: 34px; padding: 0 15px;
+    border: 1px solid transparent; border-radius: 11px;
+    background: linear-gradient(#fff,#fff) padding-box,
+                linear-gradient(105deg,#aebfcb,#54b7d3 58%,#0b69b5) border-box;
+    box-shadow: 0 3px 10px rgba(5,42,96,.065), inset 0 1px 2px rgba(5,42,96,.025);
+    transition: box-shadow .15s ease, transform .15s ease;
+}
+html[data-theme="energy-v20"] .search-box:focus-within {
+    box-shadow: 0 0 0 4px rgba(7,142,208,.10), 0 5px 14px rgba(5,42,96,.085);
+    transform: translateY(-1px);
+}
+html[data-theme="energy-v20"] .search-box input {
+    width: 100%; height: 32px; padding: 0; border: 0; outline: 0;
+    background: transparent; color: #304962; font-size: .76rem;
+    font-weight: 650; text-align: right;
+}
+html[data-theme="energy-v20"] .search-box input::placeholder { color: #6e8194; opacity: 1; }
+
+/* Return to the accepted compact FATRA-style sheet. */
+html[data-theme="energy-v20"] .table-shell {
+    border-color: #c1ccd6; border-radius: 4px;
+    box-shadow: 0 3px 10px rgba(5,42,96,.045);
+}
+html[data-theme="energy-v20"] table { font-size: .72rem; }
+html[data-theme="energy-v20"] thead {
+    background: var(--grid-head-bg); color: var(--grid-head-text);
+    box-shadow: inset 0 -1px 0 #aebbc7;
+}
+html[data-theme="energy-v20"] th {
+    height: 31px; padding-inline: 8px;
+    border-right-color: rgba(161,174,186,.20);
+    color: var(--grid-head-text); font-size: .72rem; font-weight: 820;
+}
+html[data-theme="energy-v20"] td {
+    height: 25px; padding-inline: 8px;
+    border-right-color: var(--grid-vline); border-bottom-color: var(--grid-line);
+    background: #fff; color: var(--grid-text);
+    font-size: .71rem; font-weight: 560; line-height: 1.05;
+}
+html[data-theme="energy-v20"] tbody tr td { background: #fff; }
+html[data-theme="energy-v20"] tbody tr:hover td { background: #f3f8fb; }
+html[data-theme="energy-v20"] .link-cell,
+html[data-theme="energy-v20"] .custom-text-cell,
+html[data-theme="energy-v20"] td.remaining-column {
+    color: var(--grid-text); font-weight: 600;
+}
+html[data-theme="energy-v20"] .link-cell { font-weight: 680; }
+html[data-theme="energy-v20"] th.remaining-column { color: var(--grid-head-text); box-shadow: none; }
+html[data-theme="energy-v20"] .selected-cell {
+    position: relative; background: #f7fcfe !important;
+    outline: 2px solid #078ed0; outline-offset: -2px;
+}
+
+html[data-theme="energy-v20"] .selection-summary {
+    border-color: #c8d6e0; background: #f7fafc;
+    box-shadow: 0 2px 7px rgba(5,42,96,.05);
+}
+html[data-theme="energy-v20"] .selection-summary article {
+    border-right-color: #d4dee6; background: linear-gradient(115deg,#fff,#eef7fa);
+}
+html[data-theme="energy-v20"] .selection-summary span { color: #526b80; }
+html[data-theme="energy-v20"] .selection-summary strong { color: #123f70; font-weight: 850; }
+
+@media (max-width: 1450px) {
+    html[data-theme="energy-v20"] .system-message {
+        flex-basis: 250px; min-width: 210px; max-width: 330px; padding-inline: 9px;
+    }
+    html[data-theme="energy-v20"] .system-message strong { font-size: .63rem; }
+    html[data-theme="energy-v20"] .search-group { width: min(520px,47vw); min-width: 420px; }
+    html[data-theme="energy-v20"] .basket-columns,
+    html[data-theme="energy-v20"] .basket-row {
+        grid-template-columns: minmax(100px,1.3fr) 42px minmax(96px,1fr);
+        column-gap: 7px;
+    }
+}
+
+@media (max-height: 780px) {
+    html[data-theme="energy-v20"] .page-content {
+        grid-template-rows: 94px 76px minmax(0,1fr); gap: 8px;
+    }
+    html[data-theme="energy-v20"] .basket-card { grid-template-rows: 27px minmax(0,1fr); }
+    html[data-theme="energy-v20"] .basket-card header { min-height: 27px; }
+    html[data-theme="energy-v20"] .basket-body { padding-block: 2px 3px; }
+    html[data-theme="energy-v20"] .basket-columns { min-height: 17px; }
+    html[data-theme="energy-v20"] .basket-row { min-height: 18px; }
+    html[data-theme="energy-v20"] th { height: 28px; font-size: .68rem; }
+}
+
+/* =========================================================
+   v15 — final readability refinement
+   Requested changes:
+   - Remaining icon returns to the product blue identity.
+   - Gold remains only as the card border/accent line.
+   - Basket text is larger and no longer visually clipped.
+   - Grid typography is larger and closer to FATRA rhythm,
+     while retaining the product's own cool-blue identity.
+   - External layout dimensions remain unchanged.
+   ========================================================= */
+
+/* Remaining Amount: identity-blue icon, restrained gold frame and line. */
+html[data-theme="energy-v20"] .kpi-card-four .metric-icon {
+    background: linear-gradient(145deg, #078ed0, #42b9d7);
+    box-shadow: 0 5px 12px rgba(7, 142, 208, .18);
+}
+html[data-theme="energy-v20"] .kpi-card-four {
+    border-color: #dfcfaa;
+    box-shadow: inset 3px 0 0 #b58a32, 0 2px 7px rgba(5,42,96,.05);
+}
+html[data-theme="energy-v20"] .kpi-card-four i { background: #b58a32; }
+html[data-theme="energy-v20"] .kpi-card-four strong { color: #075ca8; }
+
+/* Basket readability: preserve card dimensions, reclaim internal space. */
+html[data-theme="energy-v20"] .basket-card {
+    grid-template-rows: 28px minmax(0, 1fr);
+}
+html[data-theme="energy-v20"] .basket-card header {
+    min-height: 28px;
+    padding-inline: 10px;
+    font-size: .79rem;
+    line-height: 1.2;
+}
+html[data-theme="energy-v20"] .basket-body {
+    padding: 2px 10px 3px;
+    overflow: hidden;
+}
+html[data-theme="energy-v20"] .basket-columns,
+html[data-theme="energy-v20"] .basket-row {
+    grid-template-columns: minmax(128px, 1.42fr) 44px minmax(112px, 1fr);
+    column-gap: 8px;
+}
+html[data-theme="energy-v20"] .basket-columns {
+    min-height: 18px;
+    padding-bottom: 2px;
+    font-size: .68rem;
+    line-height: 1.15;
+}
+html[data-theme="energy-v20"] .basket-row {
+    min-height: 22px;
+    padding-top: 2px;
+}
+html[data-theme="energy-v20"] .basket-row + .basket-row {
+    padding-top: 2px;
+}
+html[data-theme="energy-v20"] .basket-row strong,
+html[data-theme="energy-v20"] .basket-row b {
+    min-width: 0;
+    font-size: .74rem;
+    line-height: 1.18;
+    color: #173c62;
+}
+html[data-theme="energy-v20"] .basket-row strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 720;
+}
+html[data-theme="energy-v20"] .basket-row b {
+    white-space: nowrap;
+    font-weight: 790;
+}
+
+/* FATRA-inspired calm header, with our own blue-grey palette. */
+html[data-theme="energy-v20"] {
+    --grid-text: #3e556d;
+    --grid-head-bg: #e7edf3;
+    --grid-head-text: #263f58;
+    --grid-line: #d5dfe7;
+    --grid-vline: rgba(166, 180, 193, .16);
+}
+html[data-theme="energy-v20"] thead {
+    background: #e7edf3;
+    box-shadow: inset 0 -1px 0 #a9b9c8;
+}
+html[data-theme="energy-v20"] th {
+    height: 31px;
+    padding-inline: 8px;
+    color: #263f58;
+    font-size: .77rem;
+    font-weight: 820;
+    line-height: 1.15;
+    border-right-color: rgba(155, 171, 185, .18);
+}
+html[data-theme="energy-v20"] td {
+    height: 25px;
+    padding-inline: 8px;
+    color: #3e556d;
+    font-size: .76rem;
+    font-weight: 560;
+    line-height: 1.12;
+    border-right-color: rgba(166, 180, 193, .14);
+    border-bottom-color: #d5dfe7;
+}
+html[data-theme="energy-v20"] .link-cell,
+html[data-theme="energy-v20"] .custom-text-cell,
+html[data-theme="energy-v20"] td.remaining-column {
+    color: #3e556d;
+    font-size: .76rem;
+    font-weight: 590;
+}
+html[data-theme="energy-v20"] .link-cell { font-weight: 650; }
+html[data-theme="energy-v20"] tbody tr:hover td { background: #f2f7fa; }
+
+@media (max-width: 1450px) {
+    html[data-theme="energy-v20"] .basket-columns,
+    html[data-theme="energy-v20"] .basket-row {
+        grid-template-columns: minmax(106px, 1.32fr) 40px minmax(102px, 1fr);
+        column-gap: 6px;
+    }
+    html[data-theme="energy-v20"] .basket-row strong,
+    html[data-theme="energy-v20"] .basket-row b { font-size: .70rem; }
+    html[data-theme="energy-v20"] th { font-size: .73rem; }
+    html[data-theme="energy-v20"] td,
+    html[data-theme="energy-v20"] .link-cell,
+    html[data-theme="energy-v20"] .custom-text-cell,
+    html[data-theme="energy-v20"] td.remaining-column { font-size: .72rem; }
+}
+
+@media (max-height: 780px) {
+    html[data-theme="energy-v20"] .basket-card { grid-template-rows: 26px minmax(0,1fr); }
+    html[data-theme="energy-v20"] .basket-card header { min-height: 26px; font-size: .73rem; }
+    html[data-theme="energy-v20"] .basket-body { padding-block: 1px 2px; }
+    html[data-theme="energy-v20"] .basket-columns { min-height: 16px; }
+    html[data-theme="energy-v20"] .basket-row { min-height: 19px; }
+    html[data-theme="energy-v20"] th { height: 28px; font-size: .70rem; }
+    html[data-theme="energy-v20"] td,
+    html[data-theme="energy-v20"] .link-cell,
+    html[data-theme="energy-v20"] .custom-text-cell,
+    html[data-theme="energy-v20"] td.remaining-column { height: 23px; font-size: .69rem; }
+}
+
+
+/* =========================================================
+   v16 — hierarchy polish
+   Requested changes:
+   - Remaining Amount keeps only gold typography emphasis.
+   - Basket cards gain clearer internal structure and better rhythm.
+   - Table header gets a distinctive branded identity.
+   ========================================================= */
+html[data-theme="energy-v20"] .kpi-card-four {
+    border-color: #d3dde5;
+    background: linear-gradient(115deg, #ffffff 0%, #f6fbfe 100%);
+    box-shadow: 0 2px 7px rgba(5,42,96,.05);
+}
+html[data-theme="energy-v20"] .kpi-card-four .metric-icon {
+    background: linear-gradient(145deg, #078ed0, #42b9d7);
+    box-shadow: 0 5px 12px rgba(7, 142, 208, .18);
+}
+html[data-theme="energy-v20"] .kpi-card-four span {
+    color: #4f6375;
+}
+html[data-theme="energy-v20"] .kpi-card-four strong {
+    color: #a6791f;
+    font-weight: 840;
+}
+html[data-theme="energy-v20"] .kpi-card-four i {
+    background: linear-gradient(90deg, #078ed0, #42b9d7);
+}
+
+/* Basket cards: cleaner mini-table styling without changing overall size. */
+html[data-theme="energy-v20"] .basket-card {
+    grid-template-rows: 30px minmax(0,1fr);
+    border-radius: 11px;
+    border-color: #d6e1e9;
+    background: linear-gradient(180deg, #ffffff 0%, #fcfdff 100%);
+    box-shadow: 0 2px 8px rgba(5,42,96,.045);
+}
+html[data-theme="energy-v20"] .basket-card header {
+    min-height: 30px;
+    padding: 0 11px;
+    font-size: .78rem;
+    font-weight: 830;
+    background: linear-gradient(180deg, #fbfdff 0%, #f0f6fa 100%);
+    border-bottom: 1px solid #e4edf3;
+}
+html[data-theme="energy-v20"] .basket-marker {
+    width: 8px;
+    height: 8px;
+}
+html[data-theme="energy-v20"] .basket-body {
+    padding: 5px 9px 6px;
+    gap: 4px;
+}
+html[data-theme="energy-v20"] .basket-columns,
+html[data-theme="energy-v20"] .basket-row {
+    grid-template-columns: minmax(0, 1.55fr) 46px minmax(108px, 1fr);
+    column-gap: 8px;
+}
+html[data-theme="energy-v20"] .basket-columns {
+    min-height: 21px;
+    padding: 0 9px;
+    border: 1px solid #ecf2f6;
+    border-radius: 7px;
+    background: #f7fafc;
+    color: #6a8094;
+    font-size: .66rem;
+    font-weight: 800;
+}
+html[data-theme="energy-v20"] .basket-row {
+    min-height: 22px;
+    padding: 0 9px;
+    border-radius: 7px;
+}
+html[data-theme="energy-v20"] .basket-row:hover {
+    background: #f5fafc;
+}
+html[data-theme="energy-v20"] .basket-row + .basket-row {
+    margin-top: 1px;
+    padding-top: 0;
+    border-top: 0;
+}
+html[data-theme="energy-v20"] .basket-row strong,
+html[data-theme="energy-v20"] .basket-row b {
+    min-width: 0;
+    font-size: .73rem;
+    line-height: 1.18;
+    color: #173c62;
+}
+html[data-theme="energy-v20"] .basket-row strong {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: 760;
+}
+html[data-theme="energy-v20"] .basket-row b {
+    font-weight: 800;
+}
+
+/* Distinctive table header: branded yet calm, closer to FATRA rhythm. */
+html[data-theme="energy-v20"] {
+    --grid-text: #425a72;
+    --grid-head-bg: #edf4f8;
+    --grid-head-text: #224764;
+    --grid-line: #d7e1e8;
+    --grid-vline: rgba(160, 176, 190, .12);
+}
+html[data-theme="energy-v20"] .table-shell {
+    border-color: #c6d3dd;
+    border-radius: 6px;
+    box-shadow: 0 3px 10px rgba(5,42,96,.05);
+}
+html[data-theme="energy-v20"] thead {
+    background: linear-gradient(180deg, #f5f9fc 0%, #e8eff5 100%);
+    color: #224764;
+    box-shadow: inset 0 3px 0 #078ed0, inset 0 -1px 0 #b8c7d3;
+}
+html[data-theme="energy-v20"] th {
+    height: 32px;
+    padding-inline: 8px;
+    color: #224764;
+    font-size: .76rem;
+    font-weight: 830;
+    line-height: 1.15;
+    border-right-color: rgba(156, 172, 186, .14);
+    background: transparent;
+}
+html[data-theme="energy-v20"] td {
+    height: 25px;
+    padding-inline: 8px;
+    color: #425a72;
+    font-size: .75rem;
+    font-weight: 560;
+    line-height: 1.12;
+    border-right-color: rgba(165, 179, 192, .12);
+    border-bottom-color: #d7e1e8;
+}
+html[data-theme="energy-v20"] .link-cell,
+html[data-theme="energy-v20"] .custom-text-cell,
+html[data-theme="energy-v20"] td.remaining-column {
+    color: #425a72;
+    font-size: .75rem;
+    font-weight: 600;
+}
+html[data-theme="energy-v20"] .link-cell { font-weight: 670; }
+html[data-theme="energy-v20"] tbody tr:hover td { background: #f4f9fc; }
+
+@media (max-width: 1450px) {
+  html[data-theme="energy-v20"] .basket-columns,
+  html[data-theme="energy-v20"] .basket-row {
+      grid-template-columns: minmax(0, 1.42fr) 40px minmax(100px, 1fr);
+      column-gap: 6px;
+  }
+  html[data-theme="energy-v20"] .basket-row strong,
+  html[data-theme="energy-v20"] .basket-row b { font-size: .69rem; }
+  html[data-theme="energy-v20"] th { font-size: .72rem; }
+  html[data-theme="energy-v20"] td,
+  html[data-theme="energy-v20"] .link-cell,
+  html[data-theme="energy-v20"] .custom-text-cell,
+  html[data-theme="energy-v20"] td.remaining-column { font-size: .71rem; }
+}
+
+@media (max-height: 780px) {
+  html[data-theme="energy-v20"] .basket-card { grid-template-rows: 27px minmax(0,1fr); }
+  html[data-theme="energy-v20"] .basket-card header { min-height: 27px; font-size: .73rem; }
+  html[data-theme="energy-v20"] .basket-body { padding: 3px 8px 4px; }
+  html[data-theme="energy-v20"] .basket-columns { min-height: 18px; }
+  html[data-theme="energy-v20"] .basket-row { min-height: 19px; }
+  html[data-theme="energy-v20"] th { height: 29px; font-size: .69rem; }
+  html[data-theme="energy-v20"] td,
+  html[data-theme="energy-v20"] .link-cell,
+  html[data-theme="energy-v20"] .custom-text-cell,
+  html[data-theme="energy-v20"] td.remaining-column { height: 23px; font-size: .68rem; }
+}
+
+
+/* =========================================================
+   v17 — KPI remaining fix + branded table header
+   Requested changes:
+   - In Remaining Amount, only the underline is gold.
+   - Number returns to the core blue identity.
+   - Table header gets a stronger, more premium visual identity
+     with larger typography and a brand-led treatment.
+   ========================================================= */
+
+/* Remaining Amount: keep gold only in the underline accent. */
+html[data-theme="energy-v20"] .kpi-card-four {
+    border-color: #d3dde5;
+    background: linear-gradient(115deg, #ffffff 0%, #f6fbfe 100%);
+    box-shadow: 0 2px 7px rgba(5,42,96,.05);
+}
+html[data-theme="energy-v20"] .kpi-card-four .metric-icon {
+    background: linear-gradient(145deg, #078ed0, #42b9d7);
+    box-shadow: 0 5px 12px rgba(7, 142, 208, .18);
+}
+html[data-theme="energy-v20"] .kpi-card-four span {
+    color: #4f6375;
+}
+html[data-theme="energy-v20"] .kpi-card-four strong {
+    color: #075ca8;
+    font-weight: 840;
+}
+html[data-theme="energy-v20"] .kpi-card-four i {
+    background: linear-gradient(90deg, #c79b3f 0%, #b88725 100%);
+}
+
+/* Table shell looks more premium before the data area starts. */
+html[data-theme="energy-v20"] .table-shell {
+    border-color: #c3d0db;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(5,42,96,.055);
+}
+
+/* Branded header identity: blue top accent + soft enterprise body. */
+html[data-theme="energy-v20"] thead {
+    background: linear-gradient(180deg, #f8fbfd 0%, #e9f0f6 100%);
+    color: #1f4563;
+    box-shadow:
+        inset 0 4px 0 #078ed0,
+        inset 0 5px 0 rgba(255,255,255,.65),
+        inset 0 -1px 0 #b7c6d2;
+}
+html[data-theme="energy-v20"] th {
+    height: 35px;
+    padding-inline: 10px;
+    color: #214866;
+    font-size: .82rem;
+    font-weight: 840;
+    letter-spacing: .01em;
+    line-height: 1.15;
+    border-right-color: rgba(150, 167, 181, .16);
+    background: linear-gradient(180deg, rgba(255,255,255,.24), rgba(255,255,255,0));
+    text-shadow: 0 1px 0 rgba(255,255,255,.55);
+}
+html[data-theme="energy-v20"] th:first-child {
+    border-top-right-radius: 7px;
+}
+html[data-theme="energy-v20"] th:last-child {
+    border-top-left-radius: 7px;
+}
+
+/* Keep body calm and readable under the stronger header. */
+html[data-theme="energy-v20"] td {
+    color: #425a72;
+    font-size: .75rem;
+    font-weight: 560;
+    border-right-color: rgba(165, 179, 192, .12);
+    border-bottom-color: #d7e1e8;
+}
+html[data-theme="energy-v20"] .link-cell,
+html[data-theme="energy-v20"] .custom-text-cell,
+html[data-theme="energy-v20"] td.remaining-column {
+    color: #425a72;
+    font-size: .75rem;
+    font-weight: 600;
+}
+
+@media (max-width: 1450px) {
+  html[data-theme="energy-v20"] th { font-size: .77rem; height: 33px; }
+}
+
+@media (max-height: 780px) {
+  html[data-theme="energy-v20"] th { height: 31px; font-size: .74rem; }
+}
+
+
+/* =========================================================
+   v20 experiment — baskets on demand
+   Fixed reference remains v17. This experiment removes the
+   permanent basket row and opens details in an overlay panel.
+   ========================================================= */
+html[data-theme="energy-v20"] .page-content {
+    grid-template-rows: clamp(98px, 11.8vh, 106px) minmax(0, 1fr);
+    gap: 10px;
+}
+html[data-theme="energy-v20"] .title-area {
+    flex-wrap: nowrap;
+}
+html[data-theme="energy-v20"] .basket-details-trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    min-height: 32px;
+    margin-left: 3px;
+    padding: 0 10px;
+    border: 1px solid #a9ccdc;
+    border-radius: 9px;
+    background: linear-gradient(180deg, #ffffff, #eef8fc);
+    color: #0a5b91;
+    box-shadow: 0 2px 7px rgba(5,42,96,.055);
+    font-size: .69rem;
+    font-weight: 800;
+    white-space: nowrap;
+}
+html[data-theme="energy-v20"] .basket-details-trigger:hover {
+    border-color: #42b9d7;
+    background: #f2fbfe;
+}
+html[data-theme="energy-v20"] .basket-details-trigger svg {
+    width: 15px;
+    height: 15px;
+}
+html[data-theme="energy-v20"] .basket-details-trigger b {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 5px;
+    border-radius: 999px;
+    background: linear-gradient(145deg, #078ed0, #42b9d7);
+    color: #fff;
+    font-size: .62rem;
+    font-weight: 850;
+}
+html[data-theme="energy-v20"] .sheet-zone {
+    min-height: 0;
+}
+
+.basket-details-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 180;
+    background: rgba(5, 31, 63, .24);
+    backdrop-filter: blur(2px);
+    opacity: 0;
+    transition: opacity .18s ease;
+}
+.basket-details-backdrop.is-visible { opacity: 1; }
+
+.basket-details-panel {
+    position: fixed;
+    z-index: 190;
+    top: clamp(70px, 8vh, 82px);
+    right: 20px;
+    bottom: 20px;
+    display: grid;
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    width: min(690px, calc(100vw - 40px));
+    overflow: hidden;
+    border: 1px solid #bfd1dd;
+    border-radius: 16px;
+    background: #fff;
+    box-shadow: 0 24px 65px rgba(5,42,96,.25);
+    direction: rtl;
+    transform: translateX(calc(100% + 40px));
+    opacity: 0;
+    transition: transform .22s ease, opacity .18s ease;
+}
+.basket-details-panel.is-open {
+    transform: translateX(0);
+    opacity: 1;
+}
+.basket-panel-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 18px;
+    padding: 18px 20px 16px;
+    border-bottom: 1px solid #c9dce7;
+    background:
+        radial-gradient(circle at 92% -18%, rgba(66,185,215,.28), transparent 36%),
+        linear-gradient(120deg, #f8fcfe 0%, #e8f5fa 100%);
+    box-shadow: inset 0 4px 0 #078ed0;
+}
+.basket-panel-kicker {
+    color: #0780b9;
+    font-size: .67rem;
+    font-weight: 850;
+}
+.basket-panel-header h2 {
+    margin: 4px 0 0;
+    color: #123f70;
+    font-size: 1.35rem;
+    font-weight: 850;
+}
+.basket-panel-header p {
+    margin: 5px 0 0;
+    color: #637a8e;
+    font-size: .74rem;
+}
+.basket-panel-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    flex: 0 0 34px;
+    border: 1px solid #b9cfdd;
+    border-radius: 10px;
+    background: rgba(255,255,255,.82);
+    color: #31536f;
+    font-size: 1.35rem;
+    line-height: 1;
+}
+.basket-panel-close:hover { background: #fff; border-color: #42b9d7; }
+.basket-panel-columns,
+.basket-detail-row {
+    display: grid;
+    grid-template-columns: minmax(180px, 1.35fr) 90px minmax(160px, 1fr) 74px;
+    column-gap: 12px;
+    align-items: center;
+}
+.basket-panel-columns {
+    min-height: 38px;
+    padding: 0 20px;
+    border-bottom: 1px solid #d8e3eb;
+    background: #f6f9fb;
+    color: #6a7f92;
+    font-size: .69rem;
+    font-weight: 800;
+}
+.basket-panel-columns span:nth-child(n+2) { text-align: center; }
+.basket-panel-list {
+    min-height: 0;
+    overflow: auto;
+    padding: 6px 12px 10px;
+}
+.basket-detail-row {
+    position: relative;
+    min-height: 58px;
+    padding: 0 8px;
+    overflow: hidden;
+    border-bottom: 1px solid #e1e9ef;
+    color: #284a66;
+}
+.basket-detail-row::after {
+    content: "";
+    position: absolute;
+    right: 8px;
+    left: 8px;
+    bottom: 5px;
+    height: 3px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #078ed0 var(--share), #e8f1f5 var(--share));
+    opacity: .72;
+}
+.basket-detail-row:hover { background: #f7fbfd; }
+.basket-name {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    min-width: 0;
+}
+.basket-name i {
+    width: 9px;
+    height: 9px;
+    flex: 0 0 9px;
+    border-radius: 50%;
+    background: linear-gradient(145deg, #0877bd, #42b9d7);
+    box-shadow: 0 0 0 4px rgba(66,185,215,.12);
+}
+.basket-name strong {
+    min-width: 0;
+    overflow: hidden;
+    color: #173f68;
+    font-size: .79rem;
+    font-weight: 800;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.basket-detail-row > b {
+    color: #075ca8;
+    font-size: .8rem;
+    font-weight: 850;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+}
+.basket-amount {
+    color: #274d6b;
+    font-size: .78rem;
+    font-weight: 760;
+    text-align: left;
+    direction: ltr;
+    font-variant-numeric: tabular-nums;
+}
+.basket-share {
+    color: #507087;
+    font-size: .72rem;
+    font-weight: 760;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+}
+.basket-panel-footer {
+    min-height: 48px;
+    padding: 12px 20px;
+    border-top: 1px solid #d7e3eb;
+    background: #f8fbfd;
+    color: #647d90;
+    font-size: .69rem;
+}
+body.basket-panel-open { overflow: hidden; }
+
+@media (max-width: 1450px) {
+    .basket-details-panel { width: min(620px, calc(100vw - 32px)); right: 16px; }
+    .basket-panel-columns,
+    .basket-detail-row { grid-template-columns: minmax(150px,1.25fr) 76px minmax(145px,1fr) 64px; column-gap: 8px; }
+}
+@media (max-height: 780px) {
+    html[data-theme="energy-v20"] .page-content {
+        grid-template-rows: 94px minmax(0,1fr);
+        gap: 8px;
+    }
+    .basket-details-panel { top: 62px; bottom: 12px; }
+    .basket-detail-row { min-height: 50px; }
+}
+
+
+/* =========================================================
+   v21 basket-to-sheet integration experiments
+   Static design lab only.
+   ========================================================= */
+html[data-theme="energy-v20"] .page-content {
+    grid-template-rows: clamp(98px, 11.8vh, 106px) minmax(0, 1fr);
+    gap: 10px;
+}
+html[data-theme="energy-v20"] .sheet-zone { min-height: 0; }
+html[data-theme="energy-v20"] .sheet-section { min-height: 0; }
+html[data-theme="energy-v20"] .sheet-toolbar {
+    position: relative;
+    z-index: 8;
+    min-height: 37px;
+}
+html[data-theme="energy-v20"] .sheet-status-actions {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    min-width: 0;
+    direction: ltr;
+}
+html[data-theme="energy-v20"] .sheet-status-actions .sheet-label { min-width: 0; }
+html[data-theme="energy-v20"] .basket-trigger-toolbar {
+    min-height: 31px;
+    padding-inline: 10px 8px;
+    border-radius: 9px;
+    box-shadow: none;
+    white-space: nowrap;
+}
+html[data-theme="energy-v20"] .experiment-mode-label {
+    display: inline-flex;
+    align-items: center;
+    min-height: 25px;
+    padding: 0 9px;
+    border: 1px solid #c9dce7;
+    border-radius: 999px;
+    background: #f4fafc;
+    color: #39708d;
+    font-size: .61rem;
+    font-weight: 780;
+    white-space: nowrap;
+}
+html[data-theme="energy-v20"] .basket-details-panel {
+    direction: rtl;
+    background: #fff;
+    border: 1px solid #bcd2df;
+    box-shadow: 0 14px 34px rgba(5,42,96,.15);
+    overflow: hidden;
+}
+html[data-theme="energy-v20"] .basket-panel-header {
+    background: linear-gradient(115deg, #f7fcfe 0%, #e7f5fa 72%, #d9f0f7 100%);
+    border-top: 4px solid #078ed0;
+}
+html[data-theme="energy-v20"] .basket-detail-row {
+    cursor: default;
+}
+html[data-theme="energy-v20"] .basket-detail-row:hover {
+    background: #f3f9fc;
+}
+html[data-theme="energy-v20"] .basket-panel-close { cursor: pointer; }
+html[data-theme="energy-v20"] body.basket-panel-open { overflow: hidden; }
+
+html[data-theme="energy-v20"] .sheet-workspace-side {
+    display: grid;
+    grid-template-columns: minmax(0,1fr) 0;
+    gap: 0;
+    min-height: 0;
+    height: 100%;
+    overflow: hidden;
+    transition: grid-template-columns .22s ease, gap .22s ease;
+}
+html[data-theme="energy-v20"] .sheet-workspace-side.panel-open {
+    grid-template-columns: minmax(0,1fr) min(570px, 35vw);
+    gap: 8px;
+}
+html[data-theme="energy-v20"] .sheet-workspace-side .table-shell {
+    min-width: 0;
+    min-height: 0;
+    height: 100%;
+}
+html[data-theme="energy-v20"] .basket-panel-side {
+    position: relative;
+    inset: auto;
+    width: auto;
+    min-width: 0;
+    height: 100%;
+    max-height: none;
+    display: grid;
+    grid-template-rows: auto auto minmax(0,1fr) auto;
+    border-radius: 10px;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateX(-18px);
+    transition: opacity .18s ease, transform .2s ease, visibility .18s ease;
+}
+html[data-theme="energy-v20"] .basket-panel-side.is-open {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(0);
+}
+html[data-theme="energy-v20"] .basket-panel-side .basket-panel-list {
+    min-height: 0;
+    overflow: auto;
+}
+html[data-theme="energy-v20"] .basket-panel-side .basket-panel-header {
+    padding: 16px 18px 13px;
+}
+html[data-theme="energy-v20"] .basket-panel-side .basket-detail-row {
+    min-height: 49px;
+}
+@media (max-width:1450px) {
+  html[data-theme="energy-v20"] .sheet-workspace-side.panel-open {
+      grid-template-columns: minmax(0,1fr) min(500px,40vw);
+  }
+}
+
+/* Arabic workflow: keep the details panel on the right side of the sheet. */
+html[data-theme="energy-v20"] .sheet-workspace-side { direction: ltr; }
+html[data-theme="energy-v20"] .sheet-workspace-side .table-shell,
+html[data-theme="energy-v20"] .basket-panel-side { direction: rtl; }
+
+
+/* =========================================================
+   v22 — resizable basket panels
+   Design-lab only. The real Work Orders screen is untouched.
+   ========================================================= */
+html[data-theme="energy-v20"] .basket-panel-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    flex: 0 0 auto;
+}
+html[data-theme="energy-v20"] .basket-size-presets {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 3px;
+    border: 1px solid #c9dce7;
+    border-radius: 9px;
+    background: rgba(255,255,255,.72);
+}
+html[data-theme="energy-v20"] .basket-size-button {
+    min-height: 27px;
+    padding: 0 8px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: #557086;
+    font-size: .63rem;
+    font-weight: 790;
+    cursor: pointer;
+}
+html[data-theme="energy-v20"] .basket-size-button:hover {
+    background: #eef8fb;
+    color: #075ca8;
+}
+html[data-theme="energy-v20"] .basket-size-button.is-active {
+    background: linear-gradient(135deg, #078ed0, #2daecf);
+    color: #fff;
+    box-shadow: 0 3px 8px rgba(7,142,208,.18);
+}
+html[data-theme="energy-v20"] .basket-resize-handle {
+    position: relative;
+    z-index: 12;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    touch-action: none;
+    user-select: none;
+    outline: none;
+}
+html[data-theme="energy-v20"] .basket-resize-handle::before {
+    content: "";
+    position: absolute;
+    border-radius: 999px;
+    background: rgba(7,142,208,.08);
+    opacity: 0;
+    transition: opacity .12s ease, background .12s ease;
+}
+html[data-theme="energy-v20"] .basket-resize-handle:hover::before,
+html[data-theme="energy-v20"] .basket-resize-handle:focus-visible::before,
+body.is-panel-resizing html[data-theme="energy-v20"] .basket-resize-handle::before {
+    opacity: 1;
+    background: rgba(7,142,208,.15);
+}
+html[data-theme="energy-v20"] .basket-resize-handle span {
+    position: relative;
+    z-index: 1;
+    display: block;
+    border-radius: 999px;
+    background: #8db5c9;
+    box-shadow: 0 0 0 3px rgba(255,255,255,.82);
+}
+body.is-panel-resizing {
+    user-select: none !important;
+}
+
+html[data-theme="energy-v20"] .sheet-workspace-side {
+    --basket-panel-width: 460px;
+    grid-template-columns: minmax(0,1fr) 0 0;
+    gap: 0;
+}
+html[data-theme="energy-v20"] .sheet-workspace-side.panel-open {
+    grid-template-columns: minmax(0,1fr) 8px var(--basket-panel-width);
+    gap: 0;
+}
+html[data-theme="energy-v20"] .basket-resize-handle-side {
+    width: 8px;
+    min-width: 8px;
+    cursor: col-resize;
+    opacity: 0;
+    visibility: hidden;
+}
+html[data-theme="energy-v20"] .sheet-workspace-side.panel-open .basket-resize-handle-side {
+    opacity: 1;
+    visibility: visible;
+}
+html[data-theme="energy-v20"] .basket-resize-handle-side::before {
+    inset: 0 -3px;
+}
+html[data-theme="energy-v20"] .basket-resize-handle-side span {
+    width: 3px;
+    height: 46px;
+}
+body.is-panel-resizing-side { cursor: col-resize !important; }
+html[data-theme="energy-v20"] .basket-panel-side {
+    min-width: 0;
+}
+html[data-theme="energy-v20"] .basket-panel-side.is-compact {
+    grid-template-rows: auto minmax(0,1fr) auto;
+}
+html[data-theme="energy-v20"] .basket-panel-side.is-compact .basket-panel-header {
+    padding: 12px 12px 10px;
+    gap: 10px;
+}
+html[data-theme="energy-v20"] .basket-panel-side.is-compact .basket-panel-header h2 {
+    font-size: 1.05rem;
+}
+html[data-theme="energy-v20"] .basket-panel-side.is-compact .basket-panel-header p,
+html[data-theme="energy-v20"] .basket-panel-side.is-compact .basket-panel-columns {
+    display: none;
+}
+html[data-theme="energy-v20"] .basket-panel-side.is-compact .basket-panel-actions {
+    align-self: flex-start;
+    gap: 5px;
+}
+html[data-theme="energy-v20"] .basket-panel-side.is-compact .basket-size-button {
+    padding-inline: 6px;
+    font-size: .58rem;
+}
+html[data-theme="energy-v20"] .basket-panel-side.is-compact .basket-panel-list {
+    padding: 5px 8px 8px;
+}
+html[data-theme="energy-v20"] .basket-panel-side.is-compact .basket-detail-row {
+    grid-template-columns: minmax(0,1fr) auto;
+    grid-template-areas:
+      "name count"
+      "amount share";
+    column-gap: 8px;
+    row-gap: 3px;
+    min-height: 62px;
+    padding: 7px 7px 9px;
+}
+html[data-theme="energy-v20"] .basket-panel-side.is-compact .basket-name { grid-area: name; }
+html[data-theme="energy-v20"] .basket-panel-side.is-compact .basket-detail-row > b { grid-area: count; }
+html[data-theme="energy-v20"] .basket-panel-side.is-compact .basket-amount { grid-area: amount; text-align: right; }
+html[data-theme="energy-v20"] .basket-panel-side.is-compact .basket-share { grid-area: share; }
+html[data-theme="energy-v20"] .basket-panel-side.is-compact .basket-panel-footer {
+    padding: 8px 11px;
+    font-size: .61rem;
+}
+@media (max-width: 1100px) {
+  html[data-theme="energy-v20"] .sheet-workspace-side.panel-open {
+      grid-template-columns: minmax(0,1fr) 8px min(390px,42vw);
+  }
+  html[data-theme="energy-v20"] .basket-panel-side .basket-size-presets { display: none; }
+}
+
+
+/* =========================================================
+   v24 — balanced refinement from v22
+   Only two deliberate changes:
+   1) Medium/default side width reduced from 520px to 460px.
+   2) Percentage bars are slightly clearer, without badges or
+      changing the established v22 spacing and typography.
+   ========================================================= */
+html[data-theme="energy-v20"] .basket-detail-row::before {
+    content: "";
+    position: absolute;
+    right: 8px;
+    left: 8px;
+    bottom: 5px;
+    height: 5px;
+    border-radius: 999px;
+    background: #e3edf3;
+    box-shadow: inset 0 1px 1px rgba(5,42,96,.06);
+}
+html[data-theme="energy-v20"] .basket-detail-row::after {
+    right: 8px;
+    left: auto;
+    width: max(5px, var(--share));
+    height: 5px;
+    background: linear-gradient(90deg, #078ed0, #39b5d4);
+    opacity: .9;
+    box-shadow: 0 1px 2px rgba(7,142,208,.14);
+}
+
+
+/* =========================================================
+   v25 — table header borrows the basket panel visual identity
+   Goal: make the table head feel like part of the same family
+   as "تفاصيل السلال" without becoming dark or heavy.
+   ========================================================= */
+html[data-theme="energy-v20"] .table-shell {
+    border-color: #bfd3df;
+    border-radius: 10px;
+    overflow: hidden;
+}
+html[data-theme="energy-v20"] thead {
+    background: linear-gradient(115deg, #f7fcfe 0%, #e7f5fa 72%, #d9f0f7 100%);
+    color: #173d63;
+    box-shadow:
+        inset 0 4px 0 #078ed0,
+        inset 0 -1px 0 #c6dce6,
+        inset 0 1px 0 rgba(255,255,255,.82);
+}
+html[data-theme="energy-v20"] th {
+    height: 36px;
+    padding-inline: 10px;
+    color: #19466a;
+    font-size: .80rem;
+    font-weight: 820;
+    letter-spacing: .01em;
+    line-height: 1.1;
+    background: linear-gradient(180deg, rgba(255,255,255,.24), rgba(255,255,255,0));
+    border-right-color: rgba(131, 173, 195, .18);
+    text-shadow: 0 1px 0 rgba(255,255,255,.62);
+}
+html[data-theme="energy-v20"] th:first-child {
+    border-top-right-radius: 9px;
+}
+html[data-theme="energy-v20"] th:last-child {
+    border-top-left-radius: 9px;
+}
+@media (max-width: 1450px) {
+  html[data-theme="energy-v20"] th { font-size: .76rem; height: 34px; }
+}
+@media (max-height: 780px) {
+  html[data-theme="energy-v20"] th { height: 32px; font-size: .74rem; }
+}
+
+
+/* =========================================================
+   v26 — complementary header balance
+   The basket panel stays aqua-led on the right.
+   The table header carries a cooler blue-mist identity,
+   stronger from the opposite (left) side and still tinted
+   on the right so the header never fades to plain white.
+   ========================================================= */
+html[data-theme="energy-v20"] thead {
+    background: linear-gradient(
+        90deg,
+        #d5e9f7 0%,
+        #deedf7 28%,
+        #e5f2f7 58%,
+        #eaf6f8 100%
+    );
+    color: #173f62;
+    box-shadow:
+        inset 0 4px 0 #2a78b8,
+        inset 0 -1px 0 #bfd4df,
+        inset 0 1px 0 rgba(255,255,255,.68);
+}
+
+html[data-theme="energy-v20"] th {
+    color: #1c4566;
+    background: linear-gradient(
+        180deg,
+        rgba(255,255,255,.20) 0%,
+        rgba(255,255,255,.03) 100%
+    );
+    border-right-color: rgba(105, 153, 181, .18);
+    text-shadow: 0 1px 0 rgba(255,255,255,.54);
+}
+
+/* Slightly cooler table frame so it complements the aqua panel. */
+html[data-theme="energy-v20"] .table-shell {
+    border-color: #b9cedb;
+    box-shadow: 0 4px 12px rgba(37, 102, 151, .055);
+}
+
+/* Keep the side panel distinctly aqua-led. */
+html[data-theme="energy-v20"] .basket-panel-side .basket-panel-header {
+    background: linear-gradient(115deg, #f6fcfe 0%, #e5f6fa 68%, #d7f0f6 100%);
+    border-top-color: #0796c9;
+}
+
+
+/* =========================================================
+   v27 — stronger complementary table identity
+   Final polish requested after v26:
+   - 10–15% clearer gradient from the side opposite the panel.
+   - Slightly larger and darker column labels.
+   - The top accent itself becomes a complementary gradient.
+   ========================================================= */
+html[data-theme="energy-v20"] thead {
+    background:
+        linear-gradient(90deg, #216fae 0%, #2c8fc0 52%, #55bfd3 100%) top / 100% 4px no-repeat,
+        linear-gradient(90deg, #c6e0f2 0%, #d3e7f3 30%, #deedf4 62%, #e5f3f6 100%);
+    color: #123b5e;
+    box-shadow:
+        inset 0 -1px 0 #b7cfdb,
+        inset 0 1px 0 rgba(255,255,255,.60);
+}
+html[data-theme="energy-v20"] th {
+    height: 36px;
+    padding-top: 3px;
+    color: #153e60;
+    font-size: .84rem;
+    font-weight: 790;
+    letter-spacing: .008em;
+    border-right-color: rgba(92, 143, 174, .18);
+    text-shadow: 0 1px 0 rgba(255,255,255,.48);
+}
+html[data-theme="energy-v20"] .table-shell {
+    border-color: #b3cbd9;
+    box-shadow: 0 4px 13px rgba(31, 95, 143, .06);
+}
+@media (max-width: 1450px) {
+  html[data-theme="energy-v20"] th { font-size: .79rem; height: 34px; }
+}
+@media (max-height: 780px) {
+  html[data-theme="energy-v20"] th { height: 32px; font-size: .76rem; }
+}
+
+
+/* =========================================================
+   v28 — sheet readability and tool integration polish
+   - Softer 3px header accent while preserving direction.
+   - FATRA-like body text: darker, steadier, quiet verticals.
+   - Search becomes part of the sheet toolbar, not a floating box.
+   - Panel size controls become a calm segmented control.
+   ========================================================= */
+
+/* 1) Keep the complementary identity, but calm the top accent. */
+html[data-theme="energy-v20"] thead {
+    background:
+        linear-gradient(90deg, #2d77ad 0%, #3a94bd 52%, #67bfd0 100%) top / 100% 3px no-repeat,
+        linear-gradient(90deg, #c8e1f1 0%, #d5e8f2 31%, #e0edf3 63%, #e7f3f6 100%);
+    box-shadow:
+        inset 0 -1px 0 #b9cfda,
+        inset 0 1px 0 rgba(255,255,255,.58);
+}
+html[data-theme="energy-v20"] th {
+    padding-top: 2px;
+}
+
+/* 2) FATRA-like table body without increasing row height. */
+html[data-theme="energy-v20"] td {
+    height: 25px;
+    padding-inline: 8px;
+    color: #344f67;
+    font-size: .76rem;
+    font-weight: 560;
+    line-height: 1.12;
+    border-bottom-color: #d5e0e8;
+    border-right-color: rgba(142, 163, 179, .08);
+}
+html[data-theme="energy-v20"] .link-cell,
+html[data-theme="energy-v20"] .custom-text-cell,
+html[data-theme="energy-v20"] td.remaining-column {
+    color: #344f67;
+    font-size: .76rem;
+    font-weight: 590;
+}
+html[data-theme="energy-v20"] .link-cell { font-weight: 650; }
+html[data-theme="energy-v20"] tbody tr:hover td { background: #f3f8fb; }
+
+/* 3) Search integrated into the sheet toolbar. */
+html[data-theme="energy-v20"] .sheet-toolbar {
+    min-height: 35px;
+    padding: 1px 0 3px;
+    border-bottom: 1px solid rgba(164, 192, 208, .28);
+}
+html[data-theme="energy-v20"] .search-group {
+    width: min(430px, 38vw);
+    min-width: 310px;
+}
+html[data-theme="energy-v20"] .search-box {
+    min-height: 31px;
+    padding: 0 12px;
+    border: 1px solid #b9d0dd;
+    border-radius: 9px;
+    background: linear-gradient(90deg, #f8fcfe 0%, #eef7fa 100%);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.82);
+}
+html[data-theme="energy-v20"] .search-box:focus-within {
+    border-color: #4aaacb;
+    box-shadow: 0 0 0 3px rgba(7,142,208,.09), inset 0 1px 0 rgba(255,255,255,.82);
+    transform: none;
+}
+html[data-theme="energy-v20"] .search-box input {
+    height: 29px;
+    color: #36536b;
+    font-size: .72rem;
+    font-weight: 620;
+}
+html[data-theme="energy-v20"] .search-box input::placeholder {
+    color: #71889a;
+}
+
+/* 4) Quieter, more compact size controls inside the side-panel header. */
+html[data-theme="energy-v20"] .basket-panel-actions {
+    align-items: center;
+    gap: 8px;
+}
+html[data-theme="energy-v20"] .basket-size-presets {
+    display: inline-flex;
+    align-items: center;
+    gap: 0;
+    padding: 2px;
+    border: 1px solid #c7dce7;
+    border-radius: 9px;
+    background: rgba(255,255,255,.72);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.86);
+}
+html[data-theme="energy-v20"] .basket-size-button {
+    min-height: 25px;
+    padding: 0 8px;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: #557187;
+    font-size: .60rem;
+    font-weight: 760;
+    box-shadow: none;
+}
+html[data-theme="energy-v20"] .basket-size-button:hover {
+    background: #edf7fb;
+    color: #176b98;
+}
+html[data-theme="energy-v20"] .basket-size-button.is-active {
+    background: linear-gradient(135deg, #078ed0, #35b1d0);
+    color: #fff;
+    box-shadow: 0 2px 6px rgba(7,142,208,.18);
+}
+html[data-theme="energy-v20"] .basket-panel-close {
+    width: 31px;
+    height: 31px;
+    border-color: #c7d9e3;
+    background: rgba(255,255,255,.76);
+}
+
+@media (max-width: 1450px) {
+  html[data-theme="energy-v20"] .search-group { width: min(370px, 34vw); min-width: 270px; }
+  html[data-theme="energy-v20"] td,
+  html[data-theme="energy-v20"] .link-cell,
+  html[data-theme="energy-v20"] .custom-text-cell,
+  html[data-theme="energy-v20"] td.remaining-column { font-size: .72rem; }
+}
+@media (max-height: 780px) {
+  html[data-theme="energy-v20"] .sheet-toolbar { min-height: 32px; }
+  html[data-theme="energy-v20"] .search-box { min-height: 29px; }
+  html[data-theme="energy-v20"] .search-box input { height: 27px; }
+  html[data-theme="energy-v20"] td,
+  html[data-theme="energy-v20"] .link-cell,
+  html[data-theme="energy-v20"] .custom-text-cell,
+  html[data-theme="energy-v20"] td.remaining-column { height: 23px; font-size: .69rem; }
+}
+
+
+/* =========================================================
+   v29 — premium selection-summary typography
+   Requested scope:
+   - Keep selection values unchanged.
+   - Give footer labels the same visual authority as table headers.
+   - Keep the treatment calm and subordinate to the data grid.
+   - Search and all other regions remain unchanged.
+   ========================================================= */
+html[data-theme="energy-v20"] .selection-summary {
+    position: relative;
+    border-color: #bfd2de;
+    border-radius: 10px;
+    background:
+        linear-gradient(90deg, #2d77ad 0%, #3a94bd 52%, #67bfd0 100%) top / 100% 2px no-repeat,
+        linear-gradient(90deg, #f7fbfd 0%, #eef6fa 52%, #f5fafc 100%);
+    box-shadow:
+        0 3px 10px rgba(31, 95, 143, .055),
+        inset 0 1px 0 rgba(255,255,255,.72);
+}
+html[data-theme="energy-v20"] .selection-summary article {
+    min-height: 48px;
+    gap: 9px;
+    padding: 6px 13px 5px;
+    border-right-color: rgba(139, 172, 191, .22);
+    background: transparent;
+}
+html[data-theme="energy-v20"] .selection-summary article > div {
+    min-width: 0;
+    justify-content: center;
+}
+html[data-theme="energy-v20"] .selection-summary span:not(.summary-icon) {
+    color: #244b68;
+    font-size: .68rem;
+    font-weight: 790;
+    letter-spacing: .006em;
+    line-height: 1.1;
+    text-shadow: 0 1px 0 rgba(255,255,255,.58);
+    white-space: nowrap;
+}
+html[data-theme="energy-v20"] .selection-summary strong {
+    margin-top: 3px;
+    color: #123f70;
+    font-size: .88rem;
+    font-weight: 850;
+    line-height: 1.05;
+    font-variant-numeric: tabular-nums;
+}
+html[data-theme="energy-v20"] .selection-summary .summary-icon {
+    width: 31px;
+    height: 31px;
+    flex: 0 0 31px;
+    border-color: rgba(61, 148, 189, .22);
+    border-radius: 9px;
+    background: linear-gradient(145deg, rgba(255,255,255,.82), rgba(222,241,248,.78));
+    color: #2a7fae;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.82);
+}
+html[data-theme="energy-v20"] .selection-summary .summary-icon svg {
+    width: 15px;
+    height: 15px;
+}
+@media (max-width: 1450px) {
+  html[data-theme="energy-v20"] .selection-summary span:not(.summary-icon) { font-size: .64rem; }
+  html[data-theme="energy-v20"] .selection-summary strong { font-size: .84rem; }
+}
+@media (max-height: 780px) {
+  html[data-theme="energy-v20"] .selection-summary article { min-height: 43px; padding-block: 4px; }
+  html[data-theme="energy-v20"] .selection-summary span:not(.summary-icon) { font-size: .61rem; }
+  html[data-theme="energy-v20"] .selection-summary strong { margin-top: 2px; font-size: .81rem; }
+  html[data-theme="energy-v20"] .selection-summary .summary-icon { width: 28px; height: 28px; flex-basis: 28px; }
+}
+
+
+/* =========================================================
+   v30 — final table and panel polish
+   Requested scope:
+   - Remove side-panel preset size buttons; keep drag resize + close.
+   - Preserve the approved basket-panel title/header.
+   - Darken table data without changing row density.
+   - Make the resize divider nearly invisible until interaction.
+   - Refine footer labels/icons while preserving values.
+   - Calm the normal system message. Search remains unchanged.
+   ========================================================= */
+
+/* Panel header now carries only the close action. */
+html[data-theme="energy-v20"] .basket-panel-actions {
+    align-items: flex-start;
+    gap: 0;
+}
+html[data-theme="energy-v20"] .basket-panel-close {
+    width: 31px;
+    height: 31px;
+    flex: 0 0 31px;
+}
+
+/* Darker FATRA-like body typography; row heights stay unchanged. */
+html[data-theme="energy-v20"] td {
+    color: #263f58;
+    font-weight: 600;
+}
+html[data-theme="energy-v20"] .link-cell,
+html[data-theme="energy-v20"] .custom-text-cell,
+html[data-theme="energy-v20"] td.remaining-column {
+    color: #263f58;
+    font-weight: 620;
+}
+html[data-theme="energy-v20"] .link-cell {
+    color: #23415d;
+    font-weight: 700;
+}
+
+/* Quiet resize affordance: visible on hover/focus/drag, not as a permanent bar. */
+html[data-theme="energy-v20"] .sheet-workspace-side.panel-open {
+    grid-template-columns: minmax(0,1fr) 6px var(--basket-panel-width);
+}
+html[data-theme="energy-v20"] .basket-resize-handle-side {
+    width: 6px;
+    min-width: 6px;
+}
+html[data-theme="energy-v20"] .basket-resize-handle-side::before {
+    inset: 0 -4px;
+    opacity: 0;
+    background: rgba(7,142,208,.07);
+}
+html[data-theme="energy-v20"] .basket-resize-handle-side span {
+    width: 2px;
+    height: 34px;
+    background: rgba(102,151,177,.22);
+    box-shadow: none;
+    opacity: .34;
+    transition: opacity .14s ease, background .14s ease, height .14s ease;
+}
+html[data-theme="energy-v20"] .basket-resize-handle-side:hover span,
+html[data-theme="energy-v20"] .basket-resize-handle-side:focus-visible span,
+body.is-panel-resizing-side html[data-theme="energy-v20"] .basket-resize-handle-side span {
+    height: 46px;
+    background: #5aaac8;
+    opacity: 1;
+}
+
+/* Footer: stronger labels, calmer icons, values unchanged. */
+html[data-theme="energy-v20"] .selection-summary span:not(.summary-icon) {
+    color: #1f435f;
+    font-weight: 815;
+}
+html[data-theme="energy-v20"] .selection-summary strong {
+    margin-top: 5px;
+}
+html[data-theme="energy-v20"] .selection-summary .summary-icon {
+    width: 28px;
+    height: 28px;
+    flex: 0 0 28px;
+    color: #397f9f;
+    opacity: .88;
+}
+html[data-theme="energy-v20"] .selection-summary .summary-icon svg {
+    width: 14px;
+    height: 14px;
+}
+
+/* Normal status message is informative but no longer competes with actions. */
+html[data-theme="energy-v20"] .system-message {
+    border-color: rgba(151,188,207,.46);
+    background: linear-gradient(90deg, #f8fbfc, #f0f7f9);
+    color: #41657a;
+    box-shadow: inset 2px 0 0 rgba(25,168,211,.54);
+}
+html[data-theme="energy-v20"] .system-message strong {
+    color: #315d74;
+    font-weight: 760;
+}
+html[data-theme="energy-v20"] .message-dot {
+    width: 7px;
+    height: 7px;
+    flex-basis: 7px;
+    background: #58b3cd;
+    box-shadow: 0 0 0 3px rgba(88,179,205,.11);
+}
+
+@media (max-width: 1100px) {
+  html[data-theme="energy-v20"] .sheet-workspace-side.panel-open {
+      grid-template-columns: minmax(0,1fr) 6px min(390px,42vw);
+  }
+}
+@media (max-height: 780px) {
+  html[data-theme="energy-v20"] .selection-summary strong { margin-top: 3px; }
+  html[data-theme="energy-v20"] .selection-summary .summary-icon {
+      width: 27px;
+      height: 27px;
+      flex-basis: 27px;
+  }
+}
+
+
+/* =========================================================
+   v31 — deeper navy table data + final minor cleanup
+   Requested scope:
+   - Basket names stay exactly as approved.
+   - All Work Orders table data moves from blue-grey to a
+     clearer institutional navy, with unchanged row density.
+   - Correct the side-panel footer instruction.
+   - Reduce the selection-summary top accent slightly.
+   ========================================================= */
+
+/* Stronger table body contrast without increasing size or row height. */
+html[data-theme="energy-v20"] td {
+    color: #173a57;
+    font-weight: 610;
+}
+html[data-theme="energy-v20"] .link-cell,
+html[data-theme="energy-v20"] .custom-text-cell,
+html[data-theme="energy-v20"] td.remaining-column {
+    color: #173a57;
+    font-weight: 630;
+}
+html[data-theme="energy-v20"] .link-cell {
+    color: #123652;
+    font-weight: 710;
+}
+
+/* Keep selection-summary hierarchy, but make its top rule subordinate. */
+html[data-theme="energy-v20"] .selection-summary {
+    background:
+        linear-gradient(90deg, #568baa 0%, #6ca6bc 52%, #8cc5cf 100%) top / 100% 1px no-repeat,
+        linear-gradient(90deg, #f7fbfd 0%, #eef6fa 52%, #f5fafc 100%);
+}
+
+
+/* v32 header refinement: WO brand mark */
+html[data-theme="energy-v20"] .topbar {
+    min-height: 72px;
+    padding: 0 28px;
+}
+html[data-theme="energy-v20"] .brand-zone {
+    gap: 12px;
+}
+html[data-theme="energy-v20"] .brand-symbol-wo {
+    position: relative;
+    background: linear-gradient(145deg, rgba(74, 196, 232, .24), rgba(9, 104, 189, .30));
+}
+html[data-theme="energy-v20"] .brand-symbol-wo::after {
+    content: "";
+    position: absolute;
+    inset: 9px;
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,.18);
+    pointer-events: none;
+}
+html[data-theme="energy-v20"] .brand-copy-wo strong {
+    font-size: 1.2rem;
+}
+html[data-theme="energy-v20"] .brand-copy-wo span {
+    color: rgba(255,255,255,.78);
+}
+
+
+/* v33 header cleanup: restore tighter scale, cleaner nav, cleaner account area */
+html[data-theme="energy-v20"] .topbar {
+    min-height: 64px;
+    padding: 0 20px 0 24px;
+    box-shadow: 0 4px 12px rgba(5, 42, 96, .18);
+}
+html[data-theme="energy-v20"] .topbar-wave {
+    right: -8%;
+    top: -86px;
+    width: 54%;
+    height: 168px;
+    border-width: 24px;
+    opacity: .38;
+}
+html[data-theme="energy-v20"] .brand-zone {
+    min-width: 265px;
+    gap: 10px;
+}
+html[data-theme="energy-v20"] .brand-symbol {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.12), 0 6px 14px rgba(0, 22, 54, .15);
+}
+html[data-theme="energy-v20"] .brand-symbol-wo {
+    background: linear-gradient(145deg, rgba(93, 211, 240, .26), rgba(12, 116, 197, .24));
+}
+html[data-theme="energy-v20"] .brand-symbol-wo::after {
+    inset: 6px;
+    border-radius: 9px;
+}
+html[data-theme="energy-v20"] .brand-monogram {
+    font-size: 1.02rem;
+    letter-spacing: -.05em;
+}
+html[data-theme="energy-v20"] .brand-monogram-sub {
+    right: 6px;
+    bottom: 5px;
+    font-size: .40rem;
+}
+html[data-theme="energy-v20"] .brand-copy strong {
+    font-size: 1.06rem;
+    font-weight: 780;
+}
+html[data-theme="energy-v20"] .brand-copy span {
+    margin-top: 1px;
+    font-size: .67rem;
+    color: rgba(255,255,255,.72);
+}
+html[data-theme="energy-v20"] .main-nav {
+    gap: 8px;
+    margin-left: 24px;
+}
+html[data-theme="energy-v20"] .nav-item {
+    min-height: 36px;
+    padding: 0 13px;
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,.06);
+    background: rgba(255,255,255,.03);
+    color: rgba(255,255,255,.90);
+    font-size: .86rem;
+    font-weight: 720;
+    gap: 7px;
+}
+html[data-theme="energy-v20"] .nav-item svg {
+    width: 15px;
+    height: 15px;
+    opacity: .92;
+}
+html[data-theme="energy-v20"] .nav-item:hover {
+    background: rgba(255,255,255,.10);
+    border-color: rgba(255,255,255,.16);
+}
+html[data-theme="energy-v20"] .nav-item.active {
+    border-color: rgba(255,255,255,.14);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 4px 12px rgba(8, 104, 189, .20);
+}
+html[data-theme="energy-v20"] .account-zone {
+    gap: 10px;
+}
+html[data-theme="energy-v20"] .account-profile {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 38px;
+    padding: 4px 10px 4px 8px;
+    border-radius: 999px;
+    background: rgba(255,255,255,.05);
+    border: 1px solid rgba(255,255,255,.10);
+}
+html[data-theme="energy-v20"] .account-copy {
+    min-width: 88px;
+    line-height: 1.05;
+    align-items: flex-end;
+    text-align: right;
+}
+html[data-theme="energy-v20"] .account-copy span {
+    font-size: .62rem;
+    color: rgba(255,255,255,.72);
+    margin-bottom: 2px;
+}
+html[data-theme="energy-v20"] .account-copy strong {
+    margin-top: 0;
+    font-size: .79rem;
+    font-weight: 750;
+}
+html[data-theme="energy-v20"] .avatar {
+    width: 34px;
+    height: 34px;
+    font-size: .88rem;
+    flex: 0 0 auto;
+}
+html[data-theme="energy-v20"] .logout-button {
+    min-height: 38px;
+    padding: 0 14px;
+    border-radius: 10px;
+    font-size: .82rem;
+    font-weight: 730;
+    border-color: rgba(255,255,255,.42);
+    background: rgba(255,255,255,.06);
+}
+html[data-theme="energy-v20"] .logout-button svg {
+    width: 14px;
+    height: 14px;
+}
+
+/* =========================================================
+   v34 — header experiment only
+   - Keep the approved color family.
+   - Smooth the header gradient.
+   - Make Home visibly clickable while remaining secondary.
+   ========================================================= */
+html[data-theme="energy-v20"] .topbar {
+    background:
+        linear-gradient(103deg,
+            #052d63 0%,
+            #06477f 38%,
+            #0870b2 72%,
+            #1597b9 100%);
+    box-shadow: 0 4px 12px rgba(5, 42, 96, .18);
+}
+html[data-theme="energy-v20"] .topbar::after {
+    content: "";
+    position: absolute;
+    inset: auto -3% -14px 47%;
+    height: 31px;
+    border-radius: 50% 50% 0 0;
+    background: linear-gradient(90deg, transparent, rgba(80, 196, 218, .14));
+    pointer-events: none;
+}
+html[data-theme="energy-v20"] .topbar-wave {
+    border-color: rgba(83, 193, 216, .16);
+    opacity: .34;
+}
+
+/* Home is a clear secondary navigation button, not plain text. */
+html[data-theme="energy-v20"] .main-nav .nav-item:first-child {
+    background: rgba(255,255,255,.085);
+    border-color: rgba(255,255,255,.18);
+    color: #fff;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.06);
+}
+html[data-theme="energy-v20"] .main-nav .nav-item:first-child svg {
+    opacity: 1;
+}
+html[data-theme="energy-v20"] .main-nav .nav-item:first-child:hover {
+    background: rgba(255,255,255,.15);
+    border-color: rgba(255,255,255,.30);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.10), 0 4px 12px rgba(0,34,72,.13);
+}
+
+/* The current page remains the visually dominant active destination. */
+html[data-theme="energy-v20"] .main-nav .nav-item.active {
+    background: linear-gradient(135deg, #0878c7, #12a3d0);
+    border-color: rgba(255,255,255,.22);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.11), 0 5px 14px rgba(8, 104, 189, .23);
+}
+
+
+/* =========================================================
+   v38 RESPONSIVE PLAYGROUND — isolated final override layer
+   Built from exact v34. No v35/v36/v37 responsive rules.
+   Principles:
+   1) no page min-width;
+   2) horizontal scrolling belongs only to the table;
+   3) basket width is user-controlled and stored as a ratio;
+   4) basket content adapts to its own actual width;
+   5) no fixed full/split layout mode in JavaScript.
+   ========================================================= */
+html[data-theme="energy-v20"],
+html[data-theme="energy-v20"] body {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0 !important;
+    height: 100%;
+    overflow: hidden !important;
+}
+html[data-theme="energy-v20"] .application-shell {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    height: 100dvh;
+    overflow: hidden;
+}
+html[data-theme="energy-v20"] .page-content {
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+    grid-template-rows: auto minmax(0,1fr);
+    padding-inline: clamp(8px, 1.25vw, 24px);
+    overflow: hidden;
+}
+html[data-theme="energy-v20"] .overview-zone,
+html[data-theme="energy-v20"] .page-heading-row,
+html[data-theme="energy-v20"] .title-area,
+html[data-theme="energy-v20"] .actions-area,
+html[data-theme="energy-v20"] .action-row,
+html[data-theme="energy-v20"] .action-buttons,
+html[data-theme="energy-v20"] .kpi-grid,
+html[data-theme="energy-v20"] .sheet-zone,
+html[data-theme="energy-v20"] .sheet-section,
+html[data-theme="energy-v20"] .sheet-toolbar,
+html[data-theme="energy-v20"] .sheet-workspace-side,
+html[data-theme="energy-v20"] .selection-summary {
+    min-width: 0;
+}
+html[data-theme="energy-v20"] .overview-zone {
+    grid-template-rows: auto auto;
+}
+html[data-theme="energy-v20"] .page-heading-row {
+    flex-wrap: wrap;
+    row-gap: 6px;
+}
+html[data-theme="energy-v20"] .title-area {
+    flex: 1 1 310px;
+    min-width: 0;
+    flex-wrap: wrap;
+}
+html[data-theme="energy-v20"] .actions-area {
+    flex: 1 1 620px;
+    min-width: 0;
+}
+html[data-theme="energy-v20"] .action-row {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+html[data-theme="energy-v20"] .system-message {
+    flex: 1 1 260px;
+    min-width: 180px;
+    max-width: none;
+}
+html[data-theme="energy-v20"] .action-buttons {
+    flex: 0 1 auto;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+html[data-theme="energy-v20"] .kpi-grid {
+    grid-template-columns: repeat(4,minmax(150px,1fr));
+    gap: clamp(6px,.7vw,10px);
+    min-height: 66px;
+    height: auto;
+}
+html[data-theme="energy-v20"] .kpi-card {
+    min-width: 0;
+    height: 100%;
+}
+html[data-theme="energy-v20"] .kpi-card > div:last-child {
+    min-width: 0;
+}
+html[data-theme="energy-v20"] .kpi-card strong,
+html[data-theme="energy-v20"] .kpi-card span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+html[data-theme="energy-v20"] .sheet-zone {
+    height: 100%;
+    min-height: 0;
+}
+html[data-theme="energy-v20"] .sheet-toolbar {
+    min-width: 0;
+    gap: 8px;
+}
+html[data-theme="energy-v20"] .sheet-status-actions {
+    min-width: 0;
+    flex: 1 1 auto;
+}
+html[data-theme="energy-v20"] .search-group {
+    width: clamp(220px, 34vw, 520px) !important;
+    min-width: 0 !important;
+    flex: 0 1 520px;
+}
+
+/* Table owns horizontal scrolling. Force LTR scroll semantics so scrollLeft=0 = first column. */
+html[data-theme="energy-v20"] .sheet-workspace-side {
+    --basket-panel-width: 460px;
+    display: grid;
+    grid-template-columns: minmax(0,1fr) 0 0;
+    gap: 0;
+    width: 100%;
+    min-width: 0;
+    height: 100%;
+    overflow: hidden;
+    direction: ltr !important;
+}
+html[data-theme="energy-v20"] .sheet-workspace-side.panel-open {
+    grid-template-columns: minmax(0,1fr) 8px var(--basket-panel-width);
+}
+html[data-theme="energy-v20"] .sheet-workspace-side .table-shell {
+    width: 100%;
+    min-width: 0;
+    height: 100%;
+    overflow-x: auto !important;
+    overflow-y: auto !important;
+    direction: ltr !important;
+    scrollbar-gutter: stable;
+    border-radius: 9px 0 0 9px;
+}
+html[data-theme="energy-v20"] .sheet-workspace-side .table-shell table {
+    width: max(100%,1450px) !important;
+    min-width: 1450px !important;
+    direction: ltr !important;
+}
+
+/* User-controlled separator. */
+html[data-theme="energy-v20"] .basket-resize-handle-side {
+    position: relative;
+    inset: auto;
+    display: none;
+    width: 8px;
+    min-width: 8px;
+    height: 100%;
+    cursor: col-resize;
+    touch-action: none;
+    background: linear-gradient(180deg,#e9f4f8,#c7e0e9 50%,#e9f4f8);
+    border-inline: 1px solid rgba(7,142,208,.12);
+    opacity: 1;
+    visibility: visible;
+    z-index: 8;
+}
+html[data-theme="energy-v20"] .panel-open .basket-resize-handle-side { display:block; }
+html[data-theme="energy-v20"] .basket-resize-handle-side::before {
+    content:"";
+    position:absolute;
+    left:50%;
+    top:50%;
+    width:3px;
+    height:48px;
+    border-radius:999px;
+    background:#5aacc9;
+    transform:translate(-50%,-50%);
+    opacity:.55;
+}
+html[data-theme="energy-v20"] .basket-resize-handle-side:hover::before,
+html[data-theme="energy-v20"] body.is-panel-resizing-side .basket-resize-handle-side::before {
+    opacity:1;
+    background:#078ed0;
+}
+
+/* Basket is always docked for normal desktop/split-screen widths. */
+html[data-theme="energy-v20"] .basket-panel-side {
+    position:relative;
+    inset:auto;
+    display:grid;
+    width:100%;
+    min-width:0;
+    max-width:none;
+    height:100%;
+    grid-template-rows:auto auto minmax(0,1fr) auto;
+    direction:rtl;
+    overflow:hidden;
+    opacity:0;
+    visibility:hidden;
+    pointer-events:none;
+    transform:none;
+    border-radius:0 10px 10px 0;
+    box-shadow:none;
+    container-type:inline-size;
+}
+html[data-theme="energy-v20"] .panel-open .basket-panel-side.is-open {
+    opacity:1;
+    visibility:visible;
+    pointer-events:auto;
+}
+html[data-theme="energy-v20"] .basket-title-short,
+html[data-theme="energy-v20"] .basket-responsive-meta { display:none; }
+
+/* Summary mode: name/count + compact remaining amount + percentage. */
+html[data-theme="energy-v20"] .basket-mode-summary {
+    grid-template-rows:52px minmax(0,1fr);
+}
+html[data-theme="energy-v20"] .basket-mode-summary .basket-panel-kicker,
+html[data-theme="energy-v20"] .basket-mode-summary .basket-panel-header p,
+html[data-theme="energy-v20"] .basket-mode-summary .basket-panel-columns,
+html[data-theme="energy-v20"] .basket-mode-summary .basket-panel-footer,
+html[data-theme="energy-v20"] .basket-mode-summary .basket-amount,
+html[data-theme="energy-v20"] .basket-mode-summary .basket-share { display:none; }
+html[data-theme="energy-v20"] .basket-mode-summary .basket-panel-header { min-height:52px; padding:9px 12px; }
+html[data-theme="energy-v20"] .basket-mode-summary .basket-detail-row {
+    display:grid;
+    grid-template-columns:minmax(0,1fr) auto;
+    grid-template-areas:"name count" "meta meta";
+    gap:5px 8px;
+    min-height:60px;
+    padding:8px 10px 7px;
+}
+html[data-theme="energy-v20"] .basket-mode-summary .basket-name { grid-area:name; min-width:0; }
+html[data-theme="energy-v20"] .basket-mode-summary .basket-detail-row > b { grid-area:count; }
+html[data-theme="energy-v20"] .basket-mode-summary .basket-responsive-meta {
+    grid-area:meta;
+    display:grid;
+    grid-template-rows:auto 4px;
+    gap:4px;
+    min-width:0;
+}
+html[data-theme="energy-v20"] .basket-responsive-line {
+    display:flex;
+    align-items:baseline;
+    gap:4px;
+    direction:ltr;
+}
+html[data-theme="energy-v20"] .basket-responsive-line strong { color:#0b5e97; font-size:.70rem; font-weight:850; }
+html[data-theme="energy-v20"] .basket-responsive-line small { color:#71889a; font-size:.57rem; font-weight:700; direction:rtl; }
+html[data-theme="energy-v20"] .basket-responsive-line em { margin-left:auto; color:#54748c; font-size:.59rem; font-style:normal; font-weight:760; }
+html[data-theme="energy-v20"] .basket-responsive-track { display:block; width:100%; height:4px; overflow:hidden; border-radius:999px; background:#dcebf2; }
+html[data-theme="energy-v20"] .basket-responsive-track i { display:block; width:max(5px,var(--share)); height:100%; border-radius:inherit; background:linear-gradient(90deg,#178fc7,#49bdd9); }
+
+/* Compact mode: only basket name and order count; never truncate the numeric count. */
+html[data-theme="energy-v20"] .basket-mode-compact {
+    grid-template-rows:48px minmax(0,1fr);
+}
+html[data-theme="energy-v20"] .basket-mode-compact .basket-title-full,
+html[data-theme="energy-v20"] .basket-mode-compact .basket-panel-kicker,
+html[data-theme="energy-v20"] .basket-mode-compact .basket-panel-header p,
+html[data-theme="energy-v20"] .basket-mode-compact .basket-panel-columns,
+html[data-theme="energy-v20"] .basket-mode-compact .basket-panel-footer,
+html[data-theme="energy-v20"] .basket-mode-compact .basket-amount,
+html[data-theme="energy-v20"] .basket-mode-compact .basket-share,
+html[data-theme="energy-v20"] .basket-mode-compact .basket-responsive-meta { display:none; }
+html[data-theme="energy-v20"] .basket-mode-compact .basket-title-short { display:inline; }
+html[data-theme="energy-v20"] .basket-mode-compact .basket-panel-header { min-height:48px; padding:8px 10px; }
+html[data-theme="energy-v20"] .basket-mode-compact .basket-detail-row {
+    display:grid;
+    grid-template-columns:minmax(0,1fr) auto;
+    align-items:center;
+    gap:8px;
+    min-height:44px;
+    padding:7px 9px;
+}
+html[data-theme="energy-v20"] .basket-mode-compact .basket-name strong {
+    display:block;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+}
+
+/* At genuinely narrow CSS viewports, keep everything usable rather than hiding items. */
+@media (max-width: 980px) {
+    html[data-theme="energy-v20"] .topbar { padding-inline:12px; }
+    html[data-theme="energy-v20"] .brand-zone { min-width:205px; }
+    html[data-theme="energy-v20"] .main-nav { margin-left:10px; }
+    html[data-theme="energy-v20"] .page-content { padding:7px 10px 9px; gap:7px; }
+    html[data-theme="energy-v20"] .page-heading-row { align-items:stretch; }
+    html[data-theme="energy-v20"] .actions-area { flex-basis:100%; width:100%; }
+    html[data-theme="energy-v20"] .action-row { justify-content:stretch; }
+    html[data-theme="energy-v20"] .system-message { flex:1 1 260px; }
+    html[data-theme="energy-v20"] .action-buttons { flex:1 1 auto; }
+    html[data-theme="energy-v20"] .kpi-card { padding-inline:9px; }
+    html[data-theme="energy-v20"] .metric-icon { width:36px; height:36px; flex-basis:36px; }
+    html[data-theme="energy-v20"] .kpi-card strong { font-size:.96rem; }
+    html[data-theme="energy-v20"] .sheet-toolbar { flex-wrap:wrap; height:auto; min-height:34px; }
+    html[data-theme="energy-v20"] .search-group { width:min(100%,420px) !important; flex-basis:320px; }
+}
+@media (max-width: 760px) {
+    html[data-theme="energy-v20"] .brand-copy span,
+    html[data-theme="energy-v20"] .account-copy span { display:none; }
+    html[data-theme="energy-v20"] .brand-zone { min-width:170px; }
+    html[data-theme="energy-v20"] .kpi-grid { grid-template-columns:repeat(2,minmax(150px,1fr)); }
+    html[data-theme="energy-v20"] .selection-summary { overflow-x:auto; grid-template-columns:repeat(4,minmax(180px,1fr)); }
+    html[data-theme="energy-v20"] .sheet-workspace-side.panel-open {
+        grid-template-columns:minmax(0,1fr) 0 0;
+    }
+    html[data-theme="energy-v20"] .panel-open .basket-resize-handle-side { display:none; }
+    html[data-theme="energy-v20"] .basket-panel-side {
+        position:absolute;
+        z-index:30;
+        inset:0 0 0 auto;
+        width:min(var(--basket-panel-width),calc(100% - 16px));
+        border-radius:10px 0 0 10px;
+        box-shadow:-12px 0 30px rgba(3,43,95,.18);
+    }
+}

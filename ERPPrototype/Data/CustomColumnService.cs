@@ -1,17 +1,15 @@
-using System.Data;
 using System.Globalization;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using ERPPrototype.Data.Entities;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Storage;
 
 namespace ERPPrototype.Data;
 
 /// <summary>
 /// Owns department custom-column definitions and the typed values stored in
 /// each WorkOrder.CustomValuesJson document. The service validates create,
-/// rename, empty-column type changes, and transactional deletion.
+/// rename, immutable types, and transactional deletion.
 /// </summary>
 public static partial class CustomColumnService
 {
@@ -55,90 +53,9 @@ public static partial class CustomColumnService
             .ThenBy(column => column.Id)
             .ToListAsync(cancellationToken);
 
-        if (definitions.Count == 0)
-        {
-            return [];
-        }
-
-        var fieldsWithStoredValues =
-            await LoadFieldsWithStoredValuesAsync(
-                dbContext,
-                departmentId,
-                cancellationToken);
-
         return definitions
-            .Select(definition => MapDefinition(
-                definition,
-                fieldsWithStoredValues.Contains(definition.FieldKey)))
+            .Select(MapDefinition)
             .ToList();
-    }
-
-    public static async Task<HashSet<string>>
-        LoadFieldsWithStoredValuesAsync(
-            ApplicationDbContext dbContext,
-            int departmentId,
-            CancellationToken cancellationToken = default)
-    {
-        var result = new HashSet<string>(StringComparer.Ordinal);
-        var connection = dbContext.Database.GetDbConnection();
-        var shouldClose = connection.State != ConnectionState.Open;
-
-        if (shouldClose)
-        {
-            await connection.OpenAsync(cancellationToken);
-        }
-
-        try
-        {
-            await using var command = connection.CreateCommand();
-            command.Transaction = dbContext.Database.CurrentTransaction
-                ?.GetDbTransaction();
-            command.CommandText =
-                """
-                SELECT DISTINCT CAST([entry].[key] AS nvarchar(40))
-                FROM [WorkOrders] AS [workOrder]
-                CROSS APPLY OPENJSON(
-                    CASE
-                        WHEN ISJSON([workOrder].[CustomValuesJson]) = 1
-                            THEN [workOrder].[CustomValuesJson]
-                        ELSE N'{}'
-                    END) AS [entry]
-                WHERE [workOrder].[DepartmentId] = @departmentId
-                  AND NULLIF(
-                        LTRIM(RTRIM(CONVERT(nvarchar(max), [entry].[value]))),
-                        N'') IS NOT NULL;
-                """;
-
-            var parameter = command.CreateParameter();
-            parameter.ParameterName = "@departmentId";
-            parameter.Value = departmentId;
-            command.Parameters.Add(parameter);
-
-            await using var reader =
-                await command.ExecuteReaderAsync(cancellationToken);
-
-            while (await reader.ReadAsync(cancellationToken))
-            {
-                if (!reader.IsDBNull(0))
-                {
-                    var fieldKey = reader.GetString(0).Trim();
-
-                    if (!string.IsNullOrWhiteSpace(fieldKey))
-                    {
-                        result.Add(fieldKey);
-                    }
-                }
-            }
-        }
-        finally
-        {
-            if (shouldClose)
-            {
-                await connection.CloseAsync();
-            }
-        }
-
-        return result;
     }
 
     public static async Task<CustomColumnPreparationResult>
@@ -198,7 +115,6 @@ public static partial class CustomColumnService
         var activeDefinitions = new List<CustomColumnDefinition>();
         var added = new List<CustomColumnDefinition>();
         var deleted = new List<CustomColumnDefinition>();
-        HashSet<string>? fieldsWithStoredValues = null;
         var utcNow = DateTime.UtcNow;
 
         foreach (var existingColumn in existing)
@@ -240,17 +156,8 @@ public static partial class CustomColumnService
 
             if (dataType != existingColumn.DataType)
             {
-                fieldsWithStoredValues ??=
-                    await LoadFieldsWithStoredValuesAsync(
-                        dbContext,
-                        departmentId,
-                        cancellationToken);
-
-                if (fieldsWithStoredValues.Contains(existingColumn.FieldKey))
-                {
-                    return CustomColumnPreparationResult.Failed(
-                        $"The type of custom column '{existingColumn.Name}' cannot be changed because it already contains saved values.");
-                }
+                return CustomColumnPreparationResult.Failed(
+                    $"The type of custom column '{existingColumn.Name}' cannot be changed after the column is created.");
             }
 
             if (!fieldKeys.Add(existingColumn.FieldKey))
@@ -266,7 +173,6 @@ public static partial class CustomColumnService
             }
 
             existingColumn.Name = name;
-            existingColumn.DataType = dataType;
             activeDefinitions.Add(existingColumn);
         }
 
@@ -577,16 +483,14 @@ public static partial class CustomColumnService
             !string.IsNullOrWhiteSpace(value));
 
     public static CustomColumnDefinitionData MapDefinition(
-        CustomColumnDefinition definition,
-        bool hasStoredValues = false) =>
+        CustomColumnDefinition definition) =>
         new(
             definition.Id,
             definition.FieldKey,
             definition.Name,
             definition.DataType.ToString(),
             definition.LayoutOrder,
-            Convert.ToBase64String(definition.RowVersion),
-            hasStoredValues);
+            Convert.ToBase64String(definition.RowVersion));
 
     private static bool TryNormalizeValue(
         CustomColumnDefinition definition,
@@ -749,8 +653,7 @@ public sealed record CustomColumnDefinitionData(
     string Name,
     string DataType,
     long LayoutOrder,
-    string RowVersion,
-    bool HasStoredValues = false);
+    string RowVersion);
 
 public sealed record CustomColumnPreparationResult(
     bool Succeeded,

@@ -220,3 +220,17 @@ Example: pasting a custom Text column into 4,952 rows changes 4,952 values, but 
 - Header title, filter icon, and sort icon stay directly adjacent. Extra horizontal space remains after that group.
 - When width is insufficient, the title uses an ellipsis; icons remain visible.
 - The row-number Header is not a saved data-column layout.
+
+## 19. Custom Column Filter, Sort, and Visibility Contract — Phase 9.3E
+
+- The custom-column type is selected once during creation and cannot be changed later, even while the column is empty.
+- `Rename Custom Column` changes the name only.
+- Custom `Text`, `Date`, and whole `Number` columns receive a value filter automatically.
+- Custom `Money` columns receive numeric Header sorting only. The first sort is descending, then ascending, then cleared by Tabulator's normal cycle.
+- Filter option values are derived from the rows already loaded in the browser and are scanned only when the popup opens. Applying a filter remains client-side and does not request the server.
+- Right-clicking a visible data-column Header exposes `Hide Column`.
+- `Unhide Column` appears in that same context menu only when at least one data column is hidden. Its list is created only when the menu opens.
+- The row-number column cannot be hidden, and at least one data column must remain visible so the Header context menu remains reachable.
+- Hide/Unhide changes update Tabulator locally, participate in Undo/Redo, and are sent to SQL Server only by the normal Save action.
+- Visibility is stored with the existing department column layout (`DepartmentId + FieldKey`) and therefore applies to every year of that department without affecting another department.
+- The selection summary renders totals only for amount columns that are currently visible. Fixed yearly summaries remain independent of column visibility.

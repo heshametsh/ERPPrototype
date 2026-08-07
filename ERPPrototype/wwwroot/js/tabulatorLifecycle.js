@@ -482,7 +482,8 @@
                     basketValues: [],
                     workOrderValueAmount: null,
                     partialAmountAmount: null,
-                    remainingAmountAmount: null
+                    remainingAmountAmount: null,
+                    customValues: {}
                 }
             };
         },

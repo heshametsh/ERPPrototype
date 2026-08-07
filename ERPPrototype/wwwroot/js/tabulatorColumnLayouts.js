@@ -25,6 +25,9 @@
                 width: Number.isFinite(width)
                     ? Math.round(width)
                     : 0,
+                isHidden: Boolean(
+                    layout?.isHidden ?? layout?.IsHidden ?? false
+                ),
                 rowVersion: String(
                     layout?.rowVersion ?? layout?.RowVersion ?? ""
                 )
@@ -54,8 +57,11 @@
         },
 
         applyColumnLayouts: function (state, columns) {
+            const sourceLayouts = state?.columnLayoutsReady === true
+                ? state.columnLayouts
+                : state?.loadedColumnLayouts;
             const savedByField = new Map(
-                (state?.loadedColumnLayouts ?? []).map(layout => [
+                (sourceLayouts ?? []).map(layout => [
                     layout.fieldKey,
                     layout
                 ])
@@ -68,7 +74,8 @@
                     return { ...column };
                 }
 
-                const savedWidth = savedByField.get(field)?.width;
+                const savedLayout = savedByField.get(field);
+                const savedWidth = savedLayout?.width;
                 const configuredWidth = Number(column?.width);
                 const configuredMinimum = Number(column?.minWidth);
                 const defaultWidth = defaultWidths[field] ?? 180;
@@ -86,7 +93,8 @@
                     maxWidth: maximumWidth,
                     widthGrow: 0,
                     widthShrink: 0,
-                    resizable: true
+                    resizable: true,
+                    visible: savedLayout?.isHidden !== true
                 };
             });
         },
@@ -136,8 +144,11 @@
                     return {
                         id: saved?.id ?? 0,
                         fieldKey: fieldKey,
-                        width: this.normalizeColumnWidth(column.getWidth()),
-                        rowVersion: saved?.rowVersion ?? ""
+                        width: this.normalizeColumnWidth(
+                            saved?.width ?? column.getWidth()
+                        ),
+                        rowVersion: saved?.rowVersion ?? "",
+                        isHidden: saved?.isHidden === true
                     };
                 })
                 .sort((first, second) =>
@@ -168,7 +179,8 @@
                     id: 0,
                     fieldKey: fieldKey,
                     width: this.normalizeColumnWidth(column.getWidth()),
-                    rowVersion: ""
+                    rowVersion: "",
+                    isHidden: column.isVisible?.() === false
                 });
                 state.columnLayouts.sort((first, second) =>
                     first.fieldKey.localeCompare(second.fieldKey)
@@ -270,7 +282,8 @@
                     id: 0,
                     fieldKey: fieldKey,
                     width: width,
-                    rowVersion: ""
+                    rowVersion: "",
+                    isHidden: false
                 };
                 state.columnLayouts.push(layout);
             } else {
@@ -288,7 +301,8 @@
                     id: layout.id,
                     fieldKey: layout.fieldKey,
                     width: layout.width,
-                    rowVersion: layout.rowVersion
+                    rowVersion: layout.rowVersion,
+                    isHidden: layout.isHidden === true
                 }))
             );
         },
@@ -351,6 +365,7 @@
 
             state.undoStack.push({
                 kind: "column-layout",
+                action: "resize",
                 label: "تغيير عرض العمود",
                 fieldKey: fieldKey,
                 oldWidth: oldWidth,
@@ -373,15 +388,30 @@
             const table = this.tables[elementId];
             const fieldKey = String(transaction?.fieldKey ?? "").trim();
             const column = table?.getColumn(fieldKey);
+
+            if (!state || !column || !fieldKey) {
+                return;
+            }
+
+            if (transaction?.action === "visibility") {
+                const isHidden = direction === "undo"
+                    ? transaction?.oldHidden === true
+                    : transaction?.newHidden === true;
+
+                this.applyColumnVisibility(
+                    elementId,
+                    fieldKey,
+                    isHidden,
+                    false
+                );
+                return;
+            }
+
             const width = this.normalizeColumnWidth(
                 direction === "undo"
                     ? transaction?.oldWidth
                     : transaction?.newWidth
             );
-
-            if (!state || !column || !fieldKey) {
-                return;
-            }
 
             this.suppressProgrammaticColumnResize(
                 state,
@@ -392,6 +422,190 @@
             this.updateColumnLayoutWidth(state, fieldKey, width);
             this.refreshColumnLayoutsChanged(elementId);
             this.arrangeColumnHeaderControls(elementId);
+        },
+
+        updateColumnLayoutVisibility: function (
+            state,
+            fieldKey,
+            isHidden,
+            width
+        ) {
+            let layout = state.columnLayouts.find(item =>
+                item.fieldKey === fieldKey);
+
+            if (!layout) {
+                layout = {
+                    id: 0,
+                    fieldKey: fieldKey,
+                    width: this.normalizeColumnWidth(
+                        width ?? defaultWidths[fieldKey] ?? 180
+                    ),
+                    rowVersion: "",
+                    isHidden: isHidden === true
+                };
+                state.columnLayouts.push(layout);
+            } else {
+                layout.isHidden = isHidden === true;
+            }
+
+            state.columnLayouts.sort((first, second) =>
+                first.fieldKey.localeCompare(second.fieldKey)
+            );
+        },
+
+        pushColumnVisibilityTransaction: function (
+            elementId,
+            fieldKey,
+            oldHidden,
+            newHidden,
+            label
+        ) {
+            const state = this.states[elementId];
+
+            if (!state || oldHidden === newHidden) {
+                return;
+            }
+
+            state.undoStack.push({
+                kind: "column-layout",
+                action: "visibility",
+                label: label,
+                fieldKey: fieldKey,
+                oldHidden: oldHidden === true,
+                newHidden: newHidden === true
+            });
+
+            if (state.undoStack.length > state.maxTransactions) {
+                state.undoStack.shift();
+            }
+
+            state.redoStack = [];
+        },
+
+        getVisibleDataColumnCount: function (elementId) {
+            const table = this.tables[elementId];
+
+            return (table?.getColumns?.() ?? []).filter(column =>
+                Boolean(column.getField()) &&
+                column.getField() !== "rowNumber" &&
+                column.isVisible()
+            ).length;
+        },
+
+        applyColumnVisibility: function (
+            elementId,
+            fieldKey,
+            isHidden,
+            recordHistory = true
+        ) {
+            const state = this.states[elementId];
+            const table = this.tables[elementId];
+            const column = table?.getColumn(fieldKey);
+
+            if (!state || !column || !fieldKey || fieldKey === "rowNumber") {
+                return false;
+            }
+
+            const oldHidden = column.isVisible?.() === false;
+            const nextHidden = isHidden === true;
+
+            if (oldHidden === nextHidden) {
+                return true;
+            }
+
+            if (nextHidden) {
+                if (this.getVisibleDataColumnCount(elementId) <= 1) {
+                    this.setStatus(
+                        elementId,
+                        "لا يمكن إخفاء آخر عمود ظاهر."
+                    );
+                    return false;
+                }
+
+                column.hide();
+            } else {
+                column.show();
+            }
+
+            this.updateColumnLayoutVisibility(
+                state,
+                fieldKey,
+                nextHidden,
+                column.getWidth()
+            );
+
+            if (recordHistory) {
+                const title = String(
+                    column.getDefinition()?.title ?? fieldKey
+                ).trim();
+
+                this.pushColumnVisibilityTransaction(
+                    elementId,
+                    fieldKey,
+                    oldHidden,
+                    nextHidden,
+                    nextHidden
+                        ? `إخفاء العمود ${title}`
+                        : `إظهار العمود ${title}`
+                );
+            }
+
+            this.refreshColumnLayoutsChanged(elementId);
+            this.arrangeColumnHeaderControls(elementId);
+            this.scheduleSelectionAggregateRefresh?.(
+                elementId,
+                "column-visibility"
+            );
+
+            if (recordHistory) {
+                this.setStatus(
+                    elementId,
+                    nextHidden
+                        ? "تم إخفاء العمود. اضغط Save لحفظ التغيير."
+                        : "تم إظهار العمود. اضغط Save لحفظ التغيير."
+                );
+            }
+
+            return true;
+        },
+
+        hideColumn: function (elementId, fieldKey) {
+            return this.applyColumnVisibility(
+                elementId,
+                fieldKey,
+                true,
+                true
+            );
+        },
+
+        unhideColumn: function (elementId, fieldKey) {
+            return this.applyColumnVisibility(
+                elementId,
+                fieldKey,
+                false,
+                true
+            );
+        },
+
+        getHiddenColumns: function (elementId) {
+            const table = this.tables[elementId];
+
+            if (!table) {
+                return [];
+            }
+
+            return table.getColumns()
+                .filter(column =>
+                    Boolean(column.getField()) &&
+                    column.getField() !== "rowNumber" &&
+                    column.isVisible() === false
+                )
+                .map(column => ({
+                    fieldKey: String(column.getField()),
+                    title: String(
+                        column.getDefinition()?.title ?? column.getField()
+                    ).trim()
+                }));
         },
 
         acceptSavedColumnLayouts: function (elementId, layouts) {

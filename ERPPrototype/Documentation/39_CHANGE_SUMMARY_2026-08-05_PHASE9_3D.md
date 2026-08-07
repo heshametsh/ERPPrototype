@@ -1,7 +1,7 @@
 # Phase 9.3D — Remove Legacy Status and Notes
 
 **Date:** 2026-08-05  
-**Status:** Candidate — requires local Release Build, destructive migration, and Core Integration suite.
+**Status:** Accepted — Release Build PASS, destructive migration applied, and SQL Server Integration `25/25` PASS.
 
 ## Final business decision
 

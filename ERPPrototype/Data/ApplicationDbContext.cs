@@ -99,6 +99,10 @@ public class ApplicationDbContext(
             entity.Property(layout => layout.Width)
                 .IsRequired();
 
+            entity.Property(layout => layout.IsHidden)
+                .HasDefaultValue(false)
+                .IsRequired();
+
             entity.Property(layout => layout.UpdatedBy)
                 .HasMaxLength(450)
                 .IsRequired();

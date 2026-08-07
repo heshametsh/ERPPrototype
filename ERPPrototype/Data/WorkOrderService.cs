@@ -780,15 +780,6 @@ public sealed class WorkOrderService(
                     DeletedRows = existingDeletedRecords.Count
                 });
 
-            var fieldsWithStoredValuesAfterSave =
-                customColumnDefinitions.Count == 0
-                    ? new HashSet<string>(StringComparer.Ordinal)
-                    : await CustomColumnService
-                        .LoadFieldsWithStoredValuesAsync(
-                            dbContext,
-                            departmentId,
-                            cancellationToken);
-
             var commitStartedAt = Stopwatch.GetTimestamp();
 
             await transaction.CommitAsync(cancellationToken);
@@ -818,10 +809,7 @@ public sealed class WorkOrderService(
             var savedCustomColumns = customColumnDefinitions
                 .OrderBy(column => column.LayoutOrder)
                 .ThenBy(column => column.Id)
-                .Select(column => CustomColumnService.MapDefinition(
-                    column,
-                    fieldsWithStoredValuesAfterSave.Contains(
-                        column.FieldKey)))
+                .Select(CustomColumnService.MapDefinition)
                 .ToList();
 
             var savedColumnLayouts = departmentColumnLayouts

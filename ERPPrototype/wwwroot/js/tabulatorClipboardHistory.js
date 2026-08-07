@@ -810,7 +810,18 @@
                 remainingAmountAmount:
                     window.tabulatorFilters.cloneAmountFilter(
                         filters?.remainingAmountAmount
-                    )
+                    ),
+
+                customValues: Object.fromEntries(
+                    Object.entries(filters?.customValues ?? {})
+                        .sort(([first], [second]) =>
+                            first.localeCompare(second)
+                        )
+                        .map(([field, values]) => [
+                            field,
+                            Array.from(values ?? [])
+                        ])
+                )
             };
         },
 

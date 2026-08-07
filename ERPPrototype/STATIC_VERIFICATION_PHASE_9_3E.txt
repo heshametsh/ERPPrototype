@@ -1,0 +1,24 @@
+Phase 9.3E static verification
+Date: 2026-08-05
+
+PASS - Every wwwroot/js/*.js file passed Node.js syntax checking.
+PASS - Targeted JavaScript behavior checks verified:
+       * Text / Date / Number custom columns register filters.
+       * Money custom columns do not register filters.
+       * Money Header sort starts descending.
+       * Number uses a filter rather than Header sorting.
+       * Empty custom filter state is removed instead of retained.
+       * persisted IsHidden=false/true is applied to column definitions.
+       * unsaved runtime visibility/width wins during a dynamic column rebuild.
+       * Hide and Unhide update the local layout and hidden-column list.
+       * the final visible data column cannot be hidden.
+PASS - Server source-contract checks verified IsHidden entity/configuration/migration/snapshot/service wiring, immutable type validation, removal of the obsolete OPENJSON stored-value scan, and the at-least-one-visible-column validation.
+PASS - git diff --check reported no whitespace errors.
+
+Not executed in this environment:
+- .NET Release Build
+- EF Core migration against SQL Server
+- SQL Server Integration suite
+- Browser interaction in Chromium
+
+Those remain required local acceptance gates.

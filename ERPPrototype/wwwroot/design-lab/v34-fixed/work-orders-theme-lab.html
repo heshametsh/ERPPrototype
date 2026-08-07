@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+
+<html data-theme="energy-v20" dir="rtl" lang="ar">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1" name="viewport"/>
+<title>Work Orders — تجربة الهيدر v34</title>
+<link href="work-orders-theme-lab.css" rel="stylesheet"/>
+</head>
+<body>
+<svg aria-hidden="true" class="svg-sprite">
+<symbol id="i-home" viewbox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5V21a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"></path></symbol>
+<symbol id="i-sheet" viewbox="0 0 24 24"><rect height="18" rx="2" width="14" x="5" y="3"></rect><path d="M8 8h8M8 12h8M8 16h5"></path></symbol>
+<symbol id="i-undo" viewbox="0 0 24 24"><path d="M9 7 4 12l5 5M5 12h8a6 6 0 0 1 6 6"></path></symbol>
+<symbol id="i-redo" viewbox="0 0 24 24"><path d="m15 7 5 5-5 5M19 12h-8a6 6 0 0 0-6 6"></path></symbol>
+<symbol id="i-plus" viewbox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></symbol>
+<symbol id="i-trash" viewbox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3m3 0-1 14H7L6 7M10 11v6M14 11v6"></path></symbol>
+<symbol id="i-copy" viewbox="0 0 24 24"><rect height="11" rx="2" width="11" x="8" y="8"></rect><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"></path></symbol>
+<symbol id="i-save" viewbox="0 0 24 24"><path d="M5 3h12l2 2v16H5zM8 3v6h8V3M8 21v-7h8v7"></path></symbol>
+<symbol id="i-clipboard" viewbox="0 0 24 24"><rect height="16" rx="2" width="14" x="5" y="5"></rect><path d="M9 5V3h6v2M8 10h8M8 14h8M8 18h5"></path></symbol>
+<symbol id="i-coins" viewbox="0 0 24 24"><ellipse cx="12" cy="6" rx="7" ry="3"></ellipse><path d="M5 6v4c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 10v4c0 1.7 3.1 3 7 3s7-1.3 7-3v-4M5 14v4c0 1.7 3.1 3 7 3s7-1.3 7-3v-4"></path></symbol>
+<symbol id="i-wallet" viewbox="0 0 24 24"><path d="M4 7h14a2 2 0 0 1 2 2v10H6a2 2 0 0 1-2-2zM4 7l2-3h10l2 3"></path><path d="M15 12h7v4h-7a2 2 0 0 1 0-4z"></path></symbol>
+<symbol id="i-calc" viewbox="0 0 24 24"><rect height="18" rx="2" width="14" x="5" y="3"></rect><path d="M8 7h8M8 11h2M12 11h2M16 11h.1M8 15h2M12 15h2M16 15h.1M8 18h2M12 18h2M16 18h.1"></path></symbol>
+<symbol id="i-search" viewbox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><path d="m16.5 16.5 4 4"></path></symbol>
+<symbol id="i-user" viewbox="0 0 24 24"><circle cx="12" cy="8" r="4"></circle><path d="M4 21a8 8 0 0 1 16 0"></path></symbol>
+<symbol id="i-logout" viewbox="0 0 24 24"><path d="M10 4H5v16h5M14 8l4 4-4 4M8 12h10"></path></symbol>
+<symbol id="i-chevron" viewbox="0 0 24 24"><path d="m8 10 4 4 4-4"></path></symbol>
+</svg>
+<div class="application-shell">
+<header class="topbar">
+<div class="topbar-wave"></div>
+<div class="brand-zone">
+<div aria-label="شعار Work Orders" class="brand-symbol brand-symbol-wo">
+<span class="brand-monogram">WO</span>
+<span class="brand-monogram-sub">ERP</span>
+</div>
+<div class="brand-copy brand-copy-wo">
+<strong>Work Orders</strong>
+<span>Contractor Prototype</span>
+</div>
+</div>
+<nav aria-label="القائمة الرئيسية" class="main-nav">
+<a class="nav-item" href="#"><svg><use href="#i-home"></use></svg>الرئيسية</a>
+<a class="nav-item active" href="#"><svg><use href="#i-sheet"></use></svg>أوامر العمل</a>
+</nav>
+<div class="account-zone">
+<button class="logout-button" type="button"><svg><use href="#i-logout"></use></svg>تسجيل الخروج</button>
+<div class="account-profile">
+<div class="avatar">A</div>
+<div class="account-copy"><span>الحساب الحالي</span><strong>alhasaccu</strong></div>
+</div>
+</div>
+</header>
+<main class="page-content">
+<section aria-label="العنوان والإجماليات" class="overview-zone">
+<section class="page-heading-row">
+<div class="title-area">
+<h1>Work Orders</h1>
+<span class="scope-label">الأحساء — قسم التوصيلات</span>
+<label class="year-control">
+<span>Year</span>
+<select><option>2026</option></select>
+</label>
+
+<span class="experiment-mode-label">تجربة: لوحة جانبية داخل الشيت</span></div>
+<div class="actions-area">
+<div class="action-row">
+<div aria-live="polite" class="system-message" role="status" title="تم تحميل 3,972 أمر عمل من قاعدة البيانات. | صفوف غير محفوظة: 1">
+<span class="message-dot"></span>
+<strong>تم تحميل 3,972 أمر عمل من قاعدة البيانات. | صفوف غير محفوظة: 1</strong>
+</div>
+<div class="action-buttons">
+<button class="button button-secondary"><svg><use href="#i-undo"></use></svg>Undo</button>
+<button class="button button-secondary"><svg><use href="#i-redo"></use></svg>Redo</button>
+<button class="button button-secondary"><svg><use href="#i-plus"></use></svg>Insert Rows</button>
+<button class="button button-secondary"><svg><use href="#i-trash"></use></svg>Delete Rows</button>
+<button class="button button-secondary"><svg><use href="#i-copy"></use></svg>Copy Selected Cells</button>
+<button class="button button-primary"><svg><use href="#i-save"></use></svg>Save</button>
+</div>
+</div>
+</div>
+</section>
+<section aria-label="ملخص أوامر العمل" class="kpi-grid">
+<article class="kpi-card kpi-card-one">
+<div class="metric-icon"><svg><use href="#i-clipboard"></use></svg></div>
+<div><span>Open Work Orders</span><strong>3,972</strong><i></i></div>
+</article>
+<article class="kpi-card kpi-card-two">
+<div class="metric-icon"><svg><use href="#i-coins"></use></svg></div>
+<div><span>Work Order Value</span><strong>4,071,901.489</strong><i></i></div>
+</article>
+<article class="kpi-card kpi-card-three">
+<div class="metric-icon"><svg><use href="#i-wallet"></use></svg></div>
+<div><span>Partial Amount</span><strong>408,006,151.79</strong><i></i></div>
+</article>
+<article class="kpi-card kpi-card-four">
+<div class="metric-icon"><svg><use href="#i-calc"></use></svg></div>
+<div><span>Remaining Amount</span><strong>3,668,895,337.21</strong><i></i></div>
+</article>
+</section>
+</section>
+<section aria-label="منطقة الشيت" class="sheet-zone">
+<section class="sheet-section">
+<div class="sheet-toolbar">
+<div class="sheet-status-actions"><div class="sheet-label">
+<span class="status-dot"></span>
+<span><strong>الشيت جاهز</strong> — 3,972 أمر عمل</span>
+</div><button aria-controls="basketDetailsPanel" aria-expanded="false" class="basket-details-trigger basket-trigger-toolbar" id="openBasketDetails" type="button"><svg><use href="#i-clipboard"></use></svg><span>تفاصيل السلال</span><b>7</b></button></div>
+<div aria-label="بحث أمر العمل" class="search-group" role="search">
+<label class="search-box">
+<input inputmode="numeric" placeholder="ابحث برقم أمر العمل..." type="search"/>
+</label>
+</div>
+</div>
+<div class="sheet-workspace sheet-workspace-side" id="sheetWorkspace"><div class="table-shell">
+<table>
+<thead>
+<tr>
+<th>#</th><th>Work Order Number</th><th>Work Type</th><th>Assignment Date</th><th>Work Order Value</th><th>Partial Amount</th><th class="remaining-column">Remaining Amount</th><th>Basket</th><th>155 date</th><th>St...</th><th>اختبار</th><th>test</th>
+</tr>
+</thead>
+<tbody>
+<tr><td>1</td><td class="link-cell">826001913</td><td>357</td><td>08/08/2026</td><td>1,305,000.75</td><td></td><td class="remaining-column">1,305,000.75</td><td>تعديل مقايسة</td><td>11/11/2011</td><td>2</td><td></td><td class="custom-text-cell">PERF_TEST_9000_2024_2026</td></tr>
+<tr><td>2</td><td class="link-cell">826001914</td><td>357</td><td>09/09/2026</td><td>1,310,000.00</td><td>393,000.00</td><td class="remaining-column">917,000.00</td><td>سلة الفحص</td><td></td><td>2</td><td></td><td class="custom-text-cell">PERF_TEST_9000_2024_2026</td></tr>
+<tr><td>3</td><td class="link-cell">826001915</td><td>357</td><td>10/10/2026</td><td>1,315,000.25</td><td></td><td class="remaining-column">1,315,000.25</td><td>صرف وراجع</td><td></td><td>3</td><td class="selected-cell"></td><td class="custom-text-cell">PERF_TEST_9000_2024_2026</td></tr>
+<tr><td>4</td><td class="link-cell">826001916</td><td>357</td><td>11/11/2026</td><td>1,320,000.50</td><td></td><td class="remaining-column">1,320,000.50</td><td>انتهاء أمر العمل</td><td></td><td>4</td><td></td><td class="custom-text-cell">PERF_TEST_9000_2024_2026</td></tr>
+<tr><td>5</td><td class="link-cell">826001917</td><td>357</td><td>12/12/2026</td><td>1,325,000.75</td><td>397,500.23</td><td class="remaining-column">927,500.52</td><td>لم يتم تقديم الطلب</td><td></td><td>5</td><td></td><td class="custom-text-cell">PERF_TEST_9000_2024_2026</td></tr>
+<tr><td>6</td><td class="link-cell">826001918</td><td>357</td><td>13/01/2026</td><td>1,330,000.00</td><td></td><td class="remaining-column">1,330,000.00</td><td>تحت التنفيذ</td><td></td><td>6</td><td></td><td class="custom-text-cell">PERF_TEST_9000_2024_2026</td></tr>
+<tr><td>7</td><td class="link-cell">826001919</td><td>357</td><td>14/02/2026</td><td>50,000.00</td><td></td><td class="remaining-column">50,000.00</td><td>سلة الفحص</td><td></td><td>7</td><td></td><td class="custom-text-cell">PERF_TEST_9000_2024_2026</td></tr>
+<tr><td>8</td><td class="link-cell">826001920</td><td>357</td><td>15/03/2026</td><td>55,000.25</td><td></td><td class="remaining-column">55,000.25</td><td>صرف وراجع</td><td></td><td></td><td></td><td class="custom-text-cell">PERF_TEST_9000_2024_2026</td></tr>
+<tr><td>9</td><td class="link-cell">826001921</td><td>357</td><td>16/04/2026</td><td>60,000.50</td><td>18,000.15</td><td class="remaining-column">42,000.35</td><td>انتهاء أمر العمل</td><td></td><td></td><td></td><td class="custom-text-cell">PERF_TEST_9000_2024_2026</td></tr>
+<tr><td>10</td><td class="link-cell">826001922</td><td>357</td><td>17/05/2026</td><td>65,000.75</td><td></td><td class="remaining-column">65,000.75</td><td>لم يتم تقديم الطلب</td><td></td><td></td><td></td><td class="custom-text-cell">PERF_TEST_9000_2024_2026</td></tr>
+<tr><td>11</td><td class="link-cell">826001923</td><td>357</td><td>18/06/2026</td><td>70,000.00</td><td></td><td class="remaining-column">70,000.00</td><td>تحت التنفيذ</td><td></td><td></td><td></td><td class="custom-text-cell">PERF_TEST_9000_2024_2026</td></tr>
+<tr><td>12</td><td class="link-cell">826001924</td><td>357</td><td>19/07/2026</td><td>75,000.25</td><td>22,500.08</td><td class="remaining-column">52,500.17</td><td>سلة الفحص</td><td></td><td></td><td></td><td class="custom-text-cell">PERF_TEST_9000_2024_2026</td></tr>
+<tr><td>13</td><td class="link-cell">826001925</td><td>357</td><td>20/08/2026</td><td>80,000.50</td><td></td><td class="remaining-column">80,000.50</td><td>صرف وراجع</td><td></td><td></td><td></td><td class="custom-text-cell">PERF_TEST_9000_2024_2026</td></tr>
+<tr><td>14</td><td class="link-cell">826001926</td><td>357</td><td>21/09/2026</td><td>85,000.75</td><td></td><td class="remaining-column">85,000.75</td><td>انتهاء أمر العمل</td><td></td><td></td><td></td><td class="custom-text-cell">PERF_TEST_9000_2024_2026</td></tr>
+<tr><td>15</td><td class="link-cell">826001927</td><td>357</td><td>22/10/2026</td><td>90,000.00</td><td>27,000.00</td><td class="remaining-column">63,000.00</td><td>تحت التنفيذ</td><td></td><td></td><td></td><td class="custom-text-cell">PERF_TEST_9000_2024_2026</td></tr>
+<tr><td>16</td><td class="link-cell">826001928</td><td>357</td><td>23/11/2026</td><td>95,000.25</td><td></td><td class="remaining-column">95,000.25</td><td>سلة الفحص</td><td></td><td></td><td></td><td class="custom-text-cell">PERF_TEST_9000_2024_2026</td></tr>
+<tr><td>17</td><td class="link-cell">826001929</td><td>357</td><td>24/12/2026</td><td>100,000.50</td><td>30,000.15</td><td class="remaining-column">70,000.35</td><td>صرف وراجع</td><td></td><td></td><td></td><td class="custom-text-cell">PERF_TEST_9000_2024_2026</td></tr>
+<tr><td>18</td><td class="link-cell">826001930</td><td>357</td><td>25/01/2026</td><td>105,000.75</td><td></td><td class="remaining-column">105,000.75</td><td>انتهاء أمر العمل</td><td></td><td></td><td></td><td class="custom-text-cell">PERF_TEST_9000_2024_2026</td></tr>
+<tr><td>19</td><td class="link-cell">826001931</td><td>357</td><td>26/02/2026</td><td>110,000.00</td><td></td><td class="remaining-column">110,000.00</td><td>تحت التنفيذ</td><td></td><td></td><td></td><td class="custom-text-cell">PERF_TEST_9000_2024_2026</td></tr>
+<tr><td>20</td><td class="link-cell">826001932</td><td>357</td><td>27/03/2026</td><td>115,000.25</td><td>34,500.08</td><td class="remaining-column">80,500.17</td><td>سلة الفحص</td><td></td><td></td><td></td><td class="custom-text-cell">PERF_TEST_9000_2024_2026</td></tr>
+</tbody>
+</table>
+</div><div aria-label="اسحب لتغيير عرض تفاصيل السلال" aria-orientation="vertical" aria-valuemin="340" aria-valuemax="720" aria-valuenow="460" class="basket-resize-handle basket-resize-handle-side" id="basketResizeHandle" role="separator" tabindex="0"><span></span></div><aside aria-hidden="true" aria-labelledby="basketDetailsTitle" class="basket-details-panel basket-panel-side" id="basketDetailsPanel">
+<header class="basket-panel-header">
+<div>
+<span class="basket-panel-kicker">ملخص سنة 2026</span>
+<h2 id="basketDetailsTitle">تفاصيل السلال</h2>
+<p>توزيع أوامر العمل والمبلغ المتبقي داخل كل سلة.</p>
+</div>
+<div class="basket-panel-actions">
+<button aria-label="إغلاق تفاصيل السلال" class="basket-panel-close" id="closeBasketDetails" type="button">×</button>
+</div>
+</header>
+<div aria-hidden="true" class="basket-panel-columns">
+<span>السلة</span><span>عدد الأوامر</span><span>Remaining Amount</span><span>النسبة</span>
+</div>
+<div class="basket-panel-list">
+<article class="basket-detail-row" style="--share: .56%">
+<div class="basket-name"><i></i><strong>السلة الهندسية</strong></div><b>32</b><strong class="basket-amount">20,345,510.20</strong><span class="basket-share">0.6%</span>
+</article>
+<article class="basket-detail-row" style="--share: .04%">
+<div class="basket-name"><i></i><strong>تجديد تعارض</strong></div><b>1</b><strong class="basket-amount">1,305,000.75</strong><span class="basket-share">0.04%</span>
+</article>
+<article class="basket-detail-row" style="--share: 24.85%">
+<div class="basket-name"><i></i><strong>انتهاء أمر العمل</strong></div><b>975</b><strong class="basket-amount">898,503,328.28</strong><span class="basket-share">24.8%</span>
+</article>
+<article class="basket-detail-row" style="--share: 24.83%">
+<div class="basket-name"><i></i><strong>سلة الفحص</strong></div><b>978</b><strong class="basket-amount">897,820,329.39</strong><span class="basket-share">24.8%</span>
+</article>
+<article class="basket-detail-row" style="--share: .01%">
+<div class="basket-name"><i></i><strong>سلة المالية</strong></div><b>2</b><strong class="basket-amount">243,001.10</strong><span class="basket-share">0.01%</span>
+</article>
+<article class="basket-detail-row" style="--share: 24.95%">
+<div class="basket-name"><i></i><strong>لم يتم تقديم الطلب</strong></div><b>976</b><strong class="basket-amount">902,501,828.56</strong><span class="basket-share">25.0%</span>
+</article>
+<article class="basket-detail-row" style="--share: 24.77%">
+<div class="basket-name"><i></i><strong>صرف وراجع</strong></div><b>976</b><strong class="basket-amount">895,956,328.34</strong><span class="basket-share">24.8%</span>
+</article>
+</div>
+<footer class="basket-panel-footer">
+<span>اسحب الحد لتغيير العرض، أو أغلق اللوحة للعودة إلى الشيت كاملًا.</span>
+</footer>
+</aside></div>
+</section>
+<section aria-label="ملخص التحديد" class="selection-summary">
+<article><span class="summary-icon"><svg><use href="#i-clipboard"></use></svg></span><div><span>Selected Work Orders</span><strong>1</strong></div></article>
+<article><span class="summary-icon"><svg><use href="#i-coins"></use></svg></span><div><span>Selected Work Order Value</span><strong>1,315,000.25</strong></div></article>
+<article><span class="summary-icon"><svg><use href="#i-wallet"></use></svg></span><div><span>Selected Partial Amount</span><strong>0.00</strong></div></article>
+<article><span class="summary-icon"><svg><use href="#i-calc"></use></svg></span><div><span>Selected Remaining Amount</span><strong>1,315,000.25</strong></div></article>
+</section>
+</section>
+</main>
+</div>
+
+
+<script src="work-orders-theme-lab.js"></script>
+</body>
+</html>

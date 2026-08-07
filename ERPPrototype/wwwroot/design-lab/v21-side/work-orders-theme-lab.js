@@ -1,0 +1,18 @@
+(() => {
+  "use strict";
+  const input=document.querySelector('.search-box input');
+  input?.addEventListener('keydown',e=>{if(e.key==='Enter')e.preventDefault();});
+  const btn=document.getElementById('openBasketDetails');
+  const close=document.getElementById('closeBasketDetails');
+  const panel=document.getElementById('basketDetailsPanel');
+  const workspace=document.getElementById('sheetWorkspace');
+  function setOpen(open){
+    panel?.classList.toggle('is-open',open);
+    workspace?.classList.toggle('panel-open',open);
+    panel?.setAttribute('aria-hidden',open?'false':'true');
+    btn?.setAttribute('aria-expanded',open?'true':'false');
+  }
+  btn?.addEventListener('click',()=>setOpen(!panel?.classList.contains('is-open')));
+  close?.addEventListener('click',()=>setOpen(false));
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')setOpen(false);});
+})();

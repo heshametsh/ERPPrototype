@@ -3,6 +3,8 @@
 **Date:** 2026-08-04  
 **Status:** Approved — local Build, migration, 20/20 Integration tests, and manual UI test passed.
 
+> **Later decisions:** Phase 9.3D removed legacy `Status` and `Notes` completely. Phase 9.3E made every custom-column type immutable after creation, so the empty-only type-change item below is historical and no longer active.
+
 ## User-visible result
 
 The Department Employee can right-click any Work Orders column header and choose:

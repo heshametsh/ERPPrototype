@@ -91,17 +91,17 @@ internal static class IntegrationTestRunner
                 "Custom Number rejects decimals atomically",
                 integrationTests.DecimalCustomNumberIsRejectedAtomicallyAsync),
             (
-                "Custom column rename and empty type change persist",
-                integrationTests.CustomColumnRenameAndEmptyTypeChangePersistAsync),
+                "Custom column rename persists without changing its type",
+                integrationTests.CustomColumnRenamePersistsAsync),
             (
-                "Custom column type change is rejected after values exist",
-                integrationTests.CustomColumnTypeChangeIsRejectedAfterValuesExistAsync),
+                "Custom column type is immutable after creation",
+                integrationTests.CustomColumnTypeIsImmutableAfterCreationAsync),
             (
                 "Custom column deletion removes values across department years",
                 integrationTests.CustomColumnDeletionRemovesValuesAcrossDepartmentYearsAsync),
             (
-                "Column widths persist across years and remain department-scoped",
-                integrationTests.ColumnWidthsPersistAcrossYearsAndRemainDepartmentScopedAsync),
+                "Column layout persists across years and remains department-scoped",
+                integrationTests.ColumnLayoutPersistsAcrossYearsAndRemainsDepartmentScopedAsync),
             (
                 "Invalid column width is rejected atomically",
                 integrationTests.InvalidColumnWidthIsRejectedAtomicallyAsync),

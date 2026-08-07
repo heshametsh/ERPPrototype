@@ -274,7 +274,7 @@
 - **Decision:** Core and custom Work Orders column widths are saved by `DepartmentId + FieldKey`, shared across every year of that department. Width changes require the existing Save button and participate in Undo/Redo before Save.
 - **Header rule:** title, filter icon, and sort icon form one adjacent group. Long titles ellipsize so controls do not move to the far edge or disappear.
 - **Reason:** the same department sheet must keep one familiar layout while still allowing the employee to make narrow or wide columns without wasting horizontal space.
-- **Constraint:** this step changes width only. Custom-column creation still asks for name and type; rename/delete/type conversion remain separate features.
+- **Constraint:** Phase 9.3B changed width only. Later decisions govern rename, delete, immutable type, filters, sorting, and visibility.
 
 
 ## DEC-028 — Remove legacy Status and Notes fields
@@ -285,3 +285,14 @@
 - **Protected columns:** Work Order Number, Work Type, Assignment Date, Work Order Value, Partial Amount, Remaining Amount, and Basket only.
 - **Reason:** every non-core business field should be created explicitly through the department custom-column system rather than retaining two special legacy fields.
 - **Constraint:** no compatibility alias or hidden fallback remains in the entity, DTOs, save pipeline, grid columns, filters, validation, tests, or current documentation. A department may later create its own custom Text column with any suitable name.
+
+## DEC-029 — Immutable custom-column types and lightweight client-side Header behavior
+
+- **Date:** 2026-08-05
+- **Status:** Accepted by user
+- **Type rule:** A custom-column type is selected once at creation and cannot be changed later. `Custom Column Properties` permits rename only; deletion is a separate confirmed action.
+- **Automatic Header rule:** Custom `Text`, `Date`, and whole `Number` columns receive value filters. Custom `Money` columns receive numeric sorting only, starting descending.
+- **Visibility rule:** `Hide Column` is available from a visible data-column Header. `Unhide Column` appears in the same context menu only when hidden columns exist and lists them on demand. No permanent `Columns` toolbar button is added.
+- **Persistence rule:** Width and hidden state are saved by `DepartmentId + FieldKey`, shared by every year of the department, and written only through the existing explicit Save transaction. Hide/Unhide participates in Undo/Redo before Save.
+- **Performance rule:** Filtering, sorting, hiding, and showing operate on the existing Tabulator data in the browser. No server request is made for those interactions. The hidden-column list is built only when the context menu opens, and the obsolete database scan that supported empty-only type conversion is removed.
+- **Safety constraint:** The row-number column cannot be hidden and at least one data column remains visible, because Unhide is intentionally reachable only through a visible Header.

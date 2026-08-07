@@ -497,8 +497,13 @@
                 return;
             }
 
+            const table = this.tables[elementId];
             const definitions =
-                this.getAggregateAmountFields(elementId);
+                this.getAggregateAmountFields(elementId)
+                    .filter(definition =>
+                        table?.getColumn?.(definition.field)
+                            ?.isVisible?.() !== false
+                    );
             const fragment = document.createDocumentFragment();
 
             fragment.appendChild(

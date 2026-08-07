@@ -63,13 +63,92 @@ window.tabulatorFilters = {
         return this.definitions[field] ?? null;
     },
 
+    registerCustomColumnDefinition: function (column) {
+        const field = String(column?.fieldKey ?? "").trim();
+        const name = String(column?.name ?? "").trim();
+        const dataType = String(column?.dataType ?? "Text").trim();
+
+        if (!field) {
+            return;
+        }
+
+        if (dataType === "Money") {
+            delete this.definitions[field];
+            return;
+        }
+
+        this.definitions[field] = {
+            stateKey: "customValues",
+            customField: true,
+            title: `Filter ${name || "Custom Column"}`,
+            storageKey: `uds-custom-filter-${field}-size`,
+            virtualThreshold: 250,
+            valueType: dataType === "Date"
+                ? "date"
+                : dataType === "Number"
+                    ? "number"
+                    : "text"
+        };
+    },
+
+    unregisterCustomColumnDefinition: function (field, state = null) {
+        const normalizedField = String(field ?? "").trim();
+
+        if (!normalizedField) {
+            return;
+        }
+
+        delete this.definitions[normalizedField];
+
+        if (state?.externalFilters?.customValues) {
+            delete state.externalFilters.customValues[normalizedField];
+        }
+    },
+
+    getStateFilterValue: function (state, definition, field) {
+        if (definition?.customField === true) {
+            return state?.externalFilters?.customValues?.[field] ?? [];
+        }
+
+        return state?.externalFilters?.[definition?.stateKey];
+    },
+
+    setStateFilterValue: function (state, definition, field, value) {
+        if (!state?.externalFilters || !definition) {
+            return;
+        }
+
+        if (definition.customField === true) {
+            state.externalFilters.customValues ??= {};
+
+            if (Array.isArray(value) && value.length === 0) {
+                delete state.externalFilters.customValues[field];
+            } else {
+                state.externalFilters.customValues[field] = value;
+            }
+
+            return;
+        }
+
+        state.externalFilters[definition.stateKey] = value;
+    },
+
     normalizeFieldValue: function (
         host,
         field,
         value
     ) {
-        if (field === "assignmentDate") {
-            return host.normalizeAssignmentDate(value);
+        const definition = this.getDefinition(field);
+
+        if (
+            field === "assignmentDate" ||
+            definition?.valueType === "date"
+        ) {
+            return host.normalizeAssignmentDate(value) ?? "";
+        }
+
+        if (definition?.valueType === "number") {
+            return host.normalizeIntegerValue(value);
         }
 
         return String(value ?? "").trim();
@@ -177,7 +256,14 @@ window.tabulatorFilters = {
             partialAmountAmount:
                 filters.partialAmountAmount,
             remainingAmountAmount:
-                filters.remainingAmountAmount
+                filters.remainingAmountAmount,
+            customValues: Object.fromEntries(
+                Object.entries(filters.customValues ?? {})
+                    .map(([field, values]) => [
+                        field,
+                        new Set(values ?? [])
+                    ])
+            )
         };
     },
 
@@ -265,6 +351,16 @@ window.tabulatorFilters = {
                 prepared.remainingAmountAmount
             );
 
+        const matchesCustomValues = Object.entries(
+            prepared.customValues ?? {}
+        ).every(([field, selectedValues]) =>
+            excludedField === field ||
+            selectedValues.size === 0 ||
+            selectedValues.has(
+                this.toFilterToken(host, field, rowData[field])
+            )
+        );
+
         return (
             matchesWorkOrderSearch &&
             matchesWorkOrderNumber &&
@@ -273,7 +369,8 @@ window.tabulatorFilters = {
             matchesBasket &&
             matchesWorkOrderValue &&
             matchesPartialAmount &&
-            matchesRemainingAmount
+            matchesRemainingAmount &&
+            matchesCustomValues
         );
     },
 
@@ -326,6 +423,7 @@ window.tabulatorFilters = {
             )
         );
 
+        const definition = this.getDefinition(field);
         const supportedValues = field === "assignmentDate"
             ? values.filter(value =>
                 value !== this.blankValueToken
@@ -343,11 +441,18 @@ window.tabulatorFilters = {
                 return -1;
             }
 
-            if (field === "assignmentDate") {
+            if (
+                field === "assignmentDate" ||
+                definition?.valueType === "date"
+            ) {
                 return (
                     this.dateToTime(first) -
                     this.dateToTime(second)
                 );
+            }
+
+            if (definition?.valueType === "number") {
+                return Number(first) - Number(second);
             }
 
             return first.localeCompare(
@@ -824,7 +929,7 @@ window.tabulatorFilters = {
         );
 
         const appliedValues =
-            state.externalFilters[definition.stateKey] ?? [];
+            this.getStateFilterValue(state, definition, field) ?? [];
 
         const pendingValues = new Set(
             appliedValues.length > 0
@@ -1054,9 +1159,12 @@ window.tabulatorFilters = {
                     state.externalFilters
                 );
 
-            state.externalFilters[
-                definition.stateKey
-            ] = [];
+            this.setStateFilterValue(
+                state,
+                definition,
+                field,
+                []
+            );
 
             const newFilters =
                 host.cloneExternalFilters(
@@ -1092,12 +1200,14 @@ window.tabulatorFilters = {
                 pendingValues.has(value)
             );
 
-            state.externalFilters[
-                definition.stateKey
-            ] =
+            this.setStateFilterValue(
+                state,
+                definition,
+                field,
                 selected.length === uniqueValues.length
                     ? []
-                    : selected;
+                    : selected
+            );
 
             const newFilters =
                 host.cloneExternalFilters(
@@ -1970,7 +2080,9 @@ window.tabulatorFilters = {
             ) ||
             this.isAmountFilterActive(
                 filters.remainingAmountAmount
-            );
+            ) ||
+            Object.values(filters.customValues ?? {})
+                .some(values => (values ?? []).length > 0);
 
         if (!hasAnyFilter) {
             table.clearFilter();
@@ -2035,7 +2147,7 @@ window.tabulatorFilters = {
             );
 
         const value =
-            state.externalFilters[definition.stateKey];
+            this.getStateFilterValue(state, definition, field);
 
         const isFiltered =
             definition.type === "amount"
@@ -2098,9 +2210,11 @@ window.tabulatorFilters = {
                 }
 
                 const value =
-                    state.externalFilters[
-                        definition.stateKey
-                    ];
+                    this.getStateFilterValue(
+                        state,
+                        definition,
+                        field
+                    );
 
                 return definition.type === "amount"
                     ? this.isAmountFilterActive(value)

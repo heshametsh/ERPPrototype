@@ -299,7 +299,7 @@ Implemented in the current patch:
 
 Practical example: changing a custom Text column in 4,952 rows still saves 4,952 values, but it does not rewrite the other columns or execute the global Work Order Number + Work Type duplicate query.
 
-Phase 9.3A now implements department-owned custom columns with stable field keys and Text/Money/Date/whole-Number values. Phase 9.3B adds department-owned persisted widths for core and custom fields. Rename/delete/type conversion and dedicated custom-column header filters remain later work.
+Phase 9.3A–9.3E now implement department-owned custom columns with stable field keys, immutable Text/Money/Date/whole-Number types, rename/delete, persisted width and visibility, automatic non-Money value filters, and descending-first Money sorting.
 
 
 ## 18. Phase 8.6-R1 — Lifecycle Ownership Extraction
@@ -508,7 +508,7 @@ count, known Work Order identity, absence of the old-year identity, and aggregat
 readiness. This removes the race where two years both contained 1,000 rows.
 
 
-## 30. Phase 9.3A–9.3D — Custom Columns, Layouts, Lifecycle, and Legacy-Field Removal
+## 30. Phase 9.3A–9.3E — Custom Columns, Layouts, Lifecycle, Visibility, and Legacy-Field Removal
 
 - A Department Employee can insert a custom column before or after any data-column Header.
 - Types are exactly Text, Money, Date, and whole Number; there is no Dropdown type.
@@ -516,5 +516,9 @@ readiness. This removes the race where two years both contained 1,000 rows.
 - Column widths are stored separately by DepartmentId + FieldKey and use the normal explicit Save action.
 - Width changes support mouse drag, Undo/Redo, Refresh, and year switching. There is no exact-width entry dialog.
 - Header text, filter, and sort controls remain adjacent; long titles ellipsize before pushing controls away.
-- Custom columns support rename, empty-only type conversion, transactional deletion across department years, and Undo/Redo before Save.
+- A custom-column type is immutable after creation. Properties allow rename only; deletion remains a separate confirmed operation.
+- Custom Text, Date, and whole-Number columns receive a client-side value filter automatically. Custom Money columns receive numeric sort only, starting largest-to-smallest.
+- Any data column can be hidden from its Header context menu. `Unhide Column` appears only while hidden columns exist and lists those columns on demand.
+- Hide/Unhide and width changes are local until the normal Save action, participate in Undo/Redo, and persist by department across all years.
+- The custom-column value scan previously used to decide whether type conversion was allowed has been removed; opening and saving the sheet no longer runs that extra `OPENJSON` query.
 - Legacy `Status` and `Notes` fields were removed from the entity, schema, grid, filters, save pipeline, and tests in Phase 9.3D. Existing values in those database columns are intentionally deleted by the migration.

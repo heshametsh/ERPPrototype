@@ -4,8 +4,8 @@ using Microsoft.EntityFrameworkCore;
 namespace ERPPrototype.Data;
 
 /// <summary>
-/// Owns persisted column widths for one department. Widths are shared by all
-/// years of that department and cover both core and custom work-order fields.
+/// Owns persisted column width and visibility for one department. Layouts are
+/// shared by all years and cover both core and custom work-order fields.
 /// </summary>
 public static class DepartmentColumnLayoutService
 {
@@ -61,9 +61,22 @@ public static class DepartmentColumnLayoutService
                 dbContext.Entry(layout).State != EntityState.Deleted)
             .ToList();
 
+        var allowedFields = new HashSet<string>(
+            CoreFieldKeys,
+            StringComparer.Ordinal);
+
+        allowedFields.UnionWith(customColumns.Select(column => column.FieldKey));
+
+        var existingByField = existing.ToDictionary(
+            layout => layout.FieldKey,
+            StringComparer.Ordinal);
+
         if (!configurationChanged)
         {
-            return DepartmentColumnLayoutPreparationResult.Success(existing);
+            return ValidateVisibleColumnExists(
+                allowedFields,
+                existingByField,
+                existing);
         }
 
         var incoming = incomingLayouts ?? [];
@@ -75,18 +88,9 @@ public static class DepartmentColumnLayoutService
         if (duplicateField is not null)
         {
             return DepartmentColumnLayoutPreparationResult.Failed(
-                "The same column width was submitted more than once. Refresh the sheet and try again.");
+                "The same column layout was submitted more than once. Refresh the sheet and try again.");
         }
 
-        var allowedFields = new HashSet<string>(
-            CoreFieldKeys,
-            StringComparer.Ordinal);
-
-        allowedFields.UnionWith(customColumns.Select(column => column.FieldKey));
-
-        var existingByField = existing.ToDictionary(
-            layout => layout.FieldKey,
-            StringComparer.Ordinal);
         var utcNow = DateTime.UtcNow;
 
         foreach (var input in incoming)
@@ -96,7 +100,7 @@ public static class DepartmentColumnLayoutService
             if (!allowedFields.Contains(fieldKey))
             {
                 return DepartmentColumnLayoutPreparationResult.Failed(
-                    "The column width belongs to an unknown field. Refresh the sheet and try again.");
+                    "The column layout belongs to an unknown field. Refresh the sheet and try again.");
             }
 
             if (input.Width is < MinimumWidth or > MaximumWidth)
@@ -112,12 +116,15 @@ public static class DepartmentColumnLayoutService
                     !RowVersionMatches(input.RowVersion, existingLayout.RowVersion))
                 {
                     return DepartmentColumnLayoutPreparationResult.Failed(
-                        "The column width was changed in another session. Refresh the sheet and try again.");
+                        "The column layout was changed in another session. Refresh the sheet and try again.");
                 }
 
-                if (existingLayout.Width != input.Width)
+                if (
+                    existingLayout.Width != input.Width ||
+                    existingLayout.IsHidden != input.IsHidden)
                 {
                     existingLayout.Width = input.Width;
+                    existingLayout.IsHidden = input.IsHidden;
                     existingLayout.UpdatedAt = utcNow;
                     existingLayout.UpdatedBy = userId;
                 }
@@ -128,7 +135,7 @@ public static class DepartmentColumnLayoutService
             if (input.Id > 0 || !string.IsNullOrWhiteSpace(input.RowVersion))
             {
                 return DepartmentColumnLayoutPreparationResult.Failed(
-                    "The column width layout is stale. Refresh the sheet and try again.");
+                    "The column layout is stale. Refresh the sheet and try again.");
             }
 
             var added = new DepartmentColumnLayout
@@ -136,6 +143,7 @@ public static class DepartmentColumnLayoutService
                 DepartmentId = departmentId,
                 FieldKey = fieldKey,
                 Width = input.Width,
+                IsHidden = input.IsHidden,
                 UpdatedAt = utcNow,
                 UpdatedBy = userId
             };
@@ -145,7 +153,27 @@ public static class DepartmentColumnLayoutService
             existingByField[fieldKey] = added;
         }
 
-        return DepartmentColumnLayoutPreparationResult.Success(existing);
+        return ValidateVisibleColumnExists(
+            allowedFields,
+            existingByField,
+            existing);
+    }
+
+    private static DepartmentColumnLayoutPreparationResult
+        ValidateVisibleColumnExists(
+            IReadOnlySet<string> allowedFields,
+            IReadOnlyDictionary<string, DepartmentColumnLayout> layoutsByField,
+            IEnumerable<DepartmentColumnLayout> layouts)
+    {
+        var allDataColumnsHidden = allowedFields.Count > 0 &&
+            allowedFields.All(fieldKey =>
+                layoutsByField.TryGetValue(fieldKey, out var layout) &&
+                layout.IsHidden);
+
+        return allDataColumnsHidden
+            ? DepartmentColumnLayoutPreparationResult.Failed(
+                "At least one data column must remain visible.")
+            : DepartmentColumnLayoutPreparationResult.Success(layouts);
     }
 
     public static DepartmentColumnLayoutData MapLayout(
@@ -154,7 +182,8 @@ public static class DepartmentColumnLayoutService
             layout.Id,
             layout.FieldKey,
             layout.Width,
-            Convert.ToBase64String(layout.RowVersion));
+            Convert.ToBase64String(layout.RowVersion),
+            layout.IsHidden);
 
     private static bool RowVersionMatches(string? encoded, byte[] current)
     {
@@ -180,13 +209,15 @@ public sealed record DepartmentColumnLayoutInput(
     int Id,
     string FieldKey,
     int Width,
-    string RowVersion = "");
+    string RowVersion = "",
+    bool IsHidden = false);
 
 public sealed record DepartmentColumnLayoutData(
     int Id,
     string FieldKey,
     int Width,
-    string RowVersion);
+    string RowVersion,
+    bool IsHidden = false);
 
 public sealed record DepartmentColumnLayoutPreparationResult(
     bool Succeeded,

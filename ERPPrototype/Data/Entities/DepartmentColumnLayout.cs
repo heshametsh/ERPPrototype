@@ -12,6 +12,8 @@ public sealed class DepartmentColumnLayout
 
     public int Width { get; set; }
 
+    public bool IsHidden { get; set; }
+
     public DateTime UpdatedAt { get; set; }
 
     public string UpdatedBy { get; set; } = string.Empty;

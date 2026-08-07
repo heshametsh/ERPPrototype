@@ -533,3 +533,26 @@ powershell -ExecutionPolicy Bypass -File .\ERPPrototype\Tools\Invoke-ERPPerforma
 
 Quantitative acceptance must use the Performance JSON reports, not the diagnostic timing fields emitted by the functional Stress journey.
 
+## Phase 9.3E — Custom Filters, Money Sort, and Hide/Unhide
+
+Server gate:
+
+- [ ] Release Build succeeds.
+- [ ] Apply migration `20260805183000_AddDepartmentColumnVisibility`.
+- [ ] Core Integration suite reports `25/25 passed`.
+- [ ] The column-layout test proves Width and IsHidden persist across years, stay department-scoped, and can be unhidden.
+- [ ] The custom-column immutability test proves an attempted type change is rejected even when the column is empty.
+
+Focused browser check:
+
+- [ ] Add a Text, Date, Number, and Money custom column.
+- [ ] Text, Date, and Number show a filter icon; Money shows a sort arrow and no filter icon.
+- [ ] The first Money sort is largest-to-smallest, then smallest-to-largest.
+- [ ] Filter options are created from the loaded rows and Apply/Clear work without a network reload.
+- [ ] Hide one core column and one custom column. `Unhide Column` appears only while something is hidden.
+- [ ] Undo and Redo restore Hide/Unhide before Save.
+- [ ] Save, Refresh, and switch year; hidden states remain for the same department.
+- [ ] Unhide and Save; both columns return after Refresh.
+- [ ] Another department does not inherit the widths or hidden states.
+- [ ] Hiding a Money column removes it from the selection-summary display but does not change fixed yearly totals.
+
