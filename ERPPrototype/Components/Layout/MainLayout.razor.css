@@ -1,7 +1,21 @@
 .app-shell {
-    --app-header-height: 54px;
+    /*
+       One visual scale token for the application top bar.
+       Wide and Split only normalize the viewport width used by the same scale.
+       The 1.5px cap intentionally keeps compensation bounded at ~67% browser zoom.
+    */
+    --topbar-scale-unit: clamp(1px, 0.0521vw, 1.5px);
+    --app-header-height: calc(54 * var(--topbar-scale-unit));
     min-height: 100dvh;
     background: radial-gradient(circle at top right, rgba(0, 174, 239, 0.07), transparent 30%), #f4f7fb;
+}
+
+.app-shell[data-layout-mode="split"] {
+    /*
+       Same physical-size idea as v46 Split:
+       half-screen needs roughly twice the vw coefficient of Wide.
+    */
+    --topbar-scale-unit: clamp(1px, 0.102vw, 1.5px);
 }
 
 

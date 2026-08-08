@@ -1,10 +1,18 @@
 /* =========================================================
-   APPLICATION TOP BAR — fixed 90% reference sizing
-   Structure: Brand | Center Navigation | Account Actions
-   Full/Split changes available space, not control sizes.
+   APPLICATION TOP BAR — shared visual scale
+   Structure: Brand | Navigation | Flexible Space | Account Actions
+
+   Architecture:
+   - MainLayout owns one --topbar-scale-unit.
+   - Wide/Split normalize that one scale for the available window width.
+   - NavMenu consumes the scale; it does not detect browser zoom.
+   - At the current 1920-class target, the scale stays visually close to
+     the approved 100% size down to about 67% browser zoom.
    ========================================================= */
 
 .main-navbar {
+    --topbar-u: var(--topbar-scale-unit, 1px);
+
     position: relative;
     width: 100%;
     height: 100%;
@@ -39,8 +47,13 @@
     width: 100%;
     height: 100%;
     min-height: 0;
-    padding-inline: clamp(12px, 1vw, 18px);
+    padding-inline: calc(18 * var(--topbar-u));
     direction: ltr;
+}
+
+/* Split changes spacing geometry only; all actual sizes still use one scale. */
+.main-navbar[data-layout-mode="split"] .navbar-inner {
+    padding-inline: calc(10 * var(--topbar-u));
 }
 
 .brand-zone {
@@ -55,7 +68,7 @@
     display: inline-flex;
     align-items: center;
     min-width: 0;
-    gap: 9px;
+    gap: calc(9 * var(--topbar-u));
     color: #ffffff;
     text-decoration: none;
 }
@@ -68,8 +81,8 @@
     position: relative;
     display: grid;
     place-items: center;
-    width: 41px;
-    height: 35px;
+    width: calc(41 * var(--topbar-u));
+    height: calc(35 * var(--topbar-u));
     flex: 0 0 auto;
     border: 1px solid rgba(255, 255, 255, .24);
     border-radius: 10px;
@@ -80,20 +93,20 @@
 }
 
 .brand-mark strong {
-    font-size: 13px;
+    font-size: calc(13 * var(--topbar-u));
     font-weight: 900;
     letter-spacing: .4px;
 }
 
 .brand-mark small {
     position: absolute;
-    right: 4px;
-    bottom: 3px;
-    padding: 1px 3px;
+    right: calc(4 * var(--topbar-u));
+    bottom: calc(3 * var(--topbar-u));
+    padding: calc(1 * var(--topbar-u)) calc(3 * var(--topbar-u));
     border-radius: 3px;
     background: rgba(255,255,255,.92);
     color: #0b6fa4;
-    font-size: 6px;
+    font-size: calc(6 * var(--topbar-u));
     font-weight: 900;
     letter-spacing: .2px;
 }
@@ -109,16 +122,16 @@
 .brand-text strong {
     color: #ffffff;
     font-family: "Segoe UI Variable Display", "Segoe UI", Tahoma, Arial, sans-serif;
-    font-size: 16px;
+    font-size: calc(16 * var(--topbar-u));
     font-weight: 820;
     letter-spacing: -.01em;
     white-space: nowrap;
 }
 
 .brand-text small {
-    margin-top: 1px;
+    margin-top: calc(1 * var(--topbar-u));
     color: rgba(255,255,255,.74);
-    font-size: 9.5px;
+    font-size: calc(9.5 * var(--topbar-u));
     font-weight: 650;
     white-space: nowrap;
 }
@@ -126,27 +139,33 @@
 .navigation-links {
     display: flex;
     align-items: center;
-    gap: 16px;
-    margin-left: 16px;
+    gap: calc(16 * var(--topbar-u));
+    margin-left: calc(16 * var(--topbar-u));
     min-width: max-content;
     flex: 0 0 auto;
     direction: rtl;
+}
+
+/* Preserve the approved equal spacing in Split: Brand ↔ Work Orders ↔ Home. */
+.main-navbar[data-layout-mode="split"] .navigation-links {
+    gap: calc(14 * var(--topbar-u));
+    margin-left: calc(14 * var(--topbar-u));
 }
 
 .navigation-links ::deep .navigation-link {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-height: 37px;
-    padding: 0 14px;
-    gap: 8px;
+    min-height: calc(37 * var(--topbar-u));
+    padding: 0 calc(14 * var(--topbar-u));
+    gap: calc(8 * var(--topbar-u));
     flex: 0 0 auto;
     border: 1px solid rgba(255,255,255,.12);
     border-radius: 8px;
     background: rgba(255,255,255,.06);
     color: rgba(255,255,255,.90);
     font-family: "Segoe UI Variable Text", "Segoe UI", Tahoma, Arial, sans-serif;
-    font-size: 13px;
+    font-size: calc(13 * var(--topbar-u));
     font-weight: 760;
     line-height: 1;
     text-decoration: none;
@@ -156,8 +175,8 @@
 
 .navigation-links ::deep .navigation-link svg,
 .logout-button svg {
-    width: 16px;
-    height: 16px;
+    width: calc(16 * var(--topbar-u));
+    height: calc(16 * var(--topbar-u));
     flex: 0 0 auto;
     fill: none;
     stroke: currentColor;
@@ -182,7 +201,7 @@
 .navbar-right {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: calc(8 * var(--topbar-u));
     margin-left: auto;
     min-width: 0;
     flex: 0 0 auto;
@@ -198,15 +217,15 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-height: 35px;
-    padding: 0 12px;
-    gap: 7px;
+    min-height: calc(35 * var(--topbar-u));
+    padding: 0 calc(12 * var(--topbar-u));
+    gap: calc(7 * var(--topbar-u));
     border: 1px solid rgba(255,255,255,.42);
     border-radius: 8px;
     background: rgba(255,255,255,.06);
     color: #ffffff;
     font-family: "Segoe UI Variable Text", "Segoe UI", Tahoma, Arial, sans-serif;
-    font-size: 12px;
+    font-size: calc(12 * var(--topbar-u));
     font-weight: 730;
     line-height: 1;
     text-decoration: none;
@@ -226,9 +245,9 @@
     display: inline-flex;
     align-items: center;
     min-width: 0;
-    min-height: 36px;
-    padding: 3px 8px;
-    gap: 8px;
+    min-height: calc(36 * var(--topbar-u));
+    padding: calc(3 * var(--topbar-u)) calc(8 * var(--topbar-u));
+    gap: calc(8 * var(--topbar-u));
     border: 1px solid rgba(255,255,255,.10);
     border-radius: 999px;
     background: rgba(255,255,255,.05);
@@ -245,20 +264,20 @@
 .user-avatar {
     display: grid;
     place-items: center;
-    width: 32px;
-    height: 32px;
-    flex: 0 0 32px;
+    width: calc(32 * var(--topbar-u));
+    height: calc(32 * var(--topbar-u));
+    flex: 0 0 calc(32 * var(--topbar-u));
     border: 1px solid rgba(255,255,255,.28);
     border-radius: 50%;
     background: linear-gradient(145deg, #078ed0, #4bbbd5);
     color: #ffffff;
-    font-size: 11.5px;
+    font-size: calc(11.5 * var(--topbar-u));
     font-weight: 800;
 }
 
 .user-details {
     display: flex;
-    min-width: 80px;
+    min-width: calc(80 * var(--topbar-u));
     flex-direction: column;
     align-items: flex-end;
     direction: ltr;
@@ -267,34 +286,22 @@
 }
 
 .user-details small {
-    margin-bottom: 2px;
+    margin-bottom: calc(2 * var(--topbar-u));
     color: rgba(255,255,255,.72);
-    font-size: 9.5px;
+    font-size: calc(9.5 * var(--topbar-u));
     font-weight: 650;
 }
 
 .user-details strong {
     overflow: hidden;
-    max-width: 140px;
+    max-width: calc(140 * var(--topbar-u));
     color: #ffffff;
     font-family: "Segoe UI Variable Display", "Segoe UI", Tahoma, Arial, sans-serif;
-    font-size: 11.5px;
+    font-size: calc(11.5 * var(--topbar-u));
     font-weight: 800;
     text-overflow: ellipsis;
     white-space: nowrap;
     direction: ltr;
-}
-
-/* Only spacing compresses as the viewport narrows. Control sizes stay fixed. */
-@media (max-width: 1100px) {
-    .navbar-inner {
-        padding-inline: 10px;
-    }
-
-    .navigation-links {
-        gap: 14px;
-        margin-left: 14px;
-    }
 }
 
 /* Genuine narrow fallback only; normal Full/Split operation should not reach this. */
@@ -304,8 +311,9 @@
         display: none;
     }
 
-    .navigation-links {
-        gap: 10px;
-        margin-left: 10px;
+    .navigation-links,
+    .main-navbar[data-layout-mode="split"] .navigation-links {
+        gap: calc(10 * var(--topbar-u));
+        margin-left: calc(10 * var(--topbar-u));
     }
 }

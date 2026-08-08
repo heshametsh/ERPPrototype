@@ -90,12 +90,7 @@
 }
 
 .scope-branch { gap: 7px; }
-.scope-branch strong {
-    color: #173f5f;
-    font-size: 1.04rem;
-    font-weight: 750;
-}
-
+.scope-branch strong,
 .scope-department strong {
     color: #0879ad;
     font-size: .88rem;
@@ -119,6 +114,7 @@
     border-radius: 8px;
     background: #fff;
     box-shadow: 0 2px 8px rgba(5,42,96,.07), inset 0 1px 0 rgba(255,255,255,.82);
+    flex: 0 0 auto;
 }
 
 .year-control span {
@@ -131,16 +127,18 @@
 }
 
 .year-control select {
-    width: 82px;
+    width: auto;
+    min-width: 92px;
     min-height: 30px;
     padding: 0 25px 0 9px;
+    flex: 0 0 auto;
     border: 0;
     border-inline-start: 1px solid #d5e4ec;
     outline: 0;
     background: #fff;
     color: #0a3f70;
     font-family: "Segoe UI Variable Display", "Segoe UI", Tahoma, Arial, sans-serif;
-    font-size: .73rem;
+    font-size: .82rem;
     font-weight: 850;
     cursor: pointer;
 }
@@ -301,19 +299,32 @@
 }
 
 .button-primary {
-    border: 1px solid #e7a59e;
-    background: linear-gradient(180deg, #fff4f2, #ffe9e6);
-    color: #a33b32;
-    box-shadow: 0 2px 7px rgba(154,54,45,.09);
+    border: 1px solid #acd2e2;
+    background: linear-gradient(180deg, #f8fdff 0%, #edf8fc 100%);
+    color: #116a99;
+    box-shadow: 0 2px 7px rgba(13,64,115,.045);
 }
 
 .button-primary:hover:not(:disabled) {
-    border-color: #db8c84;
-    background: #ffe4e0;
+    border-color: #76b9d2;
+    background: #e9f7fc;
 }
 
 .save-button {
     white-space: nowrap;
+}
+
+/* Existing badge visibility already means there are real unsaved changes. */
+.save-button:has(.save-badge:not([hidden])) {
+    border-color: #0868bd;
+    background: linear-gradient(135deg, #0868bd 0%, #078ed0 100%);
+    color: #fff;
+    box-shadow: 0 5px 14px rgba(8,104,189,.23);
+}
+
+.save-button:has(.save-badge:not([hidden])):hover:not(:disabled) {
+    border-color: #075ca8;
+    background: linear-gradient(135deg, #075ca8 0%, #067fbd 100%);
 }
 
 .save-badge {
@@ -323,8 +334,8 @@
     height: 18px;
     padding: 0 5px;
     border-radius: 999px;
-    background: rgba(163,59,50,.12);
-    color: #a33b32;
+    background: rgba(255,255,255,.20);
+    color: #fff;
     font-family: "Segoe UI Variable Text", "Segoe UI", Tahoma, Arial, sans-serif;
     font-size: .64rem;
     font-weight: 850;
@@ -542,10 +553,10 @@
 /* Wide values match the approved v46 proportions. */
 .tabulator-workorders-page[data-layout-mode="wide"] .scope-identity-item strong { font-size: 1.02rem; }
 .tabulator-workorders-page[data-layout-mode="wide"] .scope-branch { gap: 8px; }
-.tabulator-workorders-page[data-layout-mode="wide"] .scope-branch strong { font-size: 1.09rem; font-weight: 750; }
-.tabulator-workorders-page[data-layout-mode="wide"] .scope-department strong { font-size: .91rem; }
+.tabulator-workorders-page[data-layout-mode="wide"] .scope-branch strong,
+.tabulator-workorders-page[data-layout-mode="wide"] .scope-department strong { font-size: .91rem; font-weight: 700; }
 .tabulator-workorders-page[data-layout-mode="wide"] .scope-identity-label { font-size: .64rem; }
-.tabulator-workorders-page[data-layout-mode="wide"] .year-control select { font-size: .86rem; }
+.tabulator-workorders-page[data-layout-mode="wide"] .year-control select { font-size: .92rem; }
 .tabulator-workorders-page[data-layout-mode="wide"] .basket-header-trigger { min-height: 34px; font-size: .74rem; font-weight: 820; }
 
 /* Split uses the exact continuous v46 formulas; browser zoom does not create modes. */
@@ -571,12 +582,12 @@
 .tabulator-workorders-page[data-layout-mode="split"] .scope-identity-label { font-size: clamp(9.5px, .82vw, 12px); font-weight: 730; }
 .tabulator-workorders-page[data-layout-mode="split"] .scope-identity-item strong { font-size: clamp(15.5px, 1.52vw, 22px); font-weight: 800; }
 .tabulator-workorders-page[data-layout-mode="split"] .scope-branch { gap: clamp(6px, .55vw, 9px); }
-.tabulator-workorders-page[data-layout-mode="split"] .scope-branch strong { font-size: clamp(16.5px, 1.62vw, 23.5px); font-weight: 750; }
+.tabulator-workorders-page[data-layout-mode="split"] .scope-branch strong,
 .tabulator-workorders-page[data-layout-mode="split"] .scope-department strong { font-size: clamp(13px, 1.22vw, 18px); font-weight: 700; }
 .tabulator-workorders-page[data-layout-mode="split"] .scope-identity-divider { height: clamp(18px, 1.6vw, 23px); }
 .tabulator-workorders-page[data-layout-mode="split"] .year-control { min-height: clamp(33px, 3.55vw, 50px); }
 .tabulator-workorders-page[data-layout-mode="split"] .year-control span { font-size: clamp(10.5px, .98vw, 14.5px); font-weight: 780; }
-.tabulator-workorders-page[data-layout-mode="split"] .year-control select { min-height: clamp(31px, 3.35vw, 48px); font-size: clamp(12px, 1.16vw, 17px); font-weight: 860; }
+.tabulator-workorders-page[data-layout-mode="split"] .year-control select { min-height: clamp(31px, 3.35vw, 48px); font-size: clamp(13px, 1.22vw, 18px); font-weight: 860; }
 .tabulator-workorders-page[data-layout-mode="split"] .basket-header-trigger { min-height: clamp(33px, 3.55vw, 50px); padding-inline: clamp(9px, .92vw, 13px); font-size: clamp(11.5px, 1.08vw, 16px); font-weight: 820; }
 .tabulator-workorders-page[data-layout-mode="split"] .basket-header-trigger svg { width: clamp(15px, 1.28vw, 18px); height: clamp(15px, 1.28vw, 18px); }
 .tabulator-workorders-page[data-layout-mode="split"] .basket-header-trigger b { min-width: clamp(20px, 1.75vw, 25px); height: clamp(20px, 1.75vw, 25px); font-size: clamp(10px, .92vw, 13.5px); }
