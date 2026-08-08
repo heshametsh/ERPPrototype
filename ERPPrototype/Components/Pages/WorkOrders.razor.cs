@@ -35,6 +35,49 @@ public partial class WorkOrders
     private string DepartmentName = string.Empty;
     private string ErrorMessage = string.Empty;
 
+    // Phase 1B: keep persisted scope names untouched while presenting the
+    // compact identity approved in v46. The full source values remain in
+    // title attributes in WorkOrders.razor.
+    private string BranchDisplayName =>
+        GetScopeDisplayName(BranchName, "فرع", normalizeAlAhsa: true);
+
+    private string DepartmentDisplayName =>
+        GetScopeDisplayName(DepartmentName, "قسم", trimQualifier: true);
+
+    private static string GetScopeDisplayName(
+        string value,
+        string optionalPrefix,
+        bool trimQualifier = false,
+        bool normalizeAlAhsa = false)
+    {
+        var display = (value ?? string.Empty).Trim();
+
+        var prefix = optionalPrefix + " ";
+        if (display.StartsWith(prefix, StringComparison.Ordinal))
+        {
+            display = display[prefix.Length..].Trim();
+        }
+
+        if (trimQualifier)
+        {
+            var qualifierIndex = display.IndexOf('(');
+            if (qualifierIndex > 0)
+            {
+                display = display[..qualifierIndex].Trim();
+            }
+        }
+
+        if (normalizeAlAhsa &&
+            string.Equals(display, "الاحساء", StringComparison.Ordinal))
+        {
+            display = "الأحساء";
+        }
+
+        return string.IsNullOrWhiteSpace(display)
+            ? value
+            : display;
+    }
+
     private List<int> AvailableWorkYears = [DateTime.Now.Year];
     private List<TabulatorWorkOrderRow> Rows = [];
     private List<CustomColumnDefinitionData> CustomColumns = [];

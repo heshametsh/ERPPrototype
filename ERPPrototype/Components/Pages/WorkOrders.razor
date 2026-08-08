@@ -26,110 +26,165 @@
      data-testid="work-orders-page">
 
     <div class="work-orders-sticky-controls">
-        <div class="page-header-row">
-            <div class="page-title-block">
-                <h1 data-testid="work-orders-title">Work Orders</h1>
-
-                <div class="page-context-row">
-                    <div class="page-subtitle"
-                         data-testid="work-orders-scope">
-                        @if (IsLoading)
-                        {
-                            <span>Loading department data...</span>
-                        }
-                        else if (!string.IsNullOrWhiteSpace(DepartmentName))
-                        {
-                            <span>@BranchName — @DepartmentName</span>
-                        }
-                        else
-                        {
-                            <span>Work Orders</span>
-                        }
-                    </div>
-
-                    @if (!IsLoading && string.IsNullOrWhiteSpace(ErrorMessage))
+        <div class="page-heading-row">
+            <div class="title-area">
+                <div class="scope-identity"
+                     data-testid="work-orders-scope"
+                     aria-label="الفرع والقسم">
+                    @if (IsLoading)
                     {
-                        <label class="work-year-selector">
-                            <span>Year</span>
+                        <div class="scope-identity-item scope-branch">
+                            <span class="scope-identity-label">الفرع</span>
+                            <strong>جاري التحميل...</strong>
+                        </div>
+                    }
+                    else if (!string.IsNullOrWhiteSpace(DepartmentName))
+                    {
+                        <div class="scope-identity-item scope-branch">
+                            <span class="scope-identity-label">الفرع</span>
+                            <strong title="@BranchName">@BranchDisplayName</strong>
+                        </div>
 
-                            <select @key="YearSelectorRenderKey"
-                                    class="work-year-select"
-                                    data-testid="work-year-selector"
-                                    value="@SelectedWorkYear"
-                                    disabled="@(IsSaving || IsYearLoading)"
-                                    @onchange="ChangeWorkYearAsync">
-                                @foreach (var year in AvailableWorkYears)
-                                {
-                                    <option value="@year">@year</option>
-                                }
-                            </select>
-                        </label>
+                        <span class="scope-identity-divider" aria-hidden="true"></span>
+
+                        <div class="scope-identity-item scope-department">
+                            <span class="scope-identity-label">القسم</span>
+                            <strong title="@DepartmentName">@DepartmentDisplayName</strong>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="scope-identity-item scope-branch">
+                            <span class="scope-identity-label">الفرع</span>
+                            <strong>Work Orders</strong>
+                        </div>
                     }
                 </div>
+
+                @if (!IsLoading && string.IsNullOrWhiteSpace(ErrorMessage))
+                {
+                    <label class="year-control year-control-prominent">
+                        <span>السنة</span>
+
+                        <select @key="YearSelectorRenderKey"
+                                data-testid="work-year-selector"
+                                aria-label="السنة"
+                                value="@SelectedWorkYear"
+                                disabled="@(IsSaving || IsYearLoading)"
+                                @onchange="ChangeWorkYearAsync">
+                            @foreach (var year in AvailableWorkYears)
+                            {
+                                <option value="@year">@year</option>
+                            }
+                        </select>
+                    </label>
+
+                    <button type="button"
+                            id="work-orders-basket-details-trigger"
+                            class="basket-details-trigger basket-header-trigger"
+                            data-testid="work-orders-basket-details-trigger"
+                            aria-controls="tabulator-test-table-basket-dashboard"
+                            aria-expanded="true"
+                            onclick="window.tabulatorTest.toggleBasketOverview('tabulator-test-table', this)">
+                        <svg aria-hidden="true" viewBox="0 0 24 24">
+                            <rect x="5" y="5" width="14" height="16" rx="2"></rect>
+                            <path d="M9 5V3h6v2M8 10h8M8 14h8M8 18h5"></path>
+                        </svg>
+                        <span>تفاصيل السلال</span>
+                        <b>@WorkOrderBuskets.All.Count</b>
+                    </button>
+                }
             </div>
 
             @if (!IsLoading && string.IsNullOrWhiteSpace(ErrorMessage))
             {
-                <div class="page-actions-box">
-                    <div class="page-actions-buttons">
-                        <button type="button"
-                                class="page-action-button page-action-button-secondary"
-                                data-testid="work-orders-undo"
-                                disabled="@IsYearLoading"
-                                onclick="window.tabulatorTest.undo('tabulator-test-table')">
-                            Undo
-                        </button>
+                <div class="actions-area">
+                    <div class="action-row">
+                        <div class="system-message" role="status" aria-live="polite">
+                            <span class="message-dot" aria-hidden="true"></span>
+                            <strong id="tabulator-test-table-status"
+                                    data-testid="work-orders-status">
+                                Preparing database rows...
+                            </strong>
+                        </div>
 
-                        <button type="button"
-                                class="page-action-button page-action-button-secondary"
-                                data-testid="work-orders-redo"
-                                disabled="@IsYearLoading"
-                                onclick="window.tabulatorTest.redo('tabulator-test-table')">
-                            Redo
-                        </button>
+                        <div class="command-actions">
+                            <details class="commands-wrap sheet-commands-menu">
+                                <summary class="button button-secondary commands-button">
+                                    <span class="keyboard-glyph" aria-hidden="true">⌨</span>
+                                    <span>الأوامر</span>
+                                </summary>
 
-                        <button type="button"
-                                class="page-action-button page-action-button-secondary"
-                                data-testid="work-orders-insert"
-                                disabled="@IsYearLoading"
-                                onclick="window.tabulatorTest.openInsertDialog('tabulator-test-table')">
-                            Insert Rows
-                        </button>
+                                <div class="commands-menu" role="menu">
+                                    <div class="commands-menu-title">
+                                        <strong>أوامر الشيت</strong>
+                                        <span>يمكن الضغط على الأمر أو استخدام الاختصار.</span>
+                                    </div>
 
-                        <button type="button"
-                                class="page-action-button page-action-button-secondary"
-                                data-testid="work-orders-delete"
-                                disabled="@IsYearLoading"
-                                onclick="window.tabulatorTest.deleteSelectedRows('tabulator-test-table')">
-                            Delete Rows
-                        </button>
+                                    <button type="button"
+                                            class="command-item"
+                                            data-testid="work-orders-undo"
+                                            disabled="@IsYearLoading"
+                                            onclick="window.tabulatorTest.undo('tabulator-test-table')">
+                                        <span>Undo</span><kbd>Ctrl+Z</kbd>
+                                    </button>
 
-                        <button type="button"
-                                class="page-action-button page-action-button-primary page-action-button-copy"
-                                data-testid="work-orders-copy"
-                                disabled="@IsYearLoading"
-                                onclick="window.tabulatorTest.copyRange('tabulator-test-table')">
-                            Copy Selected Cells
-                        </button>
+                                    <button type="button"
+                                            class="command-item"
+                                            data-testid="work-orders-redo"
+                                            disabled="@IsYearLoading"
+                                            onclick="window.tabulatorTest.redo('tabulator-test-table')">
+                                        <span>Redo</span><kbd>Ctrl+Y</kbd>
+                                    </button>
 
-                        <button type="button"
-                                class="page-action-button page-action-button-primary page-action-button-save"
-                                data-testid="work-orders-save"
-                                disabled="@(IsSaving || IsYearLoading)"
-                                @onclick="SaveChangesAsync">
-                            @(IsYearLoading ? "Loading..." : IsSaving ? "Saving..." : "Save")
-                        </button>
-                    </div>
+                                    <button type="button"
+                                            class="command-item"
+                                            data-testid="work-orders-copy"
+                                            disabled="@IsYearLoading"
+                                            onclick="window.tabulatorTest.copyRange('tabulator-test-table')">
+                                        <span>Copy</span><kbd>Ctrl+C</kbd>
+                                    </button>
 
-                    <div class="save-status"
-                         id="tabulator-test-table-status"
-                         data-testid="work-orders-status">
-                        Preparing database rows...
+                                    <button type="button"
+                                            class="command-item"
+                                            data-testid="work-orders-insert"
+                                            disabled="@IsYearLoading"
+                                            onclick="window.tabulatorTest.openInsertDialog('tabulator-test-table')">
+                                        <span>Insert Rows</span><kbd>—</kbd>
+                                    </button>
+
+                                    <button type="button"
+                                            class="command-item"
+                                            data-testid="work-orders-delete"
+                                            disabled="@IsYearLoading"
+                                            onclick="window.tabulatorTest.deleteSelectedRows('tabulator-test-table')">
+                                        <span>Delete Rows</span><kbd>—</kbd>
+                                    </button>
+
+                                    <div class="commands-menu-note">
+                                        Paste يظل عبر Ctrl+V حتى لا نضيف مسار Clipboard جديد.
+                                    </div>
+                                </div>
+                            </details>
+
+                            <button type="button"
+                                    class="button button-primary save-button"
+                                    data-testid="work-orders-save"
+                                    disabled="@(IsSaving || IsYearLoading)"
+                                    @onclick="SaveChangesAsync">
+                                <svg aria-hidden="true" viewBox="0 0 24 24">
+                                    <path d="M5 3h12l2 2v16H5zM8 3v6h8V3M8 21v-7h8v7"></path>
+                                </svg>
+                                <span>@(IsYearLoading ? "Loading..." : IsSaving ? "Saving..." : "Save")</span>
+                                <b class="save-badge"
+                                   id="tabulator-test-table-save-badge"
+                                   hidden>0</b>
+                            </button>
+                        </div>
                     </div>
                 </div>
             }
         </div>
-
         @if (IsLoading)
         {
             <div class="alert alert-info"
@@ -146,21 +201,27 @@
         }
         else
         {
-            <div class="work-orders-open-summary"
-                 id="tabulator-test-table-summary-overview"
-                 data-testid="work-orders-summary"
-                 data-aggregate-ready="false"
-                 aria-live="polite">
-                <div class="work-orders-summary-item"
-                     data-testid="work-orders-summary-count">
-                    <span class="work-orders-summary-label">
-                        Open Work Orders
-                    </span>
-                    <strong class="work-orders-summary-value">
-                        Calculating...
-                    </strong>
-                </div>
-            </div>
+            <section class="work-orders-open-summary kpi-grid"
+                     id="tabulator-test-table-summary-overview"
+                     data-testid="work-orders-summary"
+                     data-aggregate-ready="false"
+                     aria-label="ملخص أوامر العمل"
+                     aria-live="polite">
+                <article class="kpi-card kpi-card-one"
+                         data-testid="work-orders-summary-count">
+                    <div class="metric-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24">
+                            <rect x="5" y="5" width="14" height="16" rx="2"></rect>
+                            <path d="M9 5V3h6v2M8 10h8M8 14h8M8 18h5"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <span>Open Work Orders</span>
+                        <strong>Calculating...</strong>
+                        <i></i>
+                    </div>
+                </article>
+            </section>
 
             <section class="work-orders-basket-dashboard"
                      id="tabulator-test-table-basket-dashboard"
@@ -182,16 +243,22 @@
                          aria-live="polite"
                          hidden>
                         <div class="validation-navigator-summary">
-                            <span class="validation-navigator-icon"
-                                  aria-hidden="true">!</span>
+                            <svg class="validation-navigator-icon"
+                                 aria-hidden="true"
+                                 viewBox="0 0 24 24">
+                                <circle cx="12" cy="12" r="9" />
+                                <path d="M12 7.5v6" />
+                                <path d="M12 17h.01" />
+                            </svg>
 
                             <div class="validation-navigator-copy">
                                 <strong id="tabulator-test-table-validation-title">
                                     توجد أخطاء تمنع الحفظ
                                 </strong>
 
-                                <span id="tabulator-test-table-validation-message">
-                                </span>
+                                <span class="validation-copy-divider" aria-hidden="true">|</span>
+
+                                <span id="tabulator-test-table-validation-message"></span>
                             </div>
                         </div>
 
@@ -213,7 +280,7 @@
                     </div>
                 </div>
 
-                <div class="work-order-search-box">
+                <div class="work-order-search-box" role="search" aria-label="بحث أمر العمل">
                     <label class="work-order-search-label"
                            for="tabulator-work-order-search">
                         بحث أمر العمل
@@ -227,7 +294,7 @@
                            inputmode="numeric"
                            autocomplete="off"
                            disabled="@IsYearLoading"
-                           placeholder="اكتب رقم أمر العمل..."
+                           placeholder="ابحث برقم أمر العمل..."
                            oninput="window.tabulatorTest.filterByWorkOrder('tabulator-test-table', this.value)" />
                 </div>
             </div>

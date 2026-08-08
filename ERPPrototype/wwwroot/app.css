@@ -764,122 +764,46 @@ details[open] > .excel-date-summary::before {
    Consolidated Phase 9.2C canonical styles.
    ========================================================= */
 
-/* ---------- Open and selected financial summaries ---------- */
-.work-orders-open-summary .work-orders-summary-item,
+/* ---------- Selected-row financial summary ----------
+   Open/header KPIs are owned by WorkOrders.razor.css so there is one
+   canonical visual owner instead of a global rule plus page overrides. */
 .work-orders-selection-summary-bar .work-orders-summary-item {
     box-sizing: border-box;
-    display: flex;
     min-width: 0;
-    flex-direction: column;
-    justify-content: center;
     overflow: hidden;
     font-family: "Segoe UI", Tahoma, Arial, sans-serif;
 }
 
-.work-orders-open-summary .work-orders-summary-item {
-    position: relative;
-    min-height: 36px;
-    padding: 3px 9px 2px;
-    gap: 0;
-    border: 1px solid #82b7d5;
-    border-radius: 7px;
-    background: #edf7fd;
-    box-shadow: 0 2px 6px rgba(25, 57, 80, 0.08);
-}
-
-.work-orders-open-summary .work-orders-summary-item::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    right: 0;
-    left: 0;
-    height: 3px;
-    background: #2d86b6;
-    pointer-events: none;
-}
-
-.work-orders-open-summary .work-orders-summary-item:nth-child(2) {
-    border-color: #a8b8c4;
-    background: #f5f7f9;
-}
-
-.work-orders-open-summary .work-orders-summary-item:nth-child(2)::before {
-    background: #71879a;
-}
-
-.work-orders-open-summary .work-orders-summary-item:nth-child(3) {
-    border-color: #79b69e;
-    background: #edf8f3;
-    box-shadow: 0 2px 6px rgba(36, 107, 76, 0.09);
-}
-
-.work-orders-open-summary .work-orders-summary-item:nth-child(3)::before {
-    background: #2f8a68;
-}
-
-.work-orders-open-summary .work-orders-summary-item:nth-child(4) {
-    border-color: #d8a13b;
-    background: #fff5df;
-    box-shadow: 0 2px 8px rgba(166, 106, 0, 0.16);
-}
-
-.work-orders-open-summary .work-orders-summary-item:nth-child(4)::before {
-    background: #c88612;
-}
-
-.work-orders-open-summary .work-orders-summary-label,
 .work-orders-selection-summary-bar .work-orders-summary-label {
     display: block;
     overflow: hidden;
-    color: #526c7e;
-    font-weight: 750;
+    color: #677f90;
+    font-size: .68rem;
+    font-weight: 700;
+    line-height: 1.1;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.work-orders-open-summary .work-orders-summary-label {
-    margin-bottom: 0;
-    font-size: 9.5px;
-    line-height: 1;
-}
-
-.work-orders-open-summary .work-orders-summary-value,
 .work-orders-selection-summary-bar .work-orders-summary-value {
     display: block;
     overflow: hidden;
-    color: #173f59;
+    color: #213f54;
+    font-size: .93rem;
     font-variant-numeric: tabular-nums;
-    font-weight: 800;
+    font-weight: 850;
+    line-height: 1.1;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.work-orders-open-summary .work-orders-summary-value {
-    color: #0b5f8f;
-    font-size: 14px;
-    line-height: 1.05;
-}
-
-.work-orders-open-summary .work-orders-summary-item:nth-child(2) .work-orders-summary-value {
-    color: #29485e;
-}
-
-.work-orders-open-summary .work-orders-summary-item:nth-child(3) .work-orders-summary-value {
-    color: #126747;
-}
-
-.work-orders-open-summary .work-orders-summary-item:nth-child(4) .work-orders-summary-value {
-    color: #8a5400;
-    font-size: 15.5px;
-    font-weight: 900;
-}
-
-.work-orders-selection-summary-bar[hidden] {
-    display: none !important;
-}
+.work-orders-selection-summary-bar[hidden] { display: none !important; }
 
 .work-orders-selection-summary-bar .work-orders-summary-item {
+    display: flex;
     min-height: 36px;
+    flex-direction: column;
+    justify-content: center;
     padding: 5px 9px 4px;
     gap: 3px;
     border: 0;
@@ -890,18 +814,6 @@ details[open] > .excel-date-summary::before {
 
 .work-orders-selection-summary-bar .work-orders-summary-item:first-child {
     border-inline-start: 0;
-}
-
-.work-orders-selection-summary-bar .work-orders-summary-label {
-    color: #677f90;
-    font-size: 0.68rem;
-    line-height: 1.1;
-}
-
-.work-orders-selection-summary-bar .work-orders-summary-value {
-    color: #213f54;
-    font-size: 0.93rem;
-    line-height: 1.1;
 }
 
 /* ---------- Active Basket matrix ---------- */

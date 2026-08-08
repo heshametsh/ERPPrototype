@@ -1,363 +1,311 @@
+/* =========================================================
+   APPLICATION TOP BAR — fixed 90% reference sizing
+   Structure: Brand | Center Navigation | Account Actions
+   Full/Split changes available space, not control sizes.
+   ========================================================= */
+
 .main-navbar {
+    position: relative;
     width: 100%;
-    min-height: 72px;
-    border-bottom: 1px solid rgba(203, 213, 225, 0.85);
-    background: rgba(255, 255, 255, 0.97);
-    box-shadow: 0 7px 25px rgba(15, 42, 70, 0.08);
-    backdrop-filter: blur(14px);
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+    border-bottom: 1px solid rgba(0, 61, 112, 0.28);
+    background: linear-gradient(90deg, #1598bd 0%, #0b73a9 21%, #063b70 50%, #0b73a9 79%, #1598bd 100%);
+    color: #ffffff;
+    box-shadow: 0 4px 16px rgba(3, 37, 82, .17);
+    direction: ltr;
     font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+}
+
+.topbar-wave {
+    position: absolute;
+    left: 50%;
+    top: -92px;
+    width: 52%;
+    height: 166px;
+    border: 28px solid rgba(95, 205, 225, .14);
+    border-radius: 50%;
+    opacity: .22;
+    transform: translateX(-50%);
+    pointer-events: none;
 }
 
 .navbar-inner {
     position: relative;
+    z-index: 1;
     display: flex;
     align-items: center;
     width: 100%;
-    max-width: 100%;
-    min-height: 72px;
-    margin: 0;
-    padding: 0 28px;
+    height: 100%;
+    min-height: 0;
+    padding-inline: clamp(12px, 1vw, 18px);
+    direction: ltr;
 }
 
-.navbar-left {
+.brand-zone {
     display: flex;
     align-items: center;
-    gap: 30px;
     min-width: 0;
+    min-height: 0;
+    flex: 0 0 auto;
 }
 
 .main-navbar ::deep .brand-link {
     display: inline-flex;
     align-items: center;
-    flex: 0 0 auto;
-    gap: 11px;
-    color: #14263a;
+    min-width: 0;
+    gap: 9px;
+    color: #ffffff;
     text-decoration: none;
 }
 
-    .main-navbar ::deep .brand-link:hover {
-        color: #14263a;
-    }
+.main-navbar ::deep .brand-link:hover {
+    color: #ffffff;
+}
 
 .brand-mark {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 43px;
-    height: 43px;
-    flex: 0 0 43px;
-    border-radius: 13px;
-    background: linear-gradient(135deg, #0067b9, #00a9ce);
-    color: white;
-    font-size: 0.82rem;
-    font-weight: 800;
-    letter-spacing: 0.7px;
-    box-shadow: 0 8px 20px rgba(0, 103, 185, 0.24);
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 41px;
+    height: 35px;
+    flex: 0 0 auto;
+    border: 1px solid rgba(255, 255, 255, .24);
+    border-radius: 10px;
+    background: linear-gradient(145deg, rgba(255,255,255,.15), rgba(255,255,255,.04));
+    color: #ffffff;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.14), 0 5px 12px rgba(0,43,80,.12);
+    line-height: 1;
+}
+
+.brand-mark strong {
+    font-size: 13px;
+    font-weight: 900;
+    letter-spacing: .4px;
+}
+
+.brand-mark small {
+    position: absolute;
+    right: 4px;
+    bottom: 3px;
+    padding: 1px 3px;
+    border-radius: 3px;
+    background: rgba(255,255,255,.92);
+    color: #0b6fa4;
+    font-size: 6px;
+    font-weight: 900;
+    letter-spacing: .2px;
 }
 
 .brand-text {
     display: flex;
     flex-direction: column;
-    line-height: 1.15;
+    min-width: 0;
     direction: ltr;
+    line-height: 1.08;
 }
 
-    .brand-text strong {
-        color: #14263a;
-        font-size: 1rem;
-        font-weight: 750;
-    }
+.brand-text strong {
+    color: #ffffff;
+    font-family: "Segoe UI Variable Display", "Segoe UI", Tahoma, Arial, sans-serif;
+    font-size: 16px;
+    font-weight: 820;
+    letter-spacing: -.01em;
+    white-space: nowrap;
+}
 
-    .brand-text small {
-        margin-top: 4px;
-        color: #718096;
-        font-size: 0.72rem;
-    }
+.brand-text small {
+    margin-top: 1px;
+    color: rgba(255,255,255,.74);
+    font-size: 9.5px;
+    font-weight: 650;
+    white-space: nowrap;
+}
 
 .navigation-links {
     display: flex;
     align-items: center;
-    gap: 5px;
+    gap: 16px;
+    margin-left: 16px;
+    min-width: max-content;
+    flex: 0 0 auto;
     direction: rtl;
 }
 
-    .navigation-links ::deep .navigation-link {
-        display: flex;
-        align-items: center;
-        min-height: 42px;
-        padding: 0 16px;
-        border-radius: 10px;
-        color: #475569;
-        font-size: 0.92rem;
-        font-weight: 650;
-        text-decoration: none;
-        transition: background 0.18s ease, color 0.18s ease;
-    }
+.navigation-links ::deep .navigation-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 37px;
+    padding: 0 14px;
+    gap: 8px;
+    flex: 0 0 auto;
+    border: 1px solid rgba(255,255,255,.12);
+    border-radius: 8px;
+    background: rgba(255,255,255,.06);
+    color: rgba(255,255,255,.90);
+    font-family: "Segoe UI Variable Text", "Segoe UI", Tahoma, Arial, sans-serif;
+    font-size: 13px;
+    font-weight: 760;
+    line-height: 1;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background .16s ease, border-color .16s ease, box-shadow .16s ease;
+}
 
-        .navigation-links ::deep .navigation-link:hover {
-            background: #eef6fc;
-            color: #0067b9;
-        }
+.navigation-links ::deep .navigation-link svg,
+.logout-button svg {
+    width: 16px;
+    height: 16px;
+    flex: 0 0 auto;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
 
-        .navigation-links ::deep .navigation-link.active {
-            background: rgba(0, 103, 185, 0.1);
-            color: #0067b9;
-        }
+.navigation-links ::deep .navigation-link:hover {
+    border-color: rgba(255,255,255,.22);
+    background: rgba(255,255,255,.10);
+    color: #ffffff;
+}
+
+.navigation-links ::deep .navigation-link.active {
+    border-color: rgba(255,255,255,.14);
+    background: linear-gradient(135deg, rgba(9,135,202,.78), rgba(49,176,218,.72));
+    color: #ffffff;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 4px 12px rgba(8,104,189,.20);
+}
 
 .navbar-right {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 8px;
     margin-left: auto;
-    padding-left: 4px;
+    min-width: 0;
+    flex: 0 0 auto;
     direction: rtl;
 }
-
-.main-navbar ::deep .user-card {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    max-width: 230px;
-    padding: 6px 11px;
-    border: 1px solid transparent;
-    border-radius: 12px;
-    color: #334155;
-    text-decoration: none;
-    transition: border-color 0.18s ease, background 0.18s ease, color 0.18s ease;
-}
-
-    .main-navbar ::deep .user-card:hover {
-        border-color: #d8e8f4;
-        background: #eef6fc;
-        color: #0067b9;
-    }
-
-.user-avatar {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 39px;
-    height: 39px;
-    flex: 0 0 39px;
-    border: 1px solid #cfe4f3;
-    border-radius: 50%;
-    background: linear-gradient(135deg, #e7f4fc, #d8eff9);
-    color: #0067b9;
-    font-size: 0.9rem;
-    font-weight: 800;
-}
-
-.user-details {
-    display: flex;
-    min-width: 0;
-    flex-direction: column;
-    line-height: 1.2;
-}
-
-    .user-details small {
-        color: #94a3b8;
-        font-size: 0.66rem;
-        font-weight: 500;
-    }
-
-    .user-details strong {
-        overflow: hidden;
-        max-width: 155px;
-        margin-top: 3px;
-        color: #334155;
-        font-size: 0.8rem;
-        font-weight: 700;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        direction: ltr;
-    }
 
 .logout-form {
     margin: 0;
 }
 
-.logout-button {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 40px;
-    padding: 0 16px;
-    border: 1px solid #0067b9;
-    border-radius: 10px;
-    background: white;
-    color: #0067b9;
-    font-family: inherit;
-    font-size: 0.84rem;
-    font-weight: 700;
-    cursor: pointer;
-    transition: background 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
-}
-
-    .logout-button:hover {
-        background: #0067b9;
-        color: white;
-        box-shadow: 0 7px 18px rgba(0, 103, 185, 0.2);
-    }
-
+.logout-button,
 .main-navbar ::deep .login-link {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-height: 41px;
-    padding: 0 18px;
-    border: 1px solid #0067b9;
-    border-radius: 10px;
-    background: white;
-    color: #0067b9;
-    font-size: 0.88rem;
-    font-weight: 700;
+    min-height: 35px;
+    padding: 0 12px;
+    gap: 7px;
+    border: 1px solid rgba(255,255,255,.42);
+    border-radius: 8px;
+    background: rgba(255,255,255,.06);
+    color: #ffffff;
+    font-family: "Segoe UI Variable Text", "Segoe UI", Tahoma, Arial, sans-serif;
+    font-size: 12px;
+    font-weight: 730;
+    line-height: 1;
     text-decoration: none;
-    transition: background 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background .16s ease, border-color .16s ease;
 }
 
-    .main-navbar ::deep .login-link:hover {
-        background: #0067b9;
-        color: white;
-        box-shadow: 0 8px 18px rgba(0, 103, 185, 0.2);
-    }
-
-.navigation-toggle,
-.navigation-toggle-button {
-    display: none;
+.logout-button:hover,
+.main-navbar ::deep .login-link:hover {
+    border-color: rgba(255,255,255,.56);
+    background: rgba(255,255,255,.14);
+    color: #ffffff;
 }
 
+.main-navbar ::deep .user-card {
+    display: inline-flex;
+    align-items: center;
+    min-width: 0;
+    min-height: 36px;
+    padding: 3px 8px;
+    gap: 8px;
+    border: 1px solid rgba(255,255,255,.10);
+    border-radius: 999px;
+    background: rgba(255,255,255,.05);
+    color: #ffffff;
+    text-decoration: none;
+}
+
+.main-navbar ::deep .user-card:hover {
+    border-color: rgba(255,255,255,.24);
+    background: rgba(255,255,255,.10);
+    color: #ffffff;
+}
+
+.user-avatar {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    flex: 0 0 32px;
+    border: 1px solid rgba(255,255,255,.28);
+    border-radius: 50%;
+    background: linear-gradient(145deg, #078ed0, #4bbbd5);
+    color: #ffffff;
+    font-size: 11.5px;
+    font-weight: 800;
+}
+
+.user-details {
+    display: flex;
+    min-width: 80px;
+    flex-direction: column;
+    align-items: flex-end;
+    direction: ltr;
+    line-height: 1.05;
+    text-align: right;
+}
+
+.user-details small {
+    margin-bottom: 2px;
+    color: rgba(255,255,255,.72);
+    font-size: 9.5px;
+    font-weight: 650;
+}
+
+.user-details strong {
+    overflow: hidden;
+    max-width: 140px;
+    color: #ffffff;
+    font-family: "Segoe UI Variable Display", "Segoe UI", Tahoma, Arial, sans-serif;
+    font-size: 11.5px;
+    font-weight: 800;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    direction: ltr;
+}
+
+/* Only spacing compresses as the viewport narrows. Control sizes stay fixed. */
 @media (max-width: 1100px) {
     .navbar-inner {
-        padding: 0 20px;
-    }
-
-    .navbar-left {
-        gap: 20px;
-    }
-
-    .navigation-links ::deep .navigation-link {
-        padding: 0 12px;
-    }
-
-    .user-details strong {
-        max-width: 120px;
-    }
-}
-
-@media (max-width: 900px) {
-    .brand-text small {
-        display: none;
-    }
-
-    .user-details {
-        display: none;
-    }
-
-    .navbar-right {
-        gap: 8px;
-    }
-}
-
-@media (max-width: 760px) {
-    .navbar-inner {
-        flex-wrap: wrap;
-        padding: 0 16px;
-    }
-
-    .navbar-left {
-        flex: 1;
-        gap: 12px;
-    }
-
-    .main-navbar ::deep .brand-link {
-        min-height: 72px;
+        padding-inline: 10px;
     }
 
     .navigation-links {
-        display: none;
-    }
-
-    .navigation-toggle {
-        position: absolute;
-        opacity: 0;
-        pointer-events: none;
-    }
-
-    .navigation-toggle-button {
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        gap: 5px;
-        width: 43px;
-        height: 43px;
-        margin-right: auto;
-        border: 1px solid #d8e1ea;
-        border-radius: 10px;
-        background: #f8fafc;
-        cursor: pointer;
-    }
-
-        .navigation-toggle-button span {
-            display: block;
-            width: 20px;
-            height: 2px;
-            margin: 0 auto;
-            border-radius: 99px;
-            background: #334155;
-        }
-
-    .navbar-right {
-        display: none;
-        width: 100%;
-        flex-direction: column;
-        align-items: stretch;
-        margin: 0;
-        padding: 12px 0 16px;
-        border-top: 1px solid #edf1f5;
-    }
-
-    .navigation-toggle:checked ~ .navbar-right {
-        display: flex;
-    }
-
-    .main-navbar ::deep .user-card {
-        max-width: none;
-        padding: 7px 8px;
-    }
-
-    .user-details {
-        display: flex;
-    }
-
-        .user-details strong {
-            max-width: none;
-        }
-
-    .logout-button,
-    .main-navbar ::deep .login-link {
-        width: 100%;
+        gap: 14px;
+        margin-left: 14px;
     }
 }
 
-@media (max-width: 420px) {
-    .navbar-inner {
-        padding: 0 12px;
+/* Genuine narrow fallback only; normal Full/Split operation should not reach this. */
+@media (max-width: 760px) {
+    .brand-text small,
+    .user-details small {
+        display: none;
     }
 
-    .brand-mark {
-        width: 39px;
-        height: 39px;
-        flex-basis: 39px;
-        border-radius: 11px;
-        font-size: 0.75rem;
-    }
-
-    .brand-text strong {
-        font-size: 0.9rem;
-    }
-
-    .navigation-toggle-button {
-        width: 40px;
-        height: 40px;
+    .navigation-links {
+        gap: 10px;
+        margin-left: 10px;
     }
 }

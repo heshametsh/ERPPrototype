@@ -24,6 +24,42 @@
         }
     ]);
 
+    function syncApplicationLayout() {
+        const controller = window.erpAppLayout;
+
+        if (!controller?.sync || !controller?.isSplit) {
+            throw new Error(
+                "tabulatorAggregates.js requires appLayout.js first."
+            );
+        }
+
+        controller.sync();
+        return controller;
+    }
+
+    function compactKpiAmountText(valueText) {
+        const numeric = Number(
+            String(valueText ?? "").replace(/,/g, "")
+        );
+
+        if (!Number.isFinite(numeric)) {
+            return String(valueText ?? "");
+        }
+
+        const absolute = Math.abs(numeric);
+
+        if (absolute >= 1_000_000_000) {
+            return `${(numeric / 1_000_000_000).toFixed(2)}B`;
+        }
+
+        if (absolute >= 1_000_000) {
+            const decimals = absolute >= 100_000_000 ? 1 : 2;
+            return `${(numeric / 1_000_000).toFixed(decimals)}M`;
+        }
+
+        return String(valueText ?? "");
+    }
+
     target.registerModule("aggregates", {
         getAggregateAmountFields: function (elementId) {
             const state = this.states[elementId];
@@ -411,10 +447,74 @@
                 .toLocaleString("en-US");
         },
 
+        buildOverviewAggregateItem: function (
+            label,
+            valueText,
+            testId,
+            variant,
+            compactInSplit = false
+        ) {
+            const item = document.createElement("article");
+            item.className = `kpi-card kpi-card-${variant}`;
+
+            if (testId) {
+                item.dataset.testid = testId;
+            }
+
+            const metricIcon = document.createElement("div");
+            metricIcon.className = "metric-icon";
+            metricIcon.setAttribute("aria-hidden", "true");
+
+            const svg = document.createElementNS(
+                "http://www.w3.org/2000/svg",
+                "svg"
+            );
+            svg.setAttribute("viewBox", "0 0 24 24");
+
+            const iconMarkup = {
+                one: '<rect x="5" y="5" width="14" height="16" rx="2"></rect><path d="M9 5V3h6v2M8 10h8M8 14h8M8 18h5"></path>',
+                two: '<ellipse cx="12" cy="6" rx="7" ry="3"></ellipse><path d="M5 6v4c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 10v4c0 1.7 3.1 3 7 3s7-1.3 7-3v-4M5 14v4c0 1.7 3.1 3 7 3s7-1.3 7-3v-4"></path>',
+                three: '<path d="M4 7h14a2 2 0 0 1 2 2v10H6a2 2 0 0 1-2-2zM4 7l2-3h10l2 3"></path><path d="M15 12h7v4h-7a2 2 0 0 1 0-4z"></path>',
+                four: '<rect x="5" y="3" width="14" height="18" rx="2"></rect><path d="M8 7h8M8 11h2M12 11h2M16 11h.1M8 15h2M12 15h2M16 15h.1M8 18h2M12 18h2M16 18h.1"></path>'
+            }[variant] ?? "";
+
+            svg.innerHTML = iconMarkup;
+            metricIcon.appendChild(svg);
+
+            const copy = document.createElement("div");
+
+            const itemLabel = document.createElement("span");
+            itemLabel.textContent = label;
+            itemLabel.title = label;
+
+            const itemValue = document.createElement("strong");
+            const fullValueText = String(valueText ?? "");
+
+            const isSplit = syncApplicationLayout().isSplit();
+
+            itemValue.textContent =
+                compactInSplit && isSplit
+                    ? compactKpiAmountText(fullValueText)
+                    : fullValueText;
+            itemValue.title = fullValueText;
+
+            if (compactInSplit) {
+                itemValue.dataset.fullValue = fullValueText;
+            }
+
+            const underline = document.createElement("i");
+            underline.setAttribute("aria-hidden", "true");
+
+            copy.append(itemLabel, itemValue, underline);
+            item.append(metricIcon, copy);
+            return item;
+        },
+
         buildAggregateItem: function (
             label,
             valueText,
-            testId
+            testId,
+            compactInSplit = false
         ) {
             const item = document.createElement("div");
             item.className = "work-orders-summary-item";
@@ -430,8 +530,19 @@
 
             const itemValue = document.createElement("strong");
             itemValue.className = "work-orders-summary-value";
-            itemValue.textContent = valueText;
-            itemValue.title = valueText;
+
+            const fullValueText = String(valueText ?? "");
+            const isSplit = syncApplicationLayout().isSplit();
+
+            itemValue.textContent =
+                compactInSplit && isSplit
+                    ? compactKpiAmountText(fullValueText)
+                    : fullValueText;
+            itemValue.title = fullValueText;
+
+            if (compactInSplit) {
+                itemValue.dataset.fullValue = fullValueText;
+            }
 
             item.append(itemLabel, itemValue);
             return item;
@@ -453,24 +564,30 @@
             const fragment = document.createDocumentFragment();
 
             fragment.appendChild(
-                this.buildAggregateItem(
+                this.buildOverviewAggregateItem(
                     "Open Work Orders",
                     this.formatAggregateCount(
                         snapshot.open.rowCount
                     ),
-                    "work-orders-summary-count"
+                    "work-orders-summary-count",
+                    "one"
                 )
             );
 
-            for (const definition of definitions) {
+            const variants = ["two", "three", "four"];
+
+            for (let index = 0; index < definitions.length; index++) {
+                const definition = definitions[index];
                 const openCents =
                     snapshot.open.amounts[definition.field] ?? 0;
 
                 fragment.appendChild(
-                    this.buildAggregateItem(
+                    this.buildOverviewAggregateItem(
                         definition.label,
                         this.formatAmountCents(openCents),
-                        `work-orders-summary-${definition.field}`
+                        `work-orders-summary-${definition.field}`,
+                        variants[index] ?? "two",
+                        true
                     )
                 );
             }
@@ -807,11 +924,33 @@
                 return;
             }
 
+            syncApplicationLayout();
             state.aggregateSnapshot = null;
             this.scheduleAggregateRefresh(
                 elementId,
                 "table-built"
             );
+        },
+
+        toggleBasketOverview: function (elementId, trigger) {
+            const dashboard = document.getElementById(
+                `${elementId}-basket-dashboard`
+            );
+
+            if (!dashboard) {
+                return false;
+            }
+
+            dashboard.hidden = !dashboard.hidden;
+
+            if (trigger) {
+                trigger.setAttribute(
+                    "aria-expanded",
+                    String(!dashboard.hidden)
+                );
+            }
+
+            return !dashboard.hidden;
         },
 
         resetAggregatesUi: function (elementId) {
@@ -824,10 +963,11 @@
 
             if (overview) {
                 overview.replaceChildren(
-                    this.buildAggregateItem(
+                    this.buildOverviewAggregateItem(
                         "Open Work Orders",
                         "Calculating...",
-                        "work-orders-summary-count"
+                        "work-orders-summary-count",
+                        "one"
                     )
                 );
                 overview.dataset.aggregateReady = "false";
@@ -853,4 +993,31 @@
             return JSON.parse(JSON.stringify(snapshot));
         }
     });
+
+    window.addEventListener(
+        "erp:layoutchange",
+        function (event) {
+            if (event?.detail?.mode === event?.detail?.previousMode) {
+                return;
+            }
+
+            for (const [elementId, state] of
+                Object.entries(target.states ?? {})) {
+                if (!state?.aggregateSnapshot?.open) {
+                    continue;
+                }
+
+                if (!document.getElementById(
+                    `${elementId}-summary-overview`
+                )) {
+                    continue;
+                }
+
+                target.renderAggregateOverview?.(
+                    elementId,
+                    state.aggregateSnapshot
+                );
+            }
+        }
+    );
 })();

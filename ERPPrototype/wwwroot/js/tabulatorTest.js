@@ -566,23 +566,83 @@ window.tabulatorTest = {
         const errorCount =
             state?.validationErrors?.size ?? 0;
 
-        const dirtyText =
-            `صفوف غير محفوظة: ${unsavedCount.toLocaleString()}`;
+        const loadedCount =
+            state?.originalRows?.size ?? 0;
 
-        const errorText =
-            errorCount > 0
-                ? `أخطاء: ${errorCount.toLocaleString()}`
-                : "";
+        const undoCount =
+            state?.undoStack?.length ?? 0;
 
-        const summaryText =
-            errorText
-                ? `${dirtyText} | ${errorText}`
-                : dirtyText;
+        const redoCount =
+            state?.redoStack?.length ?? 0;
+
+        const compactParts = [
+            `${loadedCount.toLocaleString()} أمر`
+        ];
+
+        if (unsavedCount === 0) {
+            compactParts.push("محفوظ");
+        } else {
+            compactParts.push(
+                `غير محفوظ: ${unsavedCount.toLocaleString()}`
+            );
+
+            if (undoCount > 0) {
+                compactParts.push(
+                    `تراجع: ${undoCount.toLocaleString()}`
+                );
+            }
+
+            if (redoCount > 0) {
+                compactParts.push(
+                    `إعادة: ${redoCount.toLocaleString()}`
+                );
+            }
+        }
 
         statusElement.textContent =
-            message
-                ? `${message} | ${summaryText}`
-                : summaryText;
+            compactParts.join(" | ");
+
+        const detailedParts = [];
+
+        if (message) {
+            detailedParts.push(message);
+        }
+
+        detailedParts.push(
+            `صفوف غير محفوظة: ${unsavedCount.toLocaleString()}`
+        );
+        detailedParts.push(
+            `التراجع المتاح: ${undoCount.toLocaleString()}`
+        );
+        detailedParts.push(
+            `الإعادة المتاحة: ${redoCount.toLocaleString()}`
+        );
+
+        if (errorCount > 0) {
+            detailedParts.push(
+                `أخطاء: ${errorCount.toLocaleString()}`
+            );
+        }
+
+        const detailedStatus = detailedParts.join(" | ");
+        statusElement.title = detailedStatus;
+        statusElement.setAttribute(
+            "aria-label",
+            detailedStatus
+        );
+
+        const saveBadge = document.getElementById(
+            `${elementId}-save-badge`
+        );
+
+        if (saveBadge) {
+            saveBadge.textContent = unsavedCount.toLocaleString();
+            saveBadge.hidden = unsavedCount === 0;
+            saveBadge.title =
+                unsavedCount === 1
+                    ? "تغيير غير محفوظ واحد"
+                    : `${unsavedCount.toLocaleString()} تغييرات غير محفوظة`;
+        }
     },
 
     /*

@@ -11,13 +11,13 @@ internal sealed class WorkOrdersPage(IPage page)
     private const int StressTimeoutMs = 180_000;
 
     private ILocator PageRoot => page.GetByTestId("work-orders-page");
-    private ILocator Title => page.GetByTestId("work-orders-title");
     private ILocator Scope => page.GetByTestId("work-orders-scope");
     private ILocator YearSelector => page.GetByTestId("work-year-selector");
     private ILocator Grid => page.GetByTestId("work-orders-grid");
     private ILocator Search => page.GetByTestId("work-orders-search");
     private ILocator SaveButton => page.GetByTestId("work-orders-save");
     private ILocator DeleteButton => page.GetByTestId("work-orders-delete");
+    private ILocator CommandsMenu => page.Locator("details.sheet-commands-menu");
     private ILocator Status => page.GetByTestId("work-orders-status");
     private ILocator ValidationPanel => page.GetByTestId("work-orders-validation");
     private ILocator Summary => page.GetByTestId("work-orders-summary");
@@ -33,12 +33,6 @@ internal sealed class WorkOrdersPage(IPage page)
             {
                 State = WaitForSelectorState.Visible,
                 Timeout = NormalTimeoutMs
-            });
-
-        await Title.WaitForAsync(
-            new LocatorWaitForOptions
-            {
-                State = WaitForSelectorState.Visible
             });
 
         await Scope.WaitForAsync(
@@ -90,7 +84,7 @@ internal sealed class WorkOrdersPage(IPage page)
     }
 
     public async Task<string> GetTitleAsync() =>
-        (await Title.InnerTextAsync()).Trim();
+        (await page.TitleAsync()).Trim();
 
     public async Task<string> GetScopeAsync() =>
         (await Scope.InnerTextAsync()).Trim();
@@ -711,7 +705,7 @@ internal sealed class WorkOrdersPage(IPage page)
                     status &&
                     save &&
                     !save.disabled &&
-                    (status.textContent || '').includes('تم حفظ')
+                    (status.title || '').includes('تم حفظ')
                 );
             }
             """,
@@ -743,7 +737,7 @@ internal sealed class WorkOrdersPage(IPage page)
                     status &&
                     save &&
                     !save.disabled &&
-                    (status.textContent || '').includes(expected)
+                    (status.title || '').includes(expected)
                 );
             }
             """,
@@ -753,7 +747,7 @@ internal sealed class WorkOrdersPage(IPage page)
                 Timeout = StressTimeoutMs
             });
 
-        return (await Status.InnerTextAsync()).Trim();
+        return (await Status.GetAttributeAsync("title") ?? string.Empty).Trim();
     }
 
     public async Task<bool> IsValidationPanelVisibleAsync()
@@ -779,6 +773,8 @@ internal sealed class WorkOrdersPage(IPage page)
 
         try
         {
+            await CommandsMenu.EvaluateAsync(
+                "element => { element.open = true; }");
             await DeleteButton.ClickAsync();
         }
         finally
