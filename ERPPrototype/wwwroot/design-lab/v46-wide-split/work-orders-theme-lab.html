@@ -23,6 +23,7 @@
 <symbol id="i-wallet" viewbox="0 0 24 24"><path d="M4 7h14a2 2 0 0 1 2 2v10H6a2 2 0 0 1-2-2zM4 7l2-3h10l2 3"></path><path d="M15 12h7v4h-7a2 2 0 0 1 0-4z"></path></symbol>
 <symbol id="i-calc" viewbox="0 0 24 24"><rect height="18" rx="2" width="14" x="5" y="3"></rect><path d="M8 7h8M8 11h2M12 11h2M16 11h.1M8 15h2M12 15h2M16 15h.1M8 18h2M12 18h2M16 18h.1"></path></symbol>
 <symbol id="i-search" viewbox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><path d="m16.5 16.5 4 4"></path></symbol>
+<symbol id="i-alert-circle" viewbox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="M12 7.5v5.5"></path><path d="M12 16.75h.01"></path></symbol>
 <symbol id="i-user" viewbox="0 0 24 24"><circle cx="12" cy="8" r="4"></circle><path d="M4 21a8 8 0 0 1 16 0"></path></symbol>
 <symbol id="i-logout" viewbox="0 0 24 24"><path d="M10 4H5v16h5M14 8l4 4-4 4M8 12h10"></path></symbol>
 <symbol id="i-chevron" viewbox="0 0 24 24"><path d="m8 10 4 4 4-4"></path></symbol>
@@ -122,7 +123,7 @@
 <div class="sheet-toolbar">
 <div class="sheet-status-actions">
 <div aria-live="assertive" class="validation-bar" hidden id="validationBar" role="alert">
-<div class="validation-main"><span class="validation-icon">!</span><div><strong id="validationTitle">خطأ 1 من 1 يمنع الحفظ</strong><span id="validationMessage">الصف 4 — تاريخ الإسناد غير صحيح بالكامل.</span></div></div>
+<div class="validation-main"><svg aria-hidden="true" class="validation-icon"><use href="#i-alert-circle"></use></svg><div><strong id="validationTitle">خطأ 1 من 1 يمنع الحفظ</strong><span id="validationMessage">الصف 4 — تاريخ الإسناد غير صحيح بالكامل.</span></div></div>
 <div class="validation-actions"><button id="validationPrev" type="button">السابق</button><button id="validationNext" type="button">التالي</button></div>
 </div>
 </div>

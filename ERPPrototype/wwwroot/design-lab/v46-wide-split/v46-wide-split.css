@@ -103,39 +103,42 @@ html[data-theme="energy-v20"] .search-box:focus-within { border-color:#36a9cf; b
 html[data-theme="energy-v20"] .validation-bar {
   display:flex; align-items:center; justify-content:space-between; gap:10px;
   width:100%; min-height:34px; margin:0; padding:3px 8px;
-  border:1px solid #efaaa3; border-left:4px solid #df5b50; border-radius:9px; background:#fff9f8; color:#b33f36;
-  box-shadow:0 2px 7px rgba(179,63,54,.055); direction:rtl;
+  border:1px solid #e8b4ae; border-radius:9px; background:#fff9f8; color:#7e332d;
+  box-shadow:0 2px 7px rgba(123,54,45,.055); direction:rtl;
   font-family:"Segoe UI",Tahoma,Arial,sans-serif;
 }
 html[data-theme="energy-v20"] .validation-bar[hidden],
 html[data-theme="energy-v20"] .validation-actions[hidden] { display:none !important; }
 html[data-theme="energy-v20"] .validation-main { display:flex; align-items:center; gap:8px; min-width:0; flex:1 1 auto; }
 html[data-theme="energy-v20"] .validation-icon {
-  display:grid; place-items:center; width:20px; height:20px; flex:0 0 20px;
-  border-radius:50%; background:#df5b50; color:#fff; font-size:.82rem; font-weight:900; line-height:1;
-  box-shadow:0 1px 3px rgba(179,63,54,.17);
+  display:block; width:19px; height:19px; flex:0 0 19px;
+  overflow:visible; color:#c94f46;
+  fill:none; stroke:currentColor; stroke-width:2.25;
+  stroke-linecap:round; stroke-linejoin:round;
 }
-html[data-theme="energy-v20"] .validation-icon::before { content:none !important; }
 html[data-theme="energy-v20"] .validation-main div {
   display:flex; flex-direction:row; align-items:center; gap:9px; min-width:0; flex:1 1 auto;
   white-space:nowrap;
 }
+html[data-theme="energy-v20"] .validation-main strong,
+html[data-theme="energy-v20"] .validation-main span {
+  color:#8d261e; font-family:"Segoe UI",Tahoma,Arial,sans-serif;
+  font-size:.78rem; line-height:1.2;
+}
 html[data-theme="energy-v20"] .validation-main strong {
-  flex:0 0 auto; color:#b33f36; font-family:"Segoe UI",Tahoma,Arial,sans-serif;
-  font-size:.75rem; font-weight:700; line-height:1.2;
+  flex:0 0 auto; font-weight:700;
 }
 html[data-theme="energy-v20"] .validation-main span {
-  position:relative; min-width:0; overflow:hidden; color:#b33f36;
-  font-family:"Segoe UI",Tahoma,Arial,sans-serif; font-size:.75rem; font-weight:600;
-  line-height:1.2; text-overflow:ellipsis; white-space:nowrap;
+  position:relative; min-width:0; overflow:hidden; font-weight:600;
+  text-overflow:ellipsis; white-space:nowrap;
 }
-html[data-theme="energy-v20"] #validationMessage::before {
-  content:"|"; margin-inline-end:9px; color:#b33f36; font-weight:600;
+html[data-theme="energy-v20"] .validation-main span::before {
+  content:"|"; margin-inline-end:9px; color:inherit; font-weight:600;
 }
 html[data-theme="energy-v20"] .validation-actions { display:flex; gap:5px; flex:0 0 auto; }
 html[data-theme="energy-v20"] .validation-actions button {
-  min-height:26px; padding:0 8px; border:1px solid #efc1bc; border-radius:7px;
-  background:#fffdfc; color:#a95a53; font:650 .60rem "Segoe UI",Tahoma,Arial,sans-serif; cursor:pointer;
+  min-height:26px; padding:0 8px; border:1px solid #e4bbb6; border-radius:7px;
+  background:#fff; color:#8d4b45; font:650 .60rem "Segoe UI",Tahoma,Arial,sans-serif; cursor:pointer;
 }
 
 /* Shared table workspace: table owns horizontal scroll; basket is a separate sibling. */
@@ -306,7 +309,7 @@ html.layout-split[data-theme="energy-v20"] .avatar { font-family:"Segoe UI Varia
 
 html.layout-split[data-theme="energy-v20"] .validation-bar { min-height:clamp(33px,3.6vw,52px); }
 html.layout-split[data-theme="energy-v20"] .validation-main strong,
-html.layout-split[data-theme="energy-v20"] .validation-main span { font-size:clamp(11.5px,.94vw,13.5px); }
+html.layout-split[data-theme="energy-v20"] .validation-main span { font-size:clamp(11px,.96vw,14.5px); }
 
 /* Split table: continuous readability floor, not per-zoom rules. */
 html.layout-split[data-theme="energy-v20"] .sheet-workspace-side .table-shell th {
@@ -600,9 +603,4 @@ html[data-theme="energy-v20"] .validation-actions button:disabled {
 html[data-theme="energy-v20"] .sheet-workspace-side tbody tr.validation-row-highlight > td {
   background:#fff1ee !important;
   box-shadow:inset 0 1px 0 #ef9c93, inset 0 -1px 0 #ef9c93;
-}
-
-/* v46 validation icon fix: keep the original white exclamation visible inside the red circle. */
-html[data-theme="energy-v20"] .validation-main .validation-icon {
-  color:#fff !important;
 }
