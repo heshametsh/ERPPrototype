@@ -932,27 +932,6 @@
             );
         },
 
-        toggleBasketOverview: function (elementId, trigger) {
-            const dashboard = document.getElementById(
-                `${elementId}-basket-dashboard`
-            );
-
-            if (!dashboard) {
-                return false;
-            }
-
-            dashboard.hidden = !dashboard.hidden;
-
-            if (trigger) {
-                trigger.setAttribute(
-                    "aria-expanded",
-                    String(!dashboard.hidden)
-                );
-            }
-
-            return !dashboard.hidden;
-        },
-
         resetAggregatesUi: function (elementId) {
             const overview = document.getElementById(
                 `${elementId}-summary-overview`

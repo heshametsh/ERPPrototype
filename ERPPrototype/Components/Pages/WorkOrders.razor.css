@@ -1,6 +1,7 @@
 /* =========================================================
-   WORK ORDERS — v46 VISUAL SHELL INTEGRATION
-   Phase 1: visual shell only. Existing grid/data/save/basket logic is preserved.
+   WORK ORDERS — v46 visual integration
+   Canonical visual owner for the page shell, responsive sizing, grid surface,
+   and Basket side panel. Data/save/aggregate behavior stays in the existing JS/C#.
    ========================================================= */
 
 .tabulator-workorders-page {
@@ -17,9 +18,47 @@
     --wo-primary-hover: #085f91;
     --wo-selection: #e3f1f7;
     --wo-selection-border: rgba(76, 145, 181, 0.68);
+
+    /*
+       Work Orders responsive foundation.
+       - --wo-ui-u keeps page chrome readable while browser zoom changes.
+       - --wo-grid-u intentionally compensates less so zoom-out can still reveal
+         more rows/columns without making the sheet uncomfortably small.
+       - Wide/Split only switch these two normalized units; components consume
+         the same semantic sizes below. No zoom-specific media-query stack.
+    */
+    --wo-ui-u: clamp(1px, 0.0521vw, 1.5px);
+    --wo-grid-u: clamp(1px, 0.0448vw, 1.28px);
+
+    --wo-control-height: calc(33 * var(--wo-ui-u));
+    --wo-control-font: calc(11.75 * var(--wo-ui-u));
+    --wo-kpi-height: calc(56 * var(--wo-ui-u));
+    --wo-kpi-label-font: calc(10.5 * var(--wo-ui-u));
+    --wo-kpi-value-font: calc(20 * var(--wo-ui-u));
+    --wo-grid-header-height: calc(42 * var(--wo-grid-u));
+    --wo-grid-row-height: calc(34 * var(--wo-grid-u));
+    --wo-grid-font: calc(13.25 * var(--wo-grid-u));
+    --wo-grid-header-font: calc(12.75 * var(--wo-grid-u));
+    --wo-selection-height: calc(42 * var(--wo-grid-u));
+    --wo-selection-label-font: calc(10.88 * var(--wo-grid-u));
+    --wo-selection-value-font: calc(14.88 * var(--wo-grid-u));
+    --wo-selection-item-height: calc(36 * var(--wo-grid-u));
+    --wo-selection-pad-y: calc(5 * var(--wo-grid-u));
+    --wo-selection-pad-x: calc(9 * var(--wo-grid-u));
+    --wo-selection-pad-bottom: calc(4 * var(--wo-grid-u));
+    --wo-selection-gap: calc(3 * var(--wo-grid-u));
+
+    /*
+       Basket panel width has one owner.
+       CSS provides only the v46 minimum fallback; tabulatorBasketDashboard.js
+       owns the user-selected width (184..320 visual units) and writes the same
+       --wo-basket-panel-width token. Wide/Split never define another width.
+    */
+    --wo-basket-panel-width: calc(184 * var(--wo-ui-u));
+    --wo-basket-content-scale: 1;
     box-sizing: border-box;
     min-height: 0;
-    padding: 8px clamp(8px, 1.25vw, 24px) 6px;
+    padding: calc(8 * var(--wo-ui-u)) clamp(calc(8 * var(--wo-ui-u)), 1.25vw, calc(24 * var(--wo-ui-u))) calc(6 * var(--wo-ui-u));
     overflow: hidden;
     background: var(--wo-page);
     color: var(--wo-text);
@@ -32,10 +71,10 @@
     display: grid;
     grid-template-columns: minmax(0, auto) minmax(0, 1fr);
     align-items: center;
-    gap: 12px;
+    gap: calc(12 * var(--wo-ui-u));
     min-width: 0;
-    min-height: 38px;
-    margin-bottom: 7px;
+    min-height: calc(38 * var(--wo-ui-u));
+    margin-bottom: calc(7 * var(--wo-ui-u));
     direction: ltr;
 }
 
@@ -43,7 +82,7 @@
     display: flex;
     align-items: center;
     min-width: 0;
-    gap: 9px;
+    gap: calc(9 * var(--wo-ui-u));
     flex-wrap: nowrap;
     direction: ltr;
 }
@@ -52,11 +91,11 @@
     display: grid;
     grid-template-columns: auto 1px auto;
     align-items: center;
-    gap: 10px;
+    gap: calc(10 * var(--wo-ui-u));
     min-width: 0;
-    padding: 4px 9px;
+    padding: calc(4 * var(--wo-ui-u)) calc(9 * var(--wo-ui-u));
     border: 1px solid #c3dce8;
-    border-radius: 10px;
+    border-radius: calc(10 * var(--wo-ui-u));
     background: linear-gradient(180deg, #ffffff 0%, #f5fafc 100%);
     box-shadow: 0 2px 7px rgba(5,42,96,.055), inset 0 1px 0 rgba(255,255,255,.9);
     direction: rtl;
@@ -67,14 +106,14 @@
 .scope-identity-item {
     display: flex;
     align-items: baseline;
-    gap: 5px;
+    gap: calc(5 * var(--wo-ui-u));
     min-width: 0;
 }
 
 .scope-identity-label {
     color: #6c8ba0;
     font-family: "Segoe UI", Tahoma, Arial, sans-serif;
-    font-size: .62rem;
+    font-size: calc(10 * var(--wo-ui-u));
     font-weight: 720;
     line-height: 1;
 }
@@ -82,24 +121,24 @@
 .scope-identity-item strong {
     color: #103f67;
     font-family: "Segoe UI", Tahoma, Arial, sans-serif;
-    font-size: .98rem;
+    font-size: calc(15.7 * var(--wo-ui-u));
     font-weight: 800;
     line-height: 1;
     letter-spacing: normal;
     white-space: nowrap;
 }
 
-.scope-branch { gap: 7px; }
+.scope-branch { gap: calc(7 * var(--wo-ui-u)); }
 .scope-branch strong,
 .scope-department strong {
     color: #0879ad;
-    font-size: .88rem;
+    font-size: calc(14.6 * var(--wo-ui-u));
     font-weight: 700;
 }
 
 .scope-identity-divider {
     width: 1px;
-    height: 18px;
+    height: calc(18 * var(--wo-ui-u));
     border-radius: 999px;
     background: linear-gradient(180deg, transparent, #9fcbdc 24%, #9fcbdc 76%, transparent);
 }
@@ -107,30 +146,30 @@
 .year-control {
     display: flex;
     align-items: center;
-    min-height: 32px;
+    min-height: calc(32 * var(--wo-ui-u));
     margin: 0;
     overflow: hidden;
     border: 1px solid #9fc9da;
-    border-radius: 8px;
+    border-radius: calc(8 * var(--wo-ui-u));
     background: #fff;
     box-shadow: 0 2px 8px rgba(5,42,96,.07), inset 0 1px 0 rgba(255,255,255,.82);
     flex: 0 0 auto;
 }
 
 .year-control span {
-    padding: 0 8px;
+    padding: 0 calc(8 * var(--wo-ui-u));
     color: #317291;
     font-family: "Segoe UI Variable Text", "Segoe UI", Tahoma, Arial, sans-serif;
-    font-size: .68rem;
+    font-size: calc(10.9 * var(--wo-ui-u));
     font-weight: 780;
     white-space: nowrap;
 }
 
 .year-control select {
     width: auto;
-    min-width: 92px;
-    min-height: 30px;
-    padding: 0 25px 0 9px;
+    min-width: calc(92 * var(--wo-ui-u));
+    min-height: calc(30 * var(--wo-ui-u));
+    padding: 0 calc(25 * var(--wo-ui-u)) 0 calc(9 * var(--wo-ui-u));
     flex: 0 0 auto;
     border: 0;
     border-inline-start: 1px solid #d5e4ec;
@@ -138,7 +177,7 @@
     background: #fff;
     color: #0a3f70;
     font-family: "Segoe UI Variable Display", "Segoe UI", Tahoma, Arial, sans-serif;
-    font-size: .82rem;
+    font-size: calc(14.7 * var(--wo-ui-u));
     font-weight: 850;
     cursor: pointer;
 }
@@ -151,12 +190,12 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-height: 33px;
-    gap: 5px;
-    padding: 0 10px;
-    border-radius: 8px;
+    min-height: var(--wo-control-height);
+    gap: calc(5 * var(--wo-ui-u));
+    padding: 0 calc(10 * var(--wo-ui-u));
+    border-radius: calc(8 * var(--wo-ui-u));
     font-family: "Segoe UI Variable Text", "Segoe UI", Tahoma, Arial, sans-serif;
-    font-size: .69rem;
+    font-size: var(--wo-control-font);
     font-weight: 750;
     white-space: nowrap;
 }
@@ -176,8 +215,8 @@
 
 .basket-header-trigger svg,
 .button svg {
-    width: 15px;
-    height: 15px;
+    width: calc(15 * var(--wo-ui-u));
+    height: calc(15 * var(--wo-ui-u));
     fill: none;
     stroke: currentColor;
     stroke-width: 1.8;
@@ -188,13 +227,13 @@
 .basket-header-trigger b {
     display: inline-grid;
     place-items: center;
-    min-width: 20px;
-    height: 20px;
-    padding: 0 5px;
+    min-width: calc(20 * var(--wo-ui-u));
+    height: calc(20 * var(--wo-ui-u));
+    padding: 0 calc(5 * var(--wo-ui-u));
     border-radius: 999px;
     background: linear-gradient(145deg, #078ed0, #42b9d7);
     color: #fff;
-    font-size: .62rem;
+    font-size: calc(10 * var(--wo-ui-u));
     font-weight: 850;
 }
 
@@ -206,7 +245,7 @@
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
-    gap: 8px;
+    gap: calc(8 * var(--wo-ui-u));
     width: 100%;
     min-width: 0;
 }
@@ -217,12 +256,12 @@
     justify-content: flex-end;
     min-width: 0;
     max-width: none;
-    min-height: 33px;
-    padding: 0 12px;
-    gap: 8px;
+    min-height: var(--wo-control-height);
+    padding: 0 calc(12 * var(--wo-ui-u));
+    gap: calc(8 * var(--wo-ui-u));
     overflow: hidden;
     border: 1px solid #afd4e3;
-    border-radius: 9px;
+    border-radius: calc(9 * var(--wo-ui-u));
     background: linear-gradient(180deg, #fbfeff 0%, #f3f9fc 100%);
     color: #154f70;
     box-shadow: 0 2px 7px rgba(5,42,96,.055), inset 0 1px 0 rgba(255,255,255,.86);
@@ -231,12 +270,12 @@
 }
 
 .message-dot {
-    width: 8px;
-    height: 8px;
-    flex: 0 0 8px;
+    width: calc(8 * var(--wo-ui-u));
+    height: calc(8 * var(--wo-ui-u));
+    flex: 0 0 calc(8 * var(--wo-ui-u));
     border-radius: 50%;
     background: #30aed2;
-    box-shadow: 0 0 0 3px rgba(48,174,210,.10);
+    box-shadow: 0 0 0 calc(3 * var(--wo-ui-u)) rgba(48,174,210,.10);
 }
 
 .system-message strong {
@@ -244,7 +283,7 @@
     overflow: hidden;
     color: #174f73;
     font-family: "Segoe UI Variable Text", "Segoe UI", Tahoma, Arial, sans-serif;
-    font-size: .73rem;
+    font-size: calc(11.7 * var(--wo-ui-u));
     font-weight: 750;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -254,7 +293,7 @@
     display: flex;
     align-items: center;
     justify-content: flex-end;
-    gap: 7px;
+    gap: calc(7 * var(--wo-ui-u));
     min-width: 0;
     direction: ltr;
 }
@@ -330,14 +369,14 @@
 .save-badge {
     display: inline-grid;
     place-items: center;
-    min-width: 18px;
-    height: 18px;
-    padding: 0 5px;
+    min-width: calc(18 * var(--wo-ui-u));
+    height: calc(18 * var(--wo-ui-u));
+    padding: 0 calc(5 * var(--wo-ui-u));
     border-radius: 999px;
     background: rgba(255,255,255,.20);
     color: #fff;
     font-family: "Segoe UI Variable Text", "Segoe UI", Tahoma, Arial, sans-serif;
-    font-size: .64rem;
+    font-size: calc(10.2 * var(--wo-ui-u));
     font-weight: 850;
 }
 
@@ -346,41 +385,41 @@
 .commands-menu {
     position: absolute;
     z-index: 4100;
-    top: calc(100% + 6px);
+    top: calc(100% + calc(6 * var(--wo-ui-u)));
     right: 0;
-    width: min(270px, calc(100vw - 16px));
+    width: min(calc(270 * var(--wo-ui-u)), calc(100vw - calc(16 * var(--wo-ui-u))));
     max-height: calc(100dvh - 16px);
     overflow: auto;
     border: 1px solid #bed5e2;
-    border-radius: 11px;
+    border-radius: calc(11 * var(--wo-ui-u));
     background: #fff;
     box-shadow: 0 14px 34px rgba(3,43,95,.20);
     direction: rtl;
 }
 
 .commands-menu-title {
-    padding: 10px 12px 8px;
+    padding: calc(10 * var(--wo-ui-u)) calc(12 * var(--wo-ui-u)) calc(8 * var(--wo-ui-u));
     border-bottom: 1px solid #dce8ef;
     background: #f4f9fc;
 }
 
-.commands-menu-title strong { display: block; color: #123f68; font-size: .79rem; }
-.commands-menu-title span { display: block; margin-top: 3px; color: #6d8597; font-size: .62rem; }
+.commands-menu-title strong { display: block; color: #123f68; font-size: calc(12.6 * var(--wo-ui-u)); }
+.commands-menu-title span { display: block; margin-top: calc(3 * var(--wo-ui-u)); color: #6d8597; font-size: calc(10 * var(--wo-ui-u)); }
 
 .command-item {
     display: flex;
     align-items: center;
     justify-content: space-between;
     width: 100%;
-    min-height: 35px;
-    padding: 0 11px;
+    min-height: calc(35 * var(--wo-ui-u));
+    padding: 0 calc(11 * var(--wo-ui-u));
     border: 0;
     border-bottom: 1px solid #edf2f5;
     background: #fff;
     color: #224b6b;
     cursor: pointer;
     font: inherit;
-    font-size: .72rem;
+    font-size: calc(11.5 * var(--wo-ui-u));
     font-weight: 750;
 }
 
@@ -388,22 +427,25 @@
 .command-item:disabled { opacity: .48; cursor: default; }
 
 .command-item kbd {
-    min-width: 58px;
-    padding: 3px 6px;
+    min-width: calc(58 * var(--wo-ui-u));
+    padding: calc(3 * var(--wo-ui-u)) calc(6 * var(--wo-ui-u));
     border: 1px solid #cfdde6;
-    border-radius: 6px;
+    border-radius: calc(6 * var(--wo-ui-u));
     background: #f7fafc;
     color: #49677c;
     direction: ltr;
-    font: 700 .62rem/1 "Segoe UI", sans-serif;
+    font-family: "Segoe UI", sans-serif;
+    font-size: calc(10 * var(--wo-ui-u));
+    font-weight: 700;
+    line-height: 1;
     text-align: center;
 }
 
 .commands-menu-note {
-    padding: 7px 10px 9px;
+    padding: calc(7 * var(--wo-ui-u)) calc(10 * var(--wo-ui-u)) calc(9 * var(--wo-ui-u));
     background: #fbfdfe;
     color: #71899a;
-    font-size: .58rem;
+    font-size: calc(9.3 * var(--wo-ui-u));
     line-height: 1.45;
 }
 
@@ -411,10 +453,10 @@
 .work-orders-open-summary {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 9px;
+    gap: calc(9 * var(--wo-ui-u));
     min-width: 0;
-    min-height: 56px;
-    margin: 0 0 5px;
+    min-height: var(--wo-kpi-height);
+    margin: 0 0 calc(5 * var(--wo-ui-u));
     padding: 0;
     border: 0;
     background: transparent;
@@ -429,11 +471,11 @@
     display: flex;
     align-items: center;
     min-width: 0;
-    min-height: 56px;
-    padding: 10px 13px;
+    min-height: var(--wo-kpi-height);
+    padding: calc(10 * var(--wo-ui-u)) calc(13 * var(--wo-ui-u));
     overflow: hidden;
     border: 1px solid #d3dde5;
-    border-radius: 11px;
+    border-radius: calc(11 * var(--wo-ui-u));
     background: #fff;
     box-shadow: 0 2px 7px rgba(5,42,96,.05);
 }
@@ -457,7 +499,7 @@
     flex: 1;
     flex-direction: column;
     min-width: 0;
-    padding-left: 10px;
+    padding-left: calc(10 * var(--wo-ui-u));
     direction: ltr;
 }
 
@@ -465,7 +507,7 @@
     overflow: hidden;
     color: #32495f;
     font-family: "Segoe UI Variable Text", "Segoe UI", Tahoma, Arial, sans-serif;
-    font-size: .66rem;
+    font-size: var(--wo-kpi-label-font);
     font-weight: 720;
     line-height: 1.05;
     text-overflow: ellipsis;
@@ -473,11 +515,11 @@
 }
 
 .work-orders-open-summary ::deep .kpi-card strong {
-    margin-top: 4px;
+    margin-top: calc(4 * var(--wo-ui-u));
     overflow: hidden;
     color: #075ca8;
     font-family: "Segoe UI Variable Display", "Segoe UI", Tahoma, Arial, sans-serif;
-    font-size: clamp(1rem, 1.18vw, 1.25rem);
+    font-size: var(--wo-kpi-value-font);
     font-variant-numeric: tabular-nums;
     font-weight: 850;
     line-height: 1;
@@ -488,9 +530,9 @@
 
 .work-orders-open-summary ::deep .kpi-card i {
     display: block;
-    width: 74px;
-    height: 3px;
-    margin-top: 7px;
+    width: calc(74 * var(--wo-ui-u));
+    height: calc(3 * var(--wo-ui-u));
+    margin-top: calc(7 * var(--wo-ui-u));
     border-radius: 999px;
     background: linear-gradient(90deg, var(--accent), var(--accent-soft));
 }
@@ -501,18 +543,18 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 43px;
-    height: 43px;
-    flex: 0 0 43px;
-    border-radius: 11px;
+    width: calc(43 * var(--wo-ui-u));
+    height: calc(43 * var(--wo-ui-u));
+    flex: 0 0 calc(43 * var(--wo-ui-u));
+    border-radius: calc(11 * var(--wo-ui-u));
     background: linear-gradient(145deg, var(--accent), var(--accent-alt));
     color: #fff;
     box-shadow: 0 5px 12px rgba(7,142,208,.18);
 }
 
 .work-orders-open-summary ::deep .metric-icon svg {
-    width: 21px;
-    height: 21px;
+    width: calc(21 * var(--wo-ui-u));
+    height: calc(21 * var(--wo-ui-u));
     fill: none;
     stroke: currentColor;
     stroke-width: 1.8;
@@ -550,70 +592,331 @@
     background: linear-gradient(90deg, #c79b3f 0%, #b88725 100%);
 }
 
-/* Wide values match the approved v46 proportions. */
-.tabulator-workorders-page[data-layout-mode="wide"] .scope-identity-item strong { font-size: 1.02rem; }
-.tabulator-workorders-page[data-layout-mode="wide"] .scope-branch { gap: 8px; }
-.tabulator-workorders-page[data-layout-mode="wide"] .scope-branch strong,
-.tabulator-workorders-page[data-layout-mode="wide"] .scope-department strong { font-size: .91rem; font-weight: 700; }
-.tabulator-workorders-page[data-layout-mode="wide"] .scope-identity-label { font-size: .64rem; }
-.tabulator-workorders-page[data-layout-mode="wide"] .year-control select { font-size: .92rem; }
-.tabulator-workorders-page[data-layout-mode="wide"] .basket-header-trigger { min-height: 34px; font-size: .74rem; font-weight: 820; }
-
-/* Split uses the exact continuous v46 formulas; browser zoom does not create modes. */
+/* ---------- Responsive mode normalization ---------- */
+/*
+   Wide is the default token set declared on the page root. Split changes only
+   the two normalized units below; individual components no longer own separate
+   Split font/height formulas.
+*/
 .tabulator-workorders-page[data-layout-mode="split"] {
-    padding: clamp(6px, .7vw, 10px) clamp(8px, 1vw, 14px);
+    --wo-ui-u: clamp(1px, 0.102vw, 1.5px);
+    --wo-grid-u: clamp(1px, 0.0877vw, 1.28px);
 }
 
-.tabulator-workorders-page[data-layout-mode="split"] .page-heading-row {
-    grid-template-columns: minmax(280px, auto) minmax(0, 1fr);
-    gap: clamp(8px, 1vw, 14px);
+/* ---------- Phase 2: v46 Basket side panel ---------- */
+/*
+   Basket calculations stay in tabulatorBasketDashboard.js.
+   This component owns only the side-panel shell and its JS-rendered descendants.
+   Unique basket-side-panel-* names deliberately avoid the retired horizontal Dashboard CSS.
+*/
+.basket-side-panel {
+    box-sizing: border-box;
+    position: relative;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    width: var(--wo-basket-panel-width);
+    min-width: 0;
+    min-height: 0;
+    height: 100%;
+    overflow: hidden;
+    border: 1px solid #bcd2df;
+    border-radius: 0 calc(10 * var(--wo-ui-u)) calc(10 * var(--wo-ui-u)) 0;
+    background: #ffffff;
+    direction: rtl;
+    box-shadow: none;
 }
 
-.tabulator-workorders-page[data-layout-mode="split"] .title-area {
-    gap: clamp(6px, .75vw, 11px);
+.basket-side-panel[hidden] {
+    display: none !important;
 }
 
-.tabulator-workorders-page[data-layout-mode="split"] .scope-identity {
-    gap: clamp(7px, .72vw, 10px);
-    padding: clamp(4px, .38vw, 6px) clamp(8px, .78vw, 11px);
+
+/*
+   v46 separator ownership:
+   the separator is a real workspace grid item between the table and Basket
+   panel. It is still rendered/listened to by the one Basket resize owner in
+   tabulatorBasketDashboard.js; there is no second resize path.
+*/
+.work-orders-sheet-workspace ::deep .basket-side-panel-resize-handle {
+    position: relative;
+    z-index: 12;
+    grid-column: 2;
+    grid-row: 1;
+    align-self: stretch;
+    display: block;
+    width: calc(8 * var(--wo-ui-u));
+    min-width: calc(8 * var(--wo-ui-u));
+    height: 100%;
+    cursor: col-resize;
+    touch-action: none;
+    user-select: none;
+    outline: none;
+    background: linear-gradient(180deg, #e9f4f8, #c7e0e9 50%, #e9f4f8);
+    border-inline: 1px solid rgba(7, 142, 208, .12);
 }
 
-.tabulator-workorders-page[data-layout-mode="split"] .scope-identity-item { gap: clamp(4px, .38vw, 6px); }
-.tabulator-workorders-page[data-layout-mode="split"] .scope-identity-label { font-size: clamp(9.5px, .82vw, 12px); font-weight: 730; }
-.tabulator-workorders-page[data-layout-mode="split"] .scope-identity-item strong { font-size: clamp(15.5px, 1.52vw, 22px); font-weight: 800; }
-.tabulator-workorders-page[data-layout-mode="split"] .scope-branch { gap: clamp(6px, .55vw, 9px); }
-.tabulator-workorders-page[data-layout-mode="split"] .scope-branch strong,
-.tabulator-workorders-page[data-layout-mode="split"] .scope-department strong { font-size: clamp(13px, 1.22vw, 18px); font-weight: 700; }
-.tabulator-workorders-page[data-layout-mode="split"] .scope-identity-divider { height: clamp(18px, 1.6vw, 23px); }
-.tabulator-workorders-page[data-layout-mode="split"] .year-control { min-height: clamp(33px, 3.55vw, 50px); }
-.tabulator-workorders-page[data-layout-mode="split"] .year-control span { font-size: clamp(10.5px, .98vw, 14.5px); font-weight: 780; }
-.tabulator-workorders-page[data-layout-mode="split"] .year-control select { min-height: clamp(31px, 3.35vw, 48px); font-size: clamp(13px, 1.22vw, 18px); font-weight: 860; }
-.tabulator-workorders-page[data-layout-mode="split"] .basket-header-trigger { min-height: clamp(33px, 3.55vw, 50px); padding-inline: clamp(9px, .92vw, 13px); font-size: clamp(11.5px, 1.08vw, 16px); font-weight: 820; }
-.tabulator-workorders-page[data-layout-mode="split"] .basket-header-trigger svg { width: clamp(15px, 1.28vw, 18px); height: clamp(15px, 1.28vw, 18px); }
-.tabulator-workorders-page[data-layout-mode="split"] .basket-header-trigger b { min-width: clamp(20px, 1.75vw, 25px); height: clamp(20px, 1.75vw, 25px); font-size: clamp(10px, .92vw, 13.5px); }
-.tabulator-workorders-page[data-layout-mode="split"] .system-message { min-height: clamp(32px, 3.6vw, 52px); padding-inline: clamp(9px, .9vw, 13px); }
-.tabulator-workorders-page[data-layout-mode="split"] .system-message strong { font-size: clamp(11.5px, 1.10vw, 16px); font-weight: 760; letter-spacing: -.006em; }
-.tabulator-workorders-page[data-layout-mode="split"] .button { min-height: clamp(33px, 3.7vw, 53px); padding-inline: clamp(10px, 1vw, 15px); font-size: clamp(11.5px, 1.12vw, 17px); font-weight: 780; }
-.tabulator-workorders-page[data-layout-mode="split"] .work-orders-open-summary { gap: clamp(6px, .7vw, 10px); min-height: clamp(56px, 5.85vw, 78px); }
-.tabulator-workorders-page[data-layout-mode="split"] .work-orders-open-summary ::deep .kpi-card { min-height: clamp(56px, 5.85vw, 78px); padding: clamp(6px, .62vw, 9px) clamp(9px, .95vw, 14px); }
-.tabulator-workorders-page[data-layout-mode="split"] .work-orders-open-summary ::deep .kpi-card span { font-size: clamp(10.5px, .95vw, 14.5px); font-weight: 720; line-height: 1.05; }
-.tabulator-workorders-page[data-layout-mode="split"] .work-orders-open-summary ::deep .kpi-card strong { font-size: clamp(19px, 1.75vw, 27px); font-weight: 850; line-height: 1; }
-.tabulator-workorders-page[data-layout-mode="split"] .work-orders-open-summary ::deep .metric-icon { width: clamp(38px, 3.55vw, 48px); height: clamp(38px, 3.55vw, 48px); flex-basis: clamp(38px, 3.55vw, 48px); }
-.tabulator-workorders-page[data-layout-mode="split"] .work-orders-open-summary ::deep .metric-icon svg { width: clamp(19px, 1.95vw, 26px); height: clamp(19px, 1.95vw, 26px); }
+.work-orders-sheet-workspace ::deep .basket-side-panel-resize-handle::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: calc(3 * var(--wo-ui-u));
+    height: calc(48 * var(--wo-ui-u));
+    border-radius: 999px;
+    background: #5aacc9;
+    transform: translate(-50%, -50%);
+    opacity: .55;
+    transition: opacity 120ms ease, background-color 120ms ease;
+}
 
-/* ---------- Temporary legacy basket dashboard ---------- */
-.work-orders-basket-dashboard {
+.work-orders-sheet-workspace ::deep .basket-side-panel-resize-handle:hover::after,
+.work-orders-sheet-workspace ::deep .basket-side-panel-resize-handle:focus-visible::after,
+.work-orders-sheet-workspace ::deep .basket-side-panel-resize-handle.is-resizing::after {
+    background: #078ed0;
+    opacity: 1;
+}
+
+/*
+   Drag preview only: moving this transform does not resize the real grid.
+   The actual Basket width is committed once on pointer release.
+*/
+.work-orders-sheet-workspace ::deep .basket-side-panel-resize-preview {
+    position: absolute;
+    z-index: 18;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: calc(2 * var(--wo-ui-u));
+    border-radius: 999px;
+    background: #169bc7;
+    box-shadow: 0 0 0 calc(2 * var(--wo-ui-u)) rgba(22, 155, 199, .12);
+    pointer-events: none;
+    will-change: transform;
+}
+
+.work-orders-sheet-workspace.is-basket-panel-preview-resizing {
+    cursor: col-resize;
+    user-select: none;
+}
+
+.basket-side-panel ::deep .basket-side-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: calc(43.2 * var(--wo-ui-u));
+    padding: calc(5.6 * var(--wo-ui-u)) calc(7.2 * var(--wo-ui-u));
+    gap: calc(8 * var(--wo-ui-u));
+    border-top: calc(3.2 * var(--wo-ui-u)) solid #0796c9;
+    border-bottom: 1px solid #c8dce8;
+    background: linear-gradient(115deg, #f6fcfe 0%, #e5f6fa 68%, #d7f0f6 100%);
+}
+
+.basket-side-panel ::deep .basket-side-panel-heading {
+    min-width: 0;
+}
+
+.basket-side-panel ::deep .basket-side-panel-kicker {
+    display: none;
+}
+
+.basket-side-panel ::deep .basket-side-panel-title {
+    margin: 0;
+    color: #123f70;
+    font-family: "Segoe UI Variable Display", "Segoe UI", Tahoma, Arial, sans-serif;
+    font-size: calc(13.6 * var(--wo-ui-u) * var(--wo-basket-content-scale));
+    font-weight: 850;
+    line-height: 1.05;
+    white-space: nowrap;
+}
+
+.basket-side-panel ::deep .basket-side-panel-actions {
+    display: flex;
+    align-items: center;
+    gap: calc(5 * var(--wo-ui-u));
+    flex: 0 0 auto;
+}
+
+.basket-side-panel ::deep .basket-side-panel-close {
+    display: inline-grid;
+    place-items: center;
+    width: calc(30 * var(--wo-ui-u));
+    height: calc(30 * var(--wo-ui-u));
+    flex: 0 0 calc(30 * var(--wo-ui-u));
+    padding: 0;
+    border: 1px solid #b9cfdd;
+    border-radius: calc(8 * var(--wo-ui-u));
+    background: rgba(255,255,255,.82);
+    color: #31536f;
+    font-family: Arial, sans-serif;
+    font-size: calc(20 * var(--wo-ui-u));
+    font-weight: 500;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.basket-side-panel ::deep .basket-side-panel-close:hover {
+    border-color: #7bb9d0;
+    background: #eff8fc;
+    color: #0b6f9f;
+}
+
+.basket-side-panel ::deep .basket-side-panel-list {
+    box-sizing: border-box;
+    min-width: 0;
+    min-height: 0;
+    margin: 0;
+    padding: calc(4 * var(--wo-ui-u)) calc(4.8 * var(--wo-ui-u)) calc(6.4 * var(--wo-ui-u));
+    overflow-x: hidden;
+    overflow-y: scroll;
+    overscroll-behavior: contain;
+    border: 0;
+    border-radius: 0;
+    background: #ffffff;
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+    scrollbar-color: #75aec3 #eef5f8;
+}
+
+.basket-side-panel ::deep .basket-side-panel-list::-webkit-scrollbar { width: 7px; }
+.basket-side-panel ::deep .basket-side-panel-list::-webkit-scrollbar-track { background: #eef5f8; }
+.basket-side-panel ::deep .basket-side-panel-list::-webkit-scrollbar-thumb { border-radius: 999px; background: #75aec3; }
+
+.basket-side-panel ::deep .basket-side-panel-card {
     position: relative;
     box-sizing: border-box;
-    width: 100%;
-    min-height: 0;
-    margin: 5px 0 5px;
-    padding: 4px 5px 5px;
-    border: 1px solid #d2e2ea;
-    border-radius: 9px;
-    background: #f8fbfd;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "name count" "meta meta";
+    align-items: start;
+    min-height: calc(49.6 * var(--wo-ui-u));
+    padding: calc(5.6 * var(--wo-ui-u)) calc(5.6 * var(--wo-ui-u)) calc(10.4 * var(--wo-ui-u));
+    gap: calc(4 * var(--wo-ui-u)) calc(6.4 * var(--wo-ui-u));
+    overflow: hidden;
+    border-bottom: 1px solid #dce8ef;
+    background: #ffffff;
+    color: #284a66;
+}
+
+.basket-side-panel ::deep .basket-side-panel-card:last-child { border-bottom: 0; }
+.basket-side-panel ::deep .basket-side-panel-card:hover { background: #f7fbfd; }
+
+.basket-side-panel ::deep .basket-side-panel-card::before,
+.basket-side-panel ::deep .basket-side-panel-card::after {
+    content: "";
+    position: absolute;
+    right: calc(4.8 * var(--wo-ui-u));
+    bottom: calc(4 * var(--wo-ui-u));
+    height: calc(3.2 * var(--wo-ui-u));
+    border-radius: 999px;
+}
+
+.basket-side-panel ::deep .basket-side-panel-card::before {
+    left: calc(4.8 * var(--wo-ui-u));
+    background: #e3edf3;
+    box-shadow: inset 0 calc(.8 * var(--wo-ui-u)) calc(.8 * var(--wo-ui-u)) rgba(5, 42, 96, .06);
+}
+
+.basket-side-panel ::deep .basket-side-panel-card::after {
+    width: var(--basket-share, 0%);
+    max-width: calc(100% - calc(9.6 * var(--wo-ui-u)));
+    background: linear-gradient(90deg, #078ed0, #39b5d4);
+    opacity: .9;
+    box-shadow: 0 calc(.8 * var(--wo-ui-u)) calc(1.6 * var(--wo-ui-u)) rgba(7, 142, 208, .14);
+}
+
+.basket-side-panel ::deep .basket-side-panel-name {
+    grid-area: name;
+    display: flex;
+    align-items: flex-start;
+    min-width: 0;
+    gap: calc(6.4 * var(--wo-ui-u));
+}
+
+.basket-side-panel ::deep .basket-side-panel-dot {
+    width: calc(6.4 * var(--wo-ui-u));
+    height: calc(6.4 * var(--wo-ui-u));
+    flex: 0 0 calc(6.4 * var(--wo-ui-u));
+    margin-top: calc(3.2 * var(--wo-ui-u));
+    border-radius: 50%;
+    background: #1a94c4;
+    box-shadow: 0 0 0 calc(2.4 * var(--wo-ui-u)) rgba(26, 148, 196, .09);
+}
+
+.basket-side-panel ::deep .basket-side-panel-card-title {
+    min-width: 0;
+    overflow: hidden;
+    color: #0b3157;
+    font-family: "Segoe UI Variable Display", "Segoe UI", Tahoma, Arial, sans-serif;
+    font-size: calc(12.96 * var(--wo-ui-u) * var(--wo-basket-content-scale));
+    font-weight: 850;
+    line-height: 1.14;
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+}
+
+.basket-side-panel ::deep .basket-side-panel-count {
+    grid-area: count;
+    align-self: start;
+    min-width: 0;
+    padding: calc(.8 * var(--wo-ui-u)) 0 0;
+    border-radius: 0;
+    background: transparent;
+    color: #2b678d;
+    font-size: calc(9.728 * var(--wo-ui-u) * var(--wo-basket-content-scale));
+    font-weight: 820;
+    line-height: 1.08;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+}
+
+.basket-side-panel ::deep .basket-side-panel-meta {
+    grid-area: meta;
+    display: flex;
+    align-items: baseline;
+    min-width: 0;
+    gap: calc(3.2 * var(--wo-ui-u));
     direction: ltr;
-    box-shadow: inset 0 1px 0 rgba(255,255,255,.92);
+}
+
+.basket-side-panel ::deep .basket-side-panel-amount {
+    min-width: 0;
+    color: #1671a4;
+    font-size: calc(11.136 * var(--wo-ui-u) * var(--wo-basket-content-scale));
+    font-weight: 820;
+    line-height: 1;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.basket-side-panel ::deep .basket-side-panel-amount-label {
+    color: #7b8f9f;
+    font-size: calc(7.04 * var(--wo-ui-u) * var(--wo-basket-content-scale));
+    font-weight: 700;
+    line-height: 1;
+    direction: rtl;
+    white-space: nowrap;
+}
+
+.basket-side-panel ::deep .basket-side-panel-share {
+    margin-left: auto;
+    color: #698395;
+    font-size: calc(7.936 * var(--wo-ui-u) * var(--wo-basket-content-scale));
+    font-style: normal;
+    font-weight: 760;
+    line-height: 1;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.basket-side-panel ::deep .basket-side-panel-loading {
+    display: grid;
+    place-items: center;
+    min-height: calc(120 * var(--wo-ui-u));
+    color: #638095;
+    font-size: calc(11.8 * var(--wo-ui-u));
+    font-weight: 700;
 }
 
 /* ---------- Validation + search row ---------- */
@@ -621,10 +924,10 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    min-height: 36px;
-    margin: 4px 0 0;
+    min-height: calc(36 * var(--wo-ui-u));
+    margin: calc(4 * var(--wo-ui-u)) 0 0;
     padding: 0;
-    gap: 10px;
+    gap: calc(10 * var(--wo-ui-u));
     direction: ltr;
 }
 
@@ -641,11 +944,11 @@
     align-items: center;
     justify-content: space-between;
     width: 100%;
-    min-height: 34px;
-    padding: 4px 8px;
-    gap: 10px;
+    min-height: calc(34 * var(--wo-ui-u));
+    padding: calc(4 * var(--wo-ui-u)) calc(8 * var(--wo-ui-u));
+    gap: calc(10 * var(--wo-ui-u));
     border: 1px solid #eca49d;
-    border-radius: 9px;
+    border-radius: calc(9 * var(--wo-ui-u));
     background: #fff7f5;
     color: #a23b33;
     direction: rtl;
@@ -659,13 +962,13 @@
     display: flex;
     align-items: center;
     min-width: 0;
-    gap: 7px;
+    gap: calc(7 * var(--wo-ui-u));
 }
 
 .validation-navigator-icon {
-    width: 19px;
-    height: 19px;
-    flex: 0 0 19px;
+    width: calc(19 * var(--wo-ui-u));
+    height: calc(19 * var(--wo-ui-u));
+    flex: 0 0 calc(19 * var(--wo-ui-u));
     fill: none;
     stroke: #c94b41;
     stroke-width: 1.8;
@@ -677,7 +980,7 @@
     display: flex;
     align-items: center;
     min-width: 0;
-    gap: 7px;
+    gap: calc(7 * var(--wo-ui-u));
     text-align: right;
     white-space: nowrap;
 }
@@ -686,7 +989,7 @@
 .validation-navigator-copy span {
     color: #9c362f;
     font-family: "Segoe UI", Tahoma, Arial, sans-serif;
-    font-size: .76rem;
+    font-size: calc(12.2 * var(--wo-ui-u));
     font-weight: 650;
     line-height: 1.2;
 }
@@ -704,20 +1007,20 @@
     display: flex;
     flex: 0 0 auto;
     align-items: center;
-    gap: 5px;
+    gap: calc(5 * var(--wo-ui-u));
     direction: ltr;
 }
 
 .validation-navigator-button {
-    min-width: 54px;
-    height: 26px;
-    padding: 0 8px;
+    min-width: calc(54 * var(--wo-ui-u));
+    height: calc(26 * var(--wo-ui-u));
+    padding: 0 calc(8 * var(--wo-ui-u));
     border: 1px solid #e1aaa4;
-    border-radius: 7px;
+    border-radius: calc(7 * var(--wo-ui-u));
     background: #ffffff;
     color: #9c4038;
     font-family: inherit;
-    font-size: .66rem;
+    font-size: calc(10.6 * var(--wo-ui-u));
     font-weight: 700;
     cursor: pointer;
 }
@@ -729,12 +1032,12 @@
     box-sizing: border-box;
     display: flex;
     align-items: center;
-    width: min(360px, 34vw);
-    min-width: 270px;
-    min-height: 34px;
+    width: min(calc(360 * var(--wo-ui-u)), 34vw);
+    min-width: calc(270 * var(--wo-ui-u));
+    min-height: calc(34 * var(--wo-ui-u));
     padding: 0;
     border: 1px solid #9fc9da;
-    border-radius: 9px;
+    border-radius: calc(9 * var(--wo-ui-u));
     background: #ffffff;
     direction: rtl;
     box-shadow: 0 2px 8px rgba(5,42,96,.06);
@@ -755,17 +1058,17 @@
 .work-order-search-input {
     box-sizing: border-box;
     width: 100%;
-    height: 32px;
-    padding: 5px 11px;
+    height: calc(32 * var(--wo-ui-u));
+    padding: calc(5 * var(--wo-ui-u)) calc(11 * var(--wo-ui-u));
     border: 0;
-    border-radius: 8px;
+    border-radius: calc(8 * var(--wo-ui-u));
     outline: 0;
     background: transparent;
     color: #173a55;
     direction: rtl;
     text-align: right;
     font-family: "Segoe UI", Tahoma, Arial, sans-serif;
-    font-size: .78rem;
+    font-size: calc(12.5 * var(--wo-ui-u));
     font-weight: 600;
 }
 
@@ -775,13 +1078,34 @@
     box-shadow: 0 0 0 2px rgba(38,166,207,.11);
 }
 
+/* ---------- Grid + Basket workspace ---------- */
+.work-orders-sheet-workspace {
+    position: relative;
+    box-sizing: border-box;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: stretch;
+    min-width: 0;
+    min-height: 0;
+    gap: 0;
+    overflow: hidden;
+}
+
+.work-orders-grid-shell {
+    grid-column: 1;
+}
+
+.basket-side-panel {
+    grid-column: 3;
+}
+
 /* ---------- Grid shell and fixed reserved footer ---------- */
 .work-orders-grid-shell {
     box-sizing: border-box;
     display: grid;
-    grid-template-rows: minmax(0, 1fr) 42px;
+    grid-template-rows: minmax(0, 1fr) var(--wo-selection-height);
     min-height: 0;
-    gap: 3px;
+    gap: calc(3 * var(--wo-grid-u));
     overflow: hidden;
 }
 
@@ -791,8 +1115,8 @@
 
 .work-orders-selection-summary-host {
     box-sizing: border-box;
-    min-height: 42px;
-    height: 42px;
+    min-height: var(--wo-selection-height);
+    height: var(--wo-selection-height);
     overflow: hidden;
 }
 
@@ -801,15 +1125,15 @@
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
     width: 100%;
-    min-height: 42px;
-    height: 42px;
+    min-height: var(--wo-selection-height);
+    height: var(--wo-selection-height);
     padding: 0;
     gap: 0;
     overflow: hidden;
     border: 1px solid #c4d3dd;
     border-top: 2px solid #789bb1;
     border-left: 0;
-    border-radius: 7px;
+    border-radius: calc(7 * var(--wo-grid-u));
     background: #f4f7f9;
     direction: ltr;
     box-shadow: none;
@@ -824,7 +1148,7 @@
     padding: 0 !important;
     overflow: hidden;
     border: 1px solid #c5d3dd !important;
-    border-radius: 9px !important;
+    border-radius: calc(9 * var(--wo-grid-u)) !important;
     background: #ffffff !important;
     box-shadow: 0 2px 7px rgba(30, 58, 78, 0.07) !important;
     overscroll-behavior: contain;
@@ -841,11 +1165,11 @@
     background: #ffffff !important;
     color: #233d50 !important;
     font-family: "Segoe UI", Tahoma, Arial, sans-serif !important;
-    font-size: 13.25px !important;
+    font-size: var(--wo-grid-font) !important;
 }
 
 .tabulator-workorders-page ::deep .tabulator .tabulator-header {
-    min-height: 42px !important;
+    min-height: var(--wo-grid-header-height) !important;
     border-top: 0 !important;
     border-right: 0 !important;
     border-bottom: 2px solid #89a9bd !important;
@@ -855,7 +1179,7 @@
 }
 
 .tabulator-workorders-page ::deep .tabulator .tabulator-header .tabulator-col {
-    min-height: 42px !important;
+    min-height: var(--wo-grid-header-height) !important;
     border-right: 1px solid #cbd8e1 !important;
     background: var(--wo-header) !important;
     color: #243f53 !important;
@@ -870,17 +1194,17 @@
 }
 
 .tabulator-workorders-page ::deep .tabulator .tabulator-col .tabulator-col-content {
-    min-height: 42px !important;
-    padding: 0 9px !important;
+    min-height: var(--wo-grid-header-height) !important;
+    padding: 0 calc(9 * var(--wo-grid-u)) !important;
 }
 
 .tabulator-workorders-page ::deep .tabulator .tabulator-col-title-holder {
     display: flex;
     align-items: center;
     justify-content: flex-start;
-    gap: 4px;
+    gap: calc(4 * var(--wo-grid-u));
     min-width: 0;
-    min-height: 42px;
+    min-height: var(--wo-grid-header-height);
     overflow: hidden;
 }
 
@@ -888,13 +1212,13 @@
     display: inline-flex;
     flex: 0 1 auto;
     align-items: center;
-    gap: 4px;
+    gap: calc(4 * var(--wo-grid-u));
     width: auto !important;
     min-width: 0;
     padding-right: 0 !important;
     overflow: hidden;
     color: #243f53 !important;
-    font-size: 12.75px !important;
+    font-size: var(--wo-grid-header-font) !important;
     font-weight: 750 !important;
     white-space: nowrap;
 }
@@ -912,8 +1236,8 @@
     flex: 0 0 auto;
     align-items: center;
     justify-content: center;
-    width: 13px !important;
-    margin: 0 0 0 1px !important;
+    width: calc(13 * var(--wo-grid-u)) !important;
+    margin: 0 0 0 calc(1 * var(--wo-grid-u)) !important;
 }
 
 .tabulator-workorders-page ::deep .tabulator .tabulator-col .tabulator-arrow {
@@ -922,7 +1246,7 @@
 }
 
 .tabulator-workorders-page ::deep .tabulator-row {
-    min-height: 34px !important;
+    min-height: var(--wo-grid-row-height) !important;
     border-bottom: 1px solid var(--wo-border-soft) !important;
     background: #ffffff !important;
 }
@@ -936,12 +1260,12 @@
 }
 
 .tabulator-workorders-page ::deep .tabulator-row .tabulator-cell {
-    min-height: 34px !important;
-    padding: 5px 8px !important;
+    min-height: var(--wo-grid-row-height) !important;
+    padding: calc(5 * var(--wo-grid-u)) calc(8 * var(--wo-grid-u)) !important;
     border-right: 1px solid var(--wo-border-cell) !important;
     color: #284458 !important;
-    font-size: 13.25px !important;
-    line-height: 23px !important;
+    font-size: var(--wo-grid-font) !important;
+    line-height: calc(23 * var(--wo-grid-u)) !important;
 }
 
 .tabulator-workorders-page ::deep .tabulator-row .tabulator-cell:last-child {
@@ -989,12 +1313,12 @@
     flex: 0 0 auto;
     align-items: center;
     justify-content: center;
-    width: 19px !important;
-    height: 19px !important;
+    width: calc(19 * var(--wo-grid-u)) !important;
+    height: calc(19 * var(--wo-grid-u)) !important;
     margin: 0 !important;
-    padding: 2px !important;
+    padding: calc(2 * var(--wo-grid-u)) !important;
     border: 1px solid transparent;
-    border-radius: 5px;
+    border-radius: calc(5 * var(--wo-grid-u));
     color: #678497 !important;
     transform: none !important;
 }
@@ -1013,8 +1337,8 @@
 
 .tabulator-workorders-page ::deep .excel-filter-icon {
     display: inline-flex;
-    width: 15px;
-    height: 15px;
+    width: calc(15 * var(--wo-grid-u));
+    height: calc(15 * var(--wo-grid-u));
 }
 
 .tabulator-workorders-page ::deep .excel-filter-icon svg {
@@ -1079,7 +1403,7 @@
     box-sizing: border-box;
     width: 100%;
     height: 100%;
-    min-height: 34px;
+    min-height: var(--wo-grid-row-height);
     overflow: visible;
     background: #ffffff;
 }
@@ -1088,9 +1412,9 @@
     box-sizing: border-box;
     width: 100%;
     height: 100%;
-    min-height: 34px;
+    min-height: var(--wo-grid-row-height);
     margin: 0;
-    padding: 5px 56px 5px 8px;
+    padding: calc(5 * var(--wo-grid-u)) calc(56 * var(--wo-grid-u)) calc(5 * var(--wo-grid-u)) calc(8 * var(--wo-grid-u));
     border: 0;
     outline: 0;
     background: #ffffff;
@@ -1104,18 +1428,18 @@
 .tabulator-workorders-page ::deep .uds-identity-editor-count {
     position: absolute;
     top: 50%;
-    right: 8px;
+    right: calc(8 * var(--wo-grid-u));
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: 38px;
-    height: 22px;
-    padding: 0 6px;
+    min-width: calc(38 * var(--wo-grid-u));
+    height: calc(22 * var(--wo-grid-u));
+    padding: 0 calc(6 * var(--wo-grid-u));
     border: 1px solid #cbd7e0;
     border-radius: 999px;
     background: #f4f7f9;
     color: #667b8d;
-    font-size: 11px;
+    font-size: calc(11 * var(--wo-grid-u));
     font-weight: 800;
     line-height: 1;
     transform: translateY(-50%);
@@ -1148,16 +1472,16 @@
     position: fixed;
     z-index: 10000;
     box-sizing: border-box;
-    min-height: 38px;
-    padding: 9px 12px 9px 36px;
+    min-height: calc(38 * var(--wo-ui-u));
+    padding: calc(9 * var(--wo-ui-u)) calc(12 * var(--wo-ui-u)) calc(9 * var(--wo-ui-u)) calc(36 * var(--wo-ui-u));
     border: 1px solid #e88c83;
-    border-radius: 8px;
+    border-radius: calc(8 * var(--wo-ui-u));
     background: #fff8f7;
     color: #8f1d15;
     direction: rtl;
     text-align: right;
     font-family: inherit;
-    font-size: 12px;
+    font-size: calc(12 * var(--wo-ui-u));
     font-weight: 700;
     line-height: 1.45;
     box-shadow: 0 8px 22px rgba(96, 22, 17, 0.16);
@@ -1168,16 +1492,16 @@
     content: "!";
     position: absolute;
     top: 50%;
-    left: 11px;
+    left: calc(11 * var(--wo-ui-u));
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 17px;
-    height: 17px;
+    width: calc(17 * var(--wo-ui-u));
+    height: calc(17 * var(--wo-ui-u));
     border-radius: 50%;
     background: #d92d20;
     color: #ffffff;
-    font-size: 11px;
+    font-size: calc(11 * var(--wo-ui-u));
     font-weight: 900;
     transform: translateY(-50%);
 }
@@ -1193,17 +1517,17 @@
 .tabulator-workorders-page ::deep .tabulator-row.uds-validation-error-row > .tabulator-cell:first-child::after {
     content: "!";
     position: absolute;
-    top: 5px;
-    right: 5px;
+    top: calc(5 * var(--wo-grid-u));
+    right: calc(5 * var(--wo-grid-u));
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 14px;
-    height: 14px;
+    width: calc(14 * var(--wo-grid-u));
+    height: calc(14 * var(--wo-grid-u));
     border-radius: 50%;
     background: #d92d20;
     color: #ffffff;
-    font-size: 9px;
+    font-size: calc(9 * var(--wo-grid-u));
     font-weight: 900;
     line-height: 1;
     pointer-events: none;
@@ -1221,4 +1545,25 @@
         overflow-x: auto;
         grid-template-columns: repeat(4, minmax(180px, 1fr));
     }
+
+    .work-orders-sheet-workspace {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .work-orders-sheet-workspace ::deep .basket-side-panel-resize-handle {
+        display: none !important;
+    }
+
+    .basket-side-panel {
+        position: absolute;
+        z-index: 30;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        width: min(var(--wo-basket-panel-width), calc(100% - 12px));
+        height: 100%;
+        border-radius: 10px 0 0 10px;
+        box-shadow: -12px 0 30px rgba(3,43,95,.18);
+    }
+
 }

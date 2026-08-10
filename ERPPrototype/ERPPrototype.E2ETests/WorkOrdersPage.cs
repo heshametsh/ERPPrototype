@@ -1099,19 +1099,6 @@ internal sealed class WorkOrdersPage(IPage page)
             .CountAsync();
     }
 
-    public async Task<int> GetBasketDashboardPlannedColumnCountAsync(
-        int activeBasketCount)
-    {
-        return await page.EvaluateAsync<int>(
-            """
-            count => Number(
-                window.tabulatorTest
-                    ?.getBasketDashboardColumnCount?.(count) ?? -1
-            )
-            """,
-            activeBasketCount);
-    }
-
     public async Task<BasketDashboardLayoutSnapshot>
         GetBasketDashboardLayoutAsync()
     {
@@ -1122,7 +1109,7 @@ internal sealed class WorkOrdersPage(IPage page)
                     `${tableId}-basket-dashboard`
                 );
                 const track = dashboard?.querySelector(
-                    '.work-orders-basket-dashboard-track'
+                    '.basket-side-panel-list'
                 );
                 const cards = Array.from(
                     track?.querySelectorAll(
@@ -1163,28 +1150,21 @@ internal sealed class WorkOrdersPage(IPage page)
                     )
                     : 0;
 
-                const groups = Array.from(
-                    track.querySelectorAll(
-                        '.work-orders-basket-dashboard-list'
-                    )
+                const groups = [track];
+                const panelStyle = getComputedStyle(dashboard);
+                const panelBorderWidths = [
+                    panelStyle.borderTopWidth,
+                    panelStyle.borderRightWidth,
+                    panelStyle.borderBottomWidth,
+                    panelStyle.borderLeftWidth
+                ].map(value => Number.parseFloat(value) || 0);
+                const panelHasVisibleBoundary = Boolean(
+                    panelBorderWidths.every(width => width >= 1) &&
+                    panelStyle.borderTopStyle !== 'none' &&
+                    panelStyle.borderRightStyle !== 'none' &&
+                    panelStyle.borderBottomStyle !== 'none' &&
+                    panelStyle.borderLeftStyle !== 'none'
                 );
-                const borderedGroups = groups.filter(group => {
-                    const style = getComputedStyle(group);
-                    const widths = [
-                        style.borderTopWidth,
-                        style.borderRightWidth,
-                        style.borderBottomWidth,
-                        style.borderLeftWidth
-                    ].map(value => Number.parseFloat(value) || 0);
-
-                    return Boolean(
-                        widths.every(width => width >= 1) &&
-                        style.borderTopStyle !== 'none' &&
-                        style.borderRightStyle !== 'none' &&
-                        style.borderBottomStyle !== 'none' &&
-                        style.borderLeftStyle !== 'none'
-                    );
-                });
 
                 return [
                     cards.length,
@@ -1195,7 +1175,7 @@ internal sealed class WorkOrdersPage(IPage page)
                     rowTops.size,
                     Math.round(maximumCardHeight),
                     groups.length,
-                    borderedGroups.length
+                    panelHasVisibleBoundary ? 1 : 0
                 ];
             }
             """,
@@ -1208,7 +1188,7 @@ internal sealed class WorkOrdersPage(IPage page)
             RowCount: values[3],
             MaximumCardHeightPixels: values[4],
             GroupCount: values[5],
-            BorderedGroupCount: values[6]);
+            PanelHasVisibleBoundary: values[6] == 1);
     }
 
     public async Task<BasketDashboardEntrySnapshot>
@@ -2349,7 +2329,7 @@ internal sealed record BasketDashboardLayoutSnapshot(
     int RowCount,
     int MaximumCardHeightPixels,
     int GroupCount,
-    int BorderedGroupCount);
+    bool PanelHasVisibleBoundary);
 
 internal sealed record SelectionSummaryLayoutSnapshot(
     bool IsVisible,

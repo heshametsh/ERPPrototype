@@ -223,17 +223,6 @@
                 </article>
             </section>
 
-            <section class="work-orders-basket-dashboard"
-                     id="tabulator-test-table-basket-dashboard"
-                     data-testid="work-orders-basket-dashboard"
-                     data-dashboard-ready="false"
-                     aria-label="Basket overview"
-                     aria-live="polite">
-                <div class="work-orders-basket-dashboard-loading">
-                    Calculating Basket totals...
-                </div>
-            </section>
-
             <div class="work-order-toolbar-row">
                 <div class="validation-navigator-slot">
                     <div class="validation-navigator"
@@ -303,25 +292,40 @@
 
     @if (!IsLoading && string.IsNullOrWhiteSpace(ErrorMessage))
     {
-        <div class="work-orders-grid-shell"
-             id="tabulator-test-table-shell"
-             data-testid="work-orders-grid-shell">
-            <div class="tabulator-card">
-                <div id="tabulator-test-table"
-                     data-testid="work-orders-grid"></div>
-            </div>
+        <div class="work-orders-sheet-workspace"
+             data-testid="work-orders-sheet-workspace">
+            <div class="work-orders-grid-shell"
+                 id="tabulator-test-table-shell"
+                 data-testid="work-orders-grid-shell">
+                <div class="tabulator-card">
+                    <div id="tabulator-test-table"
+                         data-testid="work-orders-grid"></div>
+                </div>
 
-            <div class="work-orders-selection-summary-host"
-                 id="tabulator-test-table-summary-host"
-                 data-testid="work-orders-selection-summary-host">
-                <div class="work-orders-selection-summary work-orders-selection-summary-bar"
-                     id="tabulator-test-table-summary-selection"
-                     data-testid="work-orders-selection-summary"
-                     data-aggregate-ready="false"
-                     aria-live="polite"
-                     hidden>
+                <div class="work-orders-selection-summary-host"
+                     id="tabulator-test-table-summary-host"
+                     data-testid="work-orders-selection-summary-host">
+                    <div class="work-orders-selection-summary work-orders-selection-summary-bar"
+                         id="tabulator-test-table-summary-selection"
+                         data-testid="work-orders-selection-summary"
+                         data-aggregate-ready="false"
+                         aria-live="polite"
+                         hidden>
+                    </div>
                 </div>
             </div>
+
+            <aside class="basket-side-panel"
+                   id="tabulator-test-table-basket-dashboard"
+                   data-testid="work-orders-basket-dashboard"
+                   data-dashboard-ready="false"
+                   aria-label="تفاصيل السلال"
+                   aria-live="polite"
+                   aria-hidden="false">
+                <div class="basket-side-panel-loading">
+                    Calculating Basket totals...
+                </div>
+            </aside>
         </div>
     }
 

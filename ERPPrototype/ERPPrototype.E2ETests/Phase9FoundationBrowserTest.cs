@@ -167,45 +167,25 @@ internal sealed class Phase9FoundationBrowserTest(
             E2ETestAssert.Equal(
                 1,
                 dashboardLayout.VisibleCardCount,
-                "The active Basket summary row was not visible.");
+                "The active Basket side-panel row was not visible.");
             E2ETestAssert.True(
                 !dashboardLayout.HasHorizontalOverflow,
-                "The Basket summary still requires horizontal scrolling.");
+                "The Basket side panel must not require horizontal scrolling.");
             E2ETestAssert.Equal(
                 1,
                 dashboardLayout.RowCount,
-                "One active Basket should occupy one compact summary row.");
+                "One active Basket should occupy one side-panel row.");
             E2ETestAssert.True(
-                dashboardLayout.MaximumCardHeightPixels <= 24,
-                "The active Basket summary row is too tall for a sheet-first layout.");
+                dashboardLayout.MaximumCardHeightPixels >= 48 &&
+                dashboardLayout.MaximumCardHeightPixels <= 90,
+                "The Basket side-panel row is outside the approved readable height range.");
+            E2ETestAssert.Equal(
+                1,
+                dashboardLayout.GroupCount,
+                "The Basket side panel should render one vertical list.");
             E2ETestAssert.True(
-                dashboardLayout.GroupCount > 0 &&
-                dashboardLayout.GroupCount ==
-                    dashboardLayout.BorderedGroupCount,
-                "Each Basket summary group must have its own visible boundary.");
-
-            var expectedBasketColumnPlans = new (int Active, int Columns)[]
-            {
-                (1, 1),
-                (4, 4),
-                (5, 4),
-                (8, 4),
-                (9, 5),
-                (10, 5),
-                (11, 6),
-                (12, 6),
-                (13, 7)
-            };
-
-            foreach (var plan in expectedBasketColumnPlans)
-            {
-                E2ETestAssert.Equal(
-                    plan.Columns,
-                    await workOrdersPage
-                        .GetBasketDashboardPlannedColumnCountAsync(
-                            plan.Active),
-                    $"Active Basket count {plan.Active} did not use the expected balanced column plan.");
-            }
+                dashboardLayout.PanelHasVisibleBoundary,
+                "The Basket side panel must keep its visible outer boundary.");
 
             var initialInProgressDashboard =
                 await workOrdersPage.GetBasketDashboardEntryAsync(
@@ -249,7 +229,7 @@ internal sealed class Phase9FoundationBrowserTest(
                 "The Basket dashboard must not display Work Order Value.");
 
             checks.Pass(
-                "Basket summary shows only active workflow stages in a compact matrix");
+                "Basket side panel shows active workflow stages without horizontal overflow");
 
             var firstRowWorkOrderValueCents = ParseAmountCents(
                 await workOrdersPage.GetCellValueAsync(
