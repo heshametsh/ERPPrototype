@@ -864,7 +864,7 @@
     border-radius: 0;
     background: transparent;
     color: #2b678d;
-    font-size: calc(9.728 * var(--wo-ui-u) * var(--wo-basket-content-scale));
+    font-size: calc(11.84 * var(--wo-ui-u) * var(--wo-basket-content-scale));
     font-weight: 820;
     line-height: 1.08;
     text-align: center;
@@ -1084,6 +1084,7 @@
     box-sizing: border-box;
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-rows: minmax(0, 1fr);
     align-items: stretch;
     min-width: 0;
     min-height: 0;
@@ -1105,6 +1106,7 @@
     display: grid;
     grid-template-rows: minmax(0, 1fr) var(--wo-selection-height);
     min-height: 0;
+    height: 100%;
     gap: calc(3 * var(--wo-grid-u));
     overflow: hidden;
 }

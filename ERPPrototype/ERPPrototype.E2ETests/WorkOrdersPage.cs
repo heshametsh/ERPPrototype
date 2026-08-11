@@ -1191,6 +1191,175 @@ internal sealed class WorkOrdersPage(IPage page)
             PanelHasVisibleBoundary: values[6] == 1);
     }
 
+    public async Task<BasketVerticalScrollSnapshot>
+        VerifyBasketDashboardVerticalScrollAsync()
+    {
+        var prepared = await page.EvaluateAsync<double[]>(
+            """
+            tableId => {
+                const dashboard = document.getElementById(
+                    `${tableId}-basket-dashboard`
+                );
+                const list = dashboard?.querySelector(
+                    '.basket-side-panel-list'
+                );
+                const sourceCard = list?.querySelector(
+                    '[data-testid="work-orders-basket-card"]'
+                );
+
+                if (!list || !sourceCard) {
+                    return [-1, -1, -1];
+                }
+
+                list.querySelectorAll(
+                    '[data-e2e-basket-scroll-clone="true"]'
+                ).forEach(element => element.remove());
+
+                list.scrollTop = 0;
+
+                for (let index = 0; index < 24; index++) {
+                    const clone = sourceCard.cloneNode(true);
+                    clone.removeAttribute('data-testid');
+                    clone.dataset.e2eBasketScrollClone = 'true';
+                    clone.querySelectorAll('[id]').forEach(
+                        element => element.removeAttribute('id')
+                    );
+                    list.appendChild(clone);
+                }
+
+                const rect = list.getBoundingClientRect();
+                const maximumScrollTop =
+                    Math.max(0, list.scrollHeight - list.clientHeight);
+
+                return [
+                    rect.left + (rect.width / 2),
+                    rect.top + Math.min(rect.height / 2, 40),
+                    maximumScrollTop
+                ];
+            }
+            """,
+            TableId);
+
+        if (prepared[2] <= 0)
+        {
+            await RemoveBasketScrollTestClonesAsync();
+
+            return new BasketVerticalScrollSnapshot(
+                HadVerticalOverflow: false,
+                ScrollTopIncreased: false,
+                ReachedBottom: false,
+                LastCardFullyVisible: false);
+        }
+
+        try
+        {
+            await page.Mouse.MoveAsync(
+                (float)prepared[0],
+                (float)prepared[1]);
+
+            for (var attempt = 0; attempt < 8; attempt++)
+            {
+                await page.Mouse.WheelAsync(0, 1200);
+                await page.WaitForTimeoutAsync(40);
+
+                var reachedBottom = await page.EvaluateAsync<bool>(
+                    """
+                    tableId => {
+                        const list = document
+                            .getElementById(`${tableId}-basket-dashboard`)
+                            ?.querySelector('.basket-side-panel-list');
+
+                        if (!list) {
+                            return false;
+                        }
+
+                        const maximum = Math.max(
+                            0,
+                            list.scrollHeight - list.clientHeight
+                        );
+
+                        return list.scrollTop >= maximum - 2;
+                    }
+                    """,
+                    TableId);
+
+                if (reachedBottom)
+                {
+                    break;
+                }
+            }
+
+            var values = await page.EvaluateAsync<int[]>(
+                """
+                tableId => {
+                    const list = document
+                        .getElementById(`${tableId}-basket-dashboard`)
+                        ?.querySelector('.basket-side-panel-list');
+                    const clones = list?.querySelectorAll(
+                        '[data-e2e-basket-scroll-clone="true"]'
+                    );
+                    const lastCard = clones?.[clones.length - 1];
+
+                    if (!list || !lastCard) {
+                        return [0, 0, 0, 0];
+                    }
+
+                    const maximum = Math.max(
+                        0,
+                        list.scrollHeight - list.clientHeight
+                    );
+                    const listRect = list.getBoundingClientRect();
+                    const cardRect = lastCard.getBoundingClientRect();
+                    const tolerance = 2;
+
+                    return [
+                        maximum > 0 ? 1 : 0,
+                        list.scrollTop > tolerance ? 1 : 0,
+                        list.scrollTop >= maximum - tolerance ? 1 : 0,
+                        cardRect.top >= listRect.top - tolerance &&
+                        cardRect.bottom <= listRect.bottom + tolerance
+                            ? 1
+                            : 0
+                    ];
+                }
+                """,
+                TableId);
+
+            return new BasketVerticalScrollSnapshot(
+                HadVerticalOverflow: values[0] == 1,
+                ScrollTopIncreased: values[1] == 1,
+                ReachedBottom: values[2] == 1,
+                LastCardFullyVisible: values[3] == 1);
+        }
+        finally
+        {
+            await RemoveBasketScrollTestClonesAsync();
+        }
+    }
+
+    private async Task RemoveBasketScrollTestClonesAsync()
+    {
+        await page.EvaluateAsync(
+            """
+            tableId => {
+                const list = document
+                    .getElementById(`${tableId}-basket-dashboard`)
+                    ?.querySelector('.basket-side-panel-list');
+
+                if (!list) {
+                    return;
+                }
+
+                list.querySelectorAll(
+                    '[data-e2e-basket-scroll-clone="true"]'
+                ).forEach(element => element.remove());
+
+                list.scrollTop = 0;
+            }
+            """,
+            TableId);
+    }
+
     public async Task<BasketDashboardEntrySnapshot>
         GetBasketDashboardEntryAsync(string basket)
     {
@@ -2317,6 +2486,12 @@ internal sealed class WorkOrdersPage(IPage page)
         return Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds;
     }
 }
+
+internal sealed record BasketVerticalScrollSnapshot(
+    bool HadVerticalOverflow,
+    bool ScrollTopIncreased,
+    bool ReachedBottom,
+    bool LastCardFullyVisible);
 
 internal sealed record BasketDashboardEntrySnapshot(
     int RowCount,

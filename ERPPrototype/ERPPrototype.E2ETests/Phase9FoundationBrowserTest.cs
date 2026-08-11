@@ -19,9 +19,9 @@ internal sealed class Phase9FoundationBrowserTest(
         {
             var baseCount = suite switch
             {
-                E2ETestSuite.Smoke => 10,
-                E2ETestSuite.Full => 48,
-                E2ETestSuite.Stress => 55,
+                E2ETestSuite.Smoke => 11,
+                E2ETestSuite.Full => 49,
+                E2ETestSuite.Stress => 56,
                 _ => throw new ArgumentOutOfRangeException(nameof(suite))
             };
 
@@ -186,6 +186,25 @@ internal sealed class Phase9FoundationBrowserTest(
             E2ETestAssert.True(
                 dashboardLayout.PanelHasVisibleBoundary,
                 "The Basket side panel must keep its visible outer boundary.");
+
+            var basketScroll =
+                await workOrdersPage.VerifyBasketDashboardVerticalScrollAsync();
+
+            E2ETestAssert.True(
+                basketScroll.HadVerticalOverflow,
+                "The Basket scroll test could not create vertical overflow.");
+            E2ETestAssert.True(
+                basketScroll.ScrollTopIncreased,
+                "Mouse-wheel input did not move the Basket list.");
+            E2ETestAssert.True(
+                basketScroll.ReachedBottom,
+                "The Basket list could not be scrolled to its final position.");
+            E2ETestAssert.True(
+                basketScroll.LastCardFullyVisible,
+                "The final Basket row was not fully reachable at the bottom.");
+
+            checks.Pass(
+                "Basket side panel supports mouse-wheel scrolling to the final row");
 
             var initialInProgressDashboard =
                 await workOrdersPage.GetBasketDashboardEntryAsync(

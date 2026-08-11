@@ -22,9 +22,11 @@
         },
 
         /*
-         * صفحة أوامر العمل تستخدم شريط تمرير واحد فقط: شريط الجدول.
-         * نحسب ارتفاعًا رقميًا ثابتًا من المساحة المتاحة في الشاشة،
-         * بدل height: 100% الذي كان يسبب إعادة رسم محرر الخلية.
+         * The Work Orders workspace owns the available viewport height.
+         * The grid shell and Basket panel share that one height through CSS;
+         * Tabulator receives only the remaining grid-row height after the
+         * permanently reserved Selected footer. This gives the Basket list a
+         * real constrained height so its own vertical scrollbar can work.
          */
         calculateViewportTableHeight: function (element) {
             const minimumTableHeight = 320;
@@ -37,10 +39,14 @@
             const shell = document.getElementById(
                 `${element.id}-shell`
             );
+            const workspace = shell?.closest(
+                ".work-orders-sheet-workspace"
+            );
             const selectionSummaryHost = document.getElementById(
                 `${element.id}-summary-host`
             );
-            const shellTop =
+            const workspaceTop =
+                workspace?.getBoundingClientRect().top ??
                 shell?.getBoundingClientRect().top ??
                 element.getBoundingClientRect().top;
             const measuredFooterHeight =
@@ -49,17 +55,28 @@
                 reservedFooterHeight,
                 Math.ceil(measuredFooterHeight)
             );
-            const minimumShellHeight =
+            const minimumWorkspaceHeight =
                 minimumTableHeight + footerHeight + shellGap + cardChrome;
-            const availableShellHeight = Math.max(
-                minimumShellHeight,
+            const availableWorkspaceHeight = Math.max(
+                minimumWorkspaceHeight,
                 Math.floor(
-                    viewportHeight - shellTop - bottomGap
+                    viewportHeight - workspaceTop - bottomGap
                 )
             );
 
+            if (workspace) {
+                workspace.style.height =
+                    `${availableWorkspaceHeight}px`;
+                shell?.style.removeProperty("height");
+            } else if (shell) {
+                /*
+                 * Defensive fallback for callers outside the current Work
+                 * Orders markup. The live page always has a workspace.
+                 */
+                shell.style.height = `${availableWorkspaceHeight}px`;
+            }
+
             if (shell) {
-                shell.style.height = `${availableShellHeight}px`;
                 shell.style.setProperty(
                     "--work-orders-selected-footer-height",
                     `${footerHeight}px`
@@ -68,7 +85,7 @@
 
             return Math.max(
                 minimumTableHeight,
-                availableShellHeight -
+                availableWorkspaceHeight -
                     footerHeight -
                     shellGap -
                     cardChrome
