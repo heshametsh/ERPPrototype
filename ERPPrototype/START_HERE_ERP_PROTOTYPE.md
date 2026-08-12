@@ -1,4 +1,7 @@
-# START HERE — ERP Prototype
+﻿# START HERE — ERP Prototype
+
+> تحديث 2026-08-12: أمر التحقق الآلي المعتمد الوحيد هو `Tools/Invoke-ERPTests.ps1`. مراجع أدوات Phase 8/Phase 9 القديمة في الأقسام التاريخية أدناه للتوثيق فقط؛ الأدوات القديمة أزيلت من شجرة المصدر. آخر تحقق مقبول: Integration `25/25` وSmoke Browser `11/11`.
+
 
 **الحالة:** مرجع البدء الحالي
 **آخر تحديث:** 2026-08-05
@@ -86,7 +89,7 @@ Login → فتح شيت الموظف → التأكد من الفرع والقس
 لرؤية المتصفح أثناء الاختبار من مجلد الـSolution:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\ERPPrototype\Tools\Invoke-Phase9Foundation.ps1 -Headed
+powershell -ExecutionPolicy Bypass -File .\ERPPrototype\Tools\Invoke-ERPTests.ps1 -Suite Full -Headed
 ```
 
 التشغيل ينفذ أيضًا اختبارات الحفظ العشرة أولًا. دليل القبول المسجل:
@@ -153,7 +156,7 @@ powershell -ExecutionPolicy Bypass -File .\ERPPrototype\Tools\Invoke-ERPTests.ps
 
 Acceptance order:
 
-1. `Invoke-ERPTests.ps1 -Suite Stress` must return Integration 17/17 and Browser 55/55.
+1. `Invoke-ERPTests.ps1 -Suite Stress` must return Integration 26/26 and Browser 56/56.
 2. Run the 1,000-row Arrow baseline and inspect its JSON.
 3. Run Enter and Wheel separately.
 4. Expand to 5,000 and 10,000 rows, or run the full matrix.

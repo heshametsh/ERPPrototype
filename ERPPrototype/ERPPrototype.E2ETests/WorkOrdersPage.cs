@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Globalization;
 using Microsoft.Playwright;
 
@@ -12,6 +12,9 @@ internal sealed class WorkOrdersPage(IPage page)
 
     private ILocator PageRoot => page.GetByTestId("work-orders-page");
     private ILocator Scope => page.GetByTestId("work-orders-scope");
+    private ILocator BranchScopeValue => Scope.Locator(".scope-branch strong");
+    private ILocator DepartmentScopeValue =>
+        Scope.Locator(".scope-department strong");
     private ILocator YearSelector => page.GetByTestId("work-year-selector");
     private ILocator Grid => page.GetByTestId("work-orders-grid");
     private ILocator Search => page.GetByTestId("work-orders-search");
@@ -86,8 +89,13 @@ internal sealed class WorkOrdersPage(IPage page)
     public string GetPath() =>
         new Uri(page.Url).AbsolutePath;
 
-    public async Task<string> GetScopeAsync() =>
-        (await Scope.InnerTextAsync()).Trim();
+    public async Task<string> GetBranchSourceNameAsync() =>
+        ((await BranchScopeValue.GetAttributeAsync("title")) ?? string.Empty)
+            .Trim();
+
+    public async Task<string> GetDepartmentSourceNameAsync() =>
+        ((await DepartmentScopeValue.GetAttributeAsync("title")) ?? string.Empty)
+            .Trim();
 
     public Task<string> GetSelectedYearAsync() =>
         YearSelector.InputValueAsync();

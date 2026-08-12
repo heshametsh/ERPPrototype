@@ -64,24 +64,15 @@ internal sealed class Phase9FoundationBrowserTest(
 
             checks.Pass("Login reaches the employee Work Orders sheet");
 
-            var scopeText = await workOrdersPage.GetScopeAsync();
-            var expectedBranchDisplayName =
-                seed.BranchName.StartsWith(
-                    "فرع ",
-                    StringComparison.Ordinal)
-                    ? seed.BranchName["فرع ".Length..].Trim()
-                    : seed.BranchName.Trim();
+            E2ETestAssert.Equal(
+                seed.BranchName,
+                await workOrdersPage.GetBranchSourceNameAsync(),
+                "The employee branch scope did not match the authenticated user.");
 
-
-            E2ETestAssert.Contains(
-                expectedBranchDisplayName,
-                scopeText,
-                "The employee branch was not shown on the sheet.");
-
-            E2ETestAssert.Contains(
-                "التوصيلات",
-                scopeText,
-                "The employee department was not shown on the sheet.");
+            E2ETestAssert.Equal(
+                seed.DepartmentName,
+                await workOrdersPage.GetDepartmentSourceNameAsync(),
+                "The employee department scope did not match the authenticated user.");
 
             checks.Pass("Employee branch and department scope are visible");
 

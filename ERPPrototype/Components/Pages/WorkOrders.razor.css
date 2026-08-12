@@ -1,4 +1,4 @@
-/* =========================================================
+﻿/* =========================================================
    WORK ORDERS — v46 visual integration
    Canonical visual owner for the page shell, responsive sizing, grid surface,
    and Basket side panel. Data/save/aggregate behavior stays in the existing JS/C#.
@@ -626,6 +626,7 @@
 */
 .basket-side-panel {
     box-sizing: border-box;
+    grid-column: 3;
     position: relative;
     display: grid;
     grid-template-rows: auto minmax(0, 1fr);
@@ -1107,17 +1108,12 @@
     overflow: hidden;
 }
 
-.work-orders-grid-shell {
-    grid-column: 1;
-}
 
-.basket-side-panel {
-    grid-column: 3;
-}
 
 /* ---------- Grid shell and fixed reserved footer ---------- */
 .work-orders-grid-shell {
     box-sizing: border-box;
+    grid-column: 1;
     display: grid;
     grid-template-rows: minmax(0, 1fr) var(--wo-selection-height);
     min-height: 0;

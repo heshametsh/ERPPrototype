@@ -1,4 +1,4 @@
-:root {
+﻿:root {
     --brand-primary: #0067b9;
     --brand-primary-dark: #004f91;
     --brand-secondary: #00a9ce;
@@ -56,72 +56,6 @@ input,
 select,
 textarea {
     font-family: inherit;
-}
-
-.page-container {
-    width: 100%;
-    max-width: 1700px;
-    margin: 0 auto;
-    padding: 28px 30px 40px;
-}
-
-.page-header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 24px;
-    margin-bottom: 22px;
-}
-
-.page-header-content {
-    min-width: 0;
-}
-
-.page-title {
-    margin: 0;
-    color: var(--text-primary);
-    font-size: clamp(1.75rem, 2.5vw, 2.5rem);
-    font-weight: 750;
-    line-height: 1.2;
-}
-
-.page-subtitle {
-    margin: 7px 0 0;
-    color: var(--text-muted);
-    font-size: 0.92rem;
-    line-height: 1.5;
-}
-
-.page-actions {
-    display: flex;
-    align-items: center;
-    flex: 0 0 auto;
-    gap: 10px;
-}
-
-.app-card {
-    border: 1px solid var(--border-light);
-    border-radius: var(--radius-large);
-    background: var(--surface-card);
-    box-shadow: var(--shadow-card);
-}
-
-.app-card-header {
-    padding: 20px 22px;
-    border-bottom: 1px solid var(--border-light);
-}
-
-.app-card-body {
-    padding: 22px;
-}
-
-.app-toolbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 12px;
-    margin-bottom: 18px;
 }
 
 .btn {
@@ -197,57 +131,9 @@ textarea {
     background-color: var(--brand-primary);
 }
 
-.info-banner {
-    display: flex;
-    align-items: flex-start;
-    gap: 11px;
-    margin-bottom: 18px;
-    padding: 14px 16px;
-    border: 1px solid #cfe4f3;
-    border-right: 4px solid var(--brand-primary);
-    border-radius: var(--radius-medium);
-    background: #edf7fd;
-    color: #27506f;
-    font-size: 0.9rem;
-    line-height: 1.6;
-}
-
-.success-message {
-    color: var(--success);
-    font-size: 0.86rem;
-    font-weight: 650;
-}
-
-.warning-message {
-    color: var(--warning);
-    font-size: 0.86rem;
-    font-weight: 650;
-}
-
-.error-message,
 .validation-message,
 .text-danger {
     color: var(--danger) !important;
-}
-
-.status-badge {
-    display: inline-flex;
-    align-items: center;
-    min-height: 28px;
-    padding: 0 10px;
-    border-radius: 999px;
-    background: var(--success-bg);
-    color: var(--success);
-    font-size: 0.77rem;
-    font-weight: 750;
-}
-
-.table-card {
-    overflow: hidden;
-    border: 1px solid var(--border-light);
-    border-radius: var(--radius-large);
-    background: white;
-    box-shadow: var(--shadow-card);
 }
 
 .validation-summary-errors {
@@ -278,10 +164,6 @@ textarea {
         content: "حدث خطأ غير متوقع.";
     }
 
-.darker-border-checkbox.form-check-input {
-    border-color: var(--border-medium);
-}
-
 .form-floating > .form-control-plaintext::placeholder,
 .form-floating > .form-control::placeholder {
     color: var(--text-muted);
@@ -291,29 +173,6 @@ textarea {
 .form-floating > .form-control-plaintext:focus::placeholder,
 .form-floating > .form-control:focus::placeholder {
     text-align: start;
-}
-
-@media (max-width: 760px) {
-    .page-container {
-        padding: 20px 16px 30px;
-    }
-
-    .page-header {
-        flex-direction: column;
-        align-items: stretch;
-    }
-
-    .page-actions {
-        width: 100%;
-    }
-
-        .page-actions .btn {
-            flex: 1;
-        }
-
-    .app-card-body {
-        padding: 16px;
-    }
 }
 
 /* =========================================================
@@ -700,8 +559,18 @@ details[open] > .excel-date-summary::before {
    canonical visual owner instead of a global rule plus page overrides. */
 .work-orders-selection-summary-bar .work-orders-summary-item {
     box-sizing: border-box;
+    display: flex;
     min-width: 0;
+    min-height: var(--wo-selection-item-height, 36px);
+    flex-direction: column;
+    justify-content: center;
+    padding: var(--wo-selection-pad-y, 5px) var(--wo-selection-pad-x, 9px) var(--wo-selection-pad-bottom, 4px);
+    gap: var(--wo-selection-gap, 3px);
     overflow: hidden;
+    border: 0;
+    border-inline-start: 1px solid #d6e0e6;
+    border-radius: 0;
+    background: transparent;
     font-family: "Segoe UI", Tahoma, Arial, sans-serif;
 }
 
@@ -730,18 +599,6 @@ details[open] > .excel-date-summary::before {
 
 .work-orders-selection-summary-bar[hidden] { display: none !important; }
 
-.work-orders-selection-summary-bar .work-orders-summary-item {
-    display: flex;
-    min-height: var(--wo-selection-item-height, 36px);
-    flex-direction: column;
-    justify-content: center;
-    padding: var(--wo-selection-pad-y, 5px) var(--wo-selection-pad-x, 9px) var(--wo-selection-pad-bottom, 4px);
-    gap: var(--wo-selection-gap, 3px);
-    border: 0;
-    border-inline-start: 1px solid #d6e0e6;
-    border-radius: 0;
-    background: transparent;
-}
 
 .work-orders-selection-summary-bar .work-orders-summary-item:first-child {
     border-inline-start: 0;

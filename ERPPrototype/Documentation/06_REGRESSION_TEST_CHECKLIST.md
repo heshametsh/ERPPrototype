@@ -1,4 +1,6 @@
-# 06 — Regression Test Checklist
+﻿# 06 — Regression Test Checklist
+
+> تحديث 2026-08-12: استخدم `Tools/Invoke-ERPTests.ps1` للتحقق الحالي. أوامر Phase 8/Phase 9 القديمة الواردة في أقسام تاريخية لم تعد موجودة. آخر تحقق مقبول: Integration `25/25` وSmoke Browser `11/11`.
 
 **Status:** Mandatory after any grid/runtime change
 **Stable checkpoint:** `M5D4R3-Stable-Range-UX` (E6C foundation)
@@ -411,13 +413,13 @@ Phase 8.9 changed documentation and engineering tools only. The accepted develop
 From the project folder run:
 
 ```powershell
-.\Tools\Invoke-Phase8Closure.ps1
+.\Tools\Invoke-ERPTests.ps1 -Suite Full
 ```
 
 From the solution folder, where the project is inside `ERPPrototype`, run:
 
 ```powershell
-.\ERPPrototype\Tools\Invoke-Phase8Closure.ps1
+.\ERPPrototype\Tools\Invoke-ERPTests.ps1 -Suite Full
 ```
 
 The workflow must:
@@ -443,7 +445,7 @@ No new manual grid regression was required because Phase 8.9 changed no producti
 Run from the Solution directory:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\ERPPrototype\Tools\Invoke-Phase9Foundation.ps1 -Headed
+powershell -ExecutionPolicy Bypass -File .\ERPPrototype\Tools\Invoke-ERPTests.ps1 -Suite Full -Headed
 ```
 
 The visible `-Headed` run is preferred for first acceptance. Later regression can omit `-Headed`. The command must:
@@ -517,7 +519,7 @@ Functional correctness:
 powershell -ExecutionPolicy Bypass -File .\ERPPrototype\Tools\Invoke-ERPTests.ps1 -Suite Stress
 ```
 
-Required: Integration 17/17 PASS and Browser 55/55 PASS. The run has no artificial Playwright delay.
+Required: Integration 26/26 PASS and Browser 56/56 PASS. The run has no artificial Playwright delay.
 
 Neutral deep performance, one action and one dataset:
 

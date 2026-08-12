@@ -1,4 +1,6 @@
-# 03 — Current Implementation
+﻿# 03 — Current Implementation
+
+> تحديث 2026-08-12: التحقق الحالي المقبول هو Build PASS، Integration `25/25` وSmoke Browser `11/11`. أمر الاختبار المعتمد الوحيد هو `Tools/Invoke-ERPTests.ps1`; مراجع أدوات Phase 8/Phase 9 القديمة في الأقسام التاريخية لا تعني أن تلك الأدوات ما زالت موجودة.
 
 **Status:** Phase 9.0B accepted after SQL 10/10 and browser Full 9/9; Phase 9.0C 1,000-row stress coverage implemented as an acceptance candidate
 **Review date:** 2026-07-31
@@ -451,7 +453,7 @@ The only web-startup hook is an `E2ETest` environment check that disables HTTPS 
 Acceptance command from the Solution directory:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\ERPPrototype\Tools\Invoke-Phase9Foundation.ps1 -Headed
+powershell -ExecutionPolicy Bypass -File .\ERPPrototype\Tools\Invoke-ERPTests.ps1 -Suite Full -Headed
 ```
 
 Accepted markers: integration `10/10`, browser `4/4`, and `Phase 9.0 automated foundation verification: PASS`. The first run may install the Playwright Chromium binary in the user cache; it is not stored in the project source.
@@ -470,7 +472,7 @@ The browser project now owns:
 - a common browser session that installs Chromium when absent, owns context isolation, tracing, screenshots, and cleanup;
 - browser diagnostics for page errors, HTTP 5xx responses, console errors, and failed requests;
 - artifact retention limited to the latest 10 runs;
-- `Tools/Invoke-ERPTests.ps1` as the canonical command, with the old Phase 9 script retained as a compatibility wrapper.
+- `Tools/Invoke-ERPTests.ps1` is the canonical command. The old Phase 9 compatibility wrapper was removed during the 2026-08-12 source cleanup.
 
 The Full suite remains a foundation journey, not the final Work Orders coverage. Edit/Save, insert/delete, duplicate UI, Undo/Redo, Copy/Paste, search/filter, and future financial/custom columns belong to Phase 9.0C and later feature phases.
 

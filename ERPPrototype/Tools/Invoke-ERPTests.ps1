@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [switch]$Headed,
     [switch]$Observe,
@@ -53,6 +53,7 @@ if (-not $SkipIntegration) {
         'build',
         $integrationProject,
         '--configuration', 'Release',
+        '--no-incremental',
         '--nologo'
     )
 }
@@ -61,6 +62,7 @@ Invoke-DotNetStep -Title 'Building browser tests, web application, and reference
     'build',
     $browserProject,
     '--configuration', 'Release',
+    '--no-incremental',
     '--nologo'
 )
 
@@ -72,11 +74,11 @@ if (-not $SkipIntegration) {
         '--no-build'
     )
 
-    $integrationTitle = 'Running the 18 SQL Server save, financial, and stabilization checks'
+    $integrationTitle = 'Running the SQL Server save, financial, and stabilization checks'
 
     if ($Suite -eq 'Stress') {
         $integrationArguments += @('--', '--stress')
-        $integrationTitle = 'Running 18 core SQL Server checks plus the 1,000-row batch stress check'
+        $integrationTitle = 'Running the core SQL Server checks plus the 1,000-row batch stress check'
     }
 
     Invoke-DotNetStep -Title $integrationTitle -Arguments $integrationArguments
@@ -104,21 +106,12 @@ if ($KeepDatabase) {
 
 Invoke-DotNetStep -Title "Running the $Suite browser suite" -Arguments $browserArguments
 
-$expectedBrowserChecks = switch ($Suite) {
-    'Smoke' { 10 }
-    'Full' { 48 }
-    'Stress' { 55 }
-}
-
 $integrationSummary = if ($SkipIntegration) {
     'Integration tests: skipped'
 }
-elseif ($Suite -eq 'Stress') {
-    'Integration tests: 19/19 PASS (includes 1,000-row add/update/delete)'
-}
 else {
-    'Integration tests: 18/18 PASS'
+    'Integration tests: PASS'
 }
 
 Write-Host "`nERPPrototype automated verification: PASS" -ForegroundColor Green
-Write-Host "$integrationSummary | Browser checks: $expectedBrowserChecks/$expectedBrowserChecks PASS ($Suite)"
+Write-Host "$integrationSummary | Browser suite: $Suite PASS"

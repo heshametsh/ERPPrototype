@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json;
 using ERPPrototype.Data;
@@ -74,7 +74,7 @@ public partial class WorkOrders
         }
 
         return string.IsNullOrWhiteSpace(display)
-            ? value
+            ? (value ?? string.Empty)
             : display;
     }
 
