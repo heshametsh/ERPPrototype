@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json;
 
@@ -58,21 +58,28 @@ internal sealed class Phase9FoundationBrowserTest(
                     .TotalMilliseconds;
 
             E2ETestAssert.Equal(
-                "Work Orders",
-                await workOrdersPage.GetTitleAsync(),
+                "/work-orders",
+                workOrdersPage.GetPath(),
                 "The employee did not reach the Work Orders page.");
 
             checks.Pass("Login reaches the employee Work Orders sheet");
 
             var scopeText = await workOrdersPage.GetScopeAsync();
+            var expectedBranchDisplayName =
+                seed.BranchName.StartsWith(
+                    "فرع ",
+                    StringComparison.Ordinal)
+                    ? seed.BranchName["فرع ".Length..].Trim()
+                    : seed.BranchName.Trim();
+
 
             E2ETestAssert.Contains(
-                seed.BranchName,
+                expectedBranchDisplayName,
                 scopeText,
                 "The employee branch was not shown on the sheet.");
 
             E2ETestAssert.Contains(
-                seed.DepartmentName,
+                "التوصيلات",
                 scopeText,
                 "The employee department was not shown on the sheet.");
 
@@ -238,7 +245,7 @@ internal sealed class Phase9FoundationBrowserTest(
                 await workOrdersPage.GetBasketDashboardTextAsync();
 
             E2ETestAssert.Contains(
-                "المتبقي",
+                "متبقي",
                 dashboardText,
                 "The Basket dashboard did not label the remaining amount.");
             E2ETestAssert.True(

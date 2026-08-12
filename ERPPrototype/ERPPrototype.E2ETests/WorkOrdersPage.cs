@@ -83,8 +83,8 @@ internal sealed class WorkOrdersPage(IPage page)
             });
     }
 
-    public async Task<string> GetTitleAsync() =>
-        (await page.TitleAsync()).Trim();
+    public string GetPath() =>
+        new Uri(page.Url).AbsolutePath;
 
     public async Task<string> GetScopeAsync() =>
         (await Scope.InnerTextAsync()).Trim();

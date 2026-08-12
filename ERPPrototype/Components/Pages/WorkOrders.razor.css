@@ -1198,7 +1198,7 @@
 .tabulator-workorders-page ::deep .tabulator .tabulator-header .tabulator-col {
     min-height: var(--wo-grid-header-height) !important;
     border-right: 1px solid var(--wo-grid-header-divider) !important;
-    background: var(--wo-header) !important;
+    background: var(--wo-grid-header-bg) !important;
     color: var(--wo-grid-header-text) !important;
 }
 
