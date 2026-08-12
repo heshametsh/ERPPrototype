@@ -566,41 +566,55 @@ window.tabulatorTest = {
         const errorCount =
             state?.validationErrors?.size ?? 0;
 
-        const loadedCount =
-            state?.originalRows?.size ?? 0;
-
         const undoCount =
             state?.undoStack?.length ?? 0;
 
         const redoCount =
             state?.redoStack?.length ?? 0;
 
-        const compactParts = [
-            `${loadedCount.toLocaleString()} أمر`
-        ];
+        const normalizedMessage =
+            String(message ?? "").trim();
 
-        if (unsavedCount === 0) {
-            compactParts.push("محفوظ");
+        let compactStatus;
+
+        if (
+            normalizedMessage.startsWith("فشل الحفظ") ||
+            normalizedMessage.startsWith("تعذر الحفظ") ||
+            normalizedMessage.startsWith("حدث خطأ")
+        ) {
+            compactStatus = "تعذر الحفظ";
+        } else if (
+            normalizedMessage.includes(
+                "قبل الانتقال إلى سنة أخرى"
+            )
+        ) {
+            compactStatus =
+                "احفظ التغييرات قبل تغيير السنة";
+        } else if (
+            normalizedMessage.startsWith("جارٍ حفظ")
+        ) {
+            compactStatus = "جارٍ الحفظ…";
+        } else if (
+            normalizedMessage.startsWith("تم حفظ") ||
+            normalizedMessage.includes("وحفظه بنجاح") ||
+            normalizedMessage.includes("وحفظ التعديل بنجاح")
+        ) {
+            compactStatus = "تم الحفظ";
+        } else if (errorCount > 0) {
+            compactStatus =
+                errorCount === 1
+                    ? "يوجد خطأ يحتاج تصحيحًا"
+                    : `يوجد ${errorCount.toLocaleString()} أخطاء تحتاج تصحيحًا`;
+        } else if (unsavedCount > 0) {
+            compactStatus =
+                unsavedCount === 1
+                    ? "تعديل واحد غير محفوظ"
+                    : `${unsavedCount.toLocaleString()} تعديلات غير محفوظة`;
         } else {
-            compactParts.push(
-                `غير محفوظ: ${unsavedCount.toLocaleString()}`
-            );
-
-            if (undoCount > 0) {
-                compactParts.push(
-                    `تراجع: ${undoCount.toLocaleString()}`
-                );
-            }
-
-            if (redoCount > 0) {
-                compactParts.push(
-                    `إعادة: ${redoCount.toLocaleString()}`
-                );
-            }
+            compactStatus = "كل التغييرات محفوظة";
         }
 
-        statusElement.textContent =
-            compactParts.join(" | ");
+        statusElement.textContent = compactStatus;
 
         const detailedParts = [];
 

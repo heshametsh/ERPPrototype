@@ -8,15 +8,29 @@
     --wo-page: #f3f8fb;
     --wo-surface: #ffffff;
     --wo-surface-soft: #f7fbfd;
-    --wo-header: linear-gradient(90deg, #d8f3fb 0%, #e4f2f8 48%, #cfe9f4 100%);
+    /*
+       Grid header visual identity.
+       Reuses the global brand palette from app.css and keeps one owner here.
+       Brand colors are accents; the header surface stays calm for all-day use.
+    */
+    --wo-grid-header-bg: linear-gradient(180deg, #258faf 0%, #177798 100%);
+    --wo-grid-header-text: #ffffff;
+    --wo-grid-header-divider: rgba(255,255,255,.22);
+    --wo-grid-header-hover: #1d84a3;
+    --wo-grid-header-index-bg: #197b99;
+    --wo-grid-header-icon: #e4f5fa;
+    --wo-grid-header-accent: var(--brand-secondary, #00a9ce);
+    --wo-grid-header-active: #ffffff;
+    --wo-grid-header-active-bg: rgba(255,255,255,.16);
+
     --wo-border: #c9d9e3;
-    --wo-border-soft: #e4edf2;
-    --wo-border-cell: #edf2f5;
+    --wo-border-soft: #c5d5df;
+    --wo-border-cell: #cad9e2;
     --wo-text: #173a55;
     --wo-muted: #5b7689;
     --wo-primary: #0c77ad;
     --wo-primary-hover: #085f91;
-    --wo-selection: #e3f1f7;
+    --wo-selection: #dceff7;
     --wo-selection-border: rgba(76, 145, 181, 0.68);
 
     /*
@@ -32,21 +46,21 @@
 
     --wo-control-height: calc(33 * var(--wo-ui-u));
     --wo-control-font: calc(11.75 * var(--wo-ui-u));
-    --wo-kpi-height: calc(56 * var(--wo-ui-u));
+    --wo-kpi-height: calc(44 * var(--wo-ui-u));
     --wo-kpi-label-font: calc(10.5 * var(--wo-ui-u));
     --wo-kpi-value-font: calc(20 * var(--wo-ui-u));
     --wo-grid-header-height: calc(42 * var(--wo-grid-u));
-    --wo-grid-row-height: calc(34 * var(--wo-grid-u));
+    --wo-grid-row-height: calc(22 * var(--wo-grid-u));
     --wo-grid-font: calc(13.25 * var(--wo-grid-u));
-    --wo-grid-header-font: calc(12.75 * var(--wo-grid-u));
-    --wo-selection-height: calc(42 * var(--wo-grid-u));
+    --wo-grid-header-font: calc(13.25 * var(--wo-grid-u));
+    --wo-selection-height: calc(34 * var(--wo-grid-u));
     --wo-selection-label-font: calc(10.88 * var(--wo-grid-u));
     --wo-selection-value-font: calc(14.88 * var(--wo-grid-u));
-    --wo-selection-item-height: calc(36 * var(--wo-grid-u));
-    --wo-selection-pad-y: calc(5 * var(--wo-grid-u));
+    --wo-selection-item-height: calc(30 * var(--wo-grid-u));
+    --wo-selection-pad-y: calc(3 * var(--wo-grid-u));
     --wo-selection-pad-x: calc(9 * var(--wo-grid-u));
-    --wo-selection-pad-bottom: calc(4 * var(--wo-grid-u));
-    --wo-selection-gap: calc(3 * var(--wo-grid-u));
+    --wo-selection-pad-bottom: calc(2 * var(--wo-grid-u));
+    --wo-selection-gap: calc(2 * var(--wo-grid-u));
 
     /*
        Basket panel width has one owner.
@@ -58,7 +72,7 @@
     --wo-basket-content-scale: 1;
     box-sizing: border-box;
     min-height: 0;
-    padding: calc(8 * var(--wo-ui-u)) clamp(calc(8 * var(--wo-ui-u)), 1.25vw, calc(24 * var(--wo-ui-u))) calc(6 * var(--wo-ui-u));
+    padding: calc(8 * var(--wo-ui-u)) clamp(calc(8 * var(--wo-ui-u)), 1.25vw, calc(24 * var(--wo-ui-u))) calc(2 * var(--wo-ui-u));
     overflow: hidden;
     background: var(--wo-page);
     color: var(--wo-text);
@@ -138,7 +152,7 @@
 
 .scope-identity-divider {
     width: 1px;
-    height: calc(18 * var(--wo-ui-u));
+    height: calc(17 * var(--wo-ui-u));
     border-radius: 999px;
     background: linear-gradient(180deg, transparent, #9fcbdc 24%, #9fcbdc 76%, transparent);
 }
@@ -219,7 +233,7 @@
     height: calc(15 * var(--wo-ui-u));
     fill: none;
     stroke: currentColor;
-    stroke-width: 1.8;
+    stroke-width: 1.8px;
     stroke-linecap: round;
     stroke-linejoin: round;
 }
@@ -243,7 +257,8 @@
 
 .action-row {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: auto auto;
+    justify-content: end;
     align-items: center;
     gap: calc(8 * var(--wo-ui-u));
     width: 100%;
@@ -253,7 +268,7 @@
 .system-message {
     display: inline-flex;
     align-items: center;
-    justify-content: flex-end;
+    justify-content: flex-start;
     min-width: 0;
     max-width: none;
     min-height: var(--wo-control-height);
@@ -266,6 +281,7 @@
     color: #154f70;
     box-shadow: 0 2px 7px rgba(5,42,96,.055), inset 0 1px 0 rgba(255,255,255,.86);
     direction: rtl;
+    text-align: right;
     white-space: nowrap;
 }
 
@@ -304,7 +320,6 @@
 }
 
 .commands-wrap > summary { list-style: none; }
-.commands-wrap > summary::-webkit-details-marker { display: none; }
 .commands-wrap[open] > summary {
     border-color: #72b5d0;
     background: #edf8fc;
@@ -369,7 +384,7 @@
 .save-badge {
     display: inline-grid;
     place-items: center;
-    min-width: calc(18 * var(--wo-ui-u));
+    min-width: calc(17 * var(--wo-ui-u));
     height: calc(18 * var(--wo-ui-u));
     padding: 0 calc(5 * var(--wo-ui-u));
     border-radius: 999px;
@@ -391,7 +406,7 @@
     max-height: calc(100dvh - 16px);
     overflow: auto;
     border: 1px solid #bed5e2;
-    border-radius: calc(11 * var(--wo-ui-u));
+    border-radius: calc(9 * var(--wo-ui-u));
     background: #fff;
     box-shadow: 0 14px 34px rgba(3,43,95,.20);
     direction: rtl;
@@ -472,7 +487,7 @@
     align-items: center;
     min-width: 0;
     min-height: var(--wo-kpi-height);
-    padding: calc(10 * var(--wo-ui-u)) calc(13 * var(--wo-ui-u));
+    padding: calc(5 * var(--wo-ui-u)) calc(10 * var(--wo-ui-u));
     overflow: hidden;
     border: 1px solid #d3dde5;
     border-radius: calc(11 * var(--wo-ui-u));
@@ -543,9 +558,9 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    width: calc(43 * var(--wo-ui-u));
-    height: calc(43 * var(--wo-ui-u));
-    flex: 0 0 calc(43 * var(--wo-ui-u));
+    width: calc(34 * var(--wo-ui-u));
+    height: calc(34 * var(--wo-ui-u));
+    flex: 0 0 calc(34 * var(--wo-ui-u));
     border-radius: calc(11 * var(--wo-ui-u));
     background: linear-gradient(145deg, var(--accent), var(--accent-alt));
     color: #fff;
@@ -553,11 +568,11 @@
 }
 
 .work-orders-open-summary ::deep .metric-icon svg {
-    width: calc(21 * var(--wo-ui-u));
-    height: calc(21 * var(--wo-ui-u));
+    width: calc(18 * var(--wo-ui-u));
+    height: calc(18 * var(--wo-ui-u));
     fill: none;
     stroke: currentColor;
-    stroke-width: 1.8;
+    stroke-width: 1.8px;
     stroke-linecap: round;
     stroke-linejoin: round;
 }
@@ -971,7 +986,7 @@
     flex: 0 0 calc(19 * var(--wo-ui-u));
     fill: none;
     stroke: #c94b41;
-    stroke-width: 1.8;
+    stroke-width: 1.8px;
     stroke-linecap: round;
     stroke-linejoin: round;
 }
@@ -1174,21 +1189,21 @@
     min-height: var(--wo-grid-header-height) !important;
     border-top: 0 !important;
     border-right: 0 !important;
-    border-bottom: 2px solid #89a9bd !important;
+    border-bottom: 2px solid var(--wo-grid-header-accent) !important;
     border-left: 0 !important;
-    background: var(--wo-header) !important;
-    color: #243f53 !important;
+    background: var(--wo-grid-header-bg) !important;
+    color: var(--wo-grid-header-text) !important;
 }
 
 .tabulator-workorders-page ::deep .tabulator .tabulator-header .tabulator-col {
     min-height: var(--wo-grid-header-height) !important;
-    border-right: 1px solid #cbd8e1 !important;
+    border-right: 1px solid var(--wo-grid-header-divider) !important;
     background: var(--wo-header) !important;
-    color: #243f53 !important;
+    color: var(--wo-grid-header-text) !important;
 }
 
 .tabulator-workorders-page ::deep .tabulator .tabulator-header .tabulator-col:hover {
-    background: #dbe8f0 !important;
+    background: var(--wo-grid-header-hover) !important;
 }
 
 .tabulator-workorders-page ::deep .tabulator .tabulator-header .tabulator-col:last-child {
@@ -1219,7 +1234,7 @@
     min-width: 0;
     padding-right: 0 !important;
     overflow: hidden;
-    color: #243f53 !important;
+    color: var(--wo-grid-header-text) !important;
     font-size: var(--wo-grid-header-font) !important;
     font-weight: 750 !important;
     white-space: nowrap;
@@ -1243,8 +1258,8 @@
 }
 
 .tabulator-workorders-page ::deep .tabulator .tabulator-col .tabulator-arrow {
-    border-top-color: #607f93 !important;
-    border-bottom-color: #607f93 !important;
+    border-top-color: var(--wo-grid-header-icon) !important;
+    border-bottom-color: var(--wo-grid-header-icon) !important;
 }
 
 .tabulator-workorders-page ::deep .tabulator-row {
@@ -1254,20 +1269,20 @@
 }
 
 .tabulator-workorders-page ::deep .tabulator-row:nth-child(even) {
-    background: #f7fafc !important;
+    background: #f8fafc !important;
 }
 
 .tabulator-workorders-page ::deep .tabulator-row:hover {
-    background: #edf6fb !important;
+    background: #d9edf5 !important;
 }
 
 .tabulator-workorders-page ::deep .tabulator-row .tabulator-cell {
     min-height: var(--wo-grid-row-height) !important;
-    padding: calc(5 * var(--wo-grid-u)) calc(8 * var(--wo-grid-u)) !important;
+    padding: calc(2 * var(--wo-grid-u)) calc(8 * var(--wo-grid-u)) !important;
     border-right: 1px solid var(--wo-border-cell) !important;
-    color: #284458 !important;
+    color: #0b3157 !important;
     font-size: var(--wo-grid-font) !important;
-    line-height: calc(23 * var(--wo-grid-u)) !important;
+    line-height: calc(18 * var(--wo-grid-u)) !important;
 }
 
 .tabulator-workorders-page ::deep .tabulator-row .tabulator-cell:last-child {
@@ -1276,24 +1291,24 @@
 
 .tabulator-workorders-page ::deep .tabulator .tabulator-header .tabulator-col:first-child {
     border-right-color: #c7d5de !important;
-    background: #dce7ee !important;
-    color: #36546a !important;
+    background: var(--wo-grid-header-index-bg) !important;
+    color: var(--wo-grid-header-text) !important;
 }
 
 .tabulator-workorders-page ::deep .tabulator-row .tabulator-cell:first-child {
     border-right-color: #dbe5eb !important;
-    background: #f2f6f8 !important;
-    color: #4b6679 !important;
+    background: #f1f6f8 !important;
+    color: #49677b !important;
     text-align: center;
     font-weight: 700;
 }
 
 .tabulator-workorders-page ::deep .tabulator-row:nth-child(even) .tabulator-cell:first-child {
-    background: #edf3f6 !important;
+    background: #edf4f7 !important;
 }
 
 .tabulator-workorders-page ::deep .tabulator-row:hover .tabulator-cell:first-child {
-    background: #e5f0f6 !important;
+    background: #e4f0f5 !important;
 }
 
 .tabulator-workorders-page ::deep .tabulator-cell[tabulator-field="workOrderNumber"],
@@ -1321,20 +1336,20 @@
     padding: calc(2 * var(--wo-grid-u)) !important;
     border: 1px solid transparent;
     border-radius: calc(5 * var(--wo-grid-u));
-    color: #678497 !important;
+    color: var(--wo-grid-header-icon) !important;
     transform: none !important;
 }
 
 .tabulator-workorders-page ::deep .tabulator-header-popup-button:hover {
-    border-color: #a9c2d1 !important;
-    background: #edf5f9 !important;
-    color: #176f9f !important;
+    border-color: rgba(255,255,255,.38) !important;
+    background: var(--wo-grid-header-hover) !important;
+    color: var(--wo-grid-header-active) !important;
 }
 
 .tabulator-workorders-page ::deep .tabulator-header-popup-button.is-filtered {
-    border-color: #68a7c7 !important;
-    background: #dceef7 !important;
-    color: var(--wo-primary) !important;
+    border-color: rgba(255,255,255,.72) !important;
+    background: var(--wo-grid-header-active-bg) !important;
+    color: var(--wo-grid-header-active) !important;
 }
 
 .tabulator-workorders-page ::deep .excel-filter-icon {
@@ -1567,5 +1582,4 @@
         border-radius: 10px 0 0 10px;
         box-shadow: -12px 0 30px rgba(3,43,95,.18);
     }
-
 }

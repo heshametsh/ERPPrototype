@@ -30,10 +30,6 @@
          */
         calculateViewportTableHeight: function (element) {
             const minimumTableHeight = 320;
-            const reservedFooterHeight = 50;
-            const shellGap = 6;
-            const cardChrome = 2;
-            const bottomGap = 10;
             const viewportHeight =
                 window.visualViewport?.height || window.innerHeight;
             const shell = document.getElementById(
@@ -42,21 +38,46 @@
             const workspace = shell?.closest(
                 ".work-orders-sheet-workspace"
             );
+            const pageRoot = workspace?.closest(
+                ".tabulator-workorders-page"
+            );
+            const bottomGap = pageRoot
+                ? Number.parseFloat(
+                    window.getComputedStyle(pageRoot).paddingBottom
+                ) || 0
+                : 0;
             const selectionSummaryHost = document.getElementById(
                 `${element.id}-summary-host`
             );
+            const gridCard = element.closest(".tabulator-card");
             const workspaceTop =
                 workspace?.getBoundingClientRect().top ??
                 shell?.getBoundingClientRect().top ??
                 element.getBoundingClientRect().top;
+
+            /*
+             * CSS owns the footer height and shell gap. Measure those rendered
+             * values instead of duplicating old pixel constants here.
+             */
             const measuredFooterHeight =
                 selectionSummaryHost?.getBoundingClientRect().height ?? 0;
-            const footerHeight = Math.max(
-                reservedFooterHeight,
-                Math.ceil(measuredFooterHeight)
-            );
+            const measuredShellGap = shell
+                ? Number.parseFloat(
+                    window.getComputedStyle(shell).rowGap
+                ) || 0
+                : 0;
+            const measuredCardChrome = gridCard
+                ? Math.max(
+                    0,
+                    gridCard.getBoundingClientRect().height -
+                        gridCard.clientHeight
+                )
+                : 0;
             const minimumWorkspaceHeight =
-                minimumTableHeight + footerHeight + shellGap + cardChrome;
+                minimumTableHeight +
+                measuredFooterHeight +
+                measuredShellGap +
+                measuredCardChrome;
             const availableWorkspaceHeight = Math.max(
                 minimumWorkspaceHeight,
                 Math.floor(
@@ -76,19 +97,28 @@
                 shell.style.height = `${availableWorkspaceHeight}px`;
             }
 
-            if (shell) {
-                shell.style.setProperty(
-                    "--work-orders-selected-footer-height",
-                    `${footerHeight}px`
+            /*
+             * After the workspace height is applied, CSS Grid already knows
+             * the exact first-row size. clientHeight gives Tabulator the real
+             * card interior, so no footer/gap subtraction can drift again.
+             */
+            const measuredTableHeight = gridCard?.clientHeight ?? 0;
+
+            if (measuredTableHeight > 0) {
+                return Math.max(
+                    minimumTableHeight,
+                    Math.floor(measuredTableHeight)
                 );
             }
 
             return Math.max(
                 minimumTableHeight,
-                availableWorkspaceHeight -
-                    footerHeight -
-                    shellGap -
-                    cardChrome
+                Math.floor(
+                    availableWorkspaceHeight -
+                        measuredFooterHeight -
+                        measuredShellGap -
+                        measuredCardChrome
+                )
             );
         },
 
