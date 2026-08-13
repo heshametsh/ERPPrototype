@@ -79,24 +79,6 @@
             });
 
             return true;
-        },
-
-        cancelGridInitialization: function (elementId) {
-            const key = String(elementId || "");
-            const token = activeInitializations.get(key);
-
-            if (!token) {
-                return false;
-            }
-
-            if (token.frameId !== null && token.frameId !== undefined) {
-                window.cancelAnimationFrame(token.frameId);
-            }
-
-            token.completed = true;
-            token.frameId = null;
-            activeInitializations.delete(key);
-            return true;
         }
     };
 

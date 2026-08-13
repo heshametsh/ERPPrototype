@@ -1,4 +1,4 @@
-(function () {
+﻿(function () {
     "use strict";
 
     const target = window.tabulatorTest;
@@ -42,14 +42,6 @@
                     })),
                 reason: "initial"
             };
-        },
-
-        getBasketDashboardEntry: function (snapshot, basket) {
-            const normalizedBasket = String(basket ?? "").trim();
-
-            return snapshot?.baskets?.find(
-                entry => entry.basket === normalizedBasket
-            ) ?? null;
         },
 
         calculateBasketDashboard: function (

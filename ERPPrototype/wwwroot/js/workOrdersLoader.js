@@ -1,4 +1,4 @@
-/*
+﻿/*
  * ERP Prototype — Work Orders runtime loader
  *
  * Loading boundary only: no authentication, scope, business-rule, or data
@@ -205,17 +205,6 @@
             await ensurePerformanceLoaded();
 
             return true;
-        },
-
-        isLoaded: function () {
-            return Boolean(
-                typeof window.Tabulator !== "undefined" &&
-                typeof window.tabulatorTest?.initialize === "function"
-            );
-        },
-
-        isPerformanceLoaded: function () {
-            return typeof window.tabulatorPerformance !== "undefined";
         },
 
         isWorkOrdersRoute: isWorkOrdersRoute
