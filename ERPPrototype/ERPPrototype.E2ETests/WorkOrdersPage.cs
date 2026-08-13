@@ -41,25 +41,29 @@ internal sealed class WorkOrdersPage(IPage page)
         await Scope.WaitForAsync(
             new LocatorWaitForOptions
             {
-                State = WaitForSelectorState.Visible
+                State = WaitForSelectorState.Visible,
+                Timeout = NormalTimeoutMs
             });
 
         await YearSelector.WaitForAsync(
             new LocatorWaitForOptions
             {
-                State = WaitForSelectorState.Visible
+                State = WaitForSelectorState.Visible,
+                Timeout = NormalTimeoutMs
             });
 
         await Grid.WaitForAsync(
             new LocatorWaitForOptions
             {
-                State = WaitForSelectorState.Visible
+                State = WaitForSelectorState.Visible,
+                Timeout = NormalTimeoutMs
             });
 
         await Summary.WaitForAsync(
             new LocatorWaitForOptions
             {
-                State = WaitForSelectorState.Visible
+                State = WaitForSelectorState.Visible,
+                Timeout = NormalTimeoutMs
             });
 
         await page.WaitForFunctionAsync(

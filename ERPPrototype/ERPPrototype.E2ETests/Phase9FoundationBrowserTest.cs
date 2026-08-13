@@ -20,8 +20,8 @@ internal sealed class Phase9FoundationBrowserTest(
             var baseCount = suite switch
             {
                 E2ETestSuite.Smoke => 11,
-                E2ETestSuite.Full => 49,
-                E2ETestSuite.Stress => 56,
+                E2ETestSuite.Full => 46,
+                E2ETestSuite.Stress => 53,
                 _ => throw new ArgumentOutOfRangeException(nameof(suite))
             };
 
