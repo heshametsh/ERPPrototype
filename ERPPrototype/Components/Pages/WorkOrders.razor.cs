@@ -227,6 +227,9 @@ public partial class WorkOrders
             var initializationStartedAt = Stopwatch.GetTimestamp();
 
             await JSRuntime.InvokeVoidAsync(
+                "workOrdersLoader.ensureLoaded");
+
+            await JSRuntime.InvokeVoidAsync(
                 "tabulatorTest.initialize",
                 TableId,
                 Rows,

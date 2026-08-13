@@ -65,6 +65,15 @@ Rules:
 
 كل Feature تتعامل مع الحالة عبر API واضحة، ولا تعدل متغيرات Feature أخرى مباشرة.
 
+## 4.1 Work Orders JavaScript Loading Boundary — 2026-08-13
+
+- `appLayout.js` remains application-wide because it owns Wide/Split layout for shared shell components as well as Work Orders.
+- `workOrdersLoader.js` is the single loading owner for the heavy Work Orders browser runtime.
+- The loader is route-based only: `/work-orders` triggers loading. It contains no User, Branch, Department, Year, role, or business-rule condition.
+- Tabulator plus the Work Orders `tabulator*.js` feature modules are loaded in their existing dependency order before `tabulatorTest.initialize` is called.
+- `tabulatorPerformance.js` is excluded from normal use and loads only when a supported `perf` query mode is explicitly requested.
+- Loaded scripts remain cached/in-memory for later visits in the same browser page session; the loader does not attempt unsafe script unloading.
+
 ## 5. Target JavaScript Structure
 
 هذا هدف تدريجي، وليس تغييرًا منفذًا الآن:

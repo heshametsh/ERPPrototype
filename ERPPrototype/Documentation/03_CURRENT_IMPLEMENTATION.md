@@ -2,6 +2,8 @@
 
 > تحديث 2026-08-12: التحقق الحالي المقبول هو Build PASS، Integration `25/25` وSmoke Browser `11/11`. أمر الاختبار المعتمد الوحيد هو `Tools/Invoke-ERPTests.ps1`; مراجع أدوات Phase 8/Phase 9 القديمة في الأقسام التاريخية لا تعني أن تلك الأدوات ما زالت موجودة.
 
+> تحديث 2026-08-13 — Phase 2B: `App.razor` no longer preloads the heavy Work Orders Tabulator runtime on Login/Home/Admin. `workOrdersLoader.js` loads it only for `/work-orders`; `tabulatorPerformance.js` remains opt-in through supported `perf` query modes. The loader has no User/Branch/Department conditions.
+
 **Status:** Phase 9.0B accepted after SQL 10/10 and browser Full 9/9; Phase 9.0C 1,000-row stress coverage implemented as an acceptance candidate
 **Review date:** 2026-07-31
 **Acceptance evidence:** Developer-machine Release Build PASS, 10/10 isolated SQL Server save tests, Git source hygiene PASS, and a 169-file clean source archive of 3.06 MB. The optional local Node.js check was skipped because Node.js was unavailable; project-owned JavaScript files separately passed syntax checks, and Phase 8.9 changed no production JavaScript.

@@ -46,7 +46,13 @@ internal sealed class Phase9FoundationBrowserTest(
         try
         {
             await loginPage.OpenAsync();
-            checks.Pass("Login form is rendered through stable test hooks");
+
+            E2ETestAssert.True(
+                !await workOrdersPage.IsGridRuntimeLoadedAsync(),
+                "The Login page preloaded the Work Orders grid runtime.");
+
+            checks.Pass(
+                "Login form is rendered without preloading Work Orders JavaScript");
 
             var loginToGridStartedAt = Stopwatch.GetTimestamp();
 
@@ -81,7 +87,16 @@ internal sealed class Phase9FoundationBrowserTest(
                 await workOrdersPage.GetSelectedYearAsync(),
                 "The sheet did not open on the current work year.");
 
-            checks.Pass("Blazor and Tabulator reach an explicit ready state");
+            E2ETestAssert.True(
+                await workOrdersPage.IsGridRuntimeLoadedAsync(),
+                "The Work Orders route did not lazy-load its grid runtime.");
+
+            E2ETestAssert.True(
+                !await workOrdersPage.IsPerformanceRuntimeLoadedAsync(),
+                "Normal Work Orders usage loaded the optional performance observatory.");
+
+            checks.Pass(
+                "Blazor and route-loaded Tabulator reach an explicit ready state");
 
             await workOrdersPage.WaitForActiveRowCountAsync(
                 seed.RowsPerYear);

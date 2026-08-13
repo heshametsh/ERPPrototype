@@ -89,6 +89,21 @@ internal sealed class WorkOrdersPage(IPage page)
     public string GetPath() =>
         new Uri(page.Url).AbsolutePath;
 
+    public Task<bool> IsGridRuntimeLoadedAsync() =>
+        page.EvaluateAsync<bool>(
+            """
+            () => Boolean(
+                typeof window.Tabulator !== 'undefined' &&
+                typeof window.tabulatorTest?.initialize === 'function'
+            )
+            """);
+
+    public Task<bool> IsPerformanceRuntimeLoadedAsync() =>
+        page.EvaluateAsync<bool>(
+            """
+            () => typeof window.tabulatorPerformance !== 'undefined'
+            """);
+
     public async Task<string> GetBranchSourceNameAsync() =>
         ((await BranchScopeValue.GetAttributeAsync("title")) ?? string.Empty)
             .Trim();
