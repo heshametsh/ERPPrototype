@@ -3,15 +3,19 @@
 **Status:** Current approved gates  
 **Last update:** 2026-08-16
 
-## Gate 0 — Engineering Remediation Baseline
+## Gate 0 — Engineering Remediation Baseline — **PASS / CHECKPOINTED**
 
-Required before large feature work:
+Evidence:
 
 - current docs canonicalized;
-- Runtime still traceable to `00503ab` until first remediation commit;
+- original audit Runtime remains traceable to `00503ab`;
 - normal E2E safety net expanded;
-- `LDR-002` fixed;
-- clean trustworthy performance baseline.
+- `LDR-002` fixed and contract-tested at `33e73c6`;
+- clean Open/Real-User/Torture performance baseline established;
+- current checkpoint `3dc88ff`;
+- SQL Integration 25/25 PASS; Full Browser 46/46 PASS; 10k Torture PASS.
+
+Gate 0 PASS means the measurement foundation is trustworthy. It does **not** mean Work Orders UX performance is accepted: measured Sort/dirty bulk freezes remain open and Gate 1 still requires comfortable 10k use.
 
 ## Gate 1 — Stable Online Work Orders
 

@@ -4,14 +4,31 @@
 
 ## أهم العمل الحالي قبل Pilot
 
-- `LDR-002`: Work Orders loader readiness race — أول إصلاح Runtime بعد توسيع الاختبارات.
-- `CSB-001`, `JS-003/EXF-001`, `JS-002`: boundaries/init/recovery.
+### Completed / verified on current checkpoint
+
+- `LDR-002`: **Closed and verified** at `33e73c6`; the loader contract now waits for the complete Work Orders core runtime.
+- Test Foundation: SQL Integration **25/25 PASS** and Full Browser **46/46 PASS**.
+- Clean Performance/Torture baseline: checkpoint `3dc88ff`; 10k functional/capacity torture **PASS** with no detected data loss or browser/server error.
+- Old `GRID-004` “10,000 rows untested” is superseded: 10k is now tested. **Comfort/performance acceptance remains open** because visible freezes were measured.
+- Old `TEST-001` incomplete edit/save/insert/delete/Undo/Redo browser coverage is superseded by the current Full + Torture suites.
+
+### Current open work
+
+- **Next package:** `CSB-001`, `JS-003/EXF-001`, `JS-002`, `CSB-003` — Online reliability / init / retry / event boundaries / recoverability.
 - `FRC-007`: conflict واحد لا يضيع باقي dirty batch.
 - `CON-002/003`: Custom Column schema concurrency + Schema/Config Version.
 - `SEC-001`: forced temporary-password invariant.
 - Custom Column title XSS.
-- Save transport/full-sheet performance debt (`PERF-002/003/008/009/010/011/012`).
+- Save transport/full-sheet performance debt (`PERF-002/003/008/009/010/011/012`). Runtime evidence now confirms the UX impact of `PERF-008/012` and large dirty/Save work; see Master Report §6.1.
 - Production gates: deployment/ops, dependency/security/license review, CI, backup/restore, SEC network/domain.
+
+### Current performance evidence status
+
+- `PERF-012` financial Sort: **strong runtime confirmation** — worst observed Long Task 2.596 s at 10k.
+- `PERF-008` 500+ changed-cell replacement: **runtime confirmed** — 1,000-cell Paste produced >1 s Long Task.
+- `PERF-009`: bulk Undo/Redo latency confirmed; retained-history memory risk still unmeasured.
+- `PERF-011`: broad Save contract remains static-confirmed; 1,000-edit Save showed a 9.32 s user journey, but causal cost split is still pending.
+- `PERF-002/003/006/010`: remain open and require targeted measurement; current Torture must not be used to claim them closed.
 
 ## قرارات تقلل أو تغير Findings قديمة
 

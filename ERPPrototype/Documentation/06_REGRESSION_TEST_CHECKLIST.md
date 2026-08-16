@@ -128,10 +128,21 @@
 
 ### 10,000 rows
 
-- [ ] كرر الاختبارات على بيانات تجريبية.
-- [ ] لا تعتمد النتيجة لمجرد أن الصفحة فتحت.
-- [ ] سجل الأرقام وقارنها بـ3,000 صف.
-- [ ] إذا فشل، افتح قرار server-side/progressive loading قبل إضافة ميزات أخرى.
+- [x] كرر الاختبارات على بيانات تجريبية.
+- [x] لا تعتمد النتيجة لمجرد أن الصفحة فتحت.
+- [x] سجل الأرقام وقارنها بالـdatasets الأصغر.
+- [x] نفّذ Torture فعليًا: 1,000 تعديل + 1,000 إضافة + 1,000 حذف + mixed Save + year switching + post-torture interaction.
+- [x] تحقق من persistence بعد Reload ومن عدم فقد البيانات.
+- [ ] **UX comfort acceptance remains open:** financial Sort and dirty bulk operations still show multi-second Long Tasks.
+- [ ] كرر أهم سيناريوهات القبول لاحقًا على SEC Edge/network الحقيقي قبل Gate 3.
+
+Latest 2026-08-16 evidence:
+
+- SQL Integration: 25/25 PASS.
+- Full Browser: 46/46 PASS.
+- 10k Torture: PASS; final active rows 10,000, dirty 0, max rendered DOM rows 60.
+- Worst observed Long Task: financial Sort 2.596 s; dirty-interaction 2.247 s; 1,000-row Paste 1.399 s; 1,000-edit Save 1.288 s.
+- Functional/capacity survival is therefore proven for this scope, but performance acceptance is intentionally **not closed**.
 
 ## K. Reconnection and Azure
 

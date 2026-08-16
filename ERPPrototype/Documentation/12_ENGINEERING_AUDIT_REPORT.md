@@ -2,8 +2,9 @@
 
 **Document ID:** `12_ENGINEERING_AUDIT_REPORT.md`  
 **Edition:** Post-Audit Decisions + SEC Validation — 2026-08-16  
-**Status:** Independent audits complete; product decisions substantially closed; **no Runtime remediation started yet**  
-**Baseline:** `codespaces-sync-2026-08-08` @ `00503ab`  
+**Status:** Independent audits complete; Test Foundation + `LDR-002` + clean performance/torture baseline completed; **Online Reliability is next**  
+**Audit baseline:** `codespaces-sync-2026-08-08` @ `00503ab`  
+**Current verified checkpoint:** `3dc88ff` (`Add Work Orders performance and torture baselines`)  
 **Latest SEC Codespaces check:** working tree clean; Release Build PASS on .NET `10.0.200`
 
 > This is the current daily engineering source of truth. Detailed standalone audits remain evidence; current code remains the source of truth for what is actually implemented.
@@ -172,6 +173,67 @@ Keep these explicit; “Stress Test” alone is not enough:
 
 **Operating target:** 10k Work Orders per Department/year must be comfortable.  
 **50k:** Stress/Capacity target, not normal guaranteed operating size.
+
+## 6.1 Runtime evidence reconciliation — 2026-08-16
+
+The post-audit sequence has now produced runtime evidence instead of relying on static findings alone.
+
+### Verified checkpoints and safety gates
+
+- `33e73c6`: Test Foundation strengthened and `LDR-002` fixed.
+- `3dc88ff`: Open Performance, visible Real-User, and 10k Torture baselines added.
+- SQL Server Integration: **25/25 PASS**.
+- Full Browser Regression: **46/46 PASS**.
+- Work Orders Torture: **PASS** at 10,000 rows/year after 1,000-row edit, insert, and delete abuse plus mixed Save and year switching.
+
+### Clean open baseline — same-machine loopback
+
+| Rows/year | Median login→usable grid | Median SQL rows query | Median server sheet load | Median browser first usable | Approx. grid data |
+|---:|---:|---:|---:|---:|---:|
+| 1,000 | 965 ms | 19.6 ms | 36.2 ms | 299 ms | 299 KB |
+| 5,000 | 1,535 ms | 50.9 ms | 65.5 ms | 787 ms | 1.51 MB |
+| 10,000 | 2,085 ms | 75.6 ms | 111 ms | 1,299 ms | 3.02 MB |
+
+**Interpretation:** SQL is not the dominant open-time bottleneck at 10k on the local loopback baseline. Most user-visible open cost is after the database query, in browser/data-transfer/grid preparation. This does **not** substitute for SEC-network validation.
+
+### 10k torture evidence
+
+The sheet survived the full abuse journey without detected data loss or browser/server errors. Final state: 10,000 active rows, zero dirty rows, and at most 60 rendered DOM rows.
+
+High-value measured findings:
+
+- six financial sorts: **17.4 s total**, worst browser Long Task **2.596 s**;
+- edit 1,000 rows in one Excel-like paste: **3.48 s**, worst Long Task **1.399 s**;
+- search/filter/sort while 1,000 rows remain dirty: **6.44 s**, worst Long Task **2.247 s**;
+- Undo/Redo through the large dirty operation: about **3.2 s** each, worst Long Task about **1.3 s**;
+- Save 1,000 edits: **9.32 s**, worst Long Task **1.288 s**;
+- insert/fill/save 1,000 new rows and delete/save 1,000 rows completed and persisted;
+- mixed Save of 250 edits + 250 inserts + 250 deletes completed and persisted;
+- aggressive wheel and 1,000 keyboard navigation actions did not show the multi-second freezes seen in Sort/dirty bulk work.
+
+### Audit finding ↔ runtime evidence status
+
+| Finding | Status after runtime evidence | Current conclusion |
+|---|---|---|
+| `LDR-002` | **Closed / verified** | Loader contract test reproduces the old race and now proves Work Orders waits for the complete core runtime. |
+| `PERF-002` duplicate O(N²) path | **Open — static confirmed, not quantified here** | Current torture did not intentionally create a large duplicate-conflict batch. Keep targeted measurement before closing. |
+| `PERF-003` small Save whole-sheet reconciliation | **Open — not isolated** | Bulk Save is measurably expensive, but the current evidence does not isolate the small-Save reconciliation cost. |
+| `PERF-006` search refilters every key | **Open — not yet measured as real typing** | Current automation uses field fill for search; it does not prove per-keystroke cost. Do not claim this finding closed or runtime-confirmed yet. |
+| `PERF-008` 500+ changed cells full-grid replace | **Runtime confirmed** | 1,000-cell Paste/Undo/Redo produced >1 s Long Tasks; the 500-cell replacement threshold remains a real large-batch cost center. |
+| `PERF-009` history limited by transaction count, not retained size | **Partially confirmed** | Large Undo/Redo latency is proven; retained-memory growth/budget risk still needs a dedicated long-session memory test. |
+| `PERF-010` Custom Column delete scans Department history | **Open — static only** | The current performance/torture run did not exercise large historical Custom Column deletion. |
+| `PERF-011` Save sends full dirty rows | **Static confirmed + runtime symptom** | 1,000-edit Save took 9.32 s, but transport/server/client shares are not yet isolated enough to attribute all latency to this finding. Narrow Delta Save remains the planned architectural fix. |
+| `PERF-012` money parsing coupled to display formatting | **Strongly runtime-confirmed** | Financial Sort is the clearest current UX cliff, with a 2.596 s Long Task. Keep as a measured optimization target; do not bypass the approved remediation order without an explicit decision. |
+| `PERF-013+` structural/validation cliffs | **Coverage established** | 1,000 insert/delete/mixed persistence survived; validation failure handling was also exercised during harness development. Continue targeted measurement as new cliffs appear. |
+
+### Acceptance decision
+
+- **Functional/capacity robustness at 10k:** PASS for the current torture scope.
+- **Performance engineering baseline:** established.
+- **User-experience performance acceptance:** **NOT CLOSED** because Sort and dirty bulk operations still produce visible multi-second freezes.
+- **SEC real-device/network acceptance:** still pending as a later environment gate.
+
+Therefore the next approved engineering package remains **Online Reliability**, followed by the **Narrow Save/Delta contract**. Measured performance findings remain attached to those packages and are not treated as newly discovered parallel work.
 
 ---
 
@@ -1171,13 +1233,15 @@ Required, as applicable:
 
 # 33. Current next action
 
-**Start with Test Foundation → `LDR-002` → clean Performance Baseline.**
+Completed and checkpointed:
 
-Then:
+**Test Foundation → `LDR-002` → clean Open/Real-User/Torture Performance Baseline.**
 
-**Online reliability → narrow Save/Delta/receipt contract → concurrency/security/localization → Offline/Sync.**
+Current next package:
 
-No Runtime change has been approved or applied as part of this report update.
+**Online Reliability → narrow Save/Delta/receipt contract → concurrency/security/localization → Offline/Sync.**
+
+The measured Sort/dirty/bulk Save cliffs are now linked to the existing Performance findings above. No Sort optimization patch is part of checkpoint `3dc88ff`; performance remediation must be measured against this checkpoint and the same regression/torture evidence.
 
 ---
 
