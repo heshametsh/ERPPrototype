@@ -14,6 +14,12 @@
         "partialAmount"
     ]);
 
+    // Sorting 10k+ rows calls the comparator many times for the same values.
+    // Keep only the numeric sort key so repeated comparisons do not redo
+    // digit normalization, BigInt parsing, rounding, and formatting.
+    const amountSortValueCache = new Map();
+    const amountSortValueCacheLimit = 100000;
+
     target.registerModule("financialFields", {
         normalizeFinancialDigits: function (value) {
             return String(value ?? "")
@@ -129,18 +135,29 @@
             return this.normalizeAmountValue(cell?.getValue?.());
         },
 
+        getAmountSortValue: function (value) {
+            const cacheKey = String(value ?? "").trim();
+
+            if (amountSortValueCache.has(cacheKey)) {
+                return amountSortValueCache.get(cacheKey);
+            }
+
+            const parsed = this.parseAmount(value);
+            const sortValue = parsed.valid && !parsed.empty
+                ? parsed.cents
+                : Number.NEGATIVE_INFINITY;
+
+            if (amountSortValueCache.size >= amountSortValueCacheLimit) {
+                amountSortValueCache.clear();
+            }
+
+            amountSortValueCache.set(cacheKey, sortValue);
+            return sortValue;
+        },
+
         amountSorter: function (first, second) {
-            const firstParsed = this.parseAmount(first);
-            const secondParsed = this.parseAmount(second);
-
-            const firstValue = firstParsed.valid && !firstParsed.empty
-                ? firstParsed.cents
-                : Number.NEGATIVE_INFINITY;
-            const secondValue = secondParsed.valid && !secondParsed.empty
-                ? secondParsed.cents
-                : Number.NEGATIVE_INFINITY;
-
-            return firstValue - secondValue;
+            return this.getAmountSortValue(first) -
+                this.getAmountSortValue(second);
         },
 
         calculateRemainingAmount: function (
