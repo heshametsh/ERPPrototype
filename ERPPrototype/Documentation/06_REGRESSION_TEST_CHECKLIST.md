@@ -605,6 +605,13 @@ Measure operation-specific latency/cost for:
 
 10k is the normal target; 50k is capacity/stress.
 
+Performance is accepted only when **both** conditions pass:
+
+1. engineering measurements are within the approved budget/baseline for the same environment;
+2. the visible employee workflow is smooth in the primary **Split Screen 100%** scenario.
+
+A benchmark that looks good while search, scrolling, editing, Paste, Undo/Redo, Save, or year switching feels noticeably laggy to the user is **not accepted**. Home/loopback headed evidence is required before closing the baseline, and representative SEC Edge/network validation remains a later environment gate.
+
 ## C. Offline/Sync Stress — when implemented
 
 Include:

@@ -22,7 +22,8 @@ Required:
 - Save/initialization/recovery boundaries stable;
 - narrow Save/Delta contract proven;
 - concurrency/security P1s closed;
-- 10k target measured comfortably.
+- 10k target measured comfortably;
+- performance acceptance includes both engineering numbers and a smooth visible employee workflow in the primary Split Screen 100% case. A benchmark-only PASS is not sufficient.
 
 ## Gate 2 — Offline/Sync Engineering Qualification
 

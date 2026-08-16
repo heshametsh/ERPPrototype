@@ -89,6 +89,33 @@ internal sealed record E2ETestOptions(
                 continue;
             }
 
+            if (string.Equals(
+                    argument,
+                    "--open-performance",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                suite = E2ETestSuite.OpenPerformance;
+                continue;
+            }
+
+            if (string.Equals(
+                    argument,
+                    "--real-user-performance",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                suite = E2ETestSuite.RealUserPerformance;
+                continue;
+            }
+
+            if (string.Equals(
+                    argument,
+                    "--torture",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                suite = E2ETestSuite.Torture;
+                continue;
+            }
+
             if (argument.StartsWith(
                     "--suite=",
                     StringComparison.OrdinalIgnoreCase))
@@ -178,7 +205,9 @@ internal sealed record E2ETestOptions(
         }
 
         if (
-            suite == E2ETestSuite.Performance &&
+            (suite == E2ETestSuite.Performance ||
+             suite == E2ETestSuite.OpenPerformance ||
+             suite == E2ETestSuite.RealUserPerformance) &&
             !performanceDiagnostics &&
             performanceRuns < 3)
         {
@@ -221,7 +250,7 @@ internal sealed record E2ETestOptions(
         }
 
         throw new ArgumentException(
-            $"Unknown E2E suite '{value}'. Use Smoke, Full, Stress, or Performance.");
+            $"Unknown E2E suite '{value}'. Use Smoke, Full, Stress, Performance, OpenPerformance, RealUserPerformance, or Torture.");
     }
 
     private static PerformanceAction ParsePerformanceAction(string value)

@@ -5,5 +5,8 @@ internal enum E2ETestSuite
     Smoke,
     Full,
     Stress,
-    Performance
+    Performance,
+    OpenPerformance,
+    RealUserPerformance,
+    Torture
 }

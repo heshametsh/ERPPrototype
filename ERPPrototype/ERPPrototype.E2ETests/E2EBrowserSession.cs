@@ -37,7 +37,13 @@ internal sealed class E2EBrowserSession : IAsyncDisposable
         string artifactDirectory,
         bool headed,
         bool traceEnabled = true,
-        bool benchmarkMode = false)
+        bool benchmarkMode = false,
+        int viewportWidth = 1440,
+        int viewportHeight = 1000,
+        int? windowWidth = null,
+        int? windowHeight = null,
+        int? screenWidth = null,
+        int? screenHeight = null)
     {
         var playwright = await Playwright.CreateAsync();
         IBrowser? browser = null;
@@ -48,7 +54,9 @@ internal sealed class E2EBrowserSession : IAsyncDisposable
             browser = await LaunchChromiumAsync(
                 playwright,
                 headed,
-                benchmarkMode);
+                benchmarkMode,
+                windowWidth,
+                windowHeight);
 
             context = await browser.NewContextAsync(
                 new BrowserNewContextOptions
@@ -56,9 +64,17 @@ internal sealed class E2EBrowserSession : IAsyncDisposable
                     Locale = "ar-SA",
                     ViewportSize = new ViewportSize
                     {
-                        Width = 1440,
-                        Height = 1000
-                    }
+                        Width = viewportWidth,
+                        Height = viewportHeight
+                    },
+                    ScreenSize =
+                        screenWidth.HasValue && screenHeight.HasValue
+                            ? new ScreenSize
+                            {
+                                Width = screenWidth.Value,
+                                Height = screenHeight.Value
+                            }
+                            : null
                 });
 
             if (traceEnabled)
@@ -241,14 +257,27 @@ internal sealed class E2EBrowserSession : IAsyncDisposable
     internal static async Task<IBrowser> LaunchChromiumAsync(
         IPlaywright playwright,
         bool headed,
-        bool benchmarkMode)
+        bool benchmarkMode,
+        int? windowWidth = null,
+        int? windowHeight = null)
     {
+        var arguments = new List<string>();
+
+        if (benchmarkMode)
+        {
+            arguments.Add("--enable-precise-memory-info");
+        }
+
+        if (windowWidth.HasValue && windowHeight.HasValue)
+        {
+            arguments.Add(
+                $"--window-size={windowWidth.Value},{windowHeight.Value}");
+        }
+
         var launchOptions = new BrowserTypeLaunchOptions
         {
             Headless = !headed,
-            Args = benchmarkMode
-                ? ["--enable-precise-memory-info"]
-                : null,
+            Args = arguments.Count > 0 ? arguments : null,
             SlowMo = 0
         };
 

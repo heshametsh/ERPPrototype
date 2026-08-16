@@ -9,11 +9,12 @@ internal sealed class LoginPage(IPage page, Uri baseUri)
     private ILocator Password => page.GetByTestId("login-password");
     private ILocator Submit => page.GetByTestId("login-submit");
 
-    public async Task OpenAsync()
+    public async Task OpenAsync(string returnUrl = "/work-orders")
     {
+        var encodedReturnUrl = Uri.EscapeDataString(returnUrl);
         var loginUri = new Uri(
             baseUri,
-            "/Account/Login?ReturnUrl=%2Fwork-orders");
+            $"/Account/Login?ReturnUrl={encodedReturnUrl}");
 
         var response = await page.GotoAsync(
             loginUri.ToString(),
@@ -58,7 +59,7 @@ internal sealed class LoginPage(IPage page, Uri baseUri)
         await Submit.ClickAsync();
 
         await page.WaitForURLAsync(
-            "**/work-orders",
+            "**/work-orders*",
             new PageWaitForURLOptions
             {
                 Timeout = 45_000

@@ -897,6 +897,8 @@ Include:
 
 **Acceptance rule:** functionally correct but materially slower Work Orders = **not accepted**.
 
+Performance acceptance requires **both** trustworthy engineering measurements and a visibly smooth employee workflow in the primary **Split Screen 100%** scenario. A benchmark-only PASS does not close the Performance gate; representative SEC Edge/network validation remains a later environment gate.
+
 ---
 
 # 26. Mandatory performance rules

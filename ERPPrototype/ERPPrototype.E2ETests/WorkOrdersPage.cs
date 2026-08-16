@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Globalization;
 using Microsoft.Playwright;
 
@@ -656,6 +656,81 @@ internal sealed class WorkOrdersPage(IPage page)
             expectedValue);
     }
 
+    public async Task<int[]> GetActiveRowIdsAsync(
+        int startIndex,
+        int count)
+    {
+        return await page.EvaluateAsync<int[]>(
+            """
+            args => {
+                const table =
+                    window.tabulatorTest?.tables?.[args.tableId];
+
+                if (!table) {
+                    return [];
+                }
+
+                return table
+                    .getRows('active')
+                    .slice(args.startIndex, args.startIndex + args.count)
+                    .map(row => Number(row.getIndex()))
+                    .filter(Number.isFinite);
+            }
+            """,
+            new
+            {
+                tableId = TableId,
+                startIndex,
+                count
+            });
+    }
+
+    public async Task PasteColumnValuesAsync(
+        int startRowId,
+        string field,
+        IReadOnlyList<string> values,
+        int expectedDirtyRowCount)
+    {
+        E2ETestAssert.True(
+            values.Count > 0,
+            "Bulk paste requires at least one value.");
+
+        await page.EvaluateAsync(
+            """
+            tableId => {
+                window.tabulatorTest?.clearTableRanges(tableId);
+            }
+            """,
+            TableId);
+
+        await ClickCellAsync(startRowId, field);
+
+        var clipboardText = string.Join("\n", values);
+
+        var pasted = await page.EvaluateAsync<bool>(
+            """
+            async args => {
+                return await window.tabulatorTest.pasteClipboardText(
+                    args.tableId,
+                    args.clipboardText
+                );
+            }
+            """,
+            new
+            {
+                tableId = TableId,
+                clipboardText
+            });
+
+        E2ETestAssert.True(
+            pasted,
+            $"Could not bulk paste {values.Count:N0} values into field '{field}'.");
+
+        await WaitForDirtyRowCountAsync(
+            expectedDirtyRowCount,
+            StressTimeoutMs);
+    }
+
     public async Task WaitForCellValueAsync(
         int rowId,
         string field,
@@ -816,6 +891,24 @@ internal sealed class WorkOrdersPage(IPage page)
             "visible",
             expectedRemainingRows,
             StressTimeoutMs);
+    }
+
+    public Task ActivateCellForNavigationAsync(
+        int rowId,
+        string field) =>
+        ClickCellAsync(rowId, field);
+
+    public async Task<int> GetActiveCellRowIdAsync()
+    {
+        return await page.EvaluateAsync<int>(
+            """
+            tableId => {
+                const state = window.tabulatorTest?.states?.[tableId];
+                const rowId = Number(state?.activeCell?.rowId);
+                return Number.isFinite(rowId) ? rowId : -1;
+            }
+            """,
+            TableId);
     }
 
     private async Task ClickCellAsync(
@@ -2347,6 +2440,156 @@ internal sealed class WorkOrdersPage(IPage page)
         await WaitForSelectionAggregateAsync(0);
     }
 
+
+
+    public async Task<int> CountActiveRowsByFieldValueAsync(
+        string field,
+        string value)
+    {
+        return await page.EvaluateAsync<int>(
+            """
+            args => {
+                const table = window.tabulatorTest?.tables?.[args.tableId];
+                if (!table) return -1;
+
+                return table
+                    .getRows('active')
+                    .filter(row => String(row.getData()?.[args.field] ?? '') === args.value)
+                    .length;
+            }
+            """,
+            new
+            {
+                tableId = TableId,
+                field,
+                value
+            });
+    }
+
+    public async Task InsertRowsAsync(
+        int anchorRowId,
+        int count,
+        string position,
+        int expectedRowCount)
+    {
+        await SelectActiveRowAsync(anchorRowId);
+
+        await page.EvaluateAsync<bool>(
+            """
+            async args => {
+                await window.tabulatorTest.insertRows(
+                    args.tableId,
+                    args.count,
+                    args.position
+                );
+                return true;
+            }
+            """,
+            new
+            {
+                tableId = TableId,
+                count,
+                position
+            });
+
+        await WaitForActiveRowCountAsync(expectedRowCount, StressTimeoutMs);
+    }
+
+    public async Task<int[]> GetTemporaryRowIdsAsync()
+    {
+        return await page.EvaluateAsync<int[]>(
+            """
+            tableId => {
+                const table = window.tabulatorTest?.tables?.[tableId];
+                if (!table) return [];
+
+                return table
+                    .getRows('active')
+                    .map(row => Number(row.getIndex()))
+                    .filter(rowId => Number.isFinite(rowId) && rowId < 0);
+            }
+            """,
+            TableId);
+    }
+
+    public async Task PasteMatrixAsync(
+        int startRowId,
+        string startField,
+        IReadOnlyList<string[]> rows,
+        int expectedDirtyRowCount)
+    {
+        E2ETestAssert.True(rows.Count > 0,
+            "Matrix paste requires at least one row.");
+        E2ETestAssert.True(rows.All(row => row.Length > 0),
+            "Matrix paste rows must contain at least one cell.");
+
+        await page.EvaluateAsync(
+            """
+            tableId => {
+                window.tabulatorTest?.clearTableRanges(tableId);
+            }
+            """,
+            TableId);
+
+        await ClickCellAsync(startRowId, startField);
+
+        var clipboardText = string.Join(
+            "\n",
+            rows.Select(row => string.Join("\t", row)));
+
+        var pasted = await page.EvaluateAsync<bool>(
+            """
+            async args => await window.tabulatorTest.pasteClipboardText(
+                args.tableId,
+                args.clipboardText
+            )
+            """,
+            new
+            {
+                tableId = TableId,
+                clipboardText
+            });
+
+        E2ETestAssert.True(
+            pasted,
+            $"Could not paste {rows.Count:N0} rows starting at '{startField}'.");
+
+        await WaitForDirtyRowCountAsync(
+            expectedDirtyRowCount,
+            StressTimeoutMs);
+    }
+
+    public async Task DeleteSelectedRowsAsync(
+        int expectedRemainingRows,
+        int expectedDirtyRows)
+    {
+        EventHandler<IDialog> dialogHandler =
+            async (_, dialog) => await dialog.AcceptAsync();
+
+        page.Dialog += dialogHandler;
+        try
+        {
+            await page.EvaluateAsync<bool>(
+                """
+                async tableId => {
+                    await window.tabulatorTest.deleteSelectedRows(tableId);
+                    return true;
+                }
+                """,
+                TableId);
+        }
+        finally
+        {
+            page.Dialog -= dialogHandler;
+        }
+
+        await WaitForActiveRowCountAsync(
+            expectedRemainingRows,
+            StressTimeoutMs);
+        await WaitForDirtyRowCountAsync(
+            expectedDirtyRows,
+            StressTimeoutMs);
+    }
 
     public async Task<BrowserStructureStressMetrics>
         RunThousandRowStructureStressAsync(
