@@ -238,7 +238,7 @@ internal sealed class E2EBrowserSession : IAsyncDisposable
         }
     }
 
-    private static async Task<IBrowser> LaunchChromiumAsync(
+    internal static async Task<IBrowser> LaunchChromiumAsync(
         IPlaywright playwright,
         bool headed,
         bool benchmarkMode)

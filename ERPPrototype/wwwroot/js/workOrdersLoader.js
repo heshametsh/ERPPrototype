@@ -24,6 +24,7 @@
     const pendingScripts = new Map();
 
     let corePromise = null;
+    let coreReady = false;
     let performancePromise = null;
 
     function normalizePath(pathname) {
@@ -151,18 +152,19 @@
     }
 
     function ensureCoreLoaded() {
-        if (
-            typeof window.Tabulator !== "undefined" &&
-            typeof window.tabulatorTest?.initialize === "function"
-        ) {
+        if (coreReady) {
             return Promise.resolve();
         }
 
         if (!corePromise) {
-            corePromise = loadCore().catch(error => {
-                corePromise = null;
-                throw error;
-            });
+            corePromise = loadCore()
+                .then(() => {
+                    coreReady = true;
+                })
+                .catch(error => {
+                    corePromise = null;
+                    throw error;
+                });
         }
 
         return corePromise;

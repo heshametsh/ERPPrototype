@@ -46,6 +46,18 @@ internal static class Phase9FoundationRunner
 
             Console.WriteLine();
 
+            if (options.Suite != E2ETestSuite.Performance)
+            {
+                var loaderContractTest =
+                    new WorkOrdersLoaderContractBrowserTest(
+                        projectRoot,
+                        options.Headed);
+
+                await loaderContractTest.RunAsync();
+                Console.WriteLine(
+                    "[PASS] Work Orders loader waits for the complete core runtime");
+            }
+
             await using var database =
                 await E2ETestDatabase.CreateAsync(
                     options.KeepDatabase,

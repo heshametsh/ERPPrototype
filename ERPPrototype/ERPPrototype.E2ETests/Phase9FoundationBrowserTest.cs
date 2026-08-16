@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json;
 
@@ -1279,7 +1279,7 @@ internal sealed class Phase9FoundationBrowserTest(
 
             browserSession.Diagnostics.AssertNoCriticalErrors();
             checks.Pass(
-                "Journey completes without page errors or HTTP 5xx responses");
+                "Journey completes without unexpected page, console, request, or HTTP 5xx errors");
 
             E2ETestAssert.Equal(
                 ExpectedCheckCount,

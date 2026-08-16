@@ -27,9 +27,16 @@ internal sealed class BrowserDiagnostics
         };
 
         page.RequestFailed += (_, request) =>
+        {
+            if (IsExpectedBlazorDisconnectAbort(request, baseUri))
+            {
+                return;
+            }
+
             failedRequests.Enqueue(
                 $"{request.Method} {request.Url}: " +
                 $"{request.Failure}");
+        };
 
         page.Response += (_, response) =>
         {
@@ -52,15 +59,46 @@ internal sealed class BrowserDiagnostics
         };
     }
 
+
+    private static bool IsExpectedBlazorDisconnectAbort(
+        IRequest request,
+        Uri baseUri)
+    {
+        if (!string.Equals(
+                request.Method,
+                "POST",
+                StringComparison.OrdinalIgnoreCase)
+            || !Uri.TryCreate(request.Url, UriKind.Absolute, out var uri)
+            || !string.Equals(
+                uri.Authority,
+                baseUri.Authority,
+                StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(
+                uri.AbsolutePath,
+                "/_blazor/disconnect",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        return request.Failure?.Contains(
+                   "ERR_ABORTED",
+                   StringComparison.OrdinalIgnoreCase) == true;
+    }
+
     public void AssertNoCriticalErrors()
     {
-        if (pageErrors.IsEmpty && serverErrors.IsEmpty)
+        if (
+            pageErrors.IsEmpty &&
+            serverErrors.IsEmpty &&
+            consoleErrors.IsEmpty &&
+            failedRequests.IsEmpty)
         {
             return;
         }
 
         throw new InvalidOperationException(
-            "The browser journey completed with critical client/server errors." +
+            "The browser journey completed with unexpected browser/server errors." +
             Environment.NewLine +
             BuildReport());
     }
