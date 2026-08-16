@@ -1,3 +1,23 @@
+# CURRENT REMEDIATION ROADMAP — 2026-08-16
+
+> Phase 8/9 sections below remain historical. The current engineering order after the independent audits is:
+
+1. **Test Foundation** — normal E2E first, browser diagnostics fail rules, failure injection, responsive matrix, C#↔JS contract, operation-specific performance probes.
+2. **Fix `LDR-002`** — one complete loader readiness promise.
+3. **Clean Performance Baseline** — only after loader reliability is fixed.
+4. **Online Reliability** — init/retry/event boundaries/Admin recoverability.
+5. **Narrow Save Contract** — physical field deltas, no full-row/full-year transport, receipt-compatible result.
+6. **Concurrency/Schema Integrity** — Schema/Config Version, partial conflict preservation, Custom Column races.
+7. **Identity/Security/Permissions** — forced password, OTP, server actor identity, XSS, Audit Log, manager capability foundation.
+8. **Localization identity foundation** — stable language-neutral codes.
+9. **Offline durable state** — IndexedDB Draft/Outbox, all authorized years, 5h/7d rules, Web Locks.
+10. **Sync engine** — event-driven Preflight, OperationId/receipts, partial merge/conflict UX, no polling.
+11. **Extended normal regression + Offline/Sync Stress.**
+12. **Staging + real SEC cable/domain/firewall + limited Pilot.**
+13. **Production only after operations gates.**
+
+**Stop rule:** do not jump directly to Offline before Tests + Loader + Save contract are trustworthy.
+
 # 09 — Maintainability Refactor Roadmap
 
 **Runtime baseline:** Phase 8.8-R2 accepted after the automated runner passed 10/10. Field-level tracking, batch editing, save-result merge, lifecycle ownership, interaction ownership, read-query separation, and save-plan separation are stable.

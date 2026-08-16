@@ -1,4 +1,32 @@
-﻿# START HERE — ERP Prototype
+# CURRENT HANDOFF — 2026-08-16
+
+> **هذا القسم هو الحالة الحالية المعتمدة.** أي Phase/خطة قديمة أسفل الملف تُعامل كتاريخ تنفيذي إذا تعارضت مع هذا القسم أو مع `Documentation/12_ENGINEERING_AUDIT_REPORT.md`.
+
+**Baseline code:** `codespaces-sync-2026-08-08` @ `00503ab`  
+**Runtime remediation after audits:** لم يبدأ بعد  
+**Latest SEC Codespaces Release Build:** PASS  
+**الخطوة التالية المعتمدة:** `Test Foundation → Fix LDR-002 → Clean Performance Baseline → Online Reliability → Narrow Save/Delta Contract`
+
+## اقرأ أولًا في أي محادثة/مراجعة جديدة
+
+1. `Documentation/12_ENGINEERING_AUDIT_REPORT.md` — الـMaster الحالي للـFindings والقرارات والخطة.
+2. `Documentation/ERP_AUDIT_PROTOCOL.md` — قواعد أي Audit مستقل جديد.
+3. `Documentation/00_DOCUMENTATION_INDEX.md` — ترتيب الثقة والوثائق الحالية.
+4. `Documentation/03_CURRENT_IMPLEMENTATION.md` — ما هو منفذ فعليًا في commit الحالي.
+5. `Documentation/06_REGRESSION_TEST_CHECKLIST.md` — شبكة الاختبارات الحالية والقواعد الجديدة.
+6. `Documentation/41_HANDOFF_2026-08-16_POST_AUDIT.md` — تسليم مختصر للمحادثة التالية.
+
+## قواعد لا يجوز خلطها
+
+- الكود الحالي هو الحقيقة لما هو **منفذ الآن**.
+- الـMaster هو الحقيقة لما هو **مقرر/مطلوب تنفيذه لاحقًا**.
+- Offline/Sync والـSub-workflows المستقبلية **ليست منفذة في baseline `00503ab`**.
+- لا تعديل Runtime قبل بناء/توسيع شبكة الاختبارات ثم إصلاح `LDR-002`.
+- أحجام Work Orders المجمدة لا تُغير بدون طلب صريح.
+- لا Polling ثابت للسيرفر؛ الاتصال يكون عند حدث له قيمة فعلية مثل Save/Resume مع Pending work.
+- الأداء شرط قبول: أي ميزة تسبب Lag ملحوظ في Work Orders تعاد هندستها قبل الاعتماد.
+
+# START HERE — ERP Prototype
 
 > تحديث 2026-08-12: أمر التحقق الآلي المعتمد الوحيد هو `Tools/Invoke-ERPTests.ps1`. مراجع أدوات Phase 8/Phase 9 القديمة في الأقسام التاريخية أدناه للتوثيق فقط؛ الأدوات القديمة أزيلت من شجرة المصدر. آخر تحقق مقبول: Integration `25/25` وSmoke Browser `11/11`.
 

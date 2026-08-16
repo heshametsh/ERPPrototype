@@ -1,4 +1,4 @@
-﻿# 06 — Regression Test Checklist
+# 06 — Regression Test Checklist
 
 > تحديث 2026-08-12: استخدم `Tools/Invoke-ERPTests.ps1` للتحقق الحالي. أوامر Phase 8/Phase 9 القديمة الواردة في أقسام تاريخية لم تعد موجودة. آخر تحقق مقبول: Integration `25/25` وSmoke Browser `11/11`.
 
@@ -558,3 +558,70 @@ Focused browser check:
 - [ ] Another department does not inherit the widths or hidden states.
 - [ ] Hiding a Money column removes it from the selection-summary display but does not change fixed yearly totals.
 
+
+
+# 2026-08-16 — Audit Remediation Acceptance Layer
+
+This section is authoritative for the next remediation sequence. Existing detailed Phase checks above remain useful historical/focused coverage.
+
+## A. Normal product operation must pass before Stress
+
+Cover at minimum:
+
+- Login / forced password / OTP when implemented.
+- Work Orders open/ready and year switching.
+- real keyboard + mouse.
+- Copy/Paste.
+- insert/delete.
+- Save small and bulk.
+- Draft restore once implemented.
+- Undo/Redo including after Save per approved behavior.
+- search/filter/sort.
+- Basket behavior and financial calculations.
+- Custom Column create/rename/delete/type/width/hide/unhide lifecycle.
+- authorization/permissions.
+- navigation away/back.
+- Split/Wide at 100/90/80/75/70/67.
+
+Unexpected browser `console.error`, page error, or failed request fails the test unless explicitly expected.
+
+## B. Performance acceptance
+
+Only establish the official baseline after `LDR-002` is fixed.
+
+Measure operation-specific latency/cost for:
+
+- open/ready;
+- Arrow/Enter/navigation;
+- search/filter/sort;
+- paste;
+- Undo/Redo;
+- small Save;
+- bulk Save;
+- year switch;
+- Basket;
+- Custom Columns;
+- memory + payload + server/SQL cost where practical.
+
+10k is the normal target; 50k is capacity/stress.
+
+## C. Offline/Sync Stress — when implemented
+
+Include:
+
+- thousands of Pending Outbox operations;
+- network loss/return/flapping;
+- server slow/down;
+- Save during Sync;
+- Tab/Edge close and Power Off;
+- multiple tabs/devices;
+- field/row/schema conflicts;
+- server delete vs Offline edit;
+- lost ACK after commit + duplicate OperationId retry;
+- IndexedDB migration/failure/storage pressure;
+- 5h Offline expiry / 7d Login expiry;
+- app update with Pending data;
+- permission change while Offline;
+- SEC-like network switching.
+
+**Fail criterion:** functionally correct but materially slower Work Orders is not accepted.

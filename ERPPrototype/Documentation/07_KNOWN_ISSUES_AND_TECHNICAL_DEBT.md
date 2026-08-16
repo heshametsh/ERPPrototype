@@ -1,3 +1,24 @@
+# CURRENT AUDIT FINDINGS OVERRIDE — 2026-08-16
+
+> قائمة Active Items القديمة أدناه تظل تاريخًا/تفصيلًا، لكن أولوية ما قبل Pilot الحالية تأتي من `12_ENGINEERING_AUDIT_REPORT.md`.
+
+## أهم العمل الحالي قبل Pilot
+
+- `LDR-002`: Work Orders loader readiness race — أول إصلاح Runtime بعد توسيع الاختبارات.
+- `CSB-001`, `JS-003/EXF-001`, `JS-002`: boundaries/init/recovery.
+- `FRC-007`: conflict واحد لا يضيع باقي dirty batch.
+- `CON-002/003`: Custom Column schema concurrency + Schema/Config Version.
+- `SEC-001`: forced temporary-password invariant.
+- Custom Column title XSS.
+- Save transport/full-sheet performance debt (`PERF-002/003/008/009/010/011/012`).
+- Production gates: deployment/ops, dependency/security/license review, CI, backup/restore, SEC network/domain.
+
+## قرارات تقلل أو تغير Findings قديمة
+
+- نموذج “موظف قسم واحد ثابت” لم يعد نموذج المستقبل؛ سيتم بناء capabilities/delegation.
+- Offline durable Draft/Outbox هو الحل المستقبلي لفقد العمل غير المحفوظ؛ لا تبنِ Recovery مكررًا مؤقتًا معقدًا.
+- لا Polling دوري للسيرفر؛ account disable/other-user updates تظهر عند أول server interaction فعلي لاحق.
+
 # 07 — Known Issues and Technical Debt
 
 **Status:** Active register

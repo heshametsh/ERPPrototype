@@ -1,3 +1,36 @@
+# POST-AUDIT DECISIONS — 2026-08-16
+
+> هذه القرارات أحدث من القرارات التاريخية أدناه وت supersede أي قرار يتعارض معها. التفاصيل والأسباب في `12_ENGINEERING_AUDIT_REPORT.md`.
+
+1. **No rewrite:** الحفاظ على ASP.NET Core/Blazor Server/EF/SQL/Identity/Tabulator.
+2. **Next execution:** Tests → `LDR-002` → clean baseline → Online reliability → narrow Save/Delta contract.
+3. **Performance is a hard gate:** 10k target; 50k capacity; أي Lag ملحوظ يرفض التصميم.
+4. **Save semantics:** Save = اعتماد وحفظ محلي durable؛ Sync أوتوماتيك وليس زرًا منفصلًا.
+5. **Draft:** قبل Save يمكن حماية العمل محليًا كDraft غير معتمد؛ Restore/Discard بعد reopen.
+6. **No fixed server polling.** الاتصال عند حدث مهم مثل Save/Resume مع Pending work.
+7. **Preflight:** metadata صغيرة؛ لا توقف Sync إلا لتغيير يمس Offline work فعليًا.
+8. **Offline scope:** كل السنوات المصرح بها للقسم؛ initial background prep ثم delta.
+9. **Offline editing lease:** 5 ساعات من آخر server contact؛ بعدها read/copy + حفظ ما بدأ فقط.
+10. **Trusted Login:** 7 أيام بعد Login كامل.
+11. **Auth:** Username + Password + Email OTP؛ البريد قناة تحقق وليس هوية؛ Admin ببريد خاص.
+12. **Temporary password:** 8 خانات بسيطة؛ إجبار التغيير؛ lockout تقريبًا 5 محاولات/15 دقيقة.
+13. **OperationId/receipts:** idempotent Sync/lost-ACK recovery.
+14. **Partial Sync:** sync السليم فقط، preserve conflicts.
+15. **Conflict policy:** different fields auto-merge; same field user resolves; server-delete does not auto-resurrect.
+16. **Custom schema:** server-approved structure wins؛ Offline values تُحمى ويُطلب تصرف المستخدم قبل destructive Sync.
+17. **AssignmentDate cross-year:** confirmation؛ Asia/Riyadh business time.
+18. **Multi-tab:** BroadcastChannel + Web Locks؛ one Sync owner.
+19. **Multi-device:** allowed؛ DeviceId + independent Outbox.
+20. **No dedicated Excel Import currently:** Copy/Paste from Excel is enough؛ Export/clipboard out must be Formula-Injection safe.
+21. **Work Order Value:** production-mandatory؛ Work Orders employee enters estimate؛ Extracts specialist reviews/corrects final system value.
+22. **Roles:** Admin creates/disables accounts؛ managers delegate operational capabilities within scope; no shared Admin credentials.
+23. **Main Basket + specialist sub-workflows:** Municipality/GIS/Execution/Extracts/Warehouse details must not explode the main Basket.
+24. **Warehouse detailed design deferred.**
+25. **Inspection/KPI attribution detail deferred** until KPI/workflow phase.
+26. **Offline on InPrivate:** not supported.
+27. **No separate Admin trusted-device revocation feature for now.**
+28. **Production:** Staging, CI, backup+restore test, safe migrations, limited Pilot before Production.
+
 # 08 — Decisions Log
 
 **Status:** Approved  

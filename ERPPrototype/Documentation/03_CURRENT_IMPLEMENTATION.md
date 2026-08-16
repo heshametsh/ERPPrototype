@@ -1,4 +1,33 @@
-﻿# 03 — Current Implementation
+# CURRENT IMPLEMENTATION OVERRIDE — 2026-08-16
+
+> هذا القسم يحدد الفرق بين **الموجود فعليًا** و**المخطط بعد الـAudits**. بقية الملف تحتفظ بالتاريخ والتفاصيل السابقة.
+
+**Baseline:** `00503ab` (`Remove unused Work Orders JavaScript APIs`)  
+**Branch:** `codespaces-sync-2026-08-08`  
+**Latest SEC Codespaces Release Build:** PASS  
+**Runtime changes after audit decision session:** None.
+
+## منفذ فعليًا الآن
+
+- ASP.NET Core / Blazor Interactive Server + EF Core + SQL Server + Identity + Tabulator.
+- Work Orders Online الحالية وما فيها من editing/search/filter/sort/clipboard/history/custom columns حسب الكود الحالي.
+- server-side Work Orders authority, RowVersion, SQL uniqueness/transactions.
+- route-based Work Orders JS loader موجود، لكن Finding `LDR-002` ما زال مفتوحًا.
+
+## غير منفذ بعد — لا يُعامل كأنه موجود في الكود
+
+- IndexedDB Draft/Outbox production implementation.
+- Service Worker production Offline Work Orders.
+- OperationId/receipt Sync engine.
+- 5-hour Offline lease / 7-day trusted Login implementation.
+- Email OTP final flow.
+- flexible manager capability delegation.
+- Municipality/GIS/Execution/Extracts specialist sub-workflows.
+- bilingual stable-code migration.
+
+المرجع لهذه القرارات المستقبلية هو `12_ENGINEERING_AUDIT_REPORT.md`.
+
+# 03 — Current Implementation
 
 > تحديث 2026-08-12: التحقق الحالي المقبول هو Build PASS، Integration `25/25` وSmoke Browser `11/11`. أمر الاختبار المعتمد الوحيد هو `Tools/Invoke-ERPTests.ps1`; مراجع أدوات Phase 8/Phase 9 القديمة في الأقسام التاريخية لا تعني أن تلك الأدوات ما زالت موجودة.
 
