@@ -13,11 +13,14 @@ namespace ERPPrototype.Components.Pages;
 public partial class WorkOrders
 {
     private const string TableId = "tabulator-test-table";
+    private const int MaxGridInitializationAttempts = 2;
 
     private bool IsLoading = true;
     private bool IsSaving;
     private bool IsYearLoading;
     private bool GridInitialized;
+    private bool IsGridInitializing;
+    private bool CanRetryGridInitialization;
 
     // Phase 7B5-D1: one correlated measurement journey for the initial sheet open.
     // These values are diagnostics only and do not affect grid or business state.
@@ -201,6 +204,7 @@ public partial class WorkOrders
     {
         if (
             GridInitialized ||
+            IsGridInitializing ||
             IsLoading ||
             IsYearLoading ||
             !string.IsNullOrWhiteSpace(ErrorMessage))
@@ -208,83 +212,180 @@ public partial class WorkOrders
             return;
         }
 
-        GridInitialized = true;
-        var initializationAttempt = ++GridInitializationAttempt;
+        IsGridInitializing = true;
+        Exception? lastException = null;
 
         try
         {
-            AddOpenPerformanceStage(
-                "open.blazor.component-to-grid-init-start",
-                PageOpenStartedAt,
-                new
-                {
-                    Rows = Rows.Count,
-                    SelectedWorkYear,
-                    InitializationAttempt = initializationAttempt,
-                    MeasurementId = PageOpenMeasurementId
-                });
-
-            var initializationStartedAt = Stopwatch.GetTimestamp();
-
-            await JSRuntime.InvokeVoidAsync(
-                "workOrdersLoader.ensureLoaded");
-
-            await JSRuntime.InvokeVoidAsync(
-                "tabulatorTest.initialize",
-                TableId,
-                Rows,
-                WorkOrderBuskets.All,
-                CustomColumns,
-                ColumnLayouts,
-                new
-                {
-                    MeasurementId = PageOpenMeasurementId,
-                    InitializationAttempt = initializationAttempt,
-                    ExpectedRows = Rows.Count,
-                    SelectedWorkYear,
-                    CompletedBasket = WorkOrderBuskets.WorkOrderCompleted,
-                    InitialPageOpen = !PageOpenPerformanceStagesRecorded
-                });
-
-            AddOpenPerformanceStage(
-                "open.blazor.js-interop-initialize-call",
-                initializationStartedAt,
-                new
-                {
-                    Rows = Rows.Count,
-                    SelectedWorkYear,
-                    InitializationAttempt = initializationAttempt,
-                    MeasurementId = PageOpenMeasurementId
-                });
-
-            Logger.LogInformation(
-                "Transferred and initialized {WorkOrderCount} Tabulator rows. Measurement {MeasurementId}, attempt {InitializationAttempt}.",
-                Rows.Count,
-                PageOpenMeasurementId,
-                initializationAttempt);
-
-            if (!PageOpenPerformanceStagesRecorded)
+            for (var retryAttempt = 1;
+                 retryAttempt <= MaxGridInitializationAttempts;
+                 retryAttempt++)
             {
-                PageOpenPerformanceStagesRecorded = true;
+                var initializationAttempt = ++GridInitializationAttempt;
 
-                await JSRuntime.InvokeVoidAsync(
-                    "tabulatorTest.recordExternalPerformanceStages",
-                    TableId,
-                    PageOpenPerformanceStages);
+                try
+                {
+                    AddOpenPerformanceStage(
+                        "open.blazor.component-to-grid-init-start",
+                        PageOpenStartedAt,
+                        new
+                        {
+                            Rows = Rows.Count,
+                            SelectedWorkYear,
+                            InitializationAttempt = initializationAttempt,
+                            RetryAttempt = retryAttempt,
+                            MeasurementId = PageOpenMeasurementId
+                        });
+
+                    var initializationStartedAt = Stopwatch.GetTimestamp();
+
+                    await JSRuntime.InvokeVoidAsync(
+                        "workOrdersLoader.ensureLoaded");
+
+                    await JSRuntime.InvokeVoidAsync(
+                        "tabulatorTest.initialize",
+                        TableId,
+                        Rows,
+                        WorkOrderBuskets.All,
+                        CustomColumns,
+                        ColumnLayouts,
+                        new
+                        {
+                            MeasurementId = PageOpenMeasurementId,
+                            InitializationAttempt = initializationAttempt,
+                            ExpectedRows = Rows.Count,
+                            SelectedWorkYear,
+                            CompletedBasket = WorkOrderBuskets.WorkOrderCompleted,
+                            InitialPageOpen = !PageOpenPerformanceStagesRecorded
+                        });
+
+                    var acknowledged =
+                        await JSRuntime.InvokeAsync<bool>(
+                            "tabulatorTest.waitForInitialization",
+                            TableId,
+                            30_000);
+
+                    if (!acknowledged)
+                    {
+                        throw new InvalidOperationException(
+                            "The Work Orders grid did not acknowledge successful initialization.");
+                    }
+
+                    AddOpenPerformanceStage(
+                        "open.blazor.js-interop-initialize-call",
+                        initializationStartedAt,
+                        new
+                        {
+                            Rows = Rows.Count,
+                            SelectedWorkYear,
+                            InitializationAttempt = initializationAttempt,
+                            RetryAttempt = retryAttempt,
+                            MeasurementId = PageOpenMeasurementId
+                        });
+
+                    GridInitialized = true;
+                    CanRetryGridInitialization = false;
+
+                    Logger.LogInformation(
+                        "Transferred and initialized {WorkOrderCount} Tabulator rows. Measurement {MeasurementId}, attempt {InitializationAttempt}, retry {RetryAttempt}.",
+                        Rows.Count,
+                        PageOpenMeasurementId,
+                        initializationAttempt,
+                        retryAttempt);
+
+                    if (!PageOpenPerformanceStagesRecorded)
+                    {
+                        PageOpenPerformanceStagesRecorded = true;
+
+                        await JSRuntime.InvokeVoidAsync(
+                            "tabulatorTest.recordExternalPerformanceStages",
+                            TableId,
+                            PageOpenPerformanceStages);
+                    }
+
+                    return;
+                }
+                catch (JSDisconnectedException)
+                {
+                    throw;
+                }
+                catch (Exception exception)
+                {
+                    lastException = exception;
+                    GridInitialized = false;
+
+                    Logger.LogWarning(
+                        exception,
+                        "Work Orders grid initialization attempt {Attempt}/{MaximumAttempts} failed for year {WorkYear}.",
+                        retryAttempt,
+                        MaxGridInitializationAttempts,
+                        SelectedWorkYear);
+
+                    await TryDestroyGridAsync();
+                }
+            }
+
+            CanRetryGridInitialization = true;
+            ErrorMessage =
+                "تعذر تجهيز شيت أوامر العمل. يمكنك إعادة المحاولة بدون إعادة تحميل الصفحة.";
+
+            if (lastException is not null)
+            {
+                Logger.LogError(
+                    lastException,
+                    "Work Orders grid initialization failed after {AttemptCount} attempts for year {WorkYear}.",
+                    MaxGridInitializationAttempts,
+                    SelectedWorkYear);
             }
         }
-        catch (Exception exception)
+        catch (JSDisconnectedException)
         {
-            GridInitialized = false;
+            Logger.LogWarning(
+                "The browser disconnected while initializing the Work Orders grid.");
+        }
+        finally
+        {
+            IsGridInitializing = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
 
-            Logger.LogError(
+    private async Task RetryGridInitializationAsync()
+    {
+        if (
+            !CanRetryGridInitialization ||
+            IsGridInitializing ||
+            IsLoading ||
+            IsYearLoading)
+        {
+            return;
+        }
+
+        await TryDestroyGridAsync();
+
+        CanRetryGridInitialization = false;
+        ErrorMessage = string.Empty;
+    }
+
+    private async Task TryDestroyGridAsync()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync(
+                "tabulatorTest.destroy",
+                TableId);
+        }
+        catch (JSDisconnectedException)
+        {
+        }
+        catch (JSException exception)
+        {
+            Logger.LogDebug(
                 exception,
-                "An error occurred while initializing Tabulator.");
-
-            ErrorMessage =
-                "The work-order sheet could not be initialized.";
-
-            StateHasChanged();
+                "Work Orders grid cleanup was unavailable after an initialization failure.");
+        }
+        catch (InvalidOperationException)
+        {
         }
     }
 

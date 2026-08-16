@@ -473,6 +473,8 @@
                 maxTransactions: 100,
 
                 isSaving: false,
+                initializationReady: false,
+                initializationError: "",
                 bulkStructureMutationActive: false,
                 bulkFieldMutationActive: false,
                 isActive: false,
@@ -533,6 +535,41 @@
                     customValues: {}
                 }
             };
+        },
+
+        waitForInitialization: async function (
+            elementId,
+            timeoutMs = 30000
+        ) {
+            const startedAt = performance.now();
+            const timeout = Math.max(1000, Number(timeoutMs) || 30000);
+
+            while (performance.now() - startedAt < timeout) {
+                const table = this.tables[elementId];
+                const state = this.states[elementId];
+                const host = document.getElementById(elementId);
+
+                if (state?.initializationError) {
+                    throw new Error(state.initializationError);
+                }
+
+                if (
+                    table &&
+                    state?.initializationReady === true &&
+                    host?.classList?.contains("tabulator") &&
+                    host.querySelector(".tabulator-tableholder")
+                ) {
+                    return true;
+                }
+
+                await new Promise(resolve =>
+                    window.requestAnimationFrame(resolve)
+                );
+            }
+
+            throw new Error(
+                `Work Orders grid initialization timed out after ${timeout} ms: ${elementId}`
+            );
         },
 
         destroy: function (elementId) {

@@ -140,6 +140,17 @@ internal static class Phase9FoundationRunner
                     artifactDirectory);
             }
 
+            var initializationRecoveryTest =
+                new WorkOrdersInitializationRecoveryBrowserTest(
+                    application.BaseUri,
+                    database.Seed,
+                    artifactDirectory,
+                    options.Headed);
+
+            await initializationRecoveryTest.RunAsync();
+            Console.WriteLine(
+                "[PASS] Work Orders initialization acknowledges success, cleans partial state, and recovers with bounded retry");
+
             var browserTest = new Phase9FoundationBrowserTest(
                 application.BaseUri,
                 database.Seed,

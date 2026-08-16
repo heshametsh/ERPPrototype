@@ -444,6 +444,10 @@ window.tabulatorTest = {
         );
 
         table.on("tableBuilt", function () {
+            const currentState =
+                window.tabulatorTest.states[elementId];
+
+            try {
             window.tabulatorFilters.updateAllIcons(
                 window.tabulatorTest,
                 elementId
@@ -513,6 +517,20 @@ window.tabulatorTest = {
                         openContext?.initialPageOpen === true
                 }
             );
+
+            if (currentState) {
+                currentState.initializationReady = true;
+                currentState.initializationError = "";
+            }
+            } catch (error) {
+                if (currentState) {
+                    currentState.initializationReady = false;
+                    currentState.initializationError =
+                        error instanceof Error
+                            ? error.message
+                            : String(error ?? "Grid initialization failed.");
+                }
+            }
         });
 
         this.bindGridCommandInteractions(

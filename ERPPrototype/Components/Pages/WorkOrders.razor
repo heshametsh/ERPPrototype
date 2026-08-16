@@ -192,7 +192,17 @@
         {
             <div class="alert alert-danger"
                  data-testid="work-orders-error">
-                @ErrorMessage
+                <span>@ErrorMessage</span>
+
+                @if (CanRetryGridInitialization)
+                {
+                    <button type="button"
+                            class="button button-secondary"
+                            data-testid="work-orders-retry-initialize"
+                            @onclick="RetryGridInitializationAsync">
+                        إعادة المحاولة
+                    </button>
+                }
             </div>
         }
         else

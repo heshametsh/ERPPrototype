@@ -79,7 +79,8 @@ internal sealed class WorkOrdersPage(IPage page)
                     host.classList.contains('tabulator') &&
                     host.querySelector('.tabulator-tableholder') &&
                     table &&
-                    state
+                    state &&
+                    state.initializationReady === true
                 );
             }
             """,
@@ -165,6 +166,7 @@ internal sealed class WorkOrdersPage(IPage page)
                     !host.querySelector('.tabulator-tableholder') ||
                     !table ||
                     !state ||
+                    state.initializationReady !== true ||
                     state.bulkStructureMutationActive ||
                     summary?.dataset?.aggregateReady !== 'true' ||
                     basketDashboard?.dataset?.dashboardReady !== 'true' ||
