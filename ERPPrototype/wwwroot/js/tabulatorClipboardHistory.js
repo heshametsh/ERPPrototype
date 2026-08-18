@@ -11,6 +11,45 @@
 
     target.registerModule("clipboardHistory", {
         /*
+         * Return a logical cell reference even when Tabulator has not created
+         * a CellComponent for that row/column pair yet. This happens when a
+         * custom column is added during the current session: existing off-screen
+         * rows remain valid logical rows, but only the currently rendered rows
+         * initially receive a physical cell for the new column.
+         *
+         * Clipboard operations need row/column/value semantics, not a DOM node,
+         * so a tiny adapter keeps Copy/Paste/Clear independent from Virtual DOM.
+         */
+        getLogicalCellReference: function (row, column) {
+            if (
+                !row ||
+                !column ||
+                typeof row.getCell !== "function"
+            ) {
+                return null;
+            }
+
+            const field = column.getField?.();
+
+            if (!field) {
+                return null;
+            }
+
+            const physicalCell = row.getCell(field);
+
+            if (physicalCell) {
+                return physicalCell;
+            }
+
+            return {
+                getRow: () => row,
+                getColumn: () => column,
+                getField: () => field,
+                getValue: () => row.getData?.()?.[field]
+            };
+        },
+
+        /*
          * Build the target from Tabulator's logical Range rows/columns instead
          * of asking the DOM-oriented structured-cell path to reconstruct it.
          * RangeComponent.getRows()/getColumns() are derived from the range
@@ -57,7 +96,10 @@
                     }
 
                     const cell =
-                        row.getCell(field);
+                        this.getLogicalCellReference(
+                            row,
+                            column
+                        );
 
                     if (cell) {
                         targetRow.push(cell);
@@ -768,9 +810,15 @@
                         break;
                     }
 
-                    targetRow.push(
-                        row.getCell(column)
-                    );
+                    const cell =
+                        this.getLogicalCellReference(
+                            row,
+                            column
+                        );
+
+                    if (cell) {
+                        targetRow.push(cell);
+                    }
                 }
 
                 if (targetRow.length > 0) {
