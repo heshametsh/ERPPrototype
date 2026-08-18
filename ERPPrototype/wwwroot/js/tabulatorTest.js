@@ -447,6 +447,16 @@ window.tabulatorTest = {
             const currentState =
                 window.tabulatorTest.states[elementId];
 
+            /*
+             * Tabulator creates the Virtual DOM holder during tableBuilt.
+             * Install the Arrow optimization here so it is active on the
+             * real Work Orders grid, not before the holder exists.
+             */
+            window.tabulatorTest.deferScrolledKeyboardRangeLayout(
+                elementId,
+                table
+            );
+
             try {
             window.tabulatorFilters.updateAllIcons(
                 window.tabulatorTest,
@@ -532,11 +542,6 @@ window.tabulatorTest = {
                 }
             }
         });
-
-        this.deferScrolledKeyboardRangeLayout(
-            elementId,
-            table
-        );
 
         this.bindGridCommandInteractions(
             elementId,
