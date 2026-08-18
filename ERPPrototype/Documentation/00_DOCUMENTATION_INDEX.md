@@ -1,8 +1,9 @@
 # 00 — Documentation Index
 
 **Status:** Current / Approved  
-**Last update:** 2026-08-16  
-**Baseline:** `codespaces-sync-2026-08-08` @ `00503ab`
+**Last update:** 2026-08-17
+**Audit baseline:** `00503ab`  
+**Latest confirmed runtime checkpoint:** `0f6bd3b`
 
 ## ترتيب الثقة عند التعارض
 
@@ -22,7 +23,8 @@
 | `../START_HERE_ERP_PROTOTYPE.md` | دخول سريع للحالة الحالية وخطوة التنفيذ التالية |
 | `12_ENGINEERING_AUDIT_REPORT.md` | **المرجع الهندسي الرئيسي الحالي**: Findings + قرارات + Offline + SEC validation + المستقبل + ترتيب التنفيذ |
 | `ERP_AUDIT_PROTOCOL.md` | منهج المراجعات المستقلة ومنع Confirmation Bias |
-| `41_HANDOFF_2026-08-16_POST_AUDIT.md` | تسليم مختصر جاهز للمحادثة/المهندس التالي |
+| `41_HANDOFF_2026-08-16_POST_AUDIT.md` | تسليم تاريخي لمرحلة ما قبل الـRuntime remediation |
+| `42_HANDOFF_2026-08-17_PERFORMANCE_RECONCILIATION.md` | **التسليم الحالي** بعد Test/LDR/Recovery/Sort وقياسات ArrowDown |
 | `03_CURRENT_IMPLEMENTATION.md` | ما الموجود في baseline الحالي فعليًا |
 | `05_WORK_ORDERS_GRID_BEHAVIOUR.md` | عقد سلوك شيت Work Orders الحالي |
 | `06_REGRESSION_TEST_CHECKLIST.md` | اختبارات عدم كسر السلوك الحالي + متطلبات التوسعة الجديدة |
@@ -51,5 +53,5 @@
 - Final Cross-Audit Synthesis اكتمل.
 - Product decision session بعد الـAudits اكتملت بدرجة كبيرة.
 - SEC browser/offline feasibility تم اختبارها عمليًا بنجاح قوي؛ ما زال اختبار **الكابل الحقيقي + الدومين الحقيقي + Proxy/Firewall** Gate مفتوحًا.
-- لا Runtime remediation بدأ بعد هذه القرارات.
-- أول تنفيذ: **Test Foundation ثم `LDR-002`**.
+- Runtime remediation بدأ بالفعل: Test Foundation + `LDR-002` + initialization recovery + financial Sort optimization مكتملة.
+- `GRID-001` أُعيد فتحه بعد قياس ArrowDown الحقيقي؛ **ArrowDown root-cause investigation هو العمل الحالي.**

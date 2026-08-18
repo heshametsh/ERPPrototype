@@ -13,11 +13,15 @@
         "baseline",
         "base",
         "light",
+        "arrowdiag",
         "deep",
         "diagnostic",
         "1",
         "lifecycle",
-        "audit"
+        "audit",
+        "trace",
+        "manual",
+        "explore"
     ]);
 
     const loadedScripts = new Set();
@@ -26,6 +30,7 @@
     let corePromise = null;
     let coreReady = false;
     let performancePromise = null;
+    let stallDiagnosticPromise = null;
 
     function normalizePath(pathname) {
         const value = String(pathname || "/")
@@ -58,6 +63,23 @@
         return String(
             loaderElement?.getAttribute("data-performance") || ""
         ).trim();
+    }
+
+    function readStallDiagnosticScript() {
+        return String(
+            loaderElement?.getAttribute("data-stall-diagnostic") || ""
+        ).trim();
+    }
+
+    function stallDiagnosticRequested() {
+        const value = String(
+            new URLSearchParams(window.location.search)
+                .get("diag") || ""
+        )
+            .trim()
+            .toLowerCase();
+
+        return value === "stall" || value === "reconnect";
     }
 
     function performanceRequested() {
@@ -201,10 +223,42 @@
         return performancePromise;
     }
 
+    function ensureStallDiagnosticLoaded() {
+        if (!stallDiagnosticRequested()) {
+            return Promise.resolve();
+        }
+
+        if (typeof window.tabulatorSessionStallDiagnostic !== "undefined") {
+            return Promise.resolve();
+        }
+
+        const source = readStallDiagnosticScript();
+
+        if (!source) {
+            return Promise.reject(
+                new Error(
+                    "Work Orders stall diagnostic script is not configured."
+                )
+            );
+        }
+
+        if (!stallDiagnosticPromise) {
+            stallDiagnosticPromise =
+                loadScript(source, "stall-diagnostic")
+                    .catch(error => {
+                        stallDiagnosticPromise = null;
+                        throw error;
+                    });
+        }
+
+        return stallDiagnosticPromise;
+    }
+
     const api = {
         ensureLoaded: async function () {
             await ensureCoreLoaded();
             await ensurePerformanceLoaded();
+            await ensureStallDiagnosticLoaded();
 
             return true;
         },

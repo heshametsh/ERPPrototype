@@ -1,9 +1,11 @@
 # 06 — Regression Test Checklist
 
+> **Current reconciliation 2026-08-17:** latest accepted runtime checkpoint in the captured Git log is `0f6bd3b`. For the current ArrowDown work, acceptance also requires manual Split Screen 100% improvement plus multiple `?perf=baseline` runs compared by median; `?perf=deep` is diagnostic only. Preserve the accepted financial-sort optimization.
+
 > تحديث 2026-08-12: استخدم `Tools/Invoke-ERPTests.ps1` للتحقق الحالي. أوامر Phase 8/Phase 9 القديمة الواردة في أقسام تاريخية لم تعد موجودة. آخر تحقق مقبول: Integration `25/25` وSmoke Browser `11/11`.
 
 **Status:** Mandatory after any grid/runtime change
-**Stable checkpoint:** `M5D4R3-Stable-Range-UX` (E6C foundation)
+**Historical foundation checkpoint:** `M5D4R3-Stable-Range-UX` (E6C). **Current accepted checkpoint:** `0f6bd3b` per captured Git log.
 **Rule:** لا ننتقل للخطوة التالية إذا فشل اختبار أساسي.
 
 ## A. Before Testing

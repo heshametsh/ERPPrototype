@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Globalization;
 using Microsoft.Playwright;
 
@@ -193,8 +193,11 @@ internal sealed class RealUserPerformanceBrowserTest(
                 await workOrdersPage.ActivateCellForNavigationAsync(
                     seed.CurrentYearFirstRowId,
                     "workOrderNumber");
-                var keyboardStartRow =
-                    await workOrdersPage.GetActiveCellRowIdAsync();
+                var keyboardStartRowPosition =
+                    await workOrdersPage.GetActiveRangeStartRowPositionAsync();
+                E2ETestAssert.True(
+                    keyboardStartRowPosition >= 0,
+                    "Could not read the logical active-range row before keyboard navigation.");
 
                 await MeasureAsync(
                     "keyboard-40-down",
@@ -206,27 +209,37 @@ internal sealed class RealUserPerformanceBrowserTest(
                             await page.Keyboard.PressAsync("ArrowDown");
                         }
 
+                        var expectedEndRowPosition =
+                            keyboardStartRowPosition + 40;
+
                         await page.WaitForFunctionAsync(
                             """
                             args => {
-                                const state =
-                                    window.tabulatorTest?.states?.[args.tableId];
-                                return Number(state?.activeCell?.rowId) !==
-                                    args.startRowId;
+                                const api = window.tabulatorTest;
+                                const table = api?.tables?.[args.tableId];
+                                const range = api?.getActiveRange?.(table);
+                                const top = Number(range?.getTopEdge?.());
+                                const bottom = Number(range?.getBottomEdge?.());
+
+                                return Number.isInteger(top) &&
+                                    Number.isInteger(bottom) &&
+                                    top === bottom &&
+                                    top === args.expectedRowPosition;
                             }
                             """,
                             new
                             {
                                 tableId = "tabulator-test-table",
-                                startRowId = keyboardStartRow
+                                expectedRowPosition = expectedEndRowPosition
                             });
 
-                        var keyboardEndRow =
-                            await workOrdersPage.GetActiveCellRowIdAsync();
+                        var keyboardEndRowPosition =
+                            await workOrdersPage.GetActiveRangeStartRowPositionAsync();
 
-                        E2ETestAssert.True(
-                            keyboardEndRow != keyboardStartRow,
-                            "Keyboard navigation did not move the active Work Orders cell.");
+                        E2ETestAssert.Equal(
+                            expectedEndRowPosition,
+                            keyboardEndRowPosition,
+                            "Keyboard navigation did not move exactly 40 logical Work Orders rows.");
                     });
 
                 var singleEditValue =

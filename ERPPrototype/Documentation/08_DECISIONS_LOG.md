@@ -1,9 +1,9 @@
-# POST-AUDIT DECISIONS — 2026-08-16
+# POST-AUDIT DECISIONS — reconciled 2026-08-17
 
 > هذه القرارات أحدث من القرارات التاريخية أدناه وت supersede أي قرار يتعارض معها. التفاصيل والأسباب في `12_ENGINEERING_AUDIT_REPORT.md`.
 
 1. **No rewrite:** الحفاظ على ASP.NET Core/Blazor Server/EF/SQL/Identity/Tabulator.
-2. **Next execution:** Tests → `LDR-002` → clean baseline → Online reliability → narrow Save/Delta contract.
+2. **Execution status/current priority:** Tests + `LDR-002` + clean baseline + initialization recovery + financial Sort optimization are complete. User explicitly reprioritized the measured ArrowDown/`GRID-001` regression as the current task; after it, resume Online Reliability → narrow Save/Delta contract.
 3. **Performance is a hard gate:** 10k target; 50k capacity; أي Lag ملحوظ يرفض التصميم.
 4. **Save semantics:** Save = اعتماد وحفظ محلي durable؛ Sync أوتوماتيك وليس زرًا منفصلًا.
 5. **Draft:** قبل Save يمكن حماية العمل محليًا كDraft غير معتمد؛ Restore/Discard بعد reopen.

@@ -11,6 +11,68 @@
 
     target.registerModule("clipboardHistory", {
         /*
+         * Build the target from Tabulator's logical Range rows/columns instead
+         * of asking the DOM-oriented structured-cell path to reconstruct it.
+         * RangeComponent.getRows()/getColumns() are derived from the range
+         * edges, so Virtual DOM rendering does not shorten Copy/Paste/Clear.
+         */
+        getLogicalRangeMatrix: function (range) {
+            if (!range) {
+                return [];
+            }
+
+            const rows =
+                typeof range.getRows === "function"
+                    ? range.getRows()
+                    : [];
+            const columns =
+                typeof range.getColumns === "function"
+                    ? range.getColumns()
+                    : [];
+
+            if (
+                !Array.isArray(rows) ||
+                !Array.isArray(columns) ||
+                rows.length === 0 ||
+                columns.length === 0
+            ) {
+                return [];
+            }
+
+            const matrix = [];
+
+            for (const row of rows) {
+                if (!row || typeof row.getCell !== "function") {
+                    continue;
+                }
+
+                const targetRow = [];
+
+                for (const column of columns) {
+                    const field =
+                        column?.getField?.();
+
+                    if (!field) {
+                        continue;
+                    }
+
+                    const cell =
+                        row.getCell(field);
+
+                    if (cell) {
+                        targetRow.push(cell);
+                    }
+                }
+
+                if (targetRow.length > 0) {
+                    matrix.push(targetRow);
+                }
+            }
+
+            return matrix;
+        },
+
+        /*
          * مسح محتوى النطاق المنطقي كاملًا، بما في ذلك الصفوف غير الظاهرة
          * داخل Virtual DOM. لا ننشئ تحديدًا بديلًا ولا نتعامل مع عناصر DOM؛
          * نعتمد فقط على النطاق الأصلي الذي يديره Tabulator.
@@ -25,7 +87,7 @@
                 return 0;
             }
 
-            const structuredCells = activeRange.getStructuredCells();
+            const structuredCells = this.getLogicalRangeMatrix(activeRange);
 
             if (!Array.isArray(structuredCells) || structuredCells.length === 0) {
                 return 0;
@@ -299,7 +361,7 @@
             }
 
             const matrix =
-                range.getStructuredCells();
+                this.getLogicalRangeMatrix(range);
 
             if (
                 !Array.isArray(matrix) ||
@@ -371,7 +433,7 @@
                 return [];
             }
 
-            const selectedMatrix = activeRange.getStructuredCells();
+            const selectedMatrix = this.getLogicalRangeMatrix(activeRange);
 
             if (
                 !Array.isArray(selectedMatrix) ||
@@ -382,8 +444,20 @@
             }
 
             const selectedIsSingleCell =
-                selectedMatrix.length === 1 &&
-                selectedMatrix[0].length === 1;
+                (
+                    typeof activeRange.getTopEdge === "function" &&
+                    typeof activeRange.getBottomEdge === "function" &&
+                    typeof activeRange.getLeftEdge === "function" &&
+                    typeof activeRange.getRightEdge === "function"
+                )
+                    ? (
+                        activeRange.getTopEdge() === activeRange.getBottomEdge() &&
+                        activeRange.getLeftEdge() === activeRange.getRightEdge()
+                    )
+                    : (
+                        selectedMatrix.length === 1 &&
+                        selectedMatrix[0].length === 1
+                    );
 
             const targetMatrix = selectedIsSingleCell
                 ? this.buildTargetMatrixFromStart(

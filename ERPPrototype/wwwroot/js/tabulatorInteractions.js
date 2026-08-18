@@ -119,6 +119,446 @@
         },
 
         /*
+         * Plain vertical range navigation is fast while the active cell stays
+         * inside the current viewport, but Tabulator 6.5 performs its complete
+         * range layout synchronously after it also changes holder.scrollTop.
+         * On the dense Work Orders sheet that couples one Arrow movement to the
+         * same event turn as Virtual DOM scroll/layout work.
+         *
+         * Preserve Tabulator as the only range owner. Do not limit the logical
+         * range to rendered rows. When (and only when) one keyboard navigation
+         * actually scrolls the table, defer Tabulator's original FULL range
+         * layout to the next animation frame so the scroll/Virtual DOM update
+         * can settle first. No-scroll navigation keeps the original synchronous
+         * path unchanged. Multiple moves in one frame share one latest layout.
+         */
+        /*
+         * Tabulator 6.5 keeps the logical range correctly, but its default
+         * SelectRange.layoutElement() walks every logical row and every cell
+         * after each keyboard navigation. On a 5k-10k Work Orders sheet that
+         * makes one Arrow movement pay for thousands of off-screen cells.
+         *
+         * Tabulator already exposes its own rendered-window path through
+         * layoutElement(true). In virtual mode that path covers the complete
+         * current Virtual DOM window (visible rows + render buffer), not only
+         * one screen. The logical range itself remains unchanged.
+         *
+         * During range navigation only:
+         * - if no vertical scroll happened, refresh the rendered window now;
+         * - if navigation changed scrollTop, wait one animation frame so the
+         *   Virtual DOM moves first, then refresh the latest rendered window.
+         *
+         * Non-navigation layout, structural changes, mouse selection and full
+         * redraws keep Tabulator's original behavior.
+         */
+        deferScrolledKeyboardRangeLayout: function (
+            elementId,
+            table
+        ) {
+            const rangeModule =
+                table?.modules?.selectRange;
+            const rowManager =
+                table?.rowManager;
+            const holder =
+                table?.element?.querySelector(
+                    ".tabulator-tableholder"
+                );
+
+            if (
+                !rangeModule ||
+                !rowManager ||
+                !holder ||
+                table?.options?.renderVertical !== "virtual" ||
+                rangeModule.__udsScrolledKeyboardLayoutDeferred === true
+            ) {
+                return false;
+            }
+
+            const originalNavigate =
+                rangeModule.navigate;
+            const originalLayoutElement =
+                rangeModule.layoutElement;
+
+            if (
+                typeof originalNavigate !== "function" ||
+                typeof originalLayoutElement !== "function" ||
+                typeof rowManager.getDisplayRows !== "function" ||
+                typeof rowManager.getRowFromPosition !== "function"
+            ) {
+                return false;
+            }
+
+            let navigationActive = false;
+            let navigationStartScrollTop = 0;
+            let deferredLayoutFrame = null;
+            let deferredLayoutWork = null;
+
+            const tableIsCurrent = function () {
+                return window.tabulatorTest
+                    ?.tables?.[elementId] === table;
+            };
+
+            const renderCurrentVirtualWindow = function () {
+                return originalLayoutElement.call(
+                    rangeModule,
+                    true
+                );
+            };
+
+            const queueDeferredLayout = function (work) {
+                deferredLayoutWork = work;
+
+                if (deferredLayoutFrame !== null) {
+                    return;
+                }
+
+                deferredLayoutFrame =
+                    window.requestAnimationFrame(
+                        function () {
+                            deferredLayoutFrame = null;
+
+                            if (!tableIsCurrent()) {
+                                deferredLayoutWork = null;
+                                return;
+                            }
+
+                            const latestWork =
+                                deferredLayoutWork;
+                            deferredLayoutWork = null;
+
+                            latestWork?.();
+                        }
+                    );
+            };
+
+            const refreshOneCellAndRow = function (cell) {
+                if (!cell) {
+                    return;
+                }
+
+                rangeModule.renderCell?.(cell);
+                rangeModule.layoutRow?.(cell.row);
+            };
+
+            const refreshActiveSelection = function () {
+                const activeCell =
+                    rangeModule.getActiveCell?.();
+                const activeElement =
+                    activeCell?.getElement?.();
+
+                if (!activeCell || !activeElement?.isConnected) {
+                    renderCurrentVirtualWindow();
+                    return;
+                }
+
+                refreshOneCellAndRow(activeCell);
+                rangeModule.layoutRanges?.();
+            };
+
+            const ensureTargetRowVisible = function (row) {
+                const rowElement =
+                    row?.getElement?.();
+
+                if (!rowElement) {
+                    return false;
+                }
+
+                if (!rowElement.parentNode) {
+                    row?.getComponent?.()
+                        ?.scrollTo?.(undefined, false);
+                    return true;
+                }
+
+                /*
+                 * Plain vertical navigation never changes the column, so avoid
+                 * Tabulator's four getBoundingClientRect() calls and its
+                 * horizontal visibility branch. Work only with the row offsets
+                 * already used by Tabulator's own autoScroll implementation.
+                 */
+                const rowTop =
+                    rowElement.offsetTop;
+                const rowBottom =
+                    rowTop + rowElement.offsetHeight;
+                const viewportTop =
+                    holder.scrollTop;
+                const viewportBottom =
+                    viewportTop + holder.clientHeight;
+
+                if (rowTop < viewportTop) {
+                    holder.scrollTop = rowTop;
+                    return true;
+                }
+
+                if (rowBottom > viewportBottom) {
+                    holder.scrollTop =
+                        rowBottom - holder.clientHeight;
+                    return true;
+                }
+
+                return false;
+            };
+
+            /*
+             * Tabulator's SelectRange helpers repeatedly search the complete
+             * display-row collection by logical position. At deep Work Orders
+             * rows that turns one Arrow movement into several O(N) scans.
+             *
+             * Build one logical row snapshot for the current key movement and
+             * use direct position lookup only while that movement (or its one
+             * deferred range-layout frame) is running. The override is always
+             * restored immediately. Sorting/filtering/data changes therefore
+             * keep Tabulator's normal ownership and automatically fall back if
+             * the display-row collection changed before deferred work runs.
+             */
+            const createNavigationRowSnapshot = function () {
+                const displayRows =
+                    rowManager.getDisplayRows();
+                const rows =
+                    displayRows.filter(
+                        row => row?.type === "row"
+                    );
+
+                return {
+                    displayRows,
+                    displayLength: displayRows.length,
+                    rows
+                };
+            };
+
+            const withNavigationRowLookup = function (
+                snapshot,
+                work
+            ) {
+                if (
+                    !snapshot ||
+                    typeof work !== "function"
+                ) {
+                    return work?.();
+                }
+
+                const currentDisplayRows =
+                    rowManager.getDisplayRows();
+
+                if (
+                    currentDisplayRows !== snapshot.displayRows ||
+                    currentDisplayRows.length !== snapshot.displayLength
+                ) {
+                    return work();
+                }
+
+                const previousGetRowFromPosition =
+                    rowManager.getRowFromPosition;
+
+                rowManager.getRowFromPosition = function (position) {
+                    const logicalPosition =
+                        Number(position);
+                    const row =
+                        Number.isInteger(logicalPosition)
+                            ? snapshot.rows[logicalPosition - 1]
+                            : null;
+
+                    if (
+                        row?.type === "row" &&
+                        row.position === logicalPosition
+                    ) {
+                        return row;
+                    }
+
+                    return previousGetRowFromPosition.call(
+                        this,
+                        position
+                    );
+                };
+
+                try {
+                    return work();
+                } finally {
+                    rowManager.getRowFromPosition =
+                        previousGetRowFromPosition;
+                }
+            };
+
+            rangeModule.layoutElement = function (
+                visibleRowsOnly
+            ) {
+                const navigationLayout =
+                    navigationActive &&
+                    visibleRowsOnly === undefined;
+
+                if (!navigationLayout) {
+                    return originalLayoutElement.call(
+                        this,
+                        visibleRowsOnly
+                    );
+                }
+
+                const scrolledDuringNavigation =
+                    holder.scrollTop !== navigationStartScrollTop;
+
+                if (!scrolledDuringNavigation) {
+                    return renderCurrentVirtualWindow();
+                }
+
+                queueDeferredLayout(
+                    renderCurrentVirtualWindow
+                );
+
+                return undefined;
+            };
+
+            rangeModule.navigate = function (...args) {
+                const activeRange =
+                    rangeModule.activeRange;
+
+                const startsAsOneCell =
+                    rangeModule.ranges?.length === 1 &&
+                    activeRange &&
+                    activeRange.top === activeRange.bottom &&
+                    activeRange.left === activeRange.right &&
+                    rangeModule.selecting === "cell";
+
+                const plainVerticalMove =
+                    args[0] === false &&
+                    args[1] === false &&
+                    (
+                        args[2] === "up" ||
+                        args[2] === "down"
+                    );
+
+                const canUseFastPath =
+                    Boolean(
+                        startsAsOneCell &&
+                        plainVerticalMove &&
+                        !table?.modules?.edit?.currentCell
+                    );
+
+                if (!canUseFastPath) {
+                    navigationActive = true;
+                    navigationStartScrollTop =
+                        holder.scrollTop;
+
+                    try {
+                        return originalNavigate.apply(
+                            this,
+                            args
+                        );
+                    } finally {
+                        navigationActive = false;
+                    }
+                }
+
+                const snapshot =
+                    createNavigationRowSnapshot();
+                const rows =
+                    snapshot.rows;
+                const rowCount =
+                    rows.length;
+
+                if (rowCount <= 0) {
+                    return originalNavigate.apply(
+                        this,
+                        args
+                    );
+                }
+
+                return withNavigationRowLookup(
+                    snapshot,
+                    function () {
+                        const previousCell =
+                            rangeModule.getActiveCell?.();
+
+                        if (!previousCell) {
+                            return originalNavigate.apply(
+                                rangeModule,
+                                args
+                            );
+                        }
+
+                        const currentRow =
+                            activeRange.start.row;
+                        const currentCol =
+                            activeRange.start.col;
+                        const rowDelta =
+                            args[2] === "up"
+                                ? -1
+                                : 1;
+                        const nextRow =
+                            Math.max(
+                                0,
+                                Math.min(
+                                    currentRow + rowDelta,
+                                    rowCount - 1
+                                )
+                            );
+
+                        if (nextRow === currentRow) {
+                            return true;
+                        }
+
+                        const targetRow =
+                            rows[nextRow];
+
+                        if (!targetRow) {
+                            return originalNavigate.apply(
+                                rangeModule,
+                                args
+                            );
+                        }
+
+                        const startScrollTop =
+                            holder.scrollTop;
+
+                        /*
+                         * Keep Tabulator's existing Range object and current
+                         * Work Orders visibility behavior. This optimization
+                         * changes only row lookup cost; it does not add another
+                         * Arrow owner, another scroll path, or another range.
+                         */
+                        activeRange.setStart(
+                            nextRow,
+                            currentCol
+                        );
+                        activeRange.setEnd(
+                            nextRow,
+                            currentCol
+                        );
+                        rangeModule.selecting = "cell";
+
+                        refreshOneCellAndRow(
+                            previousCell
+                        );
+
+                        const didScroll =
+                            ensureTargetRowVisible(
+                                targetRow
+                            ) ||
+                            holder.scrollTop !== startScrollTop;
+
+                        if (didScroll) {
+                            queueDeferredLayout(
+                                function () {
+                                    withNavigationRowLookup(
+                                        snapshot,
+                                        refreshActiveSelection
+                                    );
+                                }
+                            );
+                        } else {
+                            refreshActiveSelection();
+                        }
+
+                        return true;
+                    }
+                );
+            };
+
+            rangeModule.__udsScrolledKeyboardLayoutDeferred = true;
+            rangeModule.__udsPlainVerticalFastPath = true;
+            rangeModule.__udsVerticalNavigationRowLookup = true;
+            return true;
+        },
+
+        /*
          * Owns editing, selection, keyboard, clipboard and context-menu
          * interaction wiring for one live grid instance.
          *

@@ -1,23 +1,27 @@
 /*
  * UDS Work Orders Performance Observatory
- * Version: Step16P0-Final-v1
+ * Version: Step16P0-ArrowCauseDiag-v1
  *
  * Modes:
  *   Normal use:             /work-orders                -> OFF
  *   Stable comparison:      /work-orders?perf=baseline  -> low overhead
- *   Short diagnosis:        /work-orders?perf=deep      -> detailed, band-aware
+ *   Manual interaction map: /work-orders?perf=trace     -> all sheet actions, correlated
+ *   Arrow root-cause:       /work-orders?perf=arrowdiag -> diagnostic only; no runtime behavior changes
+ *   Short diagnosis:        /work-orders?perf=deep      -> detailed, band-aware, heavy
  *   Backward-compatible:    /work-orders?perf=1         -> deep
  *
  * The observatory never runs during normal use. Baseline mode avoids continuous
  * animation loops, MutationObserver, DOM geometry reads during scrolling, and
- * Tabulator-internal wrappers. Deep mode adds those diagnostics only for a short
- * test. Both modes report the time spent inside profiler callbacks so measurement
+ * Tabulator-internal wrappers. Trace mode records every manual sheet interaction
+ * and correlates it with scroll/table reactions while keeping continuous heavy
+ * observers off. Deep mode adds the heaviest diagnostics only for a short test.
+ * All modes report the time spent inside profiler callbacks so measurement
  * overhead remains visible instead of being silently attributed to the grid.
  */
 (function () {
     "use strict";
 
-    const VERSION = "Step16P0-Phase6.1-Lifecycle-Audit-v1";
+    const VERSION = "Step16P0-ArrowCauseDiag-v1";
     const DEFAULT_TABLE_ID = "tabulator-test-table";
     const ROW_BAND_SIZE = 250;
     const MAX_TIMELINE = 1200;
@@ -26,6 +30,7 @@
     const MAX_SAMPLES_PER_METRIC = 400;
     const BASELINE_SAMPLE_FIRST = 8;
     const BASELINE_SAMPLE_EVERY = 4;
+    const BASELINE_SCROLL_SAMPLE_EVERY = 16;
     const DEEP_CONTEXT_INTERVAL_MS = 120;
     const SCROLL_IDLE_MS = 220;
     const RECENT_INPUT_MS = 500;
@@ -34,6 +39,7 @@
     const TIME_BUCKET_MS = 30000;
     const MAX_TIME_BUCKETS = 240;
     const MAX_OPERATION_SAMPLES = 600;
+    const MAX_TRACE_EVENTS = 6000;
 
     const OPERATION_CONSOLE_NAMES = new Set([
         "clipboard.copy",
@@ -47,12 +53,36 @@
     ]);
 
     const parameters = new URLSearchParams(window.location.search);
+    const requestedPerfMode = String(parameters.get("perf") || "")
+        .trim()
+        .toLowerCase();
+    const ARROW_DIAG_ENABLED = [
+        "arrowdiag",
+        "arrow-trace",
+        "navdiag"
+    ].includes(requestedPerfMode);
+    const ARROW_DIAG_RECENT_MS = 550;
+    const MAX_ARROW_DIAG_WINDOWS = 800;
+    const MAX_ARROW_DIAG_FRAMES = 800;
+    const MAX_ARROW_DIAG_TASKS = 800;
+    const MAX_ARROW_DIAG_EVENT_TIMING = 800;
 
     function resolveMode(rawValue) {
         const value = String(rawValue || "").trim().toLowerCase();
 
         if (value === "baseline" || value === "base" || value === "light") {
             return "baseline";
+        }
+
+        if (
+            value === "trace" ||
+            value === "manual" ||
+            value === "explore" ||
+            value === "arrowdiag" ||
+            value === "arrow-trace" ||
+            value === "navdiag"
+        ) {
+            return "trace";
         }
 
         if (value === "deep" || value === "diagnostic" || value === "1") {
@@ -779,6 +809,106 @@
             return window.performance?.now?.() ?? Date.now();
         },
 
+        isArrowDiagnosticInput: function (input) {
+            return ARROW_DIAG_ENABLED &&
+                input?.type === "keyboard" &&
+                (input.detail === "ArrowUp" || input.detail === "ArrowDown");
+        },
+
+        getArrowDiagnosticWindow: function (session, sequence) {
+            if (!ARROW_DIAG_ENABLED || !session?.arrowDiagnosis || !sequence) {
+                return null;
+            }
+
+            return session.arrowDiagnosis.windows.get(sequence) || null;
+        },
+
+        createArrowDiagnosticWindow: function (session, input) {
+            if (!this.isArrowDiagnosticInput(input) || !session?.arrowDiagnosis) {
+                return null;
+            }
+
+            const diagnosis = session.arrowDiagnosis;
+            const sequence = input.sequence;
+            const windowItem = {
+                sequence,
+                key: input.detail,
+                direction: input.direction,
+                startedAt: input.at,
+                repeat: false,
+                internals: new Map(),
+                internalCalls: [],
+                paintProbe: null,
+                contextBefore: null,
+                contextAfter: null,
+                reaction: null,
+                actionBreakdown: null
+            };
+
+            diagnosis.windows.set(sequence, windowItem);
+            while (diagnosis.windows.size > MAX_ARROW_DIAG_WINDOWS) {
+                const oldest = diagnosis.windows.keys().next().value;
+                diagnosis.windows.delete(oldest);
+                diagnosis.droppedWindows++;
+            }
+
+            return windowItem;
+        },
+
+        findArrowDiagnosticWindowsForSpan: function (session, startAt, endAt) {
+            if (!ARROW_DIAG_ENABLED || !session?.arrowDiagnosis) {
+                return [];
+            }
+
+            const start = Number.isFinite(startAt) ? startAt : this.now();
+            const end = Number.isFinite(endAt) ? endAt : start;
+            const matches = [];
+
+            for (const item of session.arrowDiagnosis.windows.values()) {
+                if (item.startedAt >= start - 20 && item.startedAt <= end + 20) {
+                    matches.push(item.sequence);
+                }
+            }
+
+            return matches;
+        },
+
+        noteArrowDiagnosticDuration: function (session, name, durationMs) {
+            if (!ARROW_DIAG_ENABLED || !session || !Number.isFinite(durationMs)) {
+                return;
+            }
+
+            const input = session.lastInput;
+            if (!this.isArrowDiagnosticInput(input)) {
+                return;
+            }
+
+            const now = this.now();
+            if (now - input.at > ARROW_DIAG_RECENT_MS) {
+                return;
+            }
+
+            const item = this.getArrowDiagnosticWindow(session, input.sequence);
+            if (!item) return;
+
+            let metric = item.internals.get(name);
+            if (!metric) {
+                metric = { count: 0, totalMs: 0, maxMs: 0 };
+                item.internals.set(name, metric);
+            }
+            metric.count++;
+            metric.totalMs += durationMs;
+            metric.maxMs = Math.max(metric.maxMs, durationMs);
+
+            if (item.internalCalls.length < 160) {
+                item.internalCalls.push({
+                    atMs: round(now - item.startedAt),
+                    name,
+                    durationMs: round(durationMs)
+                });
+            }
+        },
+
         trackProfilerWork: function (session, name, startedAt) {
             if (!session || !Number.isFinite(startedAt)) {
                 return;
@@ -1013,6 +1143,33 @@
                 resources: null,
                 navigation: null,
                 gpuIdentity: null,
+                trace: {
+                    events: [],
+                    droppedEvents: 0,
+                    nextActionId: 1,
+                    currentActionId: null,
+                    inputSequence: 0,
+                    pendingActions: new Map(),
+                    selectionSafety: {
+                        checks: 0,
+                        failures: 0,
+                        disconnected: 0,
+                        notSelected: 0,
+                        outsideViewport: 0,
+                        supersededChecksSkipped: 0
+                    }
+                },
+                arrowDiagnosis: {
+                    enabled: ARROW_DIAG_ENABLED,
+                    windows: new Map(),
+                    frames: [],
+                    longTasks: [],
+                    eventTiming: [],
+                    droppedWindows: 0,
+                    droppedFrames: 0,
+                    droppedLongTasks: 0,
+                    droppedEventTiming: 0
+                },
                 lifecycle: {
                     start: null,
                     end: null,
@@ -1195,6 +1352,52 @@
                 }));
         },
 
+        serializeArrowDiagnosis: function (session) {
+            if (!ARROW_DIAG_ENABLED || !session?.arrowDiagnosis) {
+                return null;
+            }
+
+            const serializeMetrics = map => Array.from(map.entries())
+                .map(([name, metric]) => ({
+                    name,
+                    count: metric.count,
+                    totalMs: round(metric.totalMs),
+                    averageMs: round(metric.totalMs / Math.max(1, metric.count)),
+                    maxMs: round(metric.maxMs)
+                }))
+                .sort((a, b) => b.totalMs - a.totalMs);
+
+            const windows = Array.from(session.arrowDiagnosis.windows.values())
+                .map(item => ({
+                    sequence: item.sequence,
+                    key: item.key,
+                    direction: item.direction,
+                    repeat: item.repeat,
+                    startedMs: round(item.startedAt - session.startedAt),
+                    internals: serializeMetrics(item.internals),
+                    internalCalls: item.internalCalls,
+                    paintProbe: item.paintProbe,
+                    contextBefore: item.contextBefore,
+                    contextAfter: item.contextAfter,
+                    reaction: item.reaction,
+                    actionBreakdown: item.actionBreakdown
+                }));
+
+            return {
+                purpose: "Root-cause attribution only. Diagnostic wrappers add overhead; do not use these timings as the final before/after benchmark.",
+                windows,
+                longAnimationFrames: session.arrowDiagnosis.frames,
+                longTasks: session.arrowDiagnosis.longTasks,
+                eventTiming: session.arrowDiagnosis.eventTiming,
+                dropped: {
+                    windows: session.arrowDiagnosis.droppedWindows,
+                    frames: session.arrowDiagnosis.droppedFrames,
+                    longTasks: session.arrowDiagnosis.droppedLongTasks,
+                    eventTiming: session.arrowDiagnosis.droppedEventTiming
+                }
+            };
+        },
+
         reset: function (elementId, label) {
             const id = elementId || DEFAULT_TABLE_ID;
             const oldSession = this.sessions.get(id);
@@ -1211,6 +1414,10 @@
 
             if (attachment) {
                 attachment.lastScrollTop = attachment.holder.scrollTop;
+                attachment.lastScrollLeft = attachment.holder.scrollLeft;
+                attachment.baselineScrollCounter = 0;
+                attachment.baselineSampledScrollTop = attachment.lastScrollTop;
+                attachment.baselineSampledScrollLeft = attachment.lastScrollLeft;
                 attachment.lastContextAt = 0;
                 attachment.cachedContext = null;
                 attachment.interactionCounts.clear();
@@ -1228,11 +1435,13 @@
             this.startMemoryTimer();
             this.startDeepAutoStop();
             this.setPanelStatus(
-                this.mode === "deep"
-                    ? `Recording deep test for ${this.getDeepSeconds()}s`
-                    : this.mode === "lifecycle"
-                        ? "Recording lifecycle audit"
-                        : "Recording baseline"
+                ARROW_DIAG_ENABLED
+                    ? "Recording arrow root-cause diagnostic"
+                    : this.mode === "deep"
+                        ? `Recording deep test for ${this.getDeepSeconds()}s`
+                        : this.mode === "lifecycle"
+                            ? "Recording lifecycle audit"
+                            : "Recording baseline"
             );
             return session;
         },
@@ -1262,7 +1471,9 @@
             this.createPanel(id);
             this.startMemoryTimer();
             this.setPanelStatus(
-                `${this.mode.toUpperCase()} ready — press Start/Reset before the test`
+                ARROW_DIAG_ENABLED
+                    ? "ARROW DIAG ready — press Start/Reset before the test"
+                    : `${this.mode.toUpperCase()} ready — press Start/Reset before the test`
             );
             return session;
         },
@@ -1433,6 +1644,22 @@
                 ? session.internalDurations
                 : session.durations;
             addDuration(targetMap, name, durationMs, true);
+            if (internal === true) {
+                this.noteArrowDiagnosticDuration(session, name, durationMs);
+            }
+            this.noteTraceActionDuration(
+                session,
+                name,
+                durationMs,
+                internal === true
+            );
+
+            if (this.mode === "trace" && internal !== true) {
+                this.pushTraceEvent(elementId, "operation", {
+                    name,
+                    durationMs: round(durationMs)
+                });
+            }
 
             const normalizedMetadata = metadata
                 ? { ...metadata }
@@ -2027,7 +2254,7 @@
         },
 
         wrapDeepInternals: function (elementId, table) {
-            if (this.mode !== "deep") {
+            if (this.mode !== "deep" && this.mode !== "trace") {
                 return;
             }
 
@@ -2042,10 +2269,54 @@
                         elementId: elementId,
                         sampleEvery: sampleEvery,
                         internal: true,
-                        deepOnly: true
+                        deepOnly: this.mode === "deep"
                     });
                 }
             };
+
+            if (this.mode === "trace") {
+                wrapDefinitions(rowManager, "tabulator.row-manager", [
+                    ["reRenderInPosition", "rerender-in-position", 1],
+                    ["scrollToRow", "scroll-to-row", 1],
+                    ...(ARROW_DIAG_ENABLED
+                        ? [
+                            ["getRowFromPosition", "get-row-from-position", 1],
+                            ["renderTable", "render-table", 1]
+                        ]
+                        : [])
+                ]);
+                wrapDefinitions(renderer, "tabulator.renderer", [
+                    ["scrollRows", "scroll-rows", 1],
+                    ["scrollToRowPosition", "scroll-to-row-position", 1],
+                    ...(ARROW_DIAG_ENABLED
+                        ? [
+                            ["render", "render", 1],
+                            ["renderRows", "render-rows", 1],
+                            ["rerenderRows", "rerender-rows", 1],
+                            ["_virtualRenderFill", "virtual-render-fill", 1],
+                            ["_addTopRow", "add-top-row", 1],
+                            ["_removeBottomRow", "remove-bottom-row", 1],
+                            ["_addBottomRow", "add-bottom-row", 1],
+                            ["_removeTopRow", "remove-top-row", 1]
+                        ]
+                        : [])
+                ]);
+                wrapDefinitions(range, "tabulator.range", [
+                    ["navigate", "navigate", 1],
+                    ["layoutRanges", "layout-ranges", 1],
+                    ["layoutElement", "layout-element", 1],
+                    ...(ARROW_DIAG_ENABLED
+                        ? [
+                            ["autoScroll", "auto-scroll", 1],
+                            ["getActiveCell", "get-active-cell", 1],
+                            ["getCell", "get-cell", 1],
+                            ["getTableRows", "get-table-rows", 1],
+                            ["getRowByRangePos", "get-row-by-range-pos", 1]
+                        ]
+                        : [])
+                ]);
+                return;
+            }
 
             wrapDefinitions(rowManager, "tabulator.row-manager", [
                 ["refreshActiveData", "refresh-active-data", 1],
@@ -2117,6 +2388,10 @@
                 tableHandlers: [],
                 mutationObserver: null,
                 lastScrollTop: holder.scrollTop,
+                lastScrollLeft: holder.scrollLeft,
+                baselineScrollCounter: 0,
+                baselineSampledScrollTop: holder.scrollTop,
+                baselineSampledScrollLeft: holder.scrollLeft,
                 lastScrollAt: 0,
                 scrollIdleTimer: null,
                 scrollSession: null,
@@ -2125,7 +2400,8 @@
                 contextRaf: null,
                 interactionCounts: new Map(),
                 lastMutationDetailAt: 0,
-                firstUsableRecorded: false
+                firstUsableRecorded: false,
+                tracePointer: null
             };
 
             this.attachments.set(elementId, attachment);
@@ -2232,12 +2508,20 @@
                 return;
             }
 
+            const inputSequence = this.mode === "trace"
+                ? ++session.trace.inputSequence
+                : null;
+
             session.lastInput = {
                 type: type || "unknown",
                 detail: detail || "unknown",
                 direction: direction || "none",
-                at: this.now()
+                at: this.now(),
+                sequence: inputSequence
             };
+            if (ARROW_DIAG_ENABLED) {
+                this.createArrowDiagnosticWindow(session, session.lastInput);
+            }
             this.increment(elementId, `input.${session.lastInput.type}.${session.lastInput.detail}`);
             const bucket = this.ensureTimeBucket(session, session.lastInput.at);
 
@@ -2254,11 +2538,289 @@
             const count = (attachment.interactionCounts.get(key) || 0) + 1;
             attachment.interactionCounts.set(key, count);
 
-            if (this.mode === "deep") {
+            if (this.mode === "deep" || this.mode === "trace") {
                 return true;
             }
 
             return count <= BASELINE_SAMPLE_FIRST || count % BASELINE_SAMPLE_EVERY === 0;
+        },
+
+        pushTraceEvent: function (elementId, type, detail) {
+            if (this.mode !== "trace") {
+                return;
+            }
+
+            const session = this.ensureSession(elementId);
+
+            if (!session) {
+                return;
+            }
+
+            if (session.trace.events.length >= MAX_TRACE_EVENTS) {
+                session.trace.events.shift();
+                session.trace.droppedEvents++;
+            }
+
+            session.trace.events.push({
+                atMs: round(this.now() - session.startedAt),
+                type: type || "unknown",
+                ...(detail || {})
+            });
+        },
+
+        captureTraceContext: function (elementId, attachment, includeGeometry) {
+            if (this.mode !== "trace") {
+                return null;
+            }
+
+            const table = attachment.table;
+            const holder = attachment.holder;
+            const state = window.tabulatorTest?.states?.[elementId] || null;
+            const activeRange = window.tabulatorTest?.getActiveRange?.(table) || null;
+            const activeCell = this.getActiveCellComponent(table);
+            const activeRow = activeCell?.getRow?.();
+            const activePosition = this.getRowPosition(activeRow);
+            const cellElement = activeCell?.getElement?.();
+            const activeColumn = activeCell?.getColumn?.();
+            const activeField = activeColumn?.getField?.() ?? state?.activeCell?.field ?? null;
+            const activeRowKey = activeRow?.getIndex?.() ?? null;
+            let selected = null;
+            let intersectsViewport = null;
+
+            if (cellElement instanceof Element) {
+                selected =
+                    cellElement.classList.contains("tabulator-range-selected") ||
+                    cellElement.classList.contains("tabulator-range-only-cell-selected");
+
+                if (includeGeometry === true) {
+                    if (cellElement.isConnected) {
+                        const cellBounds = cellElement.getBoundingClientRect();
+                        const holderBounds = holder.getBoundingClientRect();
+                        intersectsViewport =
+                            cellBounds.bottom > holderBounds.top + 1 &&
+                            cellBounds.top < holderBounds.bottom - 1 &&
+                            cellBounds.right > holderBounds.left + 1 &&
+                            cellBounds.left < holderBounds.right - 1;
+                    } else {
+                        intersectsViewport = false;
+                    }
+                }
+            }
+
+            const connected = Boolean(cellElement?.isConnected);
+            const hasActiveRange = Boolean(activeRange);
+            const bounds = activeRange?.getBounds?.() || null;
+            const startCell = bounds?.start || null;
+            const endCell = bounds?.end || null;
+            const startRow = startCell?.getRow?.();
+            const endRow = endCell?.getRow?.();
+            const startRowPosition = this.getRowPosition(startRow);
+            const endRowPosition = this.getRowPosition(endRow);
+            const columns = table?.getColumns?.() || [];
+            const startColumn = startCell?.getColumn?.();
+            const endColumn = endCell?.getColumn?.();
+            const startColumnPosition = startColumn ? columns.indexOf(startColumn) + 1 : null;
+            const endColumnPosition = endColumn ? columns.indexOf(endColumn) + 1 : null;
+            const rangeRowCount =
+                Number.isFinite(startRowPosition) && Number.isFinite(endRowPosition)
+                    ? Math.abs(endRowPosition - startRowPosition) + 1
+                    : null;
+            const rangeColumnCount =
+                Number.isFinite(startColumnPosition) && Number.isFinite(endColumnPosition)
+                    ? Math.abs(endColumnPosition - startColumnPosition) + 1
+                    : null;
+            const safety =
+                !hasActiveRange ||
+                (connected &&
+                    selected === true &&
+                    (includeGeometry !== true || intersectsViewport === true));
+
+            return {
+                activeRow: activePosition,
+                activeRowKey,
+                stateActiveRowId: state?.activeCell?.rowId ?? null,
+                activeField,
+                hasActiveRange,
+                activeCellConnected: connected,
+                activeCellSelected: selected,
+                activeCellInViewport: intersectsViewport,
+                selectionSafe: safety,
+                rangeStartRow: startRowPosition,
+                rangeEndRow: endRowPosition,
+                rangeStartColumn: startColumnPosition,
+                rangeEndColumn: endColumnPosition,
+                rangeRows: rangeRowCount,
+                rangeColumns: rangeColumnCount,
+                rangeCells:
+                    Number.isFinite(rangeRowCount) && Number.isFinite(rangeColumnCount)
+                        ? rangeRowCount * rangeColumnCount
+                        : null,
+                dirtyRows: state?.dirtyRowIds?.size ?? 0,
+                deletedRows: state?.deletedOriginalRowIds?.size ?? 0,
+                undoDepth: state?.undoStack?.length ?? 0,
+                redoDepth: state?.redoStack?.length ?? 0,
+                logicalRows: table?.getDataCount?.("active") ?? table?.getDataCount?.() ?? null,
+                visibleColumns: columns.length,
+                scrollTop: round(holder.scrollTop),
+                scrollLeft: round(holder.scrollLeft),
+                renderedRows: attachment.element.querySelectorAll(".tabulator-row").length,
+                rangeElements: attachment.element.querySelectorAll(".tabulator-range").length
+            };
+        },
+
+        beginTraceAction: function (elementId, name, inputSequence) {
+            if (this.mode !== "trace") {
+                return null;
+            }
+
+            const session = this.ensureSession(elementId);
+            if (!session) return null;
+
+            const id = session.trace.nextActionId++;
+            session.trace.currentActionId = id;
+            session.trace.pendingActions.set(id, {
+                id,
+                name,
+                inputSequence: inputSequence ?? session.trace.inputSequence,
+                startedAt: this.now(),
+                internal: new Map(),
+                operations: new Map()
+            });
+
+            // Keep synchronous Tabulator work tied to this exact browser input task.
+            // The document keydown listener runs in capture phase; Tabulator handles
+            // the same event later in the same task, before this microtask clears it.
+            queueMicrotask(() => {
+                if (session.trace.currentActionId === id) {
+                    session.trace.currentActionId = null;
+                }
+            });
+
+            return id;
+        },
+
+        noteTraceActionDuration: function (session, name, durationMs, internal) {
+            if (this.mode !== "trace" || !session || !Number.isFinite(durationMs)) {
+                return;
+            }
+
+            const id = session.trace.currentActionId;
+            const action = id ? session.trace.pendingActions.get(id) : null;
+            if (!action) return;
+
+            const map = internal ? action.internal : action.operations;
+            let metric = map.get(name);
+            if (!metric) {
+                metric = { count: 0, totalMs: 0, maxMs: 0 };
+                map.set(name, metric);
+            }
+            metric.count++;
+            metric.totalMs += durationMs;
+            metric.maxMs = Math.max(metric.maxMs, durationMs);
+        },
+
+        finishTraceAction: function (elementId, actionId) {
+            if (this.mode !== "trace" || !actionId) return null;
+            const session = this.sessions.get(elementId);
+            const action = session?.trace?.pendingActions?.get(actionId);
+            if (!session || !action) return null;
+
+            session.trace.pendingActions.delete(actionId);
+            if (session.trace.currentActionId === actionId) {
+                session.trace.currentActionId = null;
+            }
+
+            const serialize = map => Array.from(map.entries())
+                .map(([name, metric]) => ({
+                    name,
+                    count: metric.count,
+                    totalMs: round(metric.totalMs),
+                    maxMs: round(metric.maxMs)
+                }))
+                .sort((a, b) => b.totalMs - a.totalMs);
+
+            return {
+                actionId,
+                actionName: action.name,
+                inputSequence: action.inputSequence,
+                elapsedMs: round(this.now() - action.startedAt),
+                internal: serialize(action.internal),
+                operations: serialize(action.operations)
+            };
+        },
+
+        enforceTraceSelectionSafety: function (elementId, name, context, superseded) {
+            if (this.mode !== "trace" || !context?.hasActiveRange) {
+                return;
+            }
+
+            const keyboardNavigation = /^keyboard\.(?:(?:ctrl|shift)\+)?(?:ArrowUp|ArrowDown|ArrowLeft|ArrowRight|PageUp|PageDown|Home|End)$/.test(name || "");
+            if (!keyboardNavigation) return;
+
+            const session = this.sessions.get(elementId);
+            if (!session) return;
+
+            const safety = session.trace.selectionSafety;
+            if (superseded === true) {
+                safety.supersededChecksSkipped++;
+                return;
+            }
+
+            safety.checks++;
+            if (context.selectionSafe === true) return;
+
+            safety.failures++;
+            if (context.activeCellConnected !== true) safety.disconnected++;
+            if (context.activeCellSelected !== true) safety.notSelected++;
+            if (context.activeCellInViewport !== true) safety.outsideViewport++;
+
+            this.pushTraceEvent(elementId, "safety", {
+                name: "selection-lost",
+                interaction: name,
+                activeRow: context.activeRow,
+                activeRowKey: context.activeRowKey,
+                stateActiveRowId: context.stateActiveRowId,
+                activeField: context.activeField
+            });
+        },
+
+        snapshotReactionCounters: function (elementId, attachment) {
+            const session = this.sessions.get(elementId);
+
+            return {
+                scrollEvents: session?.scroll?.events || 0,
+                scrollTop: attachment.holder.scrollTop,
+                scrollLeft: attachment.holder.scrollLeft,
+                tableEvents: session
+                    ? Object.fromEntries(session.tableEvents)
+                    : {}
+            };
+        },
+
+        reactionDelta: function (before, after) {
+            if (!before || !after) {
+                return null;
+            }
+
+            const tableEvents = {};
+            const names = new Set([
+                ...Object.keys(before.tableEvents || {}),
+                ...Object.keys(after.tableEvents || {})
+            ]);
+
+            for (const name of names) {
+                const delta =
+                    (after.tableEvents?.[name] || 0) -
+                    (before.tableEvents?.[name] || 0);
+                if (delta !== 0) tableEvents[name] = delta;
+            }
+
+            return {
+                scrollEvents: after.scrollEvents - before.scrollEvents,
+                scrollTopDelta: round(after.scrollTop - before.scrollTop),
+                scrollLeftDelta: round(after.scrollLeft - before.scrollLeft),
+                tableEvents
+            };
         },
 
         schedulePaintProbe: function (elementId, attachment, name, metadata) {
@@ -2274,13 +2836,37 @@
             }
 
             session.profiler.sampledInteractions++;
+            const traceInputSequence =
+                this.mode === "trace"
+                    ? session.lastInput?.sequence ?? session.trace.inputSequence
+                    : null;
+            const traceActionId = this.beginTraceAction(
+                elementId,
+                name,
+                traceInputSequence
+            );
             const startedAt = this.now();
             const contextBefore =
                 this.mode === "deep"
                     ? this.captureViewportContext(elementId, attachment, false)
+                    : this.mode === "trace"
+                        ? this.captureTraceContext(elementId, attachment, false)
+                        : null;
+            const reactionBefore =
+                this.mode === "trace"
+                    ? this.snapshotReactionCounters(elementId, attachment)
                     : null;
+            const arrowDiagWindow =
+                ARROW_DIAG_ENABLED && traceInputSequence !== null
+                    ? this.getArrowDiagnosticWindow(session, traceInputSequence)
+                    : null;
+            if (arrowDiagWindow) {
+                arrowDiagWindow.repeat = metadata?.repeat === true;
+                arrowDiagWindow.contextBefore = contextBefore;
+            }
 
             window.requestAnimationFrame(firstFrameAt => {
+                const firstRafCallbackAt = this.now();
                 window.requestAnimationFrame(secondFrameAt => {
                     if (!this.active) {
                         return;
@@ -2289,18 +2875,67 @@
                     const callbackStartedAt = this.now();
                     const inputToPaintMs = this.now() - startedAt;
                     const frameGapMs = secondFrameAt - firstFrameAt;
+                    if (arrowDiagWindow) {
+                        arrowDiagWindow.paintProbe = {
+                            inputToSecondRafMs: round(inputToPaintMs),
+                            inputToFirstRafCallbackMs: round(firstRafCallbackAt - startedAt),
+                            firstToSecondFrameMs: round(frameGapMs),
+                            firstFrameTimestampMs: round(firstFrameAt - startedAt),
+                            secondFrameTimestampMs: round(secondFrameAt - startedAt)
+                        };
+                    }
+                    const superseded =
+                        this.mode === "trace" &&
+                        traceInputSequence !== null &&
+                        session.trace.inputSequence !== traceInputSequence;
+                    const keyboardNavigation =
+                        /^keyboard\.(?:(?:ctrl|shift)\+)?(?:ArrowUp|ArrowDown|ArrowLeft|ArrowRight|PageUp|PageDown|Home|End)$/.test(name || "");
                     const contextAfter =
                         this.mode === "deep"
                             ? this.captureViewportContext(elementId, attachment, true)
+                            : this.mode === "trace"
+                                ? this.captureTraceContext(
+                                    elementId,
+                                    attachment,
+                                    keyboardNavigation && !superseded
+                                )
+                                : null;
+                    const reactionAfter =
+                        this.mode === "trace"
+                            ? this.snapshotReactionCounters(elementId, attachment)
                             : null;
+                    const reaction = this.mode === "trace"
+                        ? this.reactionDelta(reactionBefore, reactionAfter)
+                        : null;
+                    if (this.mode === "trace") {
+                        this.enforceTraceSelectionSafety(
+                            elementId,
+                            name,
+                            contextAfter,
+                            superseded
+                        );
+                    }
+                    const actionBreakdown = this.finishTraceAction(
+                        elementId,
+                        traceActionId
+                    );
+                    if (arrowDiagWindow) {
+                        arrowDiagWindow.contextAfter = contextAfter;
+                        arrowDiagWindow.reaction = reaction;
+                        arrowDiagWindow.actionBreakdown = actionBreakdown;
+                    }
 
                     this.recordInteraction(elementId, {
                         name: name,
                         inputToPaintMs: inputToPaintMs,
                         frameGapMs: frameGapMs,
-                        metadata: metadata || null,
+                        metadata: this.mode === "trace"
+                            ? { ...(metadata || {}), superseded }
+                            : metadata || null,
                         contextBefore: contextBefore,
-                        contextAfter: contextAfter
+                        contextAfter: contextAfter,
+                        reaction: reaction,
+                        actionBreakdown: actionBreakdown
                     });
                     this.trackProfilerWork(
                         session,
@@ -2382,7 +3017,7 @@
                 );
             }
 
-            if (this.mode === "deep") {
+            if (this.mode === "deep" || this.mode === "trace") {
                 pushBounded(
                     session.interactions,
                     {
@@ -2392,10 +3027,23 @@
                         frameGapMs: round(item.frameGapMs),
                         metadata: item.metadata,
                         contextBefore: item.contextBefore,
-                        contextAfter: item.contextAfter
+                        contextAfter: item.contextAfter,
+                        reaction: item.reaction || null,
+                        actionBreakdown: item.actionBreakdown || null
                     },
                     MAX_INTERACTIONS
                 );
+            }
+
+            if (this.mode === "trace") {
+                this.pushTraceEvent(elementId, "paint", {
+                    name: item.name,
+                    inputToPaintMs: round(item.inputToPaintMs),
+                    frameGapMs: round(item.frameGapMs),
+                    reaction: item.reaction || null,
+                    selectionSafe: item.contextAfter?.selectionSafe ?? null,
+                    actionBreakdown: item.actionBreakdown || null
+                });
             }
         },
 
@@ -2411,8 +3059,18 @@
                     ? "ctrl+"
                     : event.shiftKey
                         ? "shift+"
-                        : "";
-                const detail = `${modifier}${event.key}`;
+                        : event.altKey
+                            ? "alt+"
+                            : "";
+                const physicalKey = /^Key[A-Z]$/.test(event.code || "")
+                    ? event.code.slice(3).toLowerCase()
+                    : event.code === "Space"
+                        ? "Space"
+                        : event.key;
+                const shortcutUsesPhysicalKey =
+                    (event.ctrlKey || event.metaKey) && /^Key[A-Z]$/.test(event.code || "");
+                const detailKey = shortcutUsesPhysicalKey ? physicalKey : event.key;
+                const detail = `${modifier}${detailKey}`;
                 this.noteInput(elementId, "keyboard", detail, direction);
 
                 const measuredKeys = new Set([
@@ -2422,18 +3080,44 @@
                     "ArrowRight",
                     "PageUp",
                     "PageDown",
+                    "Home",
+                    "End",
                     "Enter",
                     "Tab",
+                    "Escape",
                     "Delete",
-                    "Backspace"
+                    "Backspace",
+                    " ",
+                    "a", "A", "c", "C", "v", "V", "x", "X",
+                    "z", "Z", "y", "Y"
                 ]);
 
-                if (measuredKeys.has(event.key)) {
+                if (this.mode === "trace") {
+                    this.pushTraceEvent(elementId, "input", {
+                        source: "keyboard",
+                        action: detail,
+                        key: event.key,
+                        code: event.code,
+                        direction,
+                        repeat: event.repeat === true,
+                        target: describeEventTarget(event.target)
+                    });
+                }
+
+                const measuredShortcut =
+                    (event.ctrlKey || event.metaKey) &&
+                    ["KeyA", "KeyC", "KeyV", "KeyX", "KeyZ", "KeyY"].includes(event.code);
+
+                if (measuredKeys.has(event.key) || measuredShortcut) {
                     this.schedulePaintProbe(
                         elementId,
                         attachment,
                         `keyboard.${detail}`,
-                        { direction }
+                        {
+                            direction,
+                            repeat: event.repeat === true,
+                            target: describeEventTarget(event.target)
+                        }
                     );
                 }
 
@@ -2450,13 +3134,30 @@
                 }
 
                 const callbackStartedAt = this.now();
-                const direction = event.deltaY < 0 ? "up" : "down";
-                this.noteInput(elementId, "wheel", "wheel", direction);
+                const vertical = Math.abs(event.deltaY) >= Math.abs(event.deltaX);
+                const direction = vertical
+                    ? (event.deltaY < 0 ? "up" : "down")
+                    : (event.deltaX < 0 ? "left" : "right");
+                const detail = vertical ? "wheel-vertical" : "wheel-horizontal";
+                this.noteInput(elementId, "wheel", detail, direction);
+                if (this.mode === "trace") {
+                    this.pushTraceEvent(elementId, "input", {
+                        source: "wheel",
+                        action: detail,
+                        direction,
+                        deltaX: round(event.deltaX),
+                        deltaY: round(event.deltaY)
+                    });
+                }
                 this.schedulePaintProbe(
                     elementId,
                     attachment,
                     `wheel.${direction}`,
-                    { deltaY: round(event.deltaY) }
+                    {
+                        deltaX: round(event.deltaX),
+                        deltaY: round(event.deltaY),
+                        axis: vertical ? "vertical" : "horizontal"
+                    }
                 );
                 this.trackProfilerWork(
                     this.sessions.get(elementId),
@@ -2484,6 +3185,67 @@
                     "none"
                 );
                 this.increment(elementId, "interaction.pointerdown");
+
+                if (this.mode === "trace") {
+                    attachment.tracePointer = {
+                        startedAt: this.now(),
+                        startX: event.clientX,
+                        startY: event.clientY,
+                        lastX: event.clientX,
+                        lastY: event.clientY,
+                        pointerType: event.pointerType || "pointer",
+                        button: event.button,
+                        target: describeEventTarget(event.target)
+                    };
+                    this.pushTraceEvent(elementId, "input", {
+                        source: "pointer",
+                        action: "down",
+                        pointerType: event.pointerType || "pointer",
+                        button: event.button,
+                        target: describeEventTarget(event.target)
+                    });
+                }
+            };
+
+            const pointermove = event => {
+                if (this.mode !== "trace" || !attachment.tracePointer) {
+                    return;
+                }
+
+                attachment.tracePointer.lastX = event.clientX;
+                attachment.tracePointer.lastY = event.clientY;
+            };
+
+            const pointerup = event => {
+                if (this.mode !== "trace" || !attachment.tracePointer) {
+                    return;
+                }
+
+                const gesture = attachment.tracePointer;
+                attachment.tracePointer = null;
+                const dx = event.clientX - gesture.startX;
+                const dy = event.clientY - gesture.startY;
+                const distance = Math.hypot(dx, dy);
+                const durationMs = this.now() - gesture.startedAt;
+                const action = distance >= 5 ? "drag" : "up";
+                this.noteInput(elementId, "pointer", action, "none");
+                this.pushTraceEvent(elementId, "input", {
+                    source: "pointer",
+                    action,
+                    durationMs: round(durationMs),
+                    distancePx: round(distance),
+                    deltaX: round(dx),
+                    deltaY: round(dy),
+                    pointerType: gesture.pointerType,
+                    button: gesture.button,
+                    target: gesture.target
+                });
+                this.schedulePaintProbe(
+                    elementId,
+                    attachment,
+                    `pointer.${action}`,
+                    { durationMs: round(durationMs), distancePx: round(distance) }
+                );
             };
 
             const click = event => {
@@ -2492,6 +3254,12 @@
                 }
 
                 this.noteInput(elementId, "pointer", "click", "none");
+                if (this.mode === "trace") {
+                    this.pushTraceEvent(elementId, "input", {
+                        source: "pointer", action: "click",
+                        target: describeEventTarget(event.target)
+                    });
+                }
                 this.schedulePaintProbe(elementId, attachment, "pointer.click");
             };
 
@@ -2501,12 +3269,24 @@
                 }
 
                 this.noteInput(elementId, "pointer", "double-click", "none");
+                if (this.mode === "trace") {
+                    this.pushTraceEvent(elementId, "input", {
+                        source: "pointer", action: "double-click",
+                        target: describeEventTarget(event.target)
+                    });
+                }
                 this.schedulePaintProbe(elementId, attachment, "pointer.double-click");
             };
 
             const contextMenu = event => {
                 if (this.isInsideTable(attachment, event)) {
                     this.noteInput(elementId, "pointer", "context-menu", "none");
+                    if (this.mode === "trace") {
+                        this.pushTraceEvent(elementId, "input", {
+                            source: "pointer", action: "context-menu",
+                            target: describeEventTarget(event.target)
+                        });
+                    }
                     this.schedulePaintProbe(elementId, attachment, "pointer.context-menu");
                 }
             };
@@ -2515,12 +3295,14 @@
                 if (this.isInsideTable(attachment, event)) {
                     this.noteInput(elementId, "clipboard", "copy", "none");
                     this.increment(elementId, "interaction.copy");
+                    this.pushTraceEvent(elementId, "input", { source: "clipboard", action: "copy" });
                 }
             };
 
             const paste = event => {
                 if (this.isInsideTable(attachment, event)) {
                     this.noteInput(elementId, "clipboard", "paste", "none");
+                    this.pushTraceEvent(elementId, "input", { source: "clipboard", action: "paste" });
                     this.schedulePaintProbe(elementId, attachment, "clipboard.paste-event");
                 }
             };
@@ -2529,12 +3311,27 @@
                 if (this.isInsideTable(attachment, event)) {
                     this.noteInput(elementId, "editor", "input", "none");
                     this.increment(elementId, "interaction.editor-input");
+                    if (this.mode === "trace") {
+                        this.pushTraceEvent(elementId, "input", {
+                            source: "editor",
+                            action: "input",
+                            target: describeEventTarget(event.target)
+                        });
+                        this.schedulePaintProbe(
+                            elementId, attachment, "editor.input",
+                            { target: describeEventTarget(event.target) }
+                        );
+                    }
                 }
             };
 
             const change = event => {
                 if (this.isInsideTable(attachment, event)) {
                     this.noteInput(elementId, "editor", "change", "none");
+                    this.pushTraceEvent(elementId, "input", {
+                        source: "editor", action: "change",
+                        target: describeEventTarget(event.target)
+                    });
                     this.schedulePaintProbe(elementId, attachment, "editor.change");
                 }
             };
@@ -2547,9 +3344,67 @@
                     return;
                 }
 
+                if (this.mode === "baseline") {
+                    // Baseline must not force layout work on every scroll event.
+                    // Count every event, but sample scroll geometry only occasionally.
+                    attachment.baselineScrollCounter = (attachment.baselineScrollCounter || 0) + 1;
+                    session.scroll.events++;
+
+                    const recent = session.lastInput || {
+                        type: "programmatic-or-unknown",
+                        detail: "unknown",
+                        direction: "unknown",
+                        at: 0
+                    };
+                    const direction = recent.direction || "unknown";
+                    const key = `${recent.type || "programmatic-or-unknown"}.${direction}`;
+                    let bucket = session.scroll.byInput.get(key);
+
+                    if (!bucket) {
+                        bucket = createScrollInputBucket();
+                        session.scroll.byInput.set(key, bucket);
+                    }
+
+                    bucket.events++;
+
+                    if (
+                        attachment.baselineScrollCounter === 1 ||
+                        attachment.baselineScrollCounter % BASELINE_SCROLL_SAMPLE_EVERY === 0
+                    ) {
+                        const scrollTop = attachment.holder.scrollTop;
+                        const scrollLeft = attachment.holder.scrollLeft;
+                        const delta = scrollTop - (attachment.baselineSampledScrollTop || 0);
+                        const deltaX = scrollLeft - (attachment.baselineSampledScrollLeft || 0);
+                        attachment.baselineSampledScrollTop = scrollTop;
+                        attachment.baselineSampledScrollLeft = scrollLeft;
+                        attachment.lastScrollTop = scrollTop;
+                        attachment.lastScrollLeft = scrollLeft;
+
+                        const sampledDistance = Math.abs(delta) + Math.abs(deltaX);
+                        session.scroll.distancePx += sampledDistance;
+                        bucket.distancePx += sampledDistance;
+                    }
+
+                    const handlerMs = this.now() - handlerStartedAt;
+                    session.scroll.maxHandlerMs = Math.max(
+                        session.scroll.maxHandlerMs,
+                        handlerMs
+                    );
+                    bucket.maxHandlerMs = Math.max(bucket.maxHandlerMs, handlerMs);
+                    this.trackProfilerWork(
+                        session,
+                        "profiler.scroll-handler",
+                        handlerStartedAt
+                    );
+                    return;
+                }
+
                 const scrollTop = attachment.holder.scrollTop;
+                const scrollLeft = attachment.holder.scrollLeft;
                 const delta = scrollTop - attachment.lastScrollTop;
+                const deltaX = scrollLeft - (attachment.lastScrollLeft || 0);
                 attachment.lastScrollTop = scrollTop;
+                attachment.lastScrollLeft = scrollLeft;
                 const now = this.now();
                 const recent =
                     now - session.lastInput.at <= RECENT_INPUT_MS
@@ -2559,7 +3414,22 @@
                             detail: "unknown",
                             direction: delta < 0 ? "up" : "down"
                         };
-                const key = `${recent.type}.${recent.direction}`;
+                const scrollDirection = Math.abs(delta) >= Math.abs(deltaX)
+                    ? (delta < 0 ? "up" : delta > 0 ? "down" : recent.direction)
+                    : (deltaX < 0 ? "left" : "right");
+                const key = `${recent.type}.${scrollDirection}`;
+
+                if (this.mode === "trace") {
+                    this.pushTraceEvent(elementId, "reaction", {
+                        name: "scroll",
+                        deltaY: round(delta),
+                        deltaX: round(deltaX),
+                        scrollTop: round(scrollTop),
+                        scrollLeft: round(scrollLeft),
+                        attributedTo: `${recent.type}.${recent.detail}`,
+                        direction: scrollDirection
+                    });
+                }
                 let bucket = session.scroll.byInput.get(key);
 
                 if (!bucket) {
@@ -2637,6 +3507,8 @@
             this.addDomHandler(attachment, document, "keydown", keydown, true);
             this.addDomHandler(attachment, attachment.holder, "wheel", wheel, { passive: true });
             this.addDomHandler(attachment, document, "pointerdown", pointerdown, true);
+            this.addDomHandler(attachment, document, "pointermove", pointermove, true);
+            this.addDomHandler(attachment, document, "pointerup", pointerup, true);
             this.addDomHandler(attachment, document, "click", click, true);
             this.addDomHandler(attachment, document, "dblclick", doubleClick, true);
             this.addDomHandler(attachment, document, "contextmenu", contextMenu, true);
@@ -2666,6 +3538,9 @@
                 }
 
                 this.increment(elementId, `table.${name}`);
+                this.pushTraceEvent(elementId, "reaction", {
+                    name: `table.${name}`
+                });
             };
 
             const definitions = [
@@ -2684,7 +3559,16 @@
                 ["clipboardCopied", () => noteTableEvent("clipboard-copied")],
                 ["clipboardPasted", () => noteTableEvent("clipboard-pasted")],
                 ["rangeAdded", () => noteTableEvent("range-added")],
-                ["rangeChanged", () => noteTableEvent("range-changed")]
+                ["rangeChanged", () => noteTableEvent("range-changed")],
+                ["rangeRemoved", () => noteTableEvent("range-removed")],
+                ["dataSorting", () => noteTableEvent("data-sorting")],
+                ["dataSorted", () => noteTableEvent("data-sorted")],
+                ["dataFiltering", () => noteTableEvent("data-filtering")],
+                ["dataFiltered", () => noteTableEvent("data-filtered")],
+                ["columnResized", () => noteTableEvent("column-resized")],
+                ["columnMoved", () => noteTableEvent("column-moved")],
+                ["columnVisibilityChanged", () => noteTableEvent("column-visibility-changed")],
+                ["rowSelectionChanged", () => noteTableEvent("row-selection-changed")]
             ];
 
             for (const [eventName, handler] of definitions) {
@@ -2942,6 +3826,24 @@
                             session.longTasks.maxMs,
                             entry.duration
                         );
+                        if (ARROW_DIAG_ENABLED && session.arrowDiagnosis) {
+                            const sequences = this.findArrowDiagnosticWindowsForSpan(
+                                session,
+                                entry.startTime,
+                                entry.startTime + entry.duration
+                            );
+                            if (sequences.length) {
+                                pushBounded(
+                                    session.arrowDiagnosis.longTasks,
+                                    {
+                                        startMs: round(entry.startTime - session.startedAt),
+                                        durationMs: round(entry.duration),
+                                        arrowSequences: sequences
+                                    },
+                                    MAX_ARROW_DIAG_TASKS
+                                );
+                            }
+                        }
                         const timeBucket = this.ensureTimeBucket(session, entry.startTime);
 
                         if (timeBucket) {
@@ -3007,14 +3909,89 @@
                             );
                         }
 
-                        if (this.mode === "deep") {
+                        if (this.mode === "deep" || ARROW_DIAG_ENABLED) {
                             for (const script of entry.scripts || []) {
-                                const key = `${script.sourceURL || "inline"}::${script.functionName || script.invoker || "unknown"}`;
+                                const functionName =
+                                    script.sourceFunctionName ||
+                                    script.functionName ||
+                                    script.invoker ||
+                                    "unknown";
+                                const key = `${script.sourceURL || "inline"}::${functionName}`;
                                 addDuration(
                                     target.scripts,
                                     key,
                                     script.duration || 0,
                                     false
+                                );
+                            }
+                        }
+
+                        if (ARROW_DIAG_ENABLED && session.arrowDiagnosis) {
+                            const frameEnd = entry.startTime + (entry.duration || 0);
+                            const sequences = this.findArrowDiagnosticWindowsForSpan(
+                                session,
+                                entry.startTime,
+                                frameEnd
+                            );
+                            if (sequences.length) {
+                                const scripts = (entry.scripts || [])
+                                    .map(script => ({
+                                        durationMs: round(script.duration || 0),
+                                        executionStartMs: Number.isFinite(script.executionStart)
+                                            ? round(script.executionStart - session.startedAt)
+                                            : null,
+                                        forcedStyleAndLayoutMs: round(
+                                            script.forcedStyleAndLayoutDuration || 0
+                                        ),
+                                        pauseMs: round(script.pauseDuration || 0),
+                                        invoker: script.invoker || null,
+                                        functionName:
+                                            script.sourceFunctionName ||
+                                            script.functionName ||
+                                            null,
+                                        sourceURL: script.sourceURL || null
+                                    }))
+                                    .sort((a, b) => b.durationMs - a.durationMs)
+                                    .slice(0, 12);
+                                const scriptDurationMs = scripts.reduce(
+                                    (sum, script) => sum + (script.durationMs || 0),
+                                    0
+                                );
+                                const forcedStyleAndLayoutMs = scripts.reduce(
+                                    (sum, script) =>
+                                        sum + (script.forcedStyleAndLayoutMs || 0),
+                                    0
+                                );
+                                pushBounded(
+                                    session.arrowDiagnosis.frames,
+                                    {
+                                        startMs: round(entry.startTime - session.startedAt),
+                                        durationMs: round(entry.duration || 0),
+                                        blockingDurationMs: round(entry.blockingDuration || 0),
+                                        firstUIEventTimestampMs: Number.isFinite(entry.firstUIEventTimestamp)
+                                            ? round(entry.firstUIEventTimestamp - session.startedAt)
+                                            : null,
+                                        renderStartMs: Number.isFinite(entry.renderStart)
+                                            ? round(entry.renderStart - session.startedAt)
+                                            : null,
+                                        styleAndLayoutStartMs: Number.isFinite(entry.styleAndLayoutStart)
+                                            ? round(entry.styleAndLayoutStart - session.startedAt)
+                                            : null,
+                                        preRenderMs: Number.isFinite(entry.renderStart)
+                                            ? round(entry.renderStart - entry.startTime)
+                                            : null,
+                                        renderTailMs: Number.isFinite(entry.renderStart)
+                                            ? round(frameEnd - entry.renderStart)
+                                            : null,
+                                        styleLayoutPaintTailMs: Number.isFinite(entry.styleAndLayoutStart)
+                                            ? round(frameEnd - entry.styleAndLayoutStart)
+                                            : null,
+                                        scriptDurationMs: round(scriptDurationMs),
+                                        forcedStyleAndLayoutMs: round(forcedStyleAndLayoutMs),
+                                        arrowSequences: sequences,
+                                        scripts
+                                    },
+                                    MAX_ARROW_DIAG_FRAMES
                                 );
                             }
                         }
@@ -3032,7 +4009,7 @@
                 }
             });
 
-            if (this.mode === "deep") {
+            if (this.mode === "deep" || ARROW_DIAG_ENABLED) {
                 addObserver(
                     "event",
                     list => {
@@ -3047,6 +4024,45 @@
                                         entry.duration,
                                         true
                                     );
+                                    if (ARROW_DIAG_ENABLED && session.arrowDiagnosis) {
+                                        const nearest = Array.from(
+                                            session.arrowDiagnosis.windows.values()
+                                        )
+                                            .filter(item =>
+                                                Math.abs(item.startedAt - entry.startTime) <= 40
+                                            )
+                                            .sort((a, b) =>
+                                                Math.abs(a.startedAt - entry.startTime) -
+                                                Math.abs(b.startedAt - entry.startTime)
+                                            )[0];
+                                        if (nearest) {
+                                            pushBounded(
+                                                session.arrowDiagnosis.eventTiming,
+                                                {
+                                                    sequence: nearest.sequence,
+                                                    name: entry.name || "unknown",
+                                                    startMs: round(entry.startTime - session.startedAt),
+                                                    durationMs: round(entry.duration || 0),
+                                                    processingStartDelayMs: Number.isFinite(entry.processingStart)
+                                                        ? round(entry.processingStart - entry.startTime)
+                                                        : null,
+                                                    processingDurationMs:
+                                                        Number.isFinite(entry.processingStart) &&
+                                                        Number.isFinite(entry.processingEnd)
+                                                            ? round(entry.processingEnd - entry.processingStart)
+                                                            : null,
+                                                    presentationDelayMs: Number.isFinite(entry.processingEnd)
+                                                        ? round(
+                                                            entry.startTime + entry.duration -
+                                                            entry.processingEnd
+                                                        )
+                                                        : null,
+                                                    interactionId: entry.interactionId || null
+                                                },
+                                                MAX_ARROW_DIAG_EVENT_TIMING
+                                            );
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -3064,7 +4080,8 @@
                     { type: "event", buffered: true, durationThreshold: 16 }
                 );
 
-                addObserver("layout-shift", list => {
+                if (this.mode === "deep") {
+                    addObserver("layout-shift", list => {
                     const callbackStartedAt = this.now();
 
                     for (const entry of list.getEntries()) {
@@ -3092,7 +4109,8 @@
                             );
                         }
                     }
-                });
+                    });
+                }
             }
         },
 
@@ -3396,12 +4414,15 @@
                             ? "Use for before/after regression decisions. Run three times and compare the median."
                             : session.mode === "lifecycle"
                                 ? "Use for lifecycle/resource accumulation diagnosis and time-window trends. Confirm final performance gains again in baseline mode."
-                                : "Use for diagnosis and row-band correlation. Confirm final gains again in baseline mode.",
+                                : session.mode === "trace"
+                                    ? "Use for manual interaction sequencing and cause/reaction correlation. Diagnostic only; confirm final gains again in baseline mode."
+                                    : "Use for diagnosis and row-band correlation. Confirm final gains again in baseline mode.",
                     profilerMeasuredHookTimeMs: round(session.profiler.measuredHookTimeMs),
                     profilerMeasuredHookRatioPercent: measuredOverheadRatio,
                     profilerCallbackCount: session.profiler.callbackCount,
                     profilerMaxCallbackMs: round(session.profiler.maxCallbackMs),
-                    warning: "Measured hook time is a lower-bound estimate. Browser observer and instrumentation effects cannot be measured perfectly from inside the page."
+                    warning: "Measured hook time is a lower-bound estimate. Browser observer and instrumentation effects cannot be measured perfectly from inside the page.",
+                    baselineScrollGeometrySamplingEvery: session.mode === "baseline" ? BASELINE_SCROLL_SAMPLE_EVERY : null
                 },
                 environment: session.environment,
                 grid: {
@@ -3441,8 +4462,22 @@
                     sampled: session.profiler.sampledInteractions,
                     skippedByBaselineSampling: session.profiler.skippedInteractions,
                     summary: this.serializeInteractionMetrics(session.interactionMetrics),
-                    deepSamples: session.mode === "deep" ? session.interactions : []
+                    deepSamples:
+                        session.mode === "deep" || session.mode === "trace"
+                            ? session.interactions
+                            : []
                 },
+                interactionTrace: session.mode === "trace"
+                    ? {
+                        events: session.trace.events,
+                        droppedEvents: session.trace.droppedEvents,
+                        pendingActionCount: session.trace.pendingActions.size,
+                        selectionSafety: session.trace.selectionSafety
+                    }
+                    : null,
+                arrowDiagnosis: ARROW_DIAG_ENABLED
+                    ? this.serializeArrowDiagnosis(session)
+                    : null,
                 timeSeries30s: this.serializeTimeBuckets(session),
                 lifecycleAudit: session.mode === "lifecycle"
                     ? session.lifecycle
@@ -3461,10 +4496,11 @@
                     : [],
                 operations: serializeDurationMap(session.durations),
                 operationSamples: session.operationSamples,
-                tabulatorInternals: session.mode === "deep"
-                    ? serializeDurationMap(session.internalDurations)
-                    : [],
-                eventTiming: session.mode === "deep"
+                tabulatorInternals:
+                    session.mode === "deep" || session.mode === "trace"
+                        ? serializeDurationMap(session.internalDurations)
+                        : [],
+                eventTiming: session.mode === "deep" || ARROW_DIAG_ENABLED
                     ? serializeDurationMap(session.eventTiming)
                     : [],
                 layoutShifts: session.layoutShifts,
@@ -3620,6 +4656,8 @@
                 "Baseline:  /work-orders?perf=baseline",
                 "Bulk ops:  baseline mode now records operationSamples with sizes",
                 "Lifecycle: /work-orders?perf=lifecycle",
+                "Trace:     /work-orders?perf=trace",
+                "ArrowDiag: /work-orders?perf=arrowdiag",
                 "Deep:      /work-orders?perf=deep",
                 "tabulatorPerformance.reset('tabulator-test-table')",
                 "tabulatorPerformance.mark('tabulator-test-table', 'label')",
@@ -3634,7 +4672,7 @@
     if (api.mode !== "off") {
         api.start(api.mode, DEFAULT_TABLE_ID, "UDS final performance observatory");
         console.info(
-            `[${api.version}] ${api.mode} mode active. ` +
+            `[${api.version}] ${ARROW_DIAG_ENABLED ? "arrowdiag" : api.mode} mode active. ` +
             "Press Start / Reset immediately before the test, then Download."
         );
     }

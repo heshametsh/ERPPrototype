@@ -24,7 +24,7 @@
 
 ### Current performance evidence status
 
-- `PERF-012` financial Sort: **strong runtime confirmation** — worst observed Long Task 2.596 s at 10k.
+- `PERF-012` financial Sort: **measured performance cliff mitigated by accepted optimization `0f6bd3b`** — sort storm improved from ~17.4 s to ~0.56 s and worst Long Task from ~2.60 s to ~0.07 s. Preserve the fix; underlying formatting/parsing coupling can be revisited only if new evidence requires it.
 - `PERF-008` 500+ changed-cell replacement: **runtime confirmed** — 1,000-cell Paste produced >1 s Long Task.
 - `PERF-009`: bulk Undo/Redo latency confirmed; retained-history memory risk still unmeasured.
 - `PERF-011`: broad Save contract remains static-confirmed; 1,000-edit Save showed a 9.32 s user journey, but causal cost split is still pending.
@@ -52,7 +52,7 @@
 
 | ID | Priority | Issue | Evidence / impact | Temporary position | Release gate |
 |---|---:|---|---|---|---|
-| GRID-001 | P2 | تدهور تدريجي في التنقل بعد ضغط مستمر طويل | Phase 6.0 أثبتت ارتفاع أزمنة الأسهم، وPhase 6.1 لم تثبت تراكمًا مستمرًا في Timers/Observers/known owners؛ المستخدم أكد أن السرعة العملية الحالية للأسهم وEnter والـWheel مقبولة | لا Performance Patch ولا Recovery الآن؛ نراقب فقط | يعاد فتحه عند اختبار 10,000 صف، ظهور شكوى فعلية، أو Regression واضح |
+| GRID-001 | P1 | بطء ملحوظ في التنقل الرأسي بالأسهم على الشيت الحقيقي | أُعيد فتحه في 2026-08-17: Baseline ArrowDown P95 = 214.7ms مقابل Wheel ~17–18ms، والـDeep أكد تكرار التكلفة مع scroll/range/render؛ السبب البرمجي النهائي لم يثبت بعد | لا Patch قبل تتبع المسار الحالي من الكود؛ بعدها أصغر إصلاح + before/after | **Gate قبل Pilot** لأن Keyboard navigation جزء أساسي من Excel-like Work Orders |
 | GRID-002 | P2 | `tabulatorTest.js` ما زال منسقًا كبيرًا نسبيًا رغم انخفاضه إلى نحو 2,331 سطرًا | المسؤوليات الحساسة أصبحت في Modules مستقلة؛ تقسيم إضافي الآن قد يزيد المخاطر بلا فائدة | لا Refactor إضافي دون مشكلة أو ميزة تثبت الحاجة | ليس Gate حاليًا |
 | GRID-003 | P1 | Insert/Delete/structural Undo تستخدم full `setData` | تعيد بناء بيانات الشيت والتحقق | لا نضيف عمليات هيكلية ثقيلة جديدة | تحسين مرحلي بعد فصل الموديولات |
 | GRID-004 | P1 | 10,000 صف غير مختبرة | Client-side loading قد لا يظل مقبولًا | اختبار منفصل قبل قرار معماري | مطلوب قبل تحديد سعة المنتج |
@@ -108,7 +108,7 @@
 
 ## Simple Example
 
-`GRID-001` أصبح قيد مراقبة P2 وليس مشكلة نصلحها الآن. القياس سجّل التدهور، لكن قرار المنتج يعتمد أيضًا على الاستخدام الفعلي: طالما السرعة الحالية مقبولة ولا توجد شكوى تشغيلية، لا نضيف Patch مخاطره أكبر من فائدته. يعاد فتحه عند بيانات أكبر أو مشكلة فعلية.
+**Historical decision (superseded 2026-08-17):** كان `GRID-001` تحت مراقبة P2 لأن السرعة وقتها كانت مقبولة. شرط إعادة الفتح كان بيانات أكبر/شكوى فعلية/Regression واضح. الشرط تحقق الآن، لذلك الحالة الحالية هي P1 كما هو موضح في جدول Active Items أعلاه.
 
 
 ## Phase 6.0 Long-session Reference — 2026-07-29

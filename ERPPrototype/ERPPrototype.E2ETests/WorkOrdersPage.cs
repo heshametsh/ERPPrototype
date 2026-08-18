@@ -900,18 +900,204 @@ internal sealed class WorkOrdersPage(IPage page)
         string field) =>
         ClickCellAsync(rowId, field);
 
-    public async Task<int> GetActiveCellRowIdAsync()
+    public async Task<int> GetActiveRangeStartRowPositionAsync()
     {
         return await page.EvaluateAsync<int>(
             """
             tableId => {
-                const state = window.tabulatorTest?.states?.[tableId];
-                const rowId = Number(state?.activeCell?.rowId);
+                const api = window.tabulatorTest;
+                const table = api?.tables?.[tableId];
+                const range = api?.getActiveRange?.(table);
+
+                if (
+                    !range ||
+                    typeof range.getTopEdge !== 'function' ||
+                    typeof range.getBottomEdge !== 'function'
+                ) {
+                    return -1;
+                }
+
+                const top = Number(range.getTopEdge());
+                const bottom = Number(range.getBottomEdge());
+
+                if (
+                    !Number.isInteger(top) ||
+                    !Number.isInteger(bottom) ||
+                    top !== bottom
+                ) {
+                    return -1;
+                }
+
+                return top;
+            }
+            """,
+            TableId);
+    }
+
+    public async Task<int> GetActiveRangeStartRowIdAsync()
+    {
+        return await page.EvaluateAsync<int>(
+            """
+            tableId => {
+                const api = window.tabulatorTest;
+                const table = api?.tables?.[tableId];
+                const range = api?.getActiveRange?.(table);
+                const bounds = range?.getBounds?.();
+                const rowId = Number(
+                    bounds?.start?.getRow?.()?.getIndex?.()
+                );
+
                 return Number.isFinite(rowId) ? rowId : -1;
             }
             """,
             TableId);
     }
+
+    public async Task<bool> IsActiveRangeCellVisiblySelectedAsync()
+    {
+        return await page.EvaluateAsync<bool>(
+            """
+            tableId => {
+                const api = window.tabulatorTest;
+                const table = api?.tables?.[tableId];
+                const range = api?.getActiveRange?.(table);
+                const bounds = range?.getBounds?.();
+                const cell = bounds?.start;
+                const cellElement = cell?.getElement?.();
+                const holder = table?.element?.querySelector?.(
+                    '.tabulator-tableholder'
+                );
+
+                if (
+                    !cellElement ||
+                    !holder ||
+                    !cellElement.isConnected
+                ) {
+                    return false;
+                }
+
+                const selected =
+                    cellElement.classList.contains(
+                        'tabulator-range-selected'
+                    ) ||
+                    cellElement.classList.contains(
+                        'tabulator-range-only-cell-selected'
+                    );
+
+                const cellBounds =
+                    cellElement.getBoundingClientRect();
+                const holderBounds =
+                    holder.getBoundingClientRect();
+
+                const intersectsViewport =
+                    cellBounds.bottom > holderBounds.top + 1 &&
+                    cellBounds.top < holderBounds.bottom - 1;
+
+                return selected && intersectsViewport;
+            }
+            """,
+            TableId);
+    }
+
+    public async Task<int> GetActiveRangeRowCountAsync()
+    {
+        return await page.EvaluateAsync<int>(
+            """
+            tableId => {
+                const api = window.tabulatorTest;
+                const table = api?.tables?.[tableId];
+                const range = api?.getActiveRange?.(table);
+
+                if (
+                    !range ||
+                    typeof range.getTopEdge !== 'function' ||
+                    typeof range.getBottomEdge !== 'function'
+                ) {
+                    return 0;
+                }
+
+                const top = Number(range.getTopEdge());
+                const bottom = Number(range.getBottomEdge());
+
+                return Number.isFinite(top) && Number.isFinite(bottom)
+                    ? Math.abs(bottom - top) + 1
+                    : 0;
+            }
+            """,
+            TableId);
+    }
+
+    public async Task<bool> IsRenderedRangeSelectionConsistentAsync()
+    {
+        return await page.EvaluateAsync<bool>(
+            """
+            tableId => {
+                const api = window.tabulatorTest;
+                const table = api?.tables?.[tableId];
+                const range = api?.getActiveRange?.(table);
+                const rangeModule = table?.modules?.selectRange;
+                const rowManager = table?.rowManager;
+
+                if (
+                    !range ||
+                    !rangeModule ||
+                    !rowManager ||
+                    typeof range.getTopEdge !== 'function' ||
+                    typeof range.getBottomEdge !== 'function' ||
+                    typeof range.getLeftEdge !== 'function' ||
+                    typeof range.getRightEdge !== 'function'
+                ) {
+                    return false;
+                }
+
+                const top = Number(range.getTopEdge());
+                const bottom = Number(range.getBottomEdge());
+                const left = Number(range.getLeftEdge());
+                const right = Number(range.getRightEdge());
+                const renderedRows = rowManager.getVisibleRows(true);
+
+                for (const row of renderedRows) {
+                    if (row?.type !== 'row') {
+                        continue;
+                    }
+
+                    const rowPosition = Number(row.position) - 1;
+
+                    for (const cell of row.cells ?? []) {
+                        if (!cell?.column?.visible) {
+                            continue;
+                        }
+
+                        const element = cell.getElement?.();
+
+                        if (!element?.isConnected) {
+                            continue;
+                        }
+
+                        const columnPosition =
+                            Number(cell.column.getPosition?.()) - 1;
+                        const expected =
+                            rowPosition >= top &&
+                            rowPosition <= bottom &&
+                            columnPosition >= left &&
+                            columnPosition <= right;
+                        const selected =
+                            element.classList.contains(
+                                'tabulator-range-selected'
+                            );
+
+                        if (expected !== selected) {
+                            return false;
+                        }
+                    }
+                }
+
+                return true;
+            }
+            """,
+            TableId);
+    }
+
 
     private async Task ClickCellAsync(
         int rowId,

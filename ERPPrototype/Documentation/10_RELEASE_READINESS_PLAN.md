@@ -1,7 +1,7 @@
 # 10 — Release Readiness Plan
 
 **Status:** Current approved gates  
-**Last update:** 2026-08-16
+**Last update:** 2026-08-17
 
 ## Gate 0 — Engineering Remediation Baseline — **PASS / CHECKPOINTED**
 
@@ -12,8 +12,9 @@ Evidence:
 - normal E2E safety net expanded;
 - `LDR-002` fixed and contract-tested at `33e73c6`;
 - clean Open/Real-User/Torture performance baseline established;
-- current checkpoint `3dc88ff`;
-- SQL Integration 25/25 PASS; Full Browser 46/46 PASS; 10k Torture PASS.
+- later accepted checkpoints include `98d9aa3` initialization recovery and `0f6bd3b` financial sorting;
+- current source ZIP contains those accepted runtime changes and no ManualPerformanceCapture remnants;
+- SQL Integration / Full Browser / 10k Torture safety evidence was passed at the accepted checkpoints described in the Master.
 
 Gate 0 PASS means the measurement foundation is trustworthy. It does **not** mean Work Orders UX performance is accepted: measured Sort/dirty bulk freezes remain open and Gate 1 still requires comfortable 10k use.
 
@@ -27,6 +28,7 @@ Required:
 - narrow Save/Delta contract proven;
 - concurrency/security P1s closed;
 - 10k target measured comfortably;
+- reopened `GRID-001` / ArrowDown regression closed with material manual + baseline improvement;
 - performance acceptance includes both engineering numbers and a smooth visible employee workflow in the primary Split Screen 100% case. A benchmark-only PASS is not sufficient.
 
 ## Gate 2 — Offline/Sync Engineering Qualification

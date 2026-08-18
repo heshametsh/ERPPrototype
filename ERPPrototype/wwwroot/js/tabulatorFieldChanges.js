@@ -206,31 +206,63 @@
         },
 
         captureActiveRangeDescriptor: function (table) {
-            const ranges = table?.getRanges?.() ?? [];
+            const ranges =
+                table?.getRanges?.() ?? [];
             const activeRange =
-                ranges.length > 0 ? ranges[ranges.length - 1] : null;
-            const matrix = activeRange?.getStructuredCells?.();
+                ranges.length > 0
+                    ? ranges[ranges.length - 1]
+                    : null;
 
-            if (!Array.isArray(matrix) || matrix.length === 0) {
+            if (!activeRange) {
                 return null;
             }
 
-            const firstRow = matrix.find(row => Array.isArray(row) && row.length > 0);
-            const lastRow = Array.from(matrix)
-                .reverse()
-                .find(row => Array.isArray(row) && row.length > 0);
-            const startCell = firstRow?.[0] ?? null;
-            const endCell = lastRow?.[lastRow.length - 1] ?? null;
+            const rows =
+                typeof activeRange.getRows === "function"
+                    ? activeRange.getRows()
+                    : [];
+            const columns =
+                typeof activeRange.getColumns === "function"
+                    ? activeRange.getColumns()
+                    : [];
 
-            if (!startCell || !endCell) {
+            if (
+                !Array.isArray(rows) ||
+                !Array.isArray(columns) ||
+                rows.length === 0 ||
+                columns.length === 0
+            ) {
+                return null;
+            }
+
+            const startRow =
+                rows[0];
+            const endRow =
+                rows[rows.length - 1];
+            const startColumn =
+                columns[0];
+            const endColumn =
+                columns[columns.length - 1];
+
+            const startField =
+                startColumn?.getField?.();
+            const endField =
+                endColumn?.getField?.();
+
+            if (
+                !startRow ||
+                !endRow ||
+                !startField ||
+                !endField
+            ) {
                 return null;
             }
 
             return {
-                startRowId: startCell.getRow().getIndex(),
-                startField: startCell.getField(),
-                endRowId: endCell.getRow().getIndex(),
-                endField: endCell.getField()
+                startRowId: startRow.getIndex(),
+                startField: startField,
+                endRowId: endRow.getIndex(),
+                endField: endField
             };
         },
 

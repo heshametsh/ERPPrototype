@@ -1,30 +1,32 @@
-# CURRENT HANDOFF — 2026-08-16
+# CURRENT HANDOFF — 2026-08-17
 
-> **هذا القسم هو الحالة الحالية المعتمدة.** أي Phase/خطة قديمة أسفل الملف تُعامل كتاريخ تنفيذي إذا تعارضت مع هذا القسم أو مع `Documentation/12_ENGINEERING_AUDIT_REPORT.md`.
+> **هذا القسم هو الحالة الحالية المعتمدة.** أي خطة أقدم أسفل الملف تُعامل كتاريخ إذا تعارضت مع هذا القسم أو مع `Documentation/12_ENGINEERING_AUDIT_REPORT.md`.
 
-**Baseline code:** `codespaces-sync-2026-08-08` @ `00503ab`  
-**Runtime remediation after audits:** لم يبدأ بعد  
-**Latest SEC Codespaces Release Build:** PASS  
-**الخطوة التالية المعتمدة:** `Test Foundation → Fix LDR-002 → Clean Performance Baseline → Online Reliability → Narrow Save/Delta Contract`
+**Audit baseline:** `00503ab`  
+**Latest confirmed Git checkpoint from captured log:** `0f6bd3b` — `Optimize Work Orders financial sorting`  
+**Current source ZIP reviewed:** `ERPPrototype_Current_2026-08-17.zip`  
+**Runtime remediation:** بدأ بالفعل؛ Test Foundation + `LDR-002` + initialization recovery + accepted financial-sort optimization مكتملة.  
+**Current task:** تشخيص بطء ArrowDown من الكود الحالي قبل أي Patch.
 
-## اقرأ أولًا في أي محادثة/مراجعة جديدة
+## اقرأ أولًا
 
-1. `Documentation/12_ENGINEERING_AUDIT_REPORT.md` — الـMaster الحالي للـFindings والقرارات والخطة.
-2. `Documentation/ERP_AUDIT_PROTOCOL.md` — قواعد أي Audit مستقل جديد.
-3. `Documentation/00_DOCUMENTATION_INDEX.md` — ترتيب الثقة والوثائق الحالية.
-4. `Documentation/03_CURRENT_IMPLEMENTATION.md` — ما هو منفذ فعليًا في commit الحالي.
-5. `Documentation/06_REGRESSION_TEST_CHECKLIST.md` — شبكة الاختبارات الحالية والقواعد الجديدة.
-6. `Documentation/41_HANDOFF_2026-08-16_POST_AUDIT.md` — تسليم مختصر للمحادثة التالية.
+1. `Documentation/12_ENGINEERING_AUDIT_REPORT.md`
+2. `Documentation/ERP_AUDIT_PROTOCOL.md`
+3. `Documentation/00_DOCUMENTATION_INDEX.md`
+4. `Documentation/03_CURRENT_IMPLEMENTATION.md`
+5. `Documentation/06_REGRESSION_TEST_CHECKLIST.md`
+6. `Documentation/42_HANDOFF_2026-08-17_PERFORMANCE_RECONCILIATION.md`
 
-## قواعد لا يجوز خلطها
+## قواعد الحالة الحالية
 
-- الكود الحالي هو الحقيقة لما هو **منفذ الآن**.
-- الـMaster هو الحقيقة لما هو **مقرر/مطلوب تنفيذه لاحقًا**.
-- Offline/Sync والـSub-workflows المستقبلية **ليست منفذة في baseline `00503ab`**.
-- لا تعديل Runtime قبل بناء/توسيع شبكة الاختبارات ثم إصلاح `LDR-002`.
-- أحجام Work Orders المجمدة لا تُغير بدون طلب صريح.
-- لا Polling ثابت للسيرفر؛ الاتصال يكون عند حدث له قيمة فعلية مثل Save/Resume مع Pending work.
-- الأداء شرط قبول: أي ميزة تسبب Lag ملحوظ في Work Orders تعاد هندستها قبل الاعتماد.
+- لا Offline الآن.
+- لا تغيير للأحجام المجمدة.
+- لا نخسر إصلاح الـSort المقبول.
+- لا نعيد تجربة ManualPerformanceCapture؛ الأداة المعتمدة هي `?perf=baseline` ثم `?perf=deep` عند الحاجة.
+- `GRID-001` أعيد فتحه لأن بطء الأسهم أصبح Regression مقاسًا ومشكلة محسوسة في الاستخدام الحقيقي.
+- لا Patch للأسهم قبل إثبات السبب من الكود.
+- بعد إغلاق ArrowDown نرجع إلى Online Reliability ثم Narrow Save/Delta Contract.
+
 
 # START HERE — ERP Prototype
 

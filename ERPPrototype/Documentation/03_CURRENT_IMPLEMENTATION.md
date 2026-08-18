@@ -1,31 +1,32 @@
-# CURRENT IMPLEMENTATION OVERRIDE — 2026-08-16
+# CURRENT IMPLEMENTATION OVERRIDE — 2026-08-17
 
-> هذا القسم يحدد الفرق بين **الموجود فعليًا** و**المخطط بعد الـAudits**. بقية الملف تحتفظ بالتاريخ والتفاصيل السابقة.
+> هذا القسم يحدد الواقع الفعلي الأحدث. التفاصيل التاريخية أسفل الملف لا تُستخدم لتجاوز هذا القسم.
 
-**Baseline:** `00503ab` (`Remove unused Work Orders JavaScript APIs`)  
-**Branch:** `codespaces-sync-2026-08-08`  
-**Latest SEC Codespaces Release Build:** PASS  
-**Runtime changes after audit decision session:** None.
+**Audit baseline:** `00503ab`  
+**Latest confirmed Git checkpoint from captured log:** `0f6bd3b`  
+**Current source package reviewed:** `ERPPrototype_Current_2026-08-17.zip`
 
-## منفذ فعليًا الآن
+## منفذ فعليًا الآن بعد الـAudits
 
-- ASP.NET Core / Blazor Interactive Server + EF Core + SQL Server + Identity + Tabulator.
-- Work Orders Online الحالية وما فيها من editing/search/filter/sort/clipboard/history/custom columns حسب الكود الحالي.
-- server-side Work Orders authority, RowVersion, SQL uniqueness/transactions.
-- route-based Work Orders JS loader موجود، لكن Finding `LDR-002` ما زال مفتوحًا.
+- Test Foundation strengthened; unexpected page/console/request/HTTP 5xx errors are treated as test failures.
+- `LDR-002` fixed: Work Orders waits for the complete required runtime before Ready.
+- Grid initialization now requires positive acknowledgement, has bounded retry/cleanup, and manual Retry recovery.
+- Clean Open / Real User / 10k Torture measurement infrastructure exists.
+- Financial sorting optimization is present and accepted.
+- Built-in `?perf=baseline` / `?perf=deep` profiler exists.
+- Temporary ManualPerformanceCapture experiment is **not** in current source.
+- Existing Online Work Orders behavior, server authority, RowVersion, SQL uniqueness/transactions remain.
 
-## غير منفذ بعد — لا يُعامل كأنه موجود في الكود
+## ما زال غير منفذ
 
+- ArrowDown performance fix: **not implemented**; investigation is current.
+- Save/year event-boundary reliability fix (`CSB-001`): still open after a rejected experiment was rolled back.
+- Narrow physical Delta Save / OperationId receipt contract.
 - IndexedDB Draft/Outbox production implementation.
-- Service Worker production Offline Work Orders.
-- OperationId/receipt Sync engine.
-- 5-hour Offline lease / 7-day trusted Login implementation.
-- Email OTP final flow.
-- flexible manager capability delegation.
-- Municipality/GIS/Execution/Extracts specialist sub-workflows.
-- bilingual stable-code migration.
+- Production Service Worker Offline Work Orders.
+- final Sync/Preflight/conflict engine.
+- final OTP/capability/localization foundations and specialist sub-workflows.
 
-المرجع لهذه القرارات المستقبلية هو `12_ENGINEERING_AUDIT_REPORT.md`.
 
 # 03 — Current Implementation
 

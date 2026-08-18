@@ -1,22 +1,25 @@
-# CURRENT REMEDIATION ROADMAP — 2026-08-16
+# CURRENT REMEDIATION ROADMAP — 2026-08-17
 
 > Phase 8/9 sections below remain historical. The current engineering order after the independent audits is:
 
 1. ✅ **Test Foundation** — completed and checkpointed.
 2. ✅ **Fix `LDR-002`** — completed and verified at `33e73c6`.
 3. ✅ **Clean Performance Baseline** — Open + visible Real-User + 10k Torture evidence established at `3dc88ff`; UX performance remains an open acceptance issue, not a missing baseline.
-4. ▶ **Online Reliability — CURRENT NEXT PACKAGE** — init/retry/event boundaries/Admin recoverability.
-5. **Narrow Save Contract** — physical field deltas, no full-row/full-year transport, receipt-compatible result; include measured bulk Save/dirty performance findings.
-6. **Concurrency/Schema Integrity** — Schema/Config Version, partial conflict preservation, Custom Column races.
-7. **Identity/Security/Permissions** — forced password, OTP, server actor identity, XSS, Audit Log, manager capability foundation.
-8. **Localization identity foundation** — stable language-neutral codes.
-9. **Offline durable state** — IndexedDB Draft/Outbox, all authorized years, 5h/7d rules, Web Locks.
-10. **Sync engine** — event-driven Preflight, OperationId/receipts, partial merge/conflict UX, no polling.
-11. **Extended normal regression + Offline/Sync Stress.**
-12. **Staging + real SEC cable/domain/firewall + limited Pilot.**
-13. **Production only after operations gates.**
+4. ✅ **Initialization Recovery** — accepted at `98d9aa3`.
+5. ✅ **Financial Sort Optimization** — accepted at `0f6bd3b`.
+6. ▶ **ArrowDown / `GRID-001` — CURRENT TASK** — user explicitly reprioritized this measured core-UX regression; identify cause before patch and verify with manual + baseline/deep evidence.
+7. **Resume Online Reliability** — remaining Save/year event boundary, unsaved navigation/reload, Admin recoverability.
+8. **Narrow Save Contract** — physical field deltas, no full-row/full-year transport, receipt-compatible result; include measured bulk Save/dirty performance findings.
+9. **Concurrency/Schema Integrity** — Schema/Config Version, partial conflict preservation, Custom Column races.
+10. **Identity/Security/Permissions** — forced password, OTP, server actor identity, XSS, Audit Log, manager capability foundation.
+11. **Localization identity foundation** — stable language-neutral codes.
+12. **Offline durable state** — IndexedDB Draft/Outbox, all authorized years, 5h/7d rules, Web Locks.
+13. **Sync engine** — event-driven Preflight, OperationId/receipts, partial merge/conflict UX, no polling.
+14. **Extended normal regression + Offline/Sync Stress.**
+15. **Staging + real SEC cable/domain/firewall + limited Pilot.**
+16. **Production only after operations gates.**
 
-**Stop rule:** do not jump directly to Offline before Tests + Loader + Save contract are trustworthy. Do not let a newly measured performance symptom reorder the approved remediation packages unless evidence shows it blocks the current package or the user explicitly changes the order.
+**Stop rule:** do not jump directly to Offline before Tests + Loader + Save contract are trustworthy. The ArrowDown insertion is valid because the user explicitly changed the priority after a repeatable real-user regression was measured.
 
 # 09 — Maintainability Refactor Roadmap
 

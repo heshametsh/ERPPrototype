@@ -533,6 +533,11 @@ window.tabulatorTest = {
             }
         });
 
+        this.deferScrolledKeyboardRangeLayout(
+            elementId,
+            table
+        );
+
         this.bindGridCommandInteractions(
             elementId,
             table,

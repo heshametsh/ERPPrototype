@@ -149,6 +149,19 @@ internal sealed class WorkOrdersTortureBrowserTest(
                 "One thousand rapid keyboard row-navigation actions with periodic render yields.",
                 async () => await PerformKeyboardStormAsync(page, workOrdersPage));
 
+            await MeasureAsync(
+                "range-keyboard-storm-240",
+                "Expand and shrink a logical cell range across Virtual DOM boundaries while verifying rendered selection continuity.",
+                async () => await PerformRangeKeyboardStormAsync(page, workOrdersPage));
+
+            await MeasureAsync(
+                "navigation-after-structure-changes",
+                "Verify vertical navigation uses the current row order after insert/delete and their Undo/Redo cycles.",
+                async () => await PerformNavigationAfterStructuralChangesAsync(
+                    page,
+                    workOrdersPage,
+                    seed.RowsPerYear));
+
             var editRowIds = await workOrdersPage.GetActiveRowIdsAsync(1_000, BulkRows);
             E2ETestAssert.Equal(BulkRows, editRowIds.Length,
                 "Could not obtain 1,000 existing rows for the edit torture phase.");
@@ -682,7 +695,11 @@ internal sealed class WorkOrdersTortureBrowserTest(
             "Could not choose the keyboard torture anchor row.");
 
         await workOrdersPage.ActivateCellForNavigationAsync(ids[0], "workOrderNumber");
-        var startRowId = await workOrdersPage.GetActiveCellRowIdAsync();
+
+        var startRowPosition =
+            await workOrdersPage.GetActiveRangeStartRowPositionAsync();
+        E2ETestAssert.True(startRowPosition >= 0,
+            "Keyboard torture could not read the logical active-range row.");
 
         for (var index = 0; index < 500; index++)
         {
@@ -690,8 +707,26 @@ internal sealed class WorkOrdersTortureBrowserTest(
             if (index % 25 == 24)
             {
                 await WaitForOneAnimationFrameAsync(page);
+
+                E2ETestAssert.Equal(
+                    startRowPosition + index + 1,
+                    await workOrdersPage.GetActiveRangeStartRowPositionAsync(),
+                    $"ArrowDown did not move exactly one logical row near navigation step {index + 1}.");
+
+                E2ETestAssert.True(
+                    await workOrdersPage.IsActiveRangeCellVisiblySelectedAsync(),
+                    $"ArrowDown lost the visible active-cell selection near navigation step {index + 1}.");
             }
         }
+
+        await WaitForTwoAnimationFramesAsync(page);
+        E2ETestAssert.Equal(
+            startRowPosition + 500,
+            await workOrdersPage.GetActiveRangeStartRowPositionAsync(),
+            "ArrowDown torture did not finish exactly 500 logical rows below its anchor.");
+        E2ETestAssert.True(
+            await workOrdersPage.IsActiveRangeCellVisiblySelectedAsync(),
+            "ArrowDown torture moved beyond the rendered window but lost the visible active-cell selection.");
 
         for (var index = 0; index < 500; index++)
         {
@@ -699,13 +734,220 @@ internal sealed class WorkOrdersTortureBrowserTest(
             if (index % 25 == 24)
             {
                 await WaitForOneAnimationFrameAsync(page);
+
+                E2ETestAssert.Equal(
+                    startRowPosition + 500 - index - 1,
+                    await workOrdersPage.GetActiveRangeStartRowPositionAsync(),
+                    $"ArrowUp did not move exactly one logical row near navigation step {index + 1}.");
+
+                E2ETestAssert.True(
+                    await workOrdersPage.IsActiveRangeCellVisiblySelectedAsync(),
+                    $"ArrowUp lost the visible active-cell selection near navigation step {index + 1}.");
             }
         }
 
-        var endRowId = await workOrdersPage.GetActiveCellRowIdAsync();
-        E2ETestAssert.True(startRowId > 0 && endRowId > 0,
-            "Keyboard torture lost the active Work Orders cell.");
+        await WaitForTwoAnimationFramesAsync(page);
+        E2ETestAssert.Equal(
+            startRowPosition,
+            await workOrdersPage.GetActiveRangeStartRowPositionAsync(),
+            "Keyboard torture did not return to its original logical row after 500 Down + 500 Up movements.");
+        E2ETestAssert.True(
+            await workOrdersPage.IsActiveRangeCellVisiblySelectedAsync(),
+            "ArrowUp torture moved beyond the rendered window but lost the visible active-cell selection.");
     }
+
+    private static async Task PerformNavigationAfterStructuralChangesAsync(
+        IPage page,
+        WorkOrdersPage workOrdersPage,
+        int originalRowCount)
+    {
+        var ids = await workOrdersPage.GetActiveRowIdsAsync(2_500, 4);
+        E2ETestAssert.Equal(4, ids.Length,
+            "Could not choose stable rows for the structure/navigation compatibility test.");
+
+        var anchorRowId = ids[0];
+        var originalNextRowId = ids[1];
+        var rowAfterDeletedRowId = ids[2];
+
+        async Task AssertDownUpRoundTripAsync(
+            int expectedDownRowId,
+            string phase)
+        {
+            await workOrdersPage.ActivateCellForNavigationAsync(
+                anchorRowId,
+                "workOrderNumber");
+
+            var startPosition =
+                await workOrdersPage.GetActiveRangeStartRowPositionAsync();
+            E2ETestAssert.True(startPosition >= 0,
+                $"{phase}: could not read the anchor logical row position.");
+            E2ETestAssert.Equal(
+                anchorRowId,
+                await workOrdersPage.GetActiveRangeStartRowIdAsync(),
+                $"{phase}: navigation did not start from the expected anchor row.");
+
+            await page.Keyboard.PressAsync("ArrowDown");
+            await WaitForOneAnimationFrameAsync(page);
+
+            E2ETestAssert.Equal(
+                startPosition + 1,
+                await workOrdersPage.GetActiveRangeStartRowPositionAsync(),
+                $"{phase}: ArrowDown did not move exactly one logical row.");
+            E2ETestAssert.Equal(
+                expectedDownRowId,
+                await workOrdersPage.GetActiveRangeStartRowIdAsync(),
+                $"{phase}: ArrowDown used a stale row order after the structural change.");
+            E2ETestAssert.True(
+                await workOrdersPage.IsActiveRangeCellVisiblySelectedAsync(),
+                $"{phase}: ArrowDown lost the visible active-cell selection.");
+
+            await page.Keyboard.PressAsync("ArrowUp");
+            await WaitForOneAnimationFrameAsync(page);
+
+            E2ETestAssert.Equal(
+                startPosition,
+                await workOrdersPage.GetActiveRangeStartRowPositionAsync(),
+                $"{phase}: ArrowUp did not return to the anchor logical row.");
+            E2ETestAssert.Equal(
+                anchorRowId,
+                await workOrdersPage.GetActiveRangeStartRowIdAsync(),
+                $"{phase}: ArrowUp did not return to the expected anchor row.");
+            E2ETestAssert.True(
+                await workOrdersPage.IsActiveRangeCellVisiblySelectedAsync(),
+                $"{phase}: ArrowUp lost the visible active-cell selection.");
+        }
+
+        await AssertDownUpRoundTripAsync(
+            originalNextRowId,
+            "before structural changes");
+
+        await workOrdersPage.InsertRowsAsync(
+            anchorRowId,
+            1,
+            "below",
+            originalRowCount + 1);
+        await workOrdersPage.WaitForDirtyRowCountAsync(1);
+
+        var insertedRows = await workOrdersPage.GetTemporaryRowIdsAsync();
+        E2ETestAssert.Equal(1, insertedRows.Length,
+            "Single-row insert did not create exactly one temporary row.");
+
+        await AssertDownUpRoundTripAsync(
+            insertedRows[0],
+            "after insert");
+
+        await workOrdersPage.UndoAsync();
+        await workOrdersPage.WaitForActiveRowCountAsync(originalRowCount);
+        await workOrdersPage.WaitForDirtyRowCountAsync(0);
+        await AssertDownUpRoundTripAsync(
+            originalNextRowId,
+            "after undo insert");
+
+        await workOrdersPage.RedoAsync();
+        await workOrdersPage.WaitForActiveRowCountAsync(originalRowCount + 1);
+        await workOrdersPage.WaitForDirtyRowCountAsync(1);
+
+        insertedRows = await workOrdersPage.GetTemporaryRowIdsAsync();
+        E2ETestAssert.Equal(1, insertedRows.Length,
+            "Redo insert did not restore exactly one temporary row.");
+        await AssertDownUpRoundTripAsync(
+            insertedRows[0],
+            "after redo insert");
+
+        await workOrdersPage.UndoAsync();
+        await workOrdersPage.WaitForActiveRowCountAsync(originalRowCount);
+        await workOrdersPage.WaitForDirtyRowCountAsync(0);
+        await AssertDownUpRoundTripAsync(
+            originalNextRowId,
+            "after final undo insert");
+
+        await workOrdersPage.DeleteRowAsync(
+            originalNextRowId,
+            originalRowCount - 1);
+        await workOrdersPage.WaitForDirtyRowCountAsync(1);
+        await AssertDownUpRoundTripAsync(
+            rowAfterDeletedRowId,
+            "after delete");
+
+        await workOrdersPage.UndoAsync();
+        await workOrdersPage.WaitForActiveRowCountAsync(originalRowCount);
+        await workOrdersPage.WaitForDirtyRowCountAsync(0);
+        await AssertDownUpRoundTripAsync(
+            originalNextRowId,
+            "after undo delete");
+
+        await workOrdersPage.RedoAsync();
+        await workOrdersPage.WaitForActiveRowCountAsync(originalRowCount - 1);
+        await workOrdersPage.WaitForDirtyRowCountAsync(1);
+        await AssertDownUpRoundTripAsync(
+            rowAfterDeletedRowId,
+            "after redo delete");
+
+        await workOrdersPage.UndoAsync();
+        await workOrdersPage.WaitForActiveRowCountAsync(originalRowCount);
+        await workOrdersPage.WaitForDirtyRowCountAsync(0);
+        await AssertDownUpRoundTripAsync(
+            originalNextRowId,
+            "after final undo delete");
+    }
+
+    private static async Task PerformRangeKeyboardStormAsync(
+        IPage page,
+        WorkOrdersPage workOrdersPage)
+    {
+        var ids = await workOrdersPage.GetActiveRowIdsAsync(4_000, 1);
+        E2ETestAssert.Equal(1, ids.Length,
+            "Could not choose the range-keyboard torture anchor row.");
+
+        await workOrdersPage.ActivateCellForNavigationAsync(
+            ids[0],
+            "workOrderNumber");
+
+        for (var index = 0; index < 120; index++)
+        {
+            await page.Keyboard.PressAsync("Shift+ArrowDown");
+
+            if (index % 20 == 19)
+            {
+                await WaitForOneAnimationFrameAsync(page);
+                E2ETestAssert.True(
+                    await workOrdersPage.IsRenderedRangeSelectionConsistentAsync(),
+                    $"Shift+ArrowDown produced stale rendered range styling near step {index + 1}.");
+            }
+        }
+
+        await WaitForTwoAnimationFramesAsync(page);
+        E2ETestAssert.Equal(
+            121,
+            await workOrdersPage.GetActiveRangeRowCountAsync(),
+            "Shift+ArrowDown did not preserve the full logical 121-row range.");
+        E2ETestAssert.True(
+            await workOrdersPage.IsRenderedRangeSelectionConsistentAsync(),
+            "Expanded logical range and rendered Virtual DOM selection diverged.");
+
+        for (var index = 0; index < 120; index++)
+        {
+            await page.Keyboard.PressAsync("Shift+ArrowUp");
+
+            if (index % 20 == 19)
+            {
+                await WaitForOneAnimationFrameAsync(page);
+                E2ETestAssert.True(
+                    await workOrdersPage.IsRenderedRangeSelectionConsistentAsync(),
+                    $"Shift+ArrowUp produced stale rendered range styling near step {index + 1}.");
+            }
+        }
+
+        await WaitForTwoAnimationFramesAsync(page);
+        E2ETestAssert.Equal(
+            1,
+            await workOrdersPage.GetActiveRangeRowCountAsync(),
+            "Shift range did not collapse back to one logical row.");
+        E2ETestAssert.True(
+            await workOrdersPage.IsActiveRangeCellVisiblySelectedAsync(),
+            "Collapsed Shift range lost the visible active-cell selection.");
+    }
+
 
     private static async Task InstallLongTaskObserverAsync(IPage page)
     {

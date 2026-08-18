@@ -278,7 +278,7 @@ Performance/architecture refactor لا يجب أن يغيّر هذه القيم 
 
 ## 14. Reviews Completed
 
-تمت مراجعتها كـAudits مستقلة:
+تمت المراجعات التالية كـAudits مستقلة وأُغلقت قبل بدء الـRuntime remediation:
 
 1. Architecture Red-Team
 2. Code Simplicity
@@ -290,48 +290,56 @@ Performance/architecture refactor لا يجب أن يغيّر هذه القيم 
 8. Concurrency & Multi-user
 9. Maintainability
 10. Testability
+11. Security-by-design
+12. Offline + Localization Readiness
+13. Technology Fit
+
+كما اكتمل:
+- Final Cross-Audit Synthesis.
+- Post-audit product-decision consolidation.
+- التصنيف الأساسي للـFindings وخطة الـRemediation.
 
 ---
 
-## 15. Current Review
+## 15. Current Engineering Phase
 
-**Security-by-design Audit — IN PROGRESS**
+**Independent audit sequence — COMPLETE.**
 
-يجب أن يبدأ/يستأنف من الكود الحالي فقط.
+العمل الحالي ليس Audit جديدًا من القائمة أعلاه؛ هو **post-audit remediation + measured performance investigation**.
 
-آخر زاوية بدأت قبل الانتقال لشات جديد:
+الحالة الحالية في 2026-08-17:
 
-بعض خدمات Work Orders / User Management تستقبل `userId` من الـcaller.
+- Test Foundation: مكتمل.
+- `LDR-002`: مغلق ومثبت.
+- Clean performance/torture baseline: مكتمل.
+- Initialization recovery: مكتمل ومثبت في الكود الحالي.
+- Financial Sort optimization: مكتمل ومقبول.
+- **Current investigation:** ArrowDown / reopened `GRID-001`.
 
-الوضع الحالي:
-- Blazor الحالي يمرر User ID مأخوذًا من authenticated session، لذلك لا يتم اعتبار هذا وحده exploit حاليًا.
+قاعدة التحقيق الحالية:
 
-الزاوية المطلوب فحصها:
-- هل الخدمة نفسها يجب أن تستمد هوية الـactor من trusted server context؟
-- هل API/Offline endpoint مستقبلي يمكن أن يمرر User ID من request بالخطأ ويسمح impersonation؟
-- هل authorization policy/service boundary الحالية تمنع ذلك بشكل مركزي؟
-- افحص كل المسارات المشابهة، ولا تفترض أن هذه Finding حتى يثبتها الكود.
+> ابدأ من الكود الحالي فقط، واستخدم القياسات كدليل، لكن لا تعتبر التشخيص المبدئي Root Cause حتى يثبته مسار التنفيذ في الكود.
+
+لا Patch قبل تحديد السبب البرمجي.
 
 ---
 
-## 16. Remaining Reviews
+## 16. Future Independent Reviews
 
-بعد إغلاق Security-by-design وعرض نتيجته للمستخدم:
+لا توجد مراجعة مستقلة مجدولة حاليًا من القائمة القديمة.
 
-1. Offline + Localization Readiness
-2. Technology Fit Audit
+إذا ظهر لاحقًا Audit جديد:
+- يطبق هذا البروتوكول من الصفر على الكود الحالي؛
+- لا يستخدم Findings السابقة أثناء الاكتشاف؛
+- يقارن ويُدمج في الـMaster فقط بعد إغلاقه.
 
-ثم:
-- Final cross-audit synthesis.
-- تصنيف Findings:
-  - Fix before Pilot
-  - Fix before Production
-  - Solved/changed by Offline architecture
-  - Defer
-  - Do not change
-- تجميع Open Decisions والأسئلة ومناقشتها واحدًا واحدًا.
-- Remediation roadmap.
-- لا تبدأ الإصلاحات إلا بعد اعتماد الخطة.
+أما العمل الحالي فيستمر حسب الـMaster المدمج:
+1. ArrowDown root-cause + smallest safe fix.
+2. Resume Online Reliability.
+3. Narrow Save/Delta/receipt contract.
+4. Concurrency/Security/Localization.
+5. Offline/Sync.
+6. Production gates.
 
 ---
 

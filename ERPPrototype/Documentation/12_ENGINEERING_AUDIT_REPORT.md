@@ -1,11 +1,12 @@
 # ERP Prototype — Engineering Audit Master Report
 
 **Document ID:** `12_ENGINEERING_AUDIT_REPORT.md`  
-**Edition:** Post-Audit Decisions + SEC Validation — 2026-08-16  
-**Status:** Independent audits complete; Test Foundation + `LDR-002` + clean performance/torture baseline completed; **Online Reliability is next**  
+**Edition:** Cross-Chat Reconciliation + Runtime Evidence — 2026-08-17  
+**Status:** Independent audits complete; post-audit remediation is in progress. Test Foundation, `LDR-002`, initialization recovery, performance baselines, and the accepted financial-sort optimization are complete. **Current task: ArrowDown root-cause investigation.**  
 **Audit baseline:** `codespaces-sync-2026-08-08` @ `00503ab`  
-**Current verified checkpoint:** `3dc88ff` (`Add Work Orders performance and torture baselines`)  
-**Latest SEC Codespaces check:** working tree clean; Release Build PASS on .NET `10.0.200`
+**Latest confirmed Git checkpoint from the conversation log:** `0f6bd3b` (`Optimize Work Orders financial sorting`)  
+**Current source package reviewed:** `ERPPrototype_Current_2026-08-17.zip` — content is consistent with the accepted post-`98d9aa3` initialization recovery + financial-sort optimization, and contains no ManualPerformanceCapture remnants. The ZIP excludes `.git`, so commit identity is grounded in the captured Git log, not inferred from ZIP metadata.  
+**Latest pasted local build evidence before the final cleanup:** Build PASS; final ZIP content was separately checked for cleanup consistency.
 
 > This is the current daily engineering source of truth. Detailed standalone audits remain evidence; current code remains the source of truth for what is actually implemented.
 
@@ -138,10 +139,9 @@ Readability > maximum visible row count.
 
 ## Startup / reliability
 
-- `LDR-002`: loader readiness race reproduced (`ensureStructureUi is not a function`).  
-  **Fix:** all callers await the same full-load promise.
-- `CSB-001`: Save/year preflight can fail outside complete event error boundary.
-- `JS-003` / `EXF-001`: initialization needs positive success acknowledgement, cleanup, and bounded retry.
+- `LDR-002`: **Closed / verified at `33e73c6`**. Work Orders now waits for the complete core runtime before reporting ready.
+- `CSB-001`: **Open.** Save/year preflight can fail outside a complete event error boundary. A later experimental patch for this area was rejected and fully rolled back.
+- `JS-003` / `EXF-001`: **Initialization-recovery portion substantially closed at `98d9aa3`.** The grid now requires positive initialization acknowledgement, performs bounded retry, cleans failed partial instances, and offers manual Retry. Broader online recovery items remain under the Online Reliability package.
 - `JS-002`: unsaved work must survive/guard route navigation and reload.
 - `CSB-003`: Admin DB/query failures need recoverable operational boundary.
 
@@ -233,8 +233,76 @@ High-value measured findings:
 - **User-experience performance acceptance:** **NOT CLOSED** because Sort and dirty bulk operations still produce visible multi-second freezes.
 - **SEC real-device/network acceptance:** still pending as a later environment gate.
 
-Therefore the next approved engineering package remains **Online Reliability**, followed by the **Narrow Save/Delta contract**. Measured performance findings remain attached to those packages and are not treated as newly discovered parallel work.
+At checkpoint `3dc88ff`, the approved next package was **Online Reliability**. Later work completed initialization recovery, then the user explicitly reprioritized the repeatable real-user ArrowDown regression. Section 6.2 records that newer state; this is a tactical priority change, not an architecture rewrite.
 
+## 6.2 Cross-chat runtime reconciliation — 2026-08-17
+
+This section reconciles work completed after the `3dc88ff` Master update with the current source package and the performance handoff.
+
+### Completed after the previous Master checkpoint
+
+- `98d9aa3` — **Harden Work Orders initialization recovery**
+  - positive browser-side initialization acknowledgement is required before the sheet is considered usable;
+  - transient initialization failure gets a bounded automatic retry;
+  - repeated failure leaves no partial/stale Tabulator instance;
+  - manual Retry restores the requested year cleanly;
+  - a dedicated browser recovery test exists in the current source.
+
+- A later **Save/year event-boundary experiment failed its acceptance path and was fully rolled back**. It is not part of the current source and must not be reintroduced as if it were accepted work.
+
+- `0f6bd3b` — **Optimize Work Orders financial sorting**
+  - accepted runtime change is isolated in `wwwroot/js/tabulatorFinancialFields.js`;
+  - repeated financial comparator work is cached by normalized sort value;
+  - measured sort-storm time improved from roughly **17.4 s** to **0.56 s**;
+  - worst Long Task improved from roughly **2.60 s** to **0.07 s**;
+  - this is an accepted optimization and must be preserved.
+
+- The temporary **ManualPerformanceCapture** experiment failed and was abandoned.
+  - its files are absent from `ERPPrototype_Current_2026-08-17.zip`;
+  - the built-in `?perf=baseline` / `?perf=deep` profiler remains the approved measurement path.
+
+### New measured real-user navigation regression
+
+Real Work Orders sheet measurement: **4,947 rows**.
+
+Baseline:
+- ArrowDown: average **131.8 ms**, P50 **151.4 ms**, P95 **214.7 ms**, max **237 ms**.
+- Wheel up/down: approximately **17–18 ms** typical input-to-paint.
+- JS heap did not show growth; rendered DOM stayed bounded at roughly **40–50 rows**.
+
+Deep diagnostic:
+- ArrowDown: average **141.69 ms**, P95 **188.5 ms**, max **221.8 ms**.
+- Tabulator `onkeydown` was the largest repeated keyboard-associated script: average about **41.06 ms** across 104 measured frames.
+- `tabulator.range.navigate` itself averaged only **4.84 ms**.
+- `tabulator.renderer.scroll-rows` averaged about **4.09 ms**.
+- 124 ArrowDown inputs produced **254 `range-changed` events** and 99 keyboard-linked scroll events.
+- no memory leak was demonstrated; rendered rows remained bounded by Virtual DOM.
+
+### Reconciliation with the older GRID-001 decision
+
+`07_KNOWN_ISSUES_AND_TECHNICAL_DEBT.md` previously kept `GRID-001` as P2 monitoring because:
+- older ArrowDown performance was acceptable to the user;
+- it explicitly said to reopen the issue on a 10k test, a real complaint, or a clear regression.
+
+Those reopening conditions are now met.
+
+**Decision:** reopen `GRID-001` as a **current P1 Work Orders UX performance blocker** until the ArrowDown path is understood and materially improved. Do not create a duplicate issue ID for the same underlying navigation problem.
+
+### What is proven vs not proven
+
+Confirmed:
+- ArrowDown is materially slower than wheel on the real sheet.
+- the cost is a browser interaction/render problem, not a demonstrated SQL or memory-leak problem.
+- slowdown becomes especially visible when navigation also requires vertical viewport movement.
+- high Range activity is real and must be explained from current code.
+
+Not yet proven:
+- Virtual DOM is defective;
+- duplicate `range-changed` events are themselves the root cause;
+- `range.navigate` is the dominant cost;
+- one application JS module is solely responsible.
+
+**Rule:** no ArrowDown patch until the current code path is traced and the code-level cause is identified.
 ---
 
 # 7. Revision to old fixed Employee model
@@ -1116,21 +1184,24 @@ The Master is intentionally concise, but these audit items remain active evidenc
 
 # 28. Final implementation order
 
-1. **Canonicalize this documentation / keep Runtime frozen.**
-2. **Expand normal test safety net.**
-3. **Fix `LDR-002`.**
-4. **Obtain clean trustworthy performance baseline.**
-5. **Stabilize Online reliability.**
-6. **Build narrow physical Delta Save + receipt-compatible contract.**
-7. **Close schema/concurrency/conflict gaps.**
-8. **Build Identity/security/permission foundation.**
-9. **Introduce stable language-neutral business codes.**
-10. **Add durable IndexedDB Draft/Outbox.**
-11. **Add event-driven Sync/Preflight/conflict engine.**
-12. **Run extended normal regression + Offline/Sync Stress.**
-13. **Staging + real SEC domain/cable/firewall qualification.**
-14. **Limited Pilot.**
-15. **Production only after operational gates pass.**
+1. ✅ **Canonicalize post-audit documentation.**
+2. ✅ **Expand the normal test safety net.**
+3. ✅ **Fix `LDR-002`.**
+4. ✅ **Establish clean Open / Real-User / 10k Torture performance baselines.**
+5. ▶ **Current: identify and fix the reopened ArrowDown / `GRID-001` regression** using current code only; no patch before cause, then re-measure with baseline median + focused deep confirmation.
+6. **Resume Online Reliability** — continue from the accepted initialization recovery checkpoint; next open area is Save/year event-boundary recovery (`CSB-001`) plus remaining `JS-002` / `CSB-003`.
+7. **Build narrow physical Delta Save + receipt-compatible contract.**
+8. **Close schema/concurrency/conflict gaps.**
+9. **Build Identity/security/permission foundation.**
+10. **Introduce stable language-neutral business codes.**
+11. **Add durable IndexedDB Draft/Outbox.**
+12. **Add event-driven Sync/Preflight/conflict engine.**
+13. **Run extended normal regression + Offline/Sync Stress.**
+14. **Staging + real SEC domain/cable/firewall qualification.**
+15. **Limited Pilot.**
+16. **Production only after operational gates pass.**
+
+The ArrowDown item is a user-approved tactical insertion because a repeatable core-UX regression was measured. It does not cancel the post-audit architecture roadmap.
 
 Do not jump directly to Offline implementation before the Save/client contract and tests are trustworthy.
 
@@ -1197,7 +1268,7 @@ Each specialist sees what they need; main Work Orders employee sees only the min
 - final backup schedule.
 - OTP mail provider.
 - shared SEC browser-profile reality.
-- quantitative 10k Tabulator sign-off after `LDR-002`.
+- quantitative and manual Work Orders performance sign-off, including the reopened ArrowDown / `GRID-001` regression.
 
 ## Deliberately deferred feature detail
 
@@ -1233,15 +1304,30 @@ Required, as applicable:
 
 # 33. Current next action
 
-Completed and checkpointed:
+**Current task: ArrowDown performance investigation on the current source.**
 
-**Test Foundation → `LDR-002` → clean Open/Real-User/Torture Performance Baseline.**
+Required sequence:
 
-Current next package:
+1. verify the current source/Git state on the developer machine;
+2. preserve `0f6bd3b` financial-sort optimization;
+3. trace the actual current path:
+   `ArrowDown → Tabulator range/navigation → range-changed callbacks → vertical scroll → Virtual DOM/layout/paint`;
+4. treat baseline/deep JSON as measured evidence, not as a proven root cause;
+5. make **no Runtime patch** until the code-level cause is identified;
+6. explain the cause first in Work Orders employee terms;
+7. propose the smallest safe fix;
+8. acceptance requires:
+   - Excel-like navigation unchanged;
+   - frozen UI sizes unchanged;
+   - Undo/Redo and data correctness unchanged;
+   - safety suites PASS;
+   - manual Split Screen 100% improvement;
+   - material `?perf=baseline` improvement using the median of multiple runs;
+   - `?perf=deep` only as focused confirmation.
 
-**Online Reliability → narrow Save/Delta/receipt contract → concurrency/security/localization → Offline/Sync.**
+After ArrowDown acceptance:
 
-The measured Sort/dirty/bulk Save cliffs are now linked to the existing Performance findings above. No Sort optimization patch is part of checkpoint `3dc88ff`; performance remediation must be measured against this checkpoint and the same regression/torture evidence.
+**Resume Online Reliability (`CSB-001` etc.) → Narrow Save/Delta/receipt contract → concurrency/security/localization → Offline/Sync.**
 
 ---
 
@@ -1266,3 +1352,12 @@ Key source documents:
 - Technology Fit
 
 Post-audit product decisions and real SEC workstation validation through **2026-08-16** are consolidated here.
+
+
+### Added reconciliation evidence — 2026-08-17
+
+- `ERP_Performance_Handoff_2026-08-17.md`
+- `UDS_Performance_baseline_2026-08-17T12-36-56-342Z.json`
+- `UDS_Performance_deep_2026-08-17T12-39-47-021Z.json`
+- `ERPPrototype_Current_2026-08-17.zip`
+- captured Git/log/build conversation through financial-sort checkpoint `0f6bd3b`
