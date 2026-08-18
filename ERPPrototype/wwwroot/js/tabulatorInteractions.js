@@ -303,27 +303,314 @@
              * display-row collection by logical position. At deep Work Orders
              * rows that turns one Arrow movement into several O(N) scans.
              *
-             * Build one logical row snapshot for the current key movement and
-             * use direct position lookup only while that movement (or its one
-             * deferred range-layout frame) is running. The override is always
-             * restored immediately. Sorting/filtering/data changes therefore
-             * keep Tabulator's normal ownership and automatically fall back if
-             * the display-row collection changed before deferred work runs.
+             * Keep one logical row index while the displayed order is stable.
+             * Normal Arrow movement and scrolling reuse it without rescanning
+             * the 4k-10k row collection. Only operations that can actually
+             * change row order/structure touch the index:
+             *
+             * - Sort / Filter / full data processing: invalidate once and
+             *   rebuild lazily on the next Arrow because the global order
+             *   genuinely changed.
+             * - Insert / Delete / Move: adjust the cached row list locally
+             *   whenever Tabulator kept the same display-row array.
+             * - Cell Edit: does not invalidate anything by itself. If an edit
+             *   really causes a Sort/Filter operation, those events invalidate
+             *   the cache through their own handlers.
+             *
+             * This follows the spreadsheet rule used throughout Work Orders:
+             * a local change should pay a local cost; a global reorder pays one
+             * global rebuild, never one rebuild per Arrow.
              */
-            const createNavigationRowSnapshot = function () {
+            let navigationRowSnapshot = null;
+            let pendingAddedRows = null;
+            let addedRowsSyncQueued = false;
+
+            const invalidateNavigationRowSnapshot = function () {
+                navigationRowSnapshot = null;
+            };
+
+            const rebuildNavigationRowSnapshot = function () {
                 const displayRows =
                     rowManager.getDisplayRows();
-                const rows =
-                    displayRows.filter(
-                        row => row?.type === "row"
-                    );
+                const rows = [];
 
-                return {
+                for (
+                    let index = 0;
+                    index < displayRows.length;
+                    index += 1
+                ) {
+                    const row = displayRows[index];
+
+                    if (row?.type === "row") {
+                        rows.push(row);
+                    }
+                }
+
+                navigationRowSnapshot = {
                     displayRows,
                     displayLength: displayRows.length,
                     rows
                 };
+
+                return navigationRowSnapshot;
             };
+
+            const createNavigationRowSnapshot = function () {
+                const displayRows =
+                    rowManager.getDisplayRows();
+
+                if (
+                    navigationRowSnapshot &&
+                    navigationRowSnapshot.displayRows === displayRows &&
+                    navigationRowSnapshot.displayLength === displayRows.length
+                ) {
+                    return navigationRowSnapshot;
+                }
+
+                return rebuildNavigationRowSnapshot();
+            };
+
+            const getInternalRow = function (rowComponent) {
+                return rowComponent?._getSelf?.() ?? null;
+            };
+
+            const syncDeletedNavigationRow = function (rowComponent) {
+                const snapshot =
+                    navigationRowSnapshot;
+
+                if (!snapshot) {
+                    return;
+                }
+
+                const displayRows =
+                    rowManager.getDisplayRows();
+
+                if (
+                    snapshot.displayRows !== displayRows ||
+                    displayRows.length > snapshot.displayLength
+                ) {
+                    invalidateNavigationRowSnapshot();
+                    return;
+                }
+
+                const internalRow =
+                    getInternalRow(rowComponent);
+                const cachedIndex =
+                    snapshot.rows.indexOf(internalRow);
+
+                /*
+                 * Deleting a row that is currently filtered out does not change
+                 * the displayed logical row list.
+                 */
+                if (cachedIndex >= 0) {
+                    snapshot.rows.splice(cachedIndex, 1);
+                }
+
+                snapshot.displayLength =
+                    displayRows.length;
+            };
+
+            const syncMovedNavigationRow = function (rowComponent) {
+                const snapshot =
+                    navigationRowSnapshot;
+
+                if (!snapshot) {
+                    return;
+                }
+
+                const displayRows =
+                    rowManager.getDisplayRows();
+
+                if (
+                    snapshot.displayRows !== displayRows ||
+                    snapshot.displayLength !== displayRows.length
+                ) {
+                    invalidateNavigationRowSnapshot();
+                    return;
+                }
+
+                const internalRow =
+                    getInternalRow(rowComponent);
+                const oldIndex =
+                    snapshot.rows.indexOf(internalRow);
+                const newPosition =
+                    Number(internalRow?.position);
+                const newIndex =
+                    Number.isInteger(newPosition)
+                        ? newPosition - 1
+                        : -1;
+
+                if (
+                    oldIndex < 0 ||
+                    newIndex < 0 ||
+                    newIndex >= snapshot.rows.length
+                ) {
+                    invalidateNavigationRowSnapshot();
+                    return;
+                }
+
+                if (oldIndex === newIndex) {
+                    return;
+                }
+
+                snapshot.rows.splice(oldIndex, 1);
+                snapshot.rows.splice(
+                    newIndex,
+                    0,
+                    internalRow
+                );
+            };
+
+            const flushAddedNavigationRows = function () {
+                addedRowsSyncQueued = false;
+
+                const queuedRows =
+                    pendingAddedRows;
+
+                pendingAddedRows = null;
+
+                if (
+                    !navigationRowSnapshot ||
+                    !queuedRows?.size
+                ) {
+                    return;
+                }
+
+                const snapshot =
+                    navigationRowSnapshot;
+                const displayRows =
+                    rowManager.getDisplayRows();
+
+                /*
+                 * A sort/filter pipeline may replace the display-row array
+                 * after addData/addRow completes. In that case the entire
+                 * visible order genuinely changed, so do one lazy rebuild on
+                 * the next Arrow instead of trying to patch stale order.
+                 */
+                if (
+                    snapshot.displayRows !== displayRows ||
+                    displayRows.length < snapshot.displayLength
+                ) {
+                    invalidateNavigationRowSnapshot();
+                    return;
+                }
+
+                const visibleRows = [];
+
+                queuedRows.forEach(function (internalRow) {
+                    const position =
+                        Number(internalRow?.position);
+
+                    if (
+                        internalRow?.type === "row" &&
+                        Number.isInteger(position) &&
+                        position > 0
+                    ) {
+                        visibleRows.push(internalRow);
+                    }
+                });
+
+                /*
+                 * New rows that are filtered out have no displayed logical
+                 * position and therefore do not belong in the Arrow index.
+                 */
+                const displayDelta =
+                    displayRows.length -
+                    snapshot.displayLength;
+
+                if (displayDelta !== visibleRows.length) {
+                    invalidateNavigationRowSnapshot();
+                    return;
+                }
+
+                visibleRows.sort(
+                    (left, right) =>
+                        left.position - right.position
+                );
+
+                for (const internalRow of visibleRows) {
+                    const insertionIndex =
+                        internalRow.position - 1;
+
+                    if (
+                        insertionIndex < 0 ||
+                        insertionIndex > snapshot.rows.length
+                    ) {
+                        invalidateNavigationRowSnapshot();
+                        return;
+                    }
+
+                    snapshot.rows.splice(
+                        insertionIndex,
+                        0,
+                        internalRow
+                    );
+                }
+
+                snapshot.displayLength =
+                    displayRows.length;
+            };
+
+            const queueAddedNavigationRow = function (rowComponent) {
+                if (!navigationRowSnapshot) {
+                    return;
+                }
+
+                const internalRow =
+                    getInternalRow(rowComponent);
+
+                if (!internalRow) {
+                    invalidateNavigationRowSnapshot();
+                    return;
+                }
+
+                if (!pendingAddedRows) {
+                    pendingAddedRows = new Set();
+                }
+
+                pendingAddedRows.add(internalRow);
+
+                if (addedRowsSyncQueued) {
+                    return;
+                }
+
+                addedRowsSyncQueued = true;
+
+                /*
+                 * rowAdded is emitted before addRows finishes refreshing the
+                 * display pipeline. A microtask runs after that synchronous
+                 * structural operation, when final row positions are known,
+                 * without forcing another render or frame.
+                 */
+                window.queueMicrotask(
+                    flushAddedNavigationRows
+                );
+            };
+
+            table.on(
+                "dataSorted",
+                invalidateNavigationRowSnapshot
+            );
+            table.on(
+                "dataFiltered",
+                invalidateNavigationRowSnapshot
+            );
+            table.on(
+                "dataProcessed",
+                invalidateNavigationRowSnapshot
+            );
+            table.on(
+                "rowAdded",
+                queueAddedNavigationRow
+            );
+            table.on(
+                "rowDeleted",
+                syncDeletedNavigationRow
+            );
+            table.on(
+                "rowMoved",
+                syncMovedNavigationRow
+            );
 
             const withNavigationRowLookup = function (
                 snapshot,
@@ -555,6 +842,7 @@
             rangeModule.__udsScrolledKeyboardLayoutDeferred = true;
             rangeModule.__udsPlainVerticalFastPath = true;
             rangeModule.__udsVerticalNavigationRowLookup = true;
+            rangeModule.__udsVerticalNavigationCachedRowIndex = true;
             return true;
         },
 
