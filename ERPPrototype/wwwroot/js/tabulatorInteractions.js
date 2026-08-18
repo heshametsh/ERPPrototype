@@ -192,6 +192,7 @@
             let navigationStartScrollTop = 0;
             let deferredLayoutFrame = null;
             let deferredLayoutWork = null;
+            let arrowUpCorrectionArmFrame = null;
 
             const tableIsCurrent = function () {
                 return window.tabulatorTest
@@ -227,6 +228,36 @@
                             deferredLayoutWork = null;
 
                             latestWork?.();
+                        }
+                    );
+            };
+
+            /*
+             * The ArrowUp viewport repair is only relevant when navigation
+             * actually moved the table upward. Arm it after the Virtual DOM
+             * has had one paint frame to settle, then let the existing repair
+             * verify the final geometry. This avoids forcing a layout check on
+             * every ArrowUp that stayed inside the current viewport.
+             */
+            const queueArrowUpCorrectionAfterSettledScroll = function () {
+                if (arrowUpCorrectionArmFrame !== null) {
+                    return;
+                }
+
+                arrowUpCorrectionArmFrame =
+                    window.requestAnimationFrame(
+                        function () {
+                            arrowUpCorrectionArmFrame = null;
+
+                            if (!tableIsCurrent()) {
+                                return;
+                            }
+
+                            window.tabulatorTest
+                                .queueArrowUpRangeViewportCorrection(
+                                    elementId,
+                                    2
+                                );
                         }
                     );
             };
@@ -724,14 +755,27 @@
                     navigationStartScrollTop =
                         holder.scrollTop;
 
+                    let navigationResult;
+
                     try {
-                        return originalNavigate.apply(
-                            this,
-                            args
-                        );
+                        navigationResult =
+                            originalNavigate.apply(
+                                this,
+                                args
+                            );
                     } finally {
                         navigationActive = false;
                     }
+
+                    if (
+                        plainVerticalMove &&
+                        args[2] === "up" &&
+                        holder.scrollTop < navigationStartScrollTop
+                    ) {
+                        queueArrowUpCorrectionAfterSettledScroll();
+                    }
+
+                    return navigationResult;
                 }
 
                 const snapshot =
@@ -830,6 +874,13 @@
                                     );
                                 }
                             );
+
+                            if (
+                                args[2] === "up" &&
+                                holder.scrollTop < startScrollTop
+                            ) {
+                                queueArrowUpCorrectionAfterSettledScroll();
+                            }
                         } else {
                             refreshActiveSelection();
                         }
@@ -1278,13 +1329,6 @@
                         return;
                     }
 
-                    if (event.key === "ArrowUp") {
-                        window.tabulatorTest
-                            .queueArrowUpRangeViewportCorrection(
-                                elementId,
-                                3
-                            );
-                    }
                 }
 
                 /*
