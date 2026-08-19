@@ -999,7 +999,7 @@
 
             try {
                 await Promise.resolve(
-                    table.scrollToRow(row, "center", false)
+                    table.scrollToRow(row, "nearest", false)
                 );
             } catch {
             }
