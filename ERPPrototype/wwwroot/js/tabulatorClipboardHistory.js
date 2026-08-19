@@ -501,20 +501,42 @@
                         selectedMatrix[0].length === 1
                     );
 
+            const sourceRowCount = sourceMatrix.length;
+            const sourceColumnCount = Math.max(
+                ...sourceMatrix.map(row => row.length)
+            );
+
+            /*
+             * Paste only the overlap between copied data and the available
+             * logical target. Do not repeat a smaller copied block to fill a
+             * larger selection, and do not reject a larger copied block when
+             * only part of the sheet remains below/right of the start cell.
+             *
+             * Examples:
+             * - copied 4,000 rows, 200 target rows remain -> paste 200 rows;
+             * - copied 200 rows, 4,000 rows selected -> paste 200 rows.
+             */
             const targetMatrix = selectedIsSingleCell
                 ? this.buildTargetMatrixFromStart(
                     table,
                     selectedMatrix[0][0],
-                    sourceMatrix.length,
-                    Math.max(...sourceMatrix.map(row => row.length))
+                    sourceRowCount,
+                    sourceColumnCount
                 )
-                : selectedMatrix;
+                : selectedMatrix
+                    .slice(0, sourceRowCount)
+                    .map(row =>
+                        Array.isArray(row)
+                            ? row.slice(0, sourceColumnCount)
+                            : []
+                    )
+                    .filter(row => row.length > 0);
 
             const changes = [];
 
             for (let rowIndex = 0; rowIndex < targetMatrix.length; rowIndex++) {
                 const targetRow = targetMatrix[rowIndex];
-                const sourceRow = sourceMatrix[rowIndex % sourceMatrix.length];
+                const sourceRow = sourceMatrix[rowIndex];
 
                 if (!sourceRow || sourceRow.length === 0) {
                     continue;
@@ -544,8 +566,12 @@
                         continue;
                     }
 
+                    if (columnIndex >= sourceRow.length) {
+                        continue;
+                    }
+
                     const pastedValue =
-                        sourceRow[columnIndex % sourceRow.length];
+                        sourceRow[columnIndex];
                     const newValue = this.normalizeFieldValue(
                         elementId,
                         field,
@@ -867,11 +893,16 @@
                 changedFieldsByRow
             );
 
-            this.validateFieldChanges(
-                elementId,
-                changedFieldsByRow,
-                { forceRequired: false }
-            );
+            if (
+                typeof this.doFieldChangesRequireValidation !== "function" ||
+                this.doFieldChangesRequireValidation(affectedFields)
+            ) {
+                this.validateFieldChanges(
+                    elementId,
+                    changedFieldsByRow,
+                    { forceRequired: false }
+                );
+            }
 
             window.tabulatorFilters.refreshFields(
                 this,

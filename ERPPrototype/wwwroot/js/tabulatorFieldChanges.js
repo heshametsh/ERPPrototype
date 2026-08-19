@@ -13,14 +13,6 @@
         fieldDefinitions: new Map(),
         validationRuleDefinitions: new Map(),
 
-        /*
-         * Large paste/clear/undo operations are cheaper when the final sheet
-         * data is composed once and handed back to Tabulator in one replace.
-         * Smaller edits keep updateData so a normal cell edit does not rebuild
-         * the table data pipeline.
-         */
-        bulkFieldReplaceThreshold: 500,
-
         registerFieldDefinitions: function (definitions) {
             for (const definition of definitions ?? []) {
                 const key = String(definition?.key ?? "").trim();
@@ -205,170 +197,58 @@
             );
         },
 
-        captureActiveRangeDescriptor: function (table) {
-            const ranges =
-                table?.getRanges?.() ?? [];
-            const activeRange =
-                ranges.length > 0
-                    ? ranges[ranges.length - 1]
-                    : null;
+        doFieldChangesRequireValidation: function (fields) {
+            const fieldKeys = Array.from(
+                new Set(
+                    Array.from(fields ?? [])
+                        .map(field => String(field ?? "").trim())
+                        .filter(Boolean)
+                )
+            );
 
-            if (!activeRange) {
-                return null;
-            }
-
-            const rows =
-                typeof activeRange.getRows === "function"
-                    ? activeRange.getRows()
-                    : [];
-            const columns =
-                typeof activeRange.getColumns === "function"
-                    ? activeRange.getColumns()
-                    : [];
-
-            if (
-                !Array.isArray(rows) ||
-                !Array.isArray(columns) ||
-                rows.length === 0 ||
-                columns.length === 0
-            ) {
-                return null;
-            }
-
-            const startRow =
-                rows[0];
-            const endRow =
-                rows[rows.length - 1];
-            const startColumn =
-                columns[0];
-            const endColumn =
-                columns[columns.length - 1];
-
-            const startField =
-                startColumn?.getField?.();
-            const endField =
-                endColumn?.getField?.();
-
-            if (
-                !startRow ||
-                !endRow ||
-                !startField ||
-                !endField
-            ) {
-                return null;
-            }
-
-            return {
-                startRowId: startRow.getIndex(),
-                startField: startField,
-                endRowId: endRow.getIndex(),
-                endField: endField
-            };
-        },
-
-        restoreActiveRangeDescriptor: function (
-            elementId,
-            descriptor,
-            viewportPosition
-        ) {
-            const table = this.tables[elementId];
-
-            if (!table || !descriptor) {
-                if (viewportPosition) {
-                    this.scheduleTableViewportPositionRestore(
-                        elementId,
-                        viewportPosition,
-                        4
-                    );
-                }
-
-                return;
-            }
-
-            window.requestAnimationFrame(() => {
-                const startRow = table.getRow(descriptor.startRowId);
-                const endRow = table.getRow(descriptor.endRowId);
-                const startCell = startRow?.getCell(descriptor.startField);
-                const endCell = endRow?.getCell(descriptor.endField);
-
-                if (startCell && endCell) {
-                    this.clearTableRanges(elementId);
-
-                    try {
-                        table.addRange(startCell, endCell);
-                    } catch {
-                    }
-                }
-
-                if (viewportPosition) {
-                    this.scheduleTableViewportPositionRestore(
-                        elementId,
-                        viewportPosition,
-                        4
-                    );
-                }
-            });
-        },
-
-        applyLargeFieldChangesByReplacement: async function (
-            elementId,
-            table,
-            state,
-            effectiveChanges
-        ) {
-            if (typeof table.replaceData !== "function") {
+            if (fieldKeys.length === 0) {
                 return false;
             }
 
-            const indexField = table.options?.index || "id";
-            const viewportPosition =
-                this.captureTableViewportPosition(table);
-            const rangeDescriptor =
-                this.captureActiveRangeDescriptor(table);
-            const nextData = table.getData().map(row =>
-                this.cloneRowData(row)
-            );
-            const rowsById = new Map(
-                nextData.map(row => [String(row?.[indexField]), row])
-            );
-
-            for (const change of effectiveChanges) {
-                const row = rowsById.get(String(change.rowId));
-
-                if (!row) {
-                    return false;
-                }
-
-                row[change.field] = change.newValue;
+            if (
+                this.getAffectedValidationRuleKeys(fieldKeys).size > 0
+            ) {
+                return true;
             }
 
-            const replaceStartedAt = this.getPerformanceTimestamp();
+            return fieldKeys.some(field =>
+                (this.getFieldDefinition(field)?.validators?.length ?? 0) > 0
+            );
+        },
 
-            state.applyingHistory = true;
-            state.bulkFieldMutationActive = true;
-
-            try {
-                await table.replaceData(nextData);
-            } finally {
-                state.bulkFieldMutationActive = false;
-                state.applyingHistory = false;
+        reapplyActiveSortForFields: function (table, fields) {
+            if (
+                !table ||
+                typeof table.getSorters !== "function" ||
+                typeof table.setSort !== "function"
+            ) {
+                return false;
             }
 
-            this.recordPerformanceStage(
-                elementId,
-                "fields.batch-replace-data",
-                replaceStartedAt,
-                {
-                    requestedCells: effectiveChanges.length,
-                    affectedRows: rowsById.size,
-                    finalRows: nextData.length
-                }
-            );
+            const changedFields = new Set(fields ?? []);
+            const sorters = table.getSorters() ?? [];
 
-            this.restoreActiveRangeDescriptor(
-                elementId,
-                rangeDescriptor,
-                viewportPosition
+            if (
+                sorters.length === 0 ||
+                !sorters.some(sorter =>
+                    changedFields.has(String(sorter?.field ?? ""))
+                )
+            ) {
+                return false;
+            }
+
+            table.setSort(
+                sorters
+                    .map(sorter => ({
+                        column: sorter?.field,
+                        dir: sorter?.dir
+                    }))
+                    .filter(sorter => sorter.column && sorter.dir)
             );
 
             return true;
@@ -440,63 +320,93 @@
                 updatesByRow.get(rowKey)[change.field] = change.newValue;
             }
 
-            const shouldUseReplacement =
-                effectiveChanges.length >= this.bulkFieldReplaceThreshold;
-            const replaced = shouldUseReplacement
-                ? await this.applyLargeFieldChangesByReplacement(
-                    elementId,
-                    table,
-                    state,
-                    effectiveChanges
-                )
-                : false;
+            const changedFields = new Set(
+                effectiveChanges.map(change => change.field)
+            );
 
-            if (!replaced) {
-                const canBlockRedraw =
-                    typeof table.blockRedraw === "function" &&
-                    typeof table.restoreRedraw === "function";
+            if (
+                changedFields.has("workOrderValue") ||
+                changedFields.has("partialAmount")
+            ) {
+                changedFields.add("remainingAmount");
+            }
+
+            const canBlockRedraw =
+                typeof table.blockRedraw === "function" &&
+                typeof table.restoreRedraw === "function";
+
+            if (canBlockRedraw) {
+                table.blockRedraw();
+            }
+
+            state.applyingHistory = true;
+            state.bulkFieldMutationActive = true;
+
+            try {
+                /*
+                 * A paste changes existing rows; it does not replace the
+                 * sheet. updateData patches only the supplied row fields and
+                 * keeps the current table instance, range, and Virtual DOM.
+                 */
+                await table.updateData(
+                    Array.from(updatesByRow.values())
+                );
+
+                if (typeof this.syncDerivedFieldsForChanges === "function") {
+                    await this.syncDerivedFieldsForChanges(
+                        elementId,
+                        effectiveChanges
+                    );
+                }
+
+                /*
+                 * Re-sort only when the employee changed a field that is
+                 * currently driving the active sort. Unrelated pastes leave
+                 * the row order untouched.
+                 */
+                this.reapplyActiveSortForFields(
+                    table,
+                    changedFields
+                );
+            } finally {
+                state.bulkFieldMutationActive = false;
+                state.applyingHistory = false;
 
                 if (canBlockRedraw) {
-                    table.blockRedraw();
-                }
-
-                state.applyingHistory = true;
-                state.bulkFieldMutationActive = true;
-
-                try {
-                    await table.updateData(Array.from(updatesByRow.values()));
-                } finally {
-                    state.bulkFieldMutationActive = false;
-                    state.applyingHistory = false;
-
-                    if (canBlockRedraw) {
-                        table.restoreRedraw();
-                    }
+                    table.restoreRedraw();
                 }
             }
 
-            if (typeof this.syncDerivedFieldsForChanges === "function") {
-                await this.syncDerivedFieldsForChanges(
-                    elementId,
-                    effectiveChanges
-                );
-            }
+            const aggregateAffected =
+                typeof this.doFieldChangesAffectAggregates === "function"
+                    ? this.doFieldChangesAffectAggregates(
+                        elementId,
+                        effectiveChanges
+                    )
+                    : effectiveChanges.some(change =>
+                        this.doesFieldAffectAggregates?.(change.field)
+                    );
 
-            if (effectiveChanges.some(change =>
-                this.doesFieldAffectAggregates?.(change.field))) {
-                this.scheduleAggregateRefresh?.(
-                    elementId,
-                    "content-batch"
-                );
+            if (aggregateAffected) {
+                const appliedAggregateDelta =
+                    this.applyAggregateChangesDelta?.(
+                        elementId,
+                        effectiveChanges
+                    ) === true;
+
+                if (!appliedAggregateDelta) {
+                    this.scheduleAggregateRefresh?.(
+                        elementId,
+                        "content-batch"
+                    );
+                }
             }
 
             if (options.postProcess !== false) {
                 const changedFieldsByRow =
                     this.buildChangedFieldsByRow(effectiveChanges);
                 const rowIds = effectiveChanges.map(change => change.rowId);
-                const fields = Array.from(
-                    new Set(effectiveChanges.map(change => change.field))
-                );
+                const fields = Array.from(changedFields);
 
                 this.refreshDirtyRows(
                     elementId,
@@ -504,7 +414,13 @@
                     changedFieldsByRow
                 );
 
-                if (typeof this.validateFieldChanges === "function") {
+                if (
+                    typeof this.validateFieldChanges === "function" &&
+                    (
+                        typeof this.doFieldChangesRequireValidation !== "function" ||
+                        this.doFieldChangesRequireValidation(fields)
+                    )
+                ) {
                     this.validateFieldChanges(
                         elementId,
                         changedFieldsByRow,

@@ -78,6 +78,7 @@
                 typeof this.getTrackableFieldKeys === "function"
                     ? this.getTrackableFieldKeys()
                     : this.dirtyFields;
+            const trackableFieldSet = new Set(allTrackableFields);
     
             for (const [rowKey, rowId] of uniqueRowIds) {
                 const row =
@@ -89,18 +90,18 @@
                     continue;
                 }
     
-                const currentSnapshot =
-                    this.createDirtySnapshot(
-                        row.getData()
-                    );
-    
+                const rowData = row.getData();
                 const originalSnapshot =
                     state.originalRows.get(rowKey);
     
                 const fieldsToCheck =
                     changedFieldsByRowHint instanceof Map &&
                         changedFieldsByRowHint.has(rowKey)
-                        ? Array.from(changedFieldsByRowHint.get(rowKey))
+                        ? Array.from(
+                            changedFieldsByRowHint.get(rowKey)
+                        ).filter(field =>
+                            trackableFieldSet.has(String(field))
+                        )
                         : allTrackableFields;
     
                 const changedFields = new Set(
@@ -112,9 +113,17 @@
                         changedFields.add(field);
                     }
                 } else {
+                    /*
+                     * A bulk paste already tells us which fields changed.
+                     * Compare only those values against the saved snapshot
+                     * instead of rebuilding every tracked field for every row.
+                     */
                     for (const field of fieldsToCheck) {
+                        const currentValue =
+                            this.normalizeDirtyValue(rowData?.[field]);
+
                         if (
-                            currentSnapshot[field] !==
+                            currentValue !==
                             originalSnapshot[field]
                         ) {
                             changedFields.add(field);

@@ -442,6 +442,247 @@
             return true;
         },
 
+        doFieldChangesAffectAggregates: function (
+            elementId,
+            changes
+        ) {
+            const state = this.states[elementId];
+
+            if (!state) {
+                return false;
+            }
+
+            const amountFields = new Set(
+                this.getAggregateAmountFields(elementId)
+                    .map(definition => definition.field)
+            );
+
+            for (const change of changes ?? []) {
+                const field = String(change?.field ?? "").trim();
+
+                if (!field) {
+                    continue;
+                }
+
+                if (field === "basket" || amountFields.has(field)) {
+                    return true;
+                }
+
+                /*
+                 * Persisted Work Orders are always included in the KPI count,
+                 * so changing an ordinary text/date field cannot change the
+                 * aggregate totals. Content fields matter only for a new,
+                 * unsaved row that can move between blank and non-blank.
+                 */
+                if (
+                    this.getFieldDefinition?.(field)?.countsAsContent === true &&
+                    !state.originalRows?.has(String(change?.rowId))
+                ) {
+                    return true;
+                }
+            }
+
+            return false;
+        },
+
+        applyAggregateChangesDelta: function (
+            elementId,
+            changes
+        ) {
+            const table = this.tables[elementId];
+            const state = this.states[elementId];
+            const snapshot = state?.aggregateSnapshot;
+
+            if (
+                !table ||
+                !state ||
+                !snapshot ||
+                !Array.isArray(changes) ||
+                this.hasActiveAggregateFilter(elementId)
+            ) {
+                return false;
+            }
+
+            if (!this.doFieldChangesAffectAggregates(elementId, changes)) {
+                return true;
+            }
+
+            const changesByRow = new Map();
+
+            for (const change of changes) {
+                const rowKey = String(change?.rowId ?? "");
+
+                if (!rowKey) {
+                    continue;
+                }
+
+                if (!changesByRow.has(rowKey)) {
+                    changesByRow.set(rowKey, {
+                        rowId: change.rowId,
+                        changes: []
+                    });
+                }
+
+                changesByRow.get(rowKey).changes.push(change);
+            }
+
+            const rowStatePairs = [];
+
+            for (const group of changesByRow.values()) {
+                const row = table.getRow(group.rowId);
+
+                if (!row) {
+                    return false;
+                }
+
+                const afterData = row.getData();
+                const beforeData = { ...afterData };
+                let financialChanged = false;
+
+                for (const change of group.changes) {
+                    beforeData[change.field] = change.oldValue;
+
+                    if (
+                        change.field === "workOrderValue" ||
+                        change.field === "partialAmount"
+                    ) {
+                        financialChanged = true;
+                    }
+                }
+
+                if (
+                    financialChanged &&
+                    typeof this.calculateRemainingAmount === "function"
+                ) {
+                    beforeData.remainingAmount =
+                        this.calculateRemainingAmount(
+                            beforeData.workOrderValue,
+                            beforeData.partialAmount
+                        );
+                }
+
+                rowStatePairs.push({
+                    before: this.captureAggregateRowState(
+                        elementId,
+                        beforeData
+                    ),
+                    after: this.captureAggregateRowState(
+                        elementId,
+                        afterData
+                    )
+                });
+            }
+
+            this.applyBasketDashboardChangesDelta?.(
+                elementId,
+                rowStatePairs
+            );
+
+            const definitions =
+                this.getAggregateAmountFields(elementId);
+            const openSnapshot =
+                snapshot.open ??
+                this.createEmptyAggregateTotals(elementId);
+            const nextYearAmounts = { ...snapshot.year.amounts };
+            const nextVisibleAmounts = { ...snapshot.visible.amounts };
+            const nextOpenAmounts = { ...openSnapshot.amounts };
+            let rowCountDifference = 0;
+            let openRowCountDifference = 0;
+            let hasAmountDifference = false;
+            let hasOpenAmountDifference = false;
+
+            for (const pair of rowStatePairs) {
+                const beforeState = pair.before;
+                const afterState = pair.after;
+                const beforeIncluded = beforeState.included === true;
+                const afterIncluded = afterState.included === true;
+                const beforeOpenIncluded =
+                    beforeState.openIncluded === true;
+                const afterOpenIncluded =
+                    afterState.openIncluded === true;
+
+                rowCountDifference +=
+                    Number(afterIncluded) - Number(beforeIncluded);
+                openRowCountDifference +=
+                    Number(afterOpenIncluded) -
+                    Number(beforeOpenIncluded);
+
+                for (const definition of definitions) {
+                    const field = definition.field;
+                    const beforeAmount = beforeIncluded
+                        ? beforeState.amounts?.[field] ?? 0
+                        : 0;
+                    const afterAmount = afterIncluded
+                        ? afterState.amounts?.[field] ?? 0
+                        : 0;
+                    const difference = afterAmount - beforeAmount;
+                    const beforeOpenAmount = beforeOpenIncluded
+                        ? beforeState.amounts?.[field] ?? 0
+                        : 0;
+                    const afterOpenAmount = afterOpenIncluded
+                        ? afterState.amounts?.[field] ?? 0
+                        : 0;
+                    const openDifference =
+                        afterOpenAmount - beforeOpenAmount;
+
+                    if (difference !== 0) {
+                        hasAmountDifference = true;
+                    }
+
+                    if (openDifference !== 0) {
+                        hasOpenAmountDifference = true;
+                    }
+
+                    nextYearAmounts[field] =
+                        (nextYearAmounts[field] ?? 0) + difference;
+                    nextVisibleAmounts[field] =
+                        (nextVisibleAmounts[field] ?? 0) + difference;
+                    nextOpenAmounts[field] =
+                        (nextOpenAmounts[field] ?? 0) + openDifference;
+                }
+            }
+
+            if (
+                rowCountDifference !== 0 ||
+                openRowCountDifference !== 0 ||
+                hasAmountDifference ||
+                hasOpenAmountDifference
+            ) {
+                state.aggregateSnapshot = {
+                    ...snapshot,
+                    year: {
+                        rowCount:
+                            snapshot.year.rowCount + rowCountDifference,
+                        amounts: nextYearAmounts
+                    },
+                    visible: {
+                        rowCount:
+                            snapshot.visible.rowCount + rowCountDifference,
+                        amounts: nextVisibleAmounts
+                    },
+                    open: {
+                        rowCount:
+                            openSnapshot.rowCount +
+                            openRowCountDifference,
+                        amounts: nextOpenAmounts
+                    },
+                    reason: "batch-edit-delta"
+                };
+
+                this.renderAggregateOverview(
+                    elementId,
+                    state.aggregateSnapshot
+                );
+            }
+
+            this.scheduleSelectionAggregateRefresh(
+                elementId,
+                "batch-edit-delta"
+            );
+
+            return true;
+        },
+
         formatAggregateCount: function (value) {
             return Math.max(0, Number(value) || 0)
                 .toLocaleString("en-US");

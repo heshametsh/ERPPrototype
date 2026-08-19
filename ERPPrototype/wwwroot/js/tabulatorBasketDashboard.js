@@ -1003,6 +1003,73 @@
             return true;
         },
 
+        applyBasketDashboardChangesDelta: function (
+            elementId,
+            rowStatePairs
+        ) {
+            const state = this.states[elementId];
+            const snapshot = state?.basketDashboardSnapshot;
+
+            if (!state || !snapshot?.baskets) {
+                return false;
+            }
+
+            const nextBaskets = snapshot.baskets.map(entry => ({
+                ...entry
+            }));
+            const entries = new Map(
+                nextBaskets.map(entry => [entry.basket, entry])
+            );
+            let changed = false;
+
+            const applyState = (rowState, direction) => {
+                if (rowState?.included !== true) {
+                    return;
+                }
+
+                const basket = String(
+                    rowState?.basket ?? ""
+                ).trim();
+                const entry = entries.get(basket);
+
+                if (!entry) {
+                    return;
+                }
+
+                const countDelta = direction;
+                const amountDelta =
+                    direction *
+                    (rowState.amounts?.[remainingAmountField] ?? 0);
+
+                entry.rowCount += countDelta;
+                entry.remainingAmountCents += amountDelta;
+                changed = changed ||
+                    countDelta !== 0 ||
+                    amountDelta !== 0;
+            };
+
+            for (const pair of rowStatePairs ?? []) {
+                applyState(pair?.before, -1);
+                applyState(pair?.after, 1);
+            }
+
+            if (!changed) {
+                return true;
+            }
+
+            state.basketDashboardSnapshot = {
+                baskets: nextBaskets,
+                reason: "batch-edit-delta"
+            };
+
+            this.renderBasketDashboard(
+                elementId,
+                state.basketDashboardSnapshot
+            );
+
+            return true;
+        },
+
         resetBasketDashboardUi: function (elementId) {
             const container = document.getElementById(
                 `${elementId}-basket-dashboard`
