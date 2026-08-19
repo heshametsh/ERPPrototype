@@ -1133,207 +1133,11 @@
         },
 
         /*
-     * الانتقال إلى مكان العملية التي تم عمل
-     * Undo أو Redo لها، وتحديد الخلايا المتأثرة.
-     */
-        focusTransaction: function (
-            elementId,
-            transaction
-        ) {
-            const table =
-                this.tables[elementId];
-
-            if (
-                !table ||
-                !transaction?.changes?.length
-            ) {
-                return;
-            }
-
-            const rows =
-                table.getRows("active");
-
-            const columns =
-                table
-                    .getColumns()
-                    .filter(
-                        column =>
-                            column.isVisible() &&
-                            column.getField() &&
-                            column.getField() !== "rowNumber"
-                    );
-
-            const rowPositions =
-                new Map();
-
-            for (
-                let index = 0;
-                index < rows.length;
-                index++
-            ) {
-                rowPositions.set(
-                    String(rows[index].getIndex()),
-                    index
-                );
-            }
-
-            const columnPositions =
-                new Map();
-
-            for (
-                let index = 0;
-                index < columns.length;
-                index++
-            ) {
-                columnPositions.set(
-                    columns[index].getField(),
-                    index
-                );
-            }
-
-            let minimumRow = Infinity;
-            let maximumRow = -1;
-
-            let minimumColumn = Infinity;
-            let maximumColumn = -1;
-
-            for (
-                const change
-                of transaction.changes
-            ) {
-                const rowPosition =
-                    rowPositions.get(
-                        String(change.rowId)
-                    );
-
-                const columnPosition =
-                    columnPositions.get(
-                        change.field
-                    );
-
-                if (
-                    rowPosition === undefined ||
-                    columnPosition === undefined
-                ) {
-                    continue;
-                }
-
-                minimumRow =
-                    Math.min(
-                        minimumRow,
-                        rowPosition
-                    );
-
-                maximumRow =
-                    Math.max(
-                        maximumRow,
-                        rowPosition
-                    );
-
-                minimumColumn =
-                    Math.min(
-                        minimumColumn,
-                        columnPosition
-                    );
-
-                maximumColumn =
-                    Math.max(
-                        maximumColumn,
-                        columnPosition
-                    );
-            }
-
-            if (
-                !Number.isFinite(minimumRow) ||
-                !Number.isFinite(minimumColumn) ||
-                maximumRow < 0 ||
-                maximumColumn < 0
-            ) {
-                return;
-            }
-
-            const startRow =
-                rows[minimumRow];
-
-            const endRow =
-                rows[maximumRow];
-
-            const startColumn =
-                columns[minimumColumn];
-
-            const endColumn =
-                columns[maximumColumn];
-
-            const startCell =
-                startRow?.getCell(startColumn);
-
-            const endCell =
-                endRow?.getCell(endColumn);
-
-            if (
-                !startRow ||
-                !startCell ||
-                !endCell
-            ) {
-                return;
-            }
-
-            const selectAffectedRange =
-                function () {
-                    /*
-                     * إزالة التحديد القديم.
-                     */
-                    const existingRanges =
-                        table.getRanges();
-
-                    for (
-                        const range
-                        of existingRanges
-                    ) {
-                        range.remove();
-                    }
-
-                    /*
-                     * تحديد الخلية أو النطاق
-                     * الذي تم التراجع عنه.
-                     */
-                    table.addRange(
-                        startCell,
-                        endCell
-                    );
-
-                    window.requestAnimationFrame(
-                        function () {
-                            const cellElement =
-                                startCell.getElement();
-
-                            if (cellElement) {
-                                cellElement.focus({
-                                    preventScroll: true
-                                });
-                            }
-                        }
-                    );
-                };
-
-            /*
-             * الانتقال إلى مكان العملية فورًا،
-             * ثم تحديد النطاق بعد اكتمال الانتقال.
-             */
-            table
-                .scrollToRow(
-                    startRow,
-                    "center",
-                    false
-                )
-                .then(
-                    selectAffectedRange
-                )
-                .catch(
-                    selectAffectedRange
-                );
-        },
-
+         * Cell/Paste Undo and Redo intentionally keep the employee at the
+         * current viewport and selection, matching the adopted Excel behavior.
+         * Structural history uses the shared focusRow path because a row may
+         * need to be revealed after insertion/removal.
+         */
         undo: async function (elementId) {
             const state =
                 this.states[elementId];
@@ -1445,11 +1249,6 @@
             );
 
             state.redoStack.push(
-                transaction
-            );
-
-            this.focusTransaction(
-                elementId,
                 transaction
             );
 
@@ -1572,11 +1371,6 @@
             );
 
             state.undoStack.push(
-                transaction
-            );
-
-            this.focusTransaction(
-                elementId,
                 transaction
             );
 

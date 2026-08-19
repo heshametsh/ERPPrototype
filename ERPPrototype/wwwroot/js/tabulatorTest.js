@@ -1470,10 +1470,16 @@ window.tabulatorTest = {
             );
         };
 
+        /*
+         * Keep row navigation Excel-like: if the row is already visible,
+         * do not move the viewport. If it is outside the viewport, move only
+         * enough to reveal it at the nearest edge. This shared path is used by
+         * normal structural actions and structural Undo/Redo.
+         */
         table
             .scrollToRow(
                 row,
-                "center",
+                "nearest",
                 false
             )
             .then(selectCell)
