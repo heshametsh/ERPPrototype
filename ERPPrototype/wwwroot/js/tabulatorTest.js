@@ -802,17 +802,45 @@ window.tabulatorTest = {
             return null;
         }
 
-        const ranges =
-            table.getRanges();
+        const ranges = table.getRanges();
 
-        if (
-            !Array.isArray(ranges) ||
-            ranges.length === 0
-        ) {
+        if (!Array.isArray(ranges) || ranges.length === 0) {
             return null;
         }
 
-        return ranges[ranges.length - 1];
+        /*
+         * Tabulator keeps an empty RangeComponent internally after some
+         * programmatic clear paths. Never expose that placeholder as a real
+         * employee selection. Doing so can later produce "No bounds defined"
+         * and can make a dynamic column selection resolve against old indexes.
+         */
+        for (let index = ranges.length - 1; index >= 0; index -= 1) {
+            const range = ranges[index];
+            const internalRange = range?._range;
+
+            if (internalRange) {
+                if (
+                    internalRange.destroyed === true ||
+                    internalRange.initialized !== true
+                ) {
+                    continue;
+                }
+
+                return range;
+            }
+
+            try {
+                if (
+                    range?.getRows?.().length > 0 &&
+                    range?.getColumns?.().length > 0
+                ) {
+                    return range;
+                }
+            } catch {
+            }
+        }
+
+        return null;
     },
 
     /*

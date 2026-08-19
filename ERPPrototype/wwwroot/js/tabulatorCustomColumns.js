@@ -1291,6 +1291,7 @@
                 );
             }
 
+            this.clearTableRanges(elementId);
             await current.updateDefinition(definition);
             this.arrangeColumnHeaderControls?.(elementId);
         },
@@ -1473,6 +1474,8 @@
                 )
             );
 
+            this.clearTableRanges(elementId);
+
             if (nextColumn) {
                 await table.addColumn(
                     definition,
@@ -1497,6 +1500,7 @@
             const column = table?.getColumn(fieldKey);
 
             if (column) {
+                this.clearTableRanges(elementId);
                 await table.deleteColumn(fieldKey);
             }
 
@@ -1665,6 +1669,17 @@
             }
 
             const normalized = this.cloneCustomColumns(columns);
+            const knownCustomFields = new Set(
+                [
+                    ...(state.originalCustomColumns ?? []),
+                    ...(state.customColumns ?? []),
+                    ...(state.deletedCustomColumns ?? []),
+                    ...normalized
+                ]
+                    .map(column => String(column?.fieldKey ?? "").trim())
+                    .filter(Boolean)
+            );
+
             state.customColumns = normalized;
             state.originalCustomColumns = this.cloneCustomColumns(normalized);
             state.deletedCustomColumns = [];
@@ -1680,35 +1695,54 @@
             const activeFields = new Set(
                 normalized.map(column => column.fieldKey)
             );
-            const keepTransaction = transaction => {
+            const sanitizeTransaction = transaction => {
                 if (transaction?.kind === "custom-column") {
-                    return false;
+                    return null;
                 }
 
-                if (transaction?.kind !== "filter") {
-                    return true;
-                }
+                if (transaction?.kind === "filter") {
+                    const fields = new Set([
+                        ...Object.keys(
+                            transaction?.oldFilters?.customValues ?? {}
+                        ),
+                        ...Object.keys(
+                            transaction?.newFilters?.customValues ?? {}
+                        )
+                    ]);
 
-                const fields = new Set([
-                    ...Object.keys(
-                        transaction?.oldFilters?.customValues ?? {}
-                    ),
-                    ...Object.keys(
-                        transaction?.newFilters?.customValues ?? {}
+                    return Array.from(fields).every(field =>
+                        activeFields.has(field)
                     )
-                ]);
+                        ? transaction
+                        : null;
+                }
 
-                return Array.from(fields).every(field =>
-                    activeFields.has(field)
-                );
+                if (Array.isArray(transaction?.changes)) {
+                    const changes = transaction.changes.filter(change => {
+                        const field = String(change?.field ?? "").trim();
+
+                        return !knownCustomFields.has(field) ||
+                            activeFields.has(field);
+                    });
+
+                    if (changes.length === 0) {
+                        return null;
+                    }
+
+                    return changes.length === transaction.changes.length
+                        ? transaction
+                        : { ...transaction, changes };
+                }
+
+                return transaction;
             };
 
-            state.undoStack = (state.undoStack ?? []).filter(
-                keepTransaction
-            );
-            state.redoStack = (state.redoStack ?? []).filter(
-                keepTransaction
-            );
+            state.undoStack = (state.undoStack ?? [])
+                .map(sanitizeTransaction)
+                .filter(Boolean);
+            state.redoStack = (state.redoStack ?? [])
+                .map(sanitizeTransaction)
+                .filter(Boolean);
 
             this.refreshCustomAmountAggregateFields(elementId);
             this.renderStatus(elementId);

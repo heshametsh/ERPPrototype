@@ -806,28 +806,48 @@
 
         clearTableRanges: function (elementId) {
             const table = this.tables[elementId];
+            const state = this.states[elementId];
 
             if (!table) {
                 return;
             }
 
             /*
-             * Let Tabulator remove its own range state and rendered classes.
-             * Manually deleting Tabulator CSS classes can leave the internal
-             * active range pointing at a different cell than the visible border.
+             * RangeComponent.remove() asks Tabulator to create a replacement
+             * active range immediately. That replacement has no bounds until
+             * the next real selection, which is unsafe if columns change first.
+             * Clear the SelectRange owner directly and leave no phantom range.
              */
-            for (const range of table.getRanges()) {
+            const selectRange = table.modules?.selectRange;
+
+            if (selectRange && typeof selectRange.clearRanges === "function") {
                 try {
-                    range.remove();
+                    selectRange.clearRanges();
+                    selectRange.activeRange = false;
+                    selectRange.selecting = "cell";
+                    selectRange.mousedown = false;
+                    selectRange.blockKeydown = false;
+
+                    if (selectRange.overlay) {
+                        selectRange.overlay.style.visibility = "hidden";
+                    }
+
+                    selectRange.layoutElement?.(true);
                 } catch {
+                }
+            } else {
+                for (const range of table.getRanges?.() ?? []) {
+                    try {
+                        range.remove();
+                    } catch {
+                    }
                 }
             }
 
-            /*
-             * Do not rely only on Tabulator's rangeRemoved event.
-             * Some programmatic clear paths can finish without refreshing
-             * the selected-row financial summary.
-             */
+            if (state) {
+                state.activeCell = null;
+            }
+
             this.scheduleSelectionAggregateRefresh?.(
                 elementId,
                 "ranges-cleared"

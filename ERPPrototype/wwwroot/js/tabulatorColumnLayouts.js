@@ -513,15 +513,20 @@
                 return true;
             }
 
-            if (nextHidden) {
-                if (this.getVisibleDataColumnCount(elementId) <= 1) {
-                    this.setStatus(
-                        elementId,
-                        "لا يمكن إخفاء آخر عمود ظاهر."
-                    );
-                    return false;
-                }
+            if (
+                nextHidden &&
+                this.getVisibleDataColumnCount(elementId) <= 1
+            ) {
+                this.setStatus(
+                    elementId,
+                    "لا يمكن إخفاء آخر عمود ظاهر."
+                );
+                return false;
+            }
 
+            this.clearTableRanges(elementId);
+
+            if (nextHidden) {
                 column.hide();
             } else {
                 column.show();
