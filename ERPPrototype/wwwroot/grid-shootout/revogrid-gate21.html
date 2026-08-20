@@ -1,0 +1,8 @@
+<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>RevoGrid Gate 2.1</title><link rel="stylesheet" href="./finalist.css"></head><body>
+<div class="bench-topbar"><h1>RevoGrid — Gate 2.1</h1><a class="candidate-link" href="./finalists-gate21.html">رجوع</a><span class="spacer"></span><button id="export-metrics">تصدير</button></div>
+<div class="bench-layout"><section class="bench-grid-card" id="grid-card"><div id="grid" class="bench-grid-host" dir="ltr"></div></section><aside class="bench-panel">
+<h2>اختبارات الحسم</h2><button id="run-auto" class="primary-test">تشغيل Selection + Filter</button><p class="small">يختبر Basket مع Scroll ثم 5 دورات Filter وينتظر حدث التطبيق الحقيقي، مش مجرد Frame.</p>
+<h2>Native Paste</h2><ol class="manual-tests"><li>اضغط الزر التالي مرة واحدة؛ هو ينسخ 5000 قيمة ثم يعيد الـFocus للخلية داخل RevoGrid.</li><li>اضغط <b>Ctrl+V</b> فقط.</li><li>اضغط <b>فحص Paste</b>.</li></ol>
+<div class="action-grid"><button id="prepare-copy" class="primary-test">نسخ + تجهيز Paste</button><button id="verify-paste">فحص Paste</button></div>
+<h2>النتيجة</h2><div id="bench-status" class="status">جاري التحميل…</div><div id="check-results"></div><h2>القياسات</h2><div class="metric-grid" id="bench-metrics"></div>
+</aside></div><script src="./gate21-common.js"></script><script type="module" src="./revogrid-gate21.js"></script></body></html>
