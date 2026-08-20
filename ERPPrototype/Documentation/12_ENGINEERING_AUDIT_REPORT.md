@@ -1,11 +1,12 @@
 # ERP Prototype — Engineering Audit Master Report
 
 **Document ID:** `12_ENGINEERING_AUDIT_REPORT.md`  
-**Edition:** Cross-Chat Reconciliation + Runtime Evidence — 2026-08-17  
-**Status:** Independent audits complete; post-audit remediation is in progress. Test Foundation, `LDR-002`, initialization recovery, performance baselines, and the accepted financial-sort optimization are complete. **Current task: ArrowDown root-cause investigation.**  
+**Edition:** Grid Engine Selection Reconciliation — 2026-08-20  
+**Status:** Independent audits complete. Previous remediation remains preserved. Grid Engine Shootout is complete and **RevoGrid Community 4.25.2 is selected as the Work Orders replacement target**. `/work-orders` still runs Tabulator until migration qualification. **Current task: Gate 5A isolated Blazor + RevoGrid real-data integration.**  
 **Audit baseline:** `codespaces-sync-2026-08-08` @ `00503ab`  
-**Latest confirmed Git checkpoint from the conversation log:** `0f6bd3b` (`Optimize Work Orders financial sorting`)  
-**Current source package reviewed:** `ERPPrototype_Current_2026-08-17.zip` — content is consistent with the accepted post-`98d9aa3` initialization recovery + financial-sort optimization, and contains no ManualPerformanceCapture remnants. The ZIP excludes `.git`, so commit identity is grounded in the captured Git log, not inferred from ZIP metadata.  
+**Current production runtime baseline retained:** `0f6bd3b` (`Optimize Work Orders financial sorting`)  
+**Latest reviewed Git HEAD:** `dc0b2b0` (`Checkpoint before Univer Gate U1`)  
+**Current source package reviewed:** `ERPPrototype_Current_Review_2026-08-20.zip`. The package includes Git state captures and the Grid Shootout files. Current `/work-orders` remains Tabulator; RevoGrid is still isolated test code.  
 **Latest pasted local build evidence before the final cleanup:** Build PASS; final ZIP content was separately checked for cleanup consistency.
 
 > This is the current daily engineering source of truth. Detailed standalone audits remain evidence; current code remains the source of truth for what is actually implemented.
@@ -21,7 +22,7 @@ Preserve:
 - ASP.NET Core + Blazor Server for normal ERP modules.
 - EF Core + SQL Server.
 - ASP.NET Core Identity.
-- Tabulator and browser-local high-frequency spreadsheet interaction.
+- browser-local high-frequency spreadsheet interaction; **RevoGrid Community 4.25.2 is the selected target grid engine**.
 - Modular Monolith direction.
 - global `(WorkOrderNumber + WorkTypeCode)` uniqueness.
 - RowVersion, SQL constraints/indexes, explicit transactions.
@@ -34,9 +35,27 @@ Explicitly **not** recommended without new evidence:
 - Microservices / CQRS-everywhere;
 - generic repositories for style;
 - React/Vue rewrite;
-- replacing Tabulator;
+- whole Work Orders rewrite while changing the grid engine;
 - native Windows/MAUI client on SEC machines;
 - server round-trip for every spreadsheet interaction.
+
+## Grid-engine decision — 2026-08-20
+
+The earlier Technology Fit recommendation to keep Tabulator is **superseded only for the Work Orders grid engine** by later measured evidence and the user's explicit selection.
+
+Current facts:
+
+- `/work-orders` still runs Tabulator 6.5.0.
+- RevoGrid Community 4.25.2 is selected as the replacement target, not yet integrated.
+- RevoGrid isolated qualification covered 100,000 rows plus the required ERP interaction behaviors.
+- Accepted RevoGrid gates include full-column selection under heavy scroll, sort/filter, native Paste 5,000, end-of-sheet truncation to available rows, session Undo/Redo including after Save, readonly behavior, 1,000-row delete/restore, custom-column structure, Split, RTL and Zoom preservation.
+- Univer is not selected. Its native end-of-sheet Paste expanded 100,001 total rows to 103,801 when only 200 target rows were available for 4,000 clipboard values.
+- RevoGrid Community 4.25.2 is MIT-licensed. The migration must pin exactly `4.25.2`, self-host the package for the final runtime, and retain its license text. Future upgrades are separate decisions and require regression qualification.
+- This decision does **not** replace Blazor Server, EF Core, SQL Server, Identity, current server authorization, RowVersion, SQL uniqueness or transaction boundaries.
+
+Migration principle: **replace the grid engine, not the ERP architecture.**
+
+The consolidated technology timeline and reasons for Power Apps → Blazor → Syncfusion → Tabulator → RevoGrid are retained in `13_TECHNOLOGY_EVOLUTION.md`.
 
 ## Highest-leverage weakness
 
@@ -65,7 +84,7 @@ SQL Server
 
 
 Work Orders
-Browser-owned Tabulator client
+Browser-owned RevoGrid client (target; Tabulator remains current until cutover)
         ↓
 IndexedDB
 (Draft + Outbox + local snapshots)
@@ -1268,7 +1287,7 @@ Each specialist sees what they need; main Work Orders employee sees only the min
 - final backup schedule.
 - OTP mail provider.
 - shared SEC browser-profile reality.
-- quantitative and manual Work Orders performance sign-off, including the reopened ArrowDown / `GRID-001` regression.
+- quantitative and manual Work Orders performance sign-off on the selected RevoGrid integration; `GRID-001` remains open until real cutover.
 
 ## Deliberately deferred feature detail
 
@@ -1304,30 +1323,42 @@ Required, as applicable:
 
 # 33. Current next action
 
-**Current task: ArrowDown performance investigation on the current source.**
+**Current task: Gate 5A — isolated Blazor + RevoGrid Community 4.25.2 real-data integration.**
 
 Required sequence:
 
-1. verify the current source/Git state on the developer machine;
-2. preserve `0f6bd3b` financial-sort optimization;
-3. trace the actual current path:
-   `ArrowDown → Tabulator range/navigation → range-changed callbacks → vertical scroll → Virtual DOM/layout/paint`;
-4. treat baseline/deep JSON as measured evidence, not as a proven root cause;
-5. make **no Runtime patch** until the code-level cause is identified;
-6. explain the cause first in Work Orders employee terms;
-7. propose the smallest safe fix;
-8. acceptance requires:
-   - Excel-like navigation unchanged;
-   - frozen UI sizes unchanged;
-   - Undo/Redo and data correctness unchanged;
-   - safety suites PASS;
-   - manual Split Screen 100% improvement;
-   - material `?perf=baseline` improvement using the median of multiple runs;
-   - `?perf=deep` only as focused confirmation.
+1. preserve the live `/work-orders` Tabulator route unchanged;
+2. pin RevoGrid to exact `4.25.2`; do not use `latest`;
+3. create an isolated Blazor route/component for RevoGrid;
+4. load through the **real existing employee/year read path** (`LoadSheetAsync`) rather than a new duplicate query;
+5. map core fields + custom-column definitions/layouts without changing database schema;
+6. measure the real Blazor → browser transfer, initialization, scroll and memory with realistic 10k shape;
+7. confirm year switch/disposal does not duplicate state/listeners;
+8. no production Save mutation in Gate 5A.
 
-After ArrowDown acceptance:
+After Gate 5A:
 
-**Resume Online Reliability (`CSB-001` etc.) → Narrow Save/Delta/receipt contract → concurrency/security/localization → Offline/Sync.**
+**Gate 5B — Save/ERP behavior**
+
+- real Dirty/Delta collection;
+- existing server validation/authorization/transaction authority;
+- temporary Id → saved Id + RowVersion reconciliation;
+- duplicate/concurrency/moved-year result mapping;
+- Undo/Redo after Save;
+- custom-column/layout persistence.
+
+Then:
+
+**Gate 5C — visual/regression/cutover**
+
+- frozen Row/Header/Font/KPI/Selected-bar dimensions;
+- Split + RTL + Zoom;
+- full automated/manual regression;
+- self-hosted exact package + MIT license;
+- controlled `/work-orders` switch;
+- only after accepted cutover: remove obsolete Tabulator runtime in a separate cleanup checkpoint.
+
+**Do not resume broad Offline work before the selected grid is integrated and the Online Work Orders foundation is stable.**
 
 ---
 
@@ -1361,3 +1392,7 @@ Post-audit product decisions and real SEC workstation validation through **2026-
 - `UDS_Performance_deep_2026-08-17T12-39-47-021Z.json`
 - `ERPPrototype_Current_2026-08-17.zip`
 - captured Git/log/build conversation through financial-sort checkpoint `0f6bd3b`
+- `ERPPrototype_Current_Review_2026-08-20.zip` with Git state at `dc0b2b0`
+- `wwwroot/grid-shootout/REVOGRID_FROZEN_BASELINE_2026-08-20.json`
+- RevoGrid Gate 3 / Gate 4F / 4H / 4I / 4J isolated test artifacts and the accepted user-run JSON evidence
+- Univer U1/U1B/U1C comparison evidence; U1C records native end-of-sheet row growth

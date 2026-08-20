@@ -1,32 +1,46 @@
-# CURRENT HANDOFF — 2026-08-17
+# CURRENT HANDOFF — 2026-08-20
 
 > **هذا القسم هو الحالة الحالية المعتمدة.** أي خطة أقدم أسفل الملف تُعامل كتاريخ إذا تعارضت مع هذا القسم أو مع `Documentation/12_ENGINEERING_AUDIT_REPORT.md`.
 
 **Audit baseline:** `00503ab`  
-**Latest confirmed Git checkpoint from captured log:** `0f6bd3b` — `Optimize Work Orders financial sorting`  
-**Current source ZIP reviewed:** `ERPPrototype_Current_2026-08-17.zip`  
-**Runtime remediation:** بدأ بالفعل؛ Test Foundation + `LDR-002` + initialization recovery + accepted financial-sort optimization مكتملة.  
-**Current task:** تشخيص بطء ArrowDown من الكود الحالي قبل أي Patch.
+**Current production runtime baseline retained:** `0f6bd3b` — accepted financial-sort optimization  
+**Latest reviewed Git HEAD:** `dc0b2b0` — `Checkpoint before Univer Gate U1`  
+**Current source ZIP reviewed:** `ERPPrototype_Current_Review_2026-08-20.zip`  
+**Current `/work-orders` engine:** Tabulator 6.5.0 — still the live implementation.  
+**Selected replacement engine:** **RevoGrid Community 4.25.2** — selected after isolated 100,000-row and ERP-behaviour qualification; not yet integrated into `/work-orders`.  
+**Current task:** **Gate 5A — isolated Blazor + RevoGrid real-data integration. No production cutover yet.**
+
+## Grid-engine decision
+
+- RevoGrid Community 4.25.2 is the selected target for Work Orders.
+- The decision changes the grid engine only; it does **not** reopen the ASP.NET Core / Blazor Server / EF Core / SQL Server architecture.
+- Univer is no longer a finalist. It passed normal 5,000-value Paste, but its native end-of-sheet behavior expanded the sheet from 100,001 to 103,801 rows when only 200 rows were available for a 4,000-value Paste.
+- RevoGrid passed the accepted isolated 100k core gate and the ERP behavior gates: selection, heavy scroll, sort/filter, 5,000 Paste, end-of-sheet truncation, session Undo/Redo including after Save, readonly, 1,000-row delete/restore, custom columns, Split, RTL and Zoom-preserve.
+- RevoGrid must be pinned to **4.25.2**. Final application runtime must not depend on `latest`.
+- Before production cutover, vendor/self-host the exact package and its MIT license inside the project/deployment assets instead of relying on a CDN.
+
+## قواعد الانتقال
+
+- لا تغيير للأحجام المجمدة.
+- لا Offline الآن.
+- لا نعيد بناء Work Orders من الصفر.
+- لا ننقل Tabulator-specific hacks حرفيًا إلى RevoGrid؛ ننقل **سلوك المنتج** فقط باستخدام RevoGrid public APIs قدر الإمكان.
+- `WorkOrderService`, `WorkOrderQueryService`, `WorkOrderSavePlanBuilder`, RowVersion, SQL uniqueness and transaction authority remain the server foundation.
+- Tabulator remains the fallback/current `/work-orders` implementation until RevoGrid passes real-data Blazor integration, Save/Delta integration, visual parity and the full regression gate.
+- لا Patch أداء جديد على Tabulator لمجرد تحسينه أثناء الهجرة إلا إذا كان ضروريًا لحماية الاستخدام الحالي قبل cutover.
 
 ## اقرأ أولًا
 
 1. `Documentation/12_ENGINEERING_AUDIT_REPORT.md`
-2. `Documentation/ERP_AUDIT_PROTOCOL.md`
-3. `Documentation/00_DOCUMENTATION_INDEX.md`
-4. `Documentation/03_CURRENT_IMPLEMENTATION.md`
-5. `Documentation/06_REGRESSION_TEST_CHECKLIST.md`
-6. `Documentation/42_HANDOFF_2026-08-17_PERFORMANCE_RECONCILIATION.md`
+2. `Documentation/08_DECISIONS_LOG.md`
+3. `Documentation/13_TECHNOLOGY_EVOLUTION.md` — لماذا انتقل المشروع بين التقنيات
+4. `Documentation/00_DOCUMENTATION_INDEX.md`
+5. `Documentation/03_CURRENT_IMPLEMENTATION.md`
+6. `Documentation/05_WORK_ORDERS_GRID_BEHAVIOUR.md`
+7. `Documentation/06_REGRESSION_TEST_CHECKLIST.md`
+8. `Documentation/42_HANDOFF_2026-08-17_PERFORMANCE_RECONCILIATION.md` — historical pre-grid-selection handoff
 
-## قواعد الحالة الحالية
-
-- لا Offline الآن.
-- لا تغيير للأحجام المجمدة.
-- لا نخسر إصلاح الـSort المقبول.
-- لا نعيد تجربة ManualPerformanceCapture؛ الأداة المعتمدة هي `?perf=baseline` ثم `?perf=deep` عند الحاجة.
-- `GRID-001` أعيد فتحه لأن بطء الأسهم أصبح Regression مقاسًا ومشكلة محسوسة في الاستخدام الحقيقي.
-- لا Patch للأسهم قبل إثبات السبب من الكود.
-- بعد إغلاق ArrowDown نرجع إلى Online Reliability ثم Narrow Save/Delta Contract.
-
+---
 
 # START HERE — ERP Prototype
 

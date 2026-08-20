@@ -1,6 +1,6 @@
 # 06 — Regression Test Checklist
 
-> **Current reconciliation 2026-08-17:** latest accepted runtime checkpoint in the captured Git log is `0f6bd3b`. For the current ArrowDown work, acceptance also requires manual Split Screen 100% improvement plus multiple `?perf=baseline` runs compared by median; `?perf=deep` is diagnostic only. Preserve the accepted financial-sort optimization.
+> **Current reconciliation 2026-08-20:** `/work-orders` still uses Tabulator 6.5.0, while RevoGrid Community 4.25.2 is the selected replacement target. Preserve the current accepted runtime until RevoGrid passes isolated Blazor real-data, Save/Delta, visual, and full regression gates. Do not treat Lab PASS as production cutover.
 
 > تحديث 2026-08-12: استخدم `Tools/Invoke-ERPTests.ps1` للتحقق الحالي. أوامر Phase 8/Phase 9 القديمة الواردة في أقسام تاريخية لم تعد موجودة. آخر تحقق مقبول: Integration `25/25` وSmoke Browser `11/11`.
 
@@ -645,3 +645,53 @@ Include:
 - SEC-like network switching.
 
 **Fail criterion:** functionally correct but materially slower Work Orders is not accepted.
+
+## RevoGrid Migration Qualification — added 2026-08-20
+
+### Already passed in isolated Lab
+
+- [x] RevoGrid Community 4.25.2 pinned in the test.
+- [x] 100,000 rows.
+- [x] Whole-column selection remains stable through heavy scroll.
+- [x] Sort and basic filter.
+- [x] Native Paste 5,000.
+- [x] End-of-sheet Paste truncates to available 200 rows without growing the sheet.
+- [x] Edit + Dirty + Undo/Redo + Save checkpoint + Undo/Redo after Save.
+- [x] Paste 5,000 as one ERP history transaction.
+- [x] Remaining Amount readonly behavior.
+- [x] Delete/Undo/Redo for 1,000 rows.
+- [x] Custom-column add/Undo/Redo.
+- [x] Split/Full selection stability.
+- [x] RTL + scroll stability.
+- [x] Zoom 90/80/67/100 with ERP selection preservation.
+
+### Gate 5A — real Blazor/data bridge
+
+- [ ] Use exact RevoGrid 4.25.2 assets; no `latest`.
+- [ ] Isolated route only; `/work-orders` remains Tabulator.
+- [ ] Load the real employee-scoped year through the existing server read path.
+- [ ] Core + custom columns map correctly.
+- [ ] 10k real-shape rows remain visually comfortable at Split 100%.
+- [ ] No page/console/request/HTTP 5xx errors.
+- [ ] Year change and disposal do not duplicate listeners/state.
+- [ ] No production database mutation from destructive test data.
+
+### Gate 5B — real Save/ERP behavior
+
+- [ ] Dirty field deltas match the current Save contract.
+- [ ] Add/change/delete save through existing server authority.
+- [ ] Temporary row identity / saved Id / RowVersion reconciliation.
+- [ ] Validation and duplicate errors return to the correct cell.
+- [ ] Undo/Redo remains valid after Save in the same session.
+- [ ] Custom column/layout changes preserve existing persistence rules.
+- [ ] Conflict and moved-year behavior remains correct.
+
+### Gate 5C — cutover qualification
+
+- [ ] Frozen UI dimensions unchanged.
+- [ ] Full regression checklist passes.
+- [ ] Full automated safety suites pass after adapting test hooks.
+- [ ] RevoGrid assets + MIT license are self-hosted/pinned.
+- [ ] Manual Split 100% is at least as comfortable as the accepted Lab.
+- [ ] Only after PASS: switch `/work-orders`, then remove obsolete Tabulator runtime in a separate cleanup checkpoint.
+

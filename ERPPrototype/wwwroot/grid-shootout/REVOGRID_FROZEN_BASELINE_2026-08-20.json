@@ -1,0 +1,36 @@
+{
+  "frozenAt": "2026-08-20",
+  "purpose": "Reference baseline for 1:1 comparison against Univer. Do not rewrite these results during Univer testing.",
+  "engine": "RevoGrid Community",
+  "version": "4.25.2",
+  "rows": 100000,
+  "core100k": {
+    "readyMs": 61.70000000298023,
+    "selection": "PASS — Basket stayed selected",
+    "scrollPerf": "PASS — guided 15s: Scroll=199, Worst long=53.0ms, Worst frame=83.4ms",
+    "sort": "PASS",
+    "filter": "PASS — NeedLicense 12,500 -> reset 100,000",
+    "paste5000": "PASS — 5000/5000 IDs correct",
+    "endRule": "PASS — 4000 incoming at end -> only available 200 pasted, row count stayed 100,000",
+    "sessionMetrics": {
+      "longTasks": 7,
+      "longTaskTotalMs": 523,
+      "longTaskMaxMs": 104,
+      "frameGapOver50": 22,
+      "maxFrameGapMs": 100,
+      "heapMb": 27.89177703857422,
+      "domNodes": 630
+    }
+  },
+  "erpGate": {
+    "editDirtySaveUndoRedoAfterSave": "PASS",
+    "paste5000UndoRedoOneOperation": "PASS",
+    "readonly": "PASS",
+    "deleteUndoRedo1000": "PASS",
+    "customColumnAddUndoRedo": "PASS",
+    "splitNative": "PASS — 4/4 toggles, whole Basket x=6 y=0..99999",
+    "rtlScroll": "PASS — 51 scroll events, whole Basket stable",
+    "nativeZoom": "Observed unstable once at 90% in Gate 4I",
+    "zoomPreserve": "PASS — 90 -> 80 -> 67 -> 100 with ERP range preserve"
+  }
+}

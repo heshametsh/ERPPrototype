@@ -1,0 +1,30 @@
+{
+  "date": "2026-08-20",
+  "sourceZip": "ERPPrototype_Current_Review_2026-08-20.zip",
+  "reviewedGitHead": "dc0b2b0",
+  "currentProductionGrid": "Tabulator 6.5.0",
+  "selectedReplacement": "RevoGrid Community 4.25.2",
+  "scope": "Documentation-only reconciliation. No C#, Razor, JavaScript, CSS, database, migration, or test runtime files modified.",
+  "retainedBaseline": "wwwroot/grid-shootout/REVOGRID_FROZEN_BASELINE_2026-08-20.json",
+  "cleanupScope": "Remove only the listed untracked Univer U1/U1B/U1C artifacts. Preserve older tracked shootout evidence and all RevoGrid artifacts.",
+  "cleanupFiles": [
+    "wwwroot/grid-shootout/GATE_U1_README.txt",
+    "wwwroot/grid-shootout/GATE_U1B_README.txt",
+    "wwwroot/grid-shootout/GATE_U1C_README.txt",
+    "wwwroot/grid-shootout/univer-gate-u1-core100k.css",
+    "wwwroot/grid-shootout/univer-gate-u1-core100k.html",
+    "wwwroot/grid-shootout/univer-gate-u1-core100k.js",
+    "wwwroot/grid-shootout/univer-gate-u1b-paste.css",
+    "wwwroot/grid-shootout/univer-gate-u1b-paste.html",
+    "wwwroot/grid-shootout/univer-gate-u1b-paste.js",
+    "wwwroot/grid-shootout/univer-gate-u1c-endrule.css",
+    "wwwroot/grid-shootout/univer-gate-u1c-endrule.html",
+    "wwwroot/grid-shootout/univer-gate-u1c-endrule.js"
+  ],
+  "technologyEvolutionDocument": "Documentation/13_TECHNOLOGY_EVOLUTION.md",
+  "technologyHistoryRule": "Keep historical decisions as evidence; current implementation and newer explicit decisions supersede old direction without deleting history.",
+  "additionalUpdatedFiles": [
+    "Documentation/01_PROJECT_CONTEXT.md",
+    "Documentation/13_TECHNOLOGY_EVOLUTION.md"
+  ]
+}

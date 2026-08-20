@@ -1,9 +1,35 @@
+# GRID ENGINE DECISION OVERRIDE — 2026-08-20
+
+> هذا القرار أحدث من قرار “keep Tabulator” في 2026-08-17 ومن `DEC-004` كاتجاه مستقبلي. Tabulator يظل **current runtime only** إلى أن ينجح cutover.
+
+1. **No ERP rewrite:** نحتفظ بـASP.NET Core + Blazor Server + EF Core + SQL Server + Identity + Modular Monolith.
+2. **Approved grid-engine exception:** RevoGrid Community **4.25.2** هو Work Orders replacement target.
+3. **Current runtime remains safe:** `/work-orders` ما زال Tabulator 6.5.0 حتى Gate 5A/5B/5C.
+4. **Version rule:** exact `4.25.2`, never `latest` in the application.
+5. **Deployment/license rule:** self-host the package and retain its MIT license before cutover; Community features used by the project must remain within the MIT package.
+6. **Migration rule:** port product behavior, not Tabulator internals/hacks.
+7. **Univer decision:** no longer a finalist; native end-of-sheet Paste expanded the sheet instead of truncating to available rows.
+8. **Paste rule:** clipboard overflow at the end of the sheet is clipped to available rows; the grid must not add rows automatically.
+9. **Current task:** isolated Blazor/RevoGrid real-data integration, then real Save/Delta, then visual/regression cutover.
+10. **Rollback:** Tabulator remains the current implementation and rollback point until the RevoGrid cutover checkpoint is accepted.
+
+---
+
+
+## Technology-history navigation
+
+لرؤية التسلسل الكامل من **Power Apps → Blazor → Syncfusion → Tabulator → RevoGrid** مع سبب كل انتقال والـEvidence المتاح، راجع `13_TECHNOLOGY_EVOLUTION.md`.
+
+هذه الوثيقة (`08_DECISIONS_LOG.md`) تظل المرجع للقرار التفصيلي نفسه؛ ملف Technology Evolution يجمع التسلسل ولا يستبدل الـDecision Log.
+
+
+
 # POST-AUDIT DECISIONS — reconciled 2026-08-17
 
 > هذه القرارات أحدث من القرارات التاريخية أدناه وت supersede أي قرار يتعارض معها. التفاصيل والأسباب في `12_ENGINEERING_AUDIT_REPORT.md`.
 
-1. **No rewrite:** الحفاظ على ASP.NET Core/Blazor Server/EF/SQL/Identity/Tabulator.
-2. **Execution status/current priority:** Tests + `LDR-002` + clean baseline + initialization recovery + financial Sort optimization are complete. User explicitly reprioritized the measured ArrowDown/`GRID-001` regression as the current task; after it, resume Online Reliability → narrow Save/Delta contract.
+1. **No ERP rewrite:** الحفاظ على ASP.NET Core/Blazor Server/EF/SQL/Identity؛ قرار Tabulator كـfuture engine تم نسخه بقرار RevoGrid في 2026-08-20.
+2. **Execution status/current priority:** previous remediation remains preserved; Grid Shootout is complete and RevoGrid 4.25.2 is selected. Current task is isolated real Blazor/RevoGrid integration before production cutover.
 3. **Performance is a hard gate:** 10k target; 50k capacity; أي Lag ملحوظ يرفض التصميم.
 4. **Save semantics:** Save = اعتماد وحفظ محلي durable؛ Sync أوتوماتيك وليس زرًا منفصلًا.
 5. **Draft:** قبل Save يمكن حماية العمل محليًا كDraft غير معتمد؛ Restore/Discard بعد reopen.
@@ -58,12 +84,12 @@
 - **Reason:** يناسب حجم المنتج الحالي ويمنع تعقيد Microservices.
 - **Trade-off:** نحتاج انضباطًا في الحدود داخل نفس المشروع.
 
-## DEC-004 — Tabulator is the current grid
+## DEC-004 — Tabulator is the current runtime grid
 
-- **Status:** Accepted for prototype validation
-- **Decision:** Tabulator 6.5.0 هو Grid الحالي، ولا توجد Syncfusion في الكود.
-- **Reason:** الوصول لتجربة أقرب إلى Excel والتحكم في keyboard/range/clipboard.
-- **Condition:** القرار النهائي يعتمد على اختبار 3,000 و10,000 صف والاستقرار الطويل.
+- **Status:** **Superseded as the future engine on 2026-08-20; retained as current runtime until cutover**
+- **Decision:** Tabulator 6.5.0 ما زال Grid الفعلي في `/work-orders`، لكن لم يعد المحرك المستهدف للمستقبل.
+- **Reason:** كان مناسبًا للتحقق الأولي، لكن real-use performance debt وكثرة grid-specific stabilization أدت إلى Grid Shootout مستقل.
+- **Replacement decision:** `DEC-030` — RevoGrid Community 4.25.2.
 
 ## DEC-005 — No public registration
 
@@ -329,3 +355,16 @@
 - **Persistence rule:** Width and hidden state are saved by `DepartmentId + FieldKey`, shared by every year of the department, and written only through the existing explicit Save transaction. Hide/Unhide participates in Undo/Redo before Save.
 - **Performance rule:** Filtering, sorting, hiding, and showing operate on the existing Tabulator data in the browser. No server request is made for those interactions. The hidden-column list is built only when the context menu opens, and the obsolete database scan that supported empty-only type conversion is removed.
 - **Safety constraint:** The row-number column cannot be hidden and at least one data column remains visible, because Unhide is intentionally reachable only through a visible Header.
+
+## DEC-030 — RevoGrid Community 4.25.2 selected for Work Orders
+
+- **Date:** 2026-08-20
+- **Status:** Accepted by user
+- **Decision:** اعتماد **RevoGrid Community 4.25.2** كمحرك Work Orders المستهدف بدل Tabulator بعد اكتمال isolated qualification.
+- **Current-runtime constraint:** لا يتغير `/work-orders` إلى RevoGrid قبل Gate 5A/5B/5C.
+- **Evidence:** 100,000-row core gate plus ERP history/readonly/delete/custom-column/Split/RTL/Zoom gates passed in the isolated shootout. The frozen reference is `wwwroot/grid-shootout/REVOGRID_FROZEN_BASELINE_2026-08-20.json`.
+- **Paste rule evidence:** RevoGrid matched the approved end-of-sheet truncation rule in the accepted gate. Univer did not: a 4,000-value Paste with only 200 rows available expanded the sheet by 3,800 rows.
+- **License/version rule:** pin exact `4.25.2`; Community package is MIT-licensed. Self-host package assets and retain license text before production cutover. Do not depend on `latest`.
+- **Migration rule:** preserve existing Work Orders business/server contracts and frozen visual sizes. Reimplement required interaction behavior using public RevoGrid APIs; do not mechanically port Tabulator internals.
+- **Rollback:** keep the current Tabulator route intact until the RevoGrid cutover checkpoint passes full regression.
+

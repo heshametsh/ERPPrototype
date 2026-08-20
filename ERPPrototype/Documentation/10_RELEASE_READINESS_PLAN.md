@@ -1,7 +1,7 @@
 # 10 — Release Readiness Plan
 
 **Status:** Current approved gates  
-**Last update:** 2026-08-17
+**Last update:** 2026-08-20
 
 ## Gate 0 — Engineering Remediation Baseline — **PASS / CHECKPOINTED**
 
@@ -18,6 +18,19 @@ Evidence:
 
 Gate 0 PASS means the measurement foundation is trustworthy. It does **not** mean Work Orders UX performance is accepted: measured Sort/dirty bulk freezes remain open and Gate 1 still requires comfortable 10k use.
 
+## Gate 0.5 — Work Orders Grid Engine Migration — **OPEN**
+
+RevoGrid Community 4.25.2 is selected, but Lab qualification is not production qualification.
+
+Required before `/work-orders` cutover:
+
+- Gate 5A isolated Blazor + real employee/year data path passes;
+- Gate 5B real Dirty/Delta Save + validation + RowVersion + custom-column/layout behavior passes;
+- Gate 5C frozen visual parity + full regression + performance passes;
+- exact RevoGrid 4.25.2 assets are pinned/self-hosted and MIT license retained;
+- Tabulator remains available as rollback until the accepted cutover checkpoint;
+- no production database is used for destructive qualification.
+
 ## Gate 1 — Stable Online Work Orders
 
 Required:
@@ -28,7 +41,7 @@ Required:
 - narrow Save/Delta contract proven;
 - concurrency/security P1s closed;
 - 10k target measured comfortably;
-- reopened `GRID-001` / ArrowDown regression closed with material manual + baseline improvement;
+- `GRID-001` closed by an accepted Work Orders grid solution; current planned closure path is RevoGrid Gate 5 + cutover rather than further Tabulator micro-patching;
 - performance acceptance includes both engineering numbers and a smooth visible employee workflow in the primary Split Screen 100% case. A benchmark-only PASS is not sufficient.
 
 ## Gate 2 — Offline/Sync Engineering Qualification

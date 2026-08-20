@@ -1,3 +1,32 @@
+# CURRENT REMEDIATION ROADMAP — 2026-08-20
+
+> هذا الترتيب ينسخ “ArrowDown is current task” في Roadmap الأقدم. اختيار RevoGrid تم بعد Grid Shootout مستقل، ولا يعني Rewrite لباقي النظام.
+
+1. ✅ Test Foundation.
+2. ✅ `LDR-002`.
+3. ✅ Clean Performance/Torture baseline.
+4. ✅ Initialization Recovery.
+5. ✅ Financial Sort Optimization.
+6. ✅ **Grid Engine Shootout / selection** — RevoGrid Community 4.25.2 selected; Univer comparison closed.
+7. ▶ **Gate 5A — CURRENT:** isolated Blazor + RevoGrid with the real employee/year read path; no Save mutation and no `/work-orders` cutover.
+8. **Gate 5B:** RevoGrid real Dirty/Delta Save, validation result mapping, saved identity/RowVersion reconciliation, Undo/Redo after Save, custom columns/layout persistence.
+9. **Gate 5C:** frozen visual parity + full regression + performance + controlled `/work-orders` cutover.
+10. **Post-cutover cleanup:** remove obsolete Tabulator production runtime only after a separate accepted checkpoint.
+11. Resume Online Reliability.
+12. Narrow Save/receipt contract.
+13. Concurrency/Schema Integrity.
+14. Identity/Security/Permissions.
+15. Localization identity foundation.
+16. Offline durable state.
+17. Sync engine.
+18. Extended normal regression + Offline/Sync Stress.
+19. Staging + real SEC cable/domain/firewall + limited Pilot.
+20. Production only after operations gates.
+
+**Stop rule:** Gate 5A must not modify the live Work Orders route. Gate 5B must not weaken server authority. Gate 5C must not change frozen UI dimensions. Do not delete Tabulator until the RevoGrid cutover has its own accepted checkpoint.
+
+---
+
 # CURRENT REMEDIATION ROADMAP — 2026-08-17
 
 > Phase 8/9 sections below remain historical. The current engineering order after the independent audits is:

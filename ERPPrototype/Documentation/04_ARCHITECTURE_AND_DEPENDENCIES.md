@@ -1,5 +1,44 @@
 # 04 — Architecture and Dependencies
 
+## CURRENT GRID-ENGINE TRANSITION — 2026-08-20
+
+**Current runtime:** `/work-orders` still uses Tabulator 6.5.0.  
+**Selected target:** RevoGrid Community 4.25.2.  
+**Scope:** replace the browser grid engine only; preserve the current Blazor/server/database boundaries.
+
+### Gate 5 architecture rule
+
+```text
+Isolated RevoGrid Work Orders route
+        |
+        | same real load DTO / employee scope
+        v
+WorkOrderQueryService / WorkOrderService
+        |
+        v
+EF Core / SQL Server
+
+Browser side:
+RevoGrid 4.25.2
+        |
+        +--> Work Orders-specific adapter/state
+        |
+        +--> existing business behavior contract
+```
+
+Rules:
+
+- Do not run Tabulator and RevoGrid as two state owners for the **same live Work Orders page**.
+- Gate 5A may coexist as a separate route only.
+- Reuse the server read/save contracts where they are business contracts; do not copy Tabulator internals into the server.
+- Do not port Tabulator-specific range/Virtual-DOM workarounds unless an equivalent RevoGrid defect is independently reproduced.
+- Public RevoGrid APIs are preferred over undocumented internals.
+- Before final cutover, the exact `4.25.2` assets and MIT license must be self-hosted/pinned; the production path must not depend on `latest` or an external CDN.
+- The current C#/Razor page calls a 22-method `tabulatorTest` surface. Gate 5 must replace that dependency deliberately; it must not create a second parallel facade that leaves both implementations authoritative.
+- Frozen UI dimensions and `05_WORK_ORDERS_GRID_BEHAVIOUR.md` remain the product contract regardless of engine.
+
+---
+
 **Status:** Approved direction  
 **Current state:** One project with partial separation  
 **Target:** Modular Monolith without a full rewrite

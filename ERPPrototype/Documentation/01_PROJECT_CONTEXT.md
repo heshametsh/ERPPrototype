@@ -25,9 +25,12 @@ UDS ERP هو منتج ويب لمتابعة عمليات المقاولين ال
 - SQL Server محليًا
 - Azure SQL Database عند النشر
 - Azure App Service
-- Tabulator لشيت أوامر العمل
+- **Current runtime grid:** Tabulator 6.5.0 في `/work-orders`
+- **Selected replacement target:** RevoGrid Community 4.25.2 — ما زال قبل production integration
 
 قرار Power Apps وDataverse الموجود في Version 2.0 أُلغي كاتجاه حالي وأُرشف، لأن الكود الفعلي والاختبارات انتقلت إلى Blazor وSQL Server.
+
+مسار تطور القرارات التقنية من Power Apps حتى RevoGrid موثق في `13_TECHNOLOGY_EVOLUTION.md`.
 
 ## 3. Customer Deployment Model
 

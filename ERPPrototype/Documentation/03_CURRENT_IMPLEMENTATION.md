@@ -1,3 +1,35 @@
+# CURRENT IMPLEMENTATION OVERRIDE — 2026-08-20
+
+> هذا القسم ينسخ أي وصف أقدم لحالة Grid Engine أو “Current task” عند التعارض. الكود الحالي يظل الحقيقة لما هو منفذ.
+
+**Audit baseline:** `00503ab`  
+**Current production runtime baseline retained:** `0f6bd3b`  
+**Latest reviewed Git HEAD:** `dc0b2b0`  
+**Current source package reviewed:** `ERPPrototype_Current_Review_2026-08-20.zip`
+
+## Grid engine state
+
+- `/work-orders` ما زال يعمل فعليًا بـ **Tabulator 6.5.0** و`tabulatorTest` + الوحدات الحالية.
+- **RevoGrid Community 4.25.2** تم اختياره كـtarget replacement بعد اختبارات isolated؛ لم يتم ربطه بعد بالصفحة الحقيقية أو Save path الحقيقي.
+- ملفات `wwwroot/grid-shootout/` و`ERPPrototype.E2ETests/RevoGridCommunityAutomationRunner.cs` هي Lab/Test evidence وليست production Work Orders runtime.
+- لا يوجد في الحالة الحالية RevoGrid production adapter أو RevoGrid package محلي داخل runtime الحقيقي.
+- Server authority لم يتغير: `WorkOrderQueryService` للقراءة، `WorkOrderSavePlanBuilder` للتحضير/validation، `WorkOrderService` للحفظ/authorization/transaction، وSQL/RowVersion كخط الدفاع النهائي.
+
+## لماذا تغير الاتجاه
+
+Tabulator ظل قابلًا للعمل لكنه احتاج تراكمًا كبيرًا من grid-specific stabilization حول range/navigation/Virtual DOM/clipboard/structure. بعد اختبار بدائل في isolated shootout، RevoGrid أثبت السلوك المطلوب على 100,000 صف مع مسار أبسط، لذلك تم اعتماد **استبدال المحرك فقط** بدل الاستمرار في micro-patching Tabulator.
+
+## ما زال غير منفذ
+
+- Gate 5A: RevoGrid داخل Blazor page مع **نفس real `LoadSheetAsync` data contract** وفي Route معزول.
+- Gate 5B: Dirty/Delta Save + Save result merge + Undo/Redo after Save + Custom Columns/column layouts على RevoGrid.
+- Gate 5C: frozen visual parity + full regression + controlled cutover.
+- Local/self-hosted pinned RevoGrid 4.25.2 package + retained MIT license.
+- إزالة Tabulator production runtime تتم **بعد** نجاح cutover فقط، وليس أثناء Gate 5A.
+- بقية Online Reliability / narrow Save / concurrency / security / localization / Offline work تظل لاحقة كما في الـMaster.
+
+---
+
 # CURRENT IMPLEMENTATION OVERRIDE — 2026-08-17
 
 > هذا القسم يحدد الواقع الفعلي الأحدث. التفاصيل التاريخية أسفل الملف لا تُستخدم لتجاوز هذا القسم.

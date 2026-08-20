@@ -1,5 +1,7 @@
 # 05 — Work Orders Grid Behaviour
 
+> **Grid-engine transition 2026-08-20:** هذه الوثيقة أصبحت **engine-independent behavior contract**. `/work-orders` الحالي ما زال Tabulator 6.5.0، لكن RevoGrid Community 4.25.2 هو المحرك المختار للاستبدال. أي RevoGrid integration يجب أن يحافظ على السلوك هنا ولا يغيّره لمجرد اختلاف المكتبة.
+
 **Status:** Approved description of `M5D4R3-Stable-Range-UX` behavior and acceptance contract  
 **Route:** `/work-orders`  
 **Authorized current role:** `Employee`
@@ -50,6 +52,7 @@ System fields مثل Id وWorkYear وDisplayOrder وRowVersion لا تظهر ل�
 - One selectable range can include rows and columns.
 - Copy produces tab-separated values without headers.
 - Paste is treated as one transaction even when it changes many cells.
+- **Approved end-of-sheet rule:** Paste never grows the sheet merely to fit clipboard data. If 4,000 values are copied and only 200 target rows remain, paste exactly the available 200 and ignore the overflow.
 - Delete/Backspace can clear a selected range.
 - Paste and range clear participate in Undo/Redo.
 
@@ -176,6 +179,12 @@ A grid change is not accepted until all pass:
 - Resize at a deep row.
 - No red Console error.
 - No duplicated event response.
+- 100,000-row candidate qualification before an engine cutover.
+- Paste 5,000 values without data loss and as one Undo/Redo transaction.
+- End-of-sheet overflow obeys the approved available-space-only rule.
+- Split Screen selection stability.
+- RTL + deep scroll stability.
+- Browser Zoom 100/90/80/75/70/67% with selection preserved/restored without visible breakage.
 
 ## 15. Simple Example
 

@@ -1,3 +1,16 @@
+# CURRENT GRID-ENGINE OVERRIDE — 2026-08-20
+
+> هذا القسم ينسخ أولوية Grid القديمة عند التعارض، لكنه لا يمحو Evidence التاريخي أسفل الملف.
+
+- `GRID-001` لم يُغلق بعد، لكن **مسار المعالجة تغير**: بدل استمرار micro-patching على Tabulator، تم اختيار RevoGrid Community 4.25.2 كـreplacement target بعد isolated qualification.
+- لا يعتبر `GRID-001` Closed إلا بعد Gate 5A/5B/5C ونجاح cutover الحقيقي على `/work-orders`.
+- `GRID-MIG-001` **P1 / Open:** RevoGrid ما زال Lab فقط؛ real Blazor load/save/custom-column/regression integration غير منفذ.
+- `GRID-LIC-001` **P1 before cutover:** pin/self-host exact 4.25.2 assets and retain MIT license; do not use `latest` or CDN as final production dependency.
+- Univer لم يُختر: native `4000 → available 200` Paste خالف قاعدة المنتج وأضاف 3,800 صف.
+- Accepted RevoGrid Lab behavior must not be “improved” by carrying Tabulator-specific hacks into the new engine without an independently reproduced need.
+
+---
+
 # CURRENT AUDIT FINDINGS OVERRIDE — 2026-08-16
 
 > قائمة Active Items القديمة أدناه تظل تاريخًا/تفصيلًا، لكن أولوية ما قبل Pilot الحالية تأتي من `12_ENGINEERING_AUDIT_REPORT.md`.
@@ -52,7 +65,7 @@
 
 | ID | Priority | Issue | Evidence / impact | Temporary position | Release gate |
 |---|---:|---|---|---|---|
-| GRID-001 | P1 | بطء ملحوظ في التنقل الرأسي بالأسهم على الشيت الحقيقي | أُعيد فتحه في 2026-08-17: Baseline ArrowDown P95 = 214.7ms مقابل Wheel ~17–18ms، والـDeep أكد تكرار التكلفة مع scroll/range/render؛ السبب البرمجي النهائي لم يثبت بعد | لا Patch قبل تتبع المسار الحالي من الكود؛ بعدها أصغر إصلاح + before/after | **Gate قبل Pilot** لأن Keyboard navigation جزء أساسي من Excel-like Work Orders |
+| GRID-001 | P1 | بطء Tabulator الملحوظ في التنقل الرأسي بالأسهم على الشيت الحقيقي | أُعيد فتحه في 2026-08-17؛ بعد ذلك تم تنفيذ Grid Shootout مستقل وانتهى باختيار RevoGrid 4.25.2 | لا مزيد من micro-patching كخطة رئيسية؛ يُغلق فقط بعد نجاح RevoGrid real integration/cutover | **Gate قبل Pilot** |
 | GRID-002 | P2 | `tabulatorTest.js` ما زال منسقًا كبيرًا نسبيًا رغم انخفاضه إلى نحو 2,331 سطرًا | المسؤوليات الحساسة أصبحت في Modules مستقلة؛ تقسيم إضافي الآن قد يزيد المخاطر بلا فائدة | لا Refactor إضافي دون مشكلة أو ميزة تثبت الحاجة | ليس Gate حاليًا |
 | GRID-003 | P1 | Insert/Delete/structural Undo تستخدم full `setData` | تعيد بناء بيانات الشيت والتحقق | لا نضيف عمليات هيكلية ثقيلة جديدة | تحسين مرحلي بعد فصل الموديولات |
 | GRID-004 | P1 | 10,000 صف غير مختبرة | Client-side loading قد لا يظل مقبولًا | اختبار منفصل قبل قرار معماري | مطلوب قبل تحديد سعة المنتج |
