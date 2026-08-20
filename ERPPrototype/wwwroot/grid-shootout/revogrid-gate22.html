@@ -1,0 +1,10 @@
+<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>RevoGrid Community Gate 2.2</title><link rel="stylesheet" href="./finalist.css"></head><body>
+<div class="bench-topbar"><h1>RevoGrid Community — Gate 2.2</h1><span class="spacer"></span><button id="export-metrics">تصدير JSON</button></div>
+<div class="bench-layout"><section class="bench-grid-card" id="grid-card"><div id="grid" class="bench-grid-host" dir="ltr"></div></section><aside class="bench-panel">
+<h2>1 — الفلتر المجاني الحقيقي</h2><ol class="manual-tests"><li>اضغط <b>تحديد Basket</b>.</li><li>من رأس عمود <b>Basket</b> افتح <b>علامة الفلتر</b> بجانب الترتيب. لو لم تظهر العلامة، وقف الاختبار وابعتلي صورة.</li><li>اختر <b>Equal / Equals</b> واكتب <b>NeedLicense</b> ثم Apply.</li><li>اضغط <b>فحص الفلتر</b>. المتوقع 6,250 صف.</li><li>امسح الفلتر من نفس الواجهة، ثم اضغط <b>فحص المسح</b>. المتوقع 50,000.</li></ol>
+<div class="action-grid"><button id="select-basket">تحديد Basket</button><button id="check-filter" class="primary-test">فحص الفلتر</button><button id="check-clear">فحص المسح</button></div>
+<h2>2 — Paste الحقيقي</h2><ol class="manual-tests"><li>اضغط <b>نسخ + تجهيز Paste</b>.</li><li>بعدها اضغط <b>Ctrl+V</b> فقط.</li><li>اضغط <b>فحص Paste</b>. لازم 5000/5000.</li></ol>
+<div class="action-grid"><button id="prepare-paste" class="primary-test">نسخ + تجهيز Paste</button><button id="verify-paste">فحص Paste</button></div>
+<h2>3 — نهاية الشيت</h2><p class="small">4000 قيمة والمتاح 200 فقط: المفروض يلصق 200 ولا يضيف صفوف.</p><div class="action-grid"><button id="prepare-end">تجهيز 4000→200</button><button id="verify-end">فحص 4000→200</button></div>
+<h2>النتيجة</h2><div id="bench-status" class="status">جاري التحميل…</div><div id="check-results"></div><h2>القياسات</h2><div class="metric-grid" id="bench-metrics"></div>
+</aside></div><script src="./gate22-common.js"></script><script type="module" src="./revogrid-gate22.js"></script></body></html>
