@@ -1,0 +1,22 @@
+.guided-layout { grid-template-columns:minmax(0,1fr) 390px; }
+.guided-panel { max-height:calc(100vh - 78px); }
+.guide-now { border:1px solid #cfd6e1; border-radius:8px; padding:10px; margin-bottom:9px; background:#f8fafc; }
+.guide-label { font-size:11px; color:#667085; margin-bottom:4px; }
+.guide-instruction { font-weight:700; font-size:14px; line-height:1.55; }
+.countdown { margin-top:6px; font-size:22px; font-weight:800; font-variant-numeric:tabular-nums; }
+.guided-tests { display:grid; gap:6px; margin:9px 0; }
+.guided-test { display:grid; grid-template-columns:34px minmax(0,1fr); align-items:center; gap:7px; padding:8px; border:1px solid #e0e5ec; border-radius:7px; background:#fff; }
+.guided-test small { display:block; margin-top:3px; color:#667085; line-height:1.35; }
+.guided-test.running { border-color:#7da7df; background:#f5f9ff; }
+.guided-test.pass { border-color:#9bd0ac; background:#eff9f2; }
+.guided-test.fail { border-color:#e3a5a5; background:#fff3f3; }
+.test-badge { width:28px; height:28px; border-radius:50%; display:grid; place-items:center; font-weight:800; }
+.test-badge.pending { background:#eef1f5; color:#667085; }
+.test-badge.running { background:#e7f0fd; color:#245b9e; }
+.test-badge.pass { background:#dff3e5; color:#176331; }
+.test-badge.fail { background:#fde3e3; color:#9b2222; }
+.mini-action { grid-column:2; border:1px solid #8b96a7; background:#fff; border-radius:6px; padding:7px 8px; cursor:pointer; width:max-content; }
+.final-result { padding:9px; margin:9px 0; border-radius:7px; background:#eef3f9; font-weight:800; }
+.final-result.pass { background:#eaf7ef; color:#176331; }
+.final-result.fail { background:#fdecec; color:#8a1f1f; }
+@media (max-width:1050px) { .guided-layout { grid-template-columns:1fr; } .guided-panel { max-height:none; } }
