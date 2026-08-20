@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ERP Grid Shootout</title>
+  <link rel="stylesheet" href="./common.css" />
+</head>
+<body>
+  <main class="index-wrap">
+    <section class="hero">
+      <h1>ERP Grid Shootout — Gate 0</h1>
+      <p>This lab does not touch the production Work Orders page. It exists only to eliminate weak grid engines before any migration work.</p>
+      <p><strong>Same dataset, same machine, same Chrome profile, same zoom, same torture cycle.</strong> A candidate that fails selection correctness, fast-scroll rendering, clipboard, RTL, or resize stability is eliminated.</p>
+      <p class="small">The competitor pages use pinned public CDN builds only for this isolated evaluation. If a winner is selected, its final assets will be vendored locally before production/offline work.</p>
+    </section>
+
+    <section class="candidates">
+      <article class="candidate-card">
+        <h2>Current baseline: Tabulator 6.5.0</h2>
+        <p>Control group. Stock engine only, without the ERP custom patches. This tells us whether a failure belongs to Tabulator itself or our integration.</p>
+        <a class="candidate-link" href="./tabulator.html">Open Tabulator torture page</a>
+      </article>
+      <article class="candidate-card">
+        <h2>SlickGrid Universal 10.9.0</h2>
+        <p>MIT, framework-agnostic, cell selection + Excel copy buffer. Main question: selection/clipboard stability and Arabic/RTL behavior.</p>
+        <a class="candidate-link" href="./slickgrid.html">Open SlickGrid torture page</a>
+      </article>
+      <article class="candidate-card">
+        <h2>RevoGrid 4.24.2</h2>
+        <p>MIT, web component, virtualization, core range selection/clipboard and explicit RTL support. Main question: whether we can own Undo/Redo cleanly without Pro.</p>
+        <a class="candidate-link" href="./revogrid.html">Open RevoGrid torture page</a>
+      </article>
+      <article class="candidate-card">
+        <h2>Univer 0.25.1</h2>
+        <p>Apache-2.0 spreadsheet engine with Canvas rendering. Main question: raw spreadsheet behavior is excellent enough to justify a heavier integration, and whether current RTL is acceptable.</p>
+        <a class="candidate-link" href="./univer.html">Open Univer torture page</a>
+      </article>
+    </section>
+
+    <section class="gates">
+      <h2>Fatal gates — fail one, candidate is not adopted</h2>
+      <table>
+        <thead><tr><th>Gate</th><th>Torture test</th><th>Pass condition</th></tr></thead>
+        <tbody>
+          <tr><td>Selection ownership</td><td>Select Basket cell → violent top/bottom scrollbar drag 20× → return.</td><td>Selection stays on the same logical cell/column. No ghost range, no jump to Work Order.</td></tr>
+          <tr><td>Fast scroll</td><td>30 seconds wheel storm + 20 full scrollbar jumps on 10k, then 50k rows.</td><td>No prolonged white viewport; final visible rows paint immediately; no broken scrollbar geometry.</td></tr>
+          <tr><td>Clipboard</td><td>Paste 1000×6 payload → Ctrl+Z → Ctrl+Y → repeat at bottom boundary.</td><td>Exact matrix, no shifted columns, no duplicate rows, no frozen UI.</td></tr>
+          <tr><td>Zoom/resize</td><td>100→90→80→75→70→67→100%, toggle half-width 20×.</td><td>Selection, row geometry, scroll position and headers remain coherent.</td></tr>
+          <tr><td>RTL</td><td>Enable RTL, navigate with keyboard, paste, resize columns, scroll horizontally.</td><td>Arabic layout is usable and column identity never flips incorrectly.</td></tr>
+          <tr><td>Headroom</td><td>Repeat core tests on 50k and 100k rows.</td><td>10k must feel effortless; larger sets must degrade predictably, not catastrophically.</td></tr>
+          <tr><td>Long session</td><td>5 minutes repeated scroll/paste/resize while watching heap and long tasks.</td><td>No runaway memory growth, escalating lag, or reconnect-inducing main-thread stalls.</td></tr>
+        </tbody>
+      </table>
+      <p><strong>Gate 1 after survivors:</strong> only candidates that pass this page get a real ERP integration prototype with baskets, custom columns, save deltas, Undo/Redo-after-save, validation, year move, and E2E abuse.</p>
+    </section>
+  </main>
+</body>
+</html>

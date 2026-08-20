@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RevoGrid 4.25.2 — الاختبار النهائي</title>
+  <link rel="stylesheet" href="./finalist.css" />
+</head>
+<body>
+  <div class="bench-topbar">
+    <h1>RevoGrid 4.25.2</h1>
+    <a class="candidate-link" href="./finalists.html">رجوع</a>
+    <label>الصفوف <select id="row-count"><option>10000</option><option>50000</option><option>100000</option></select></label>
+    <button id="reload-grid">إعادة تحميل</button>
+    <button id="toggle-split">نصف الشاشة</button>
+    <button id="toggle-rtl">RTL</button>
+    <span class="spacer"></span>
+    <button id="reset-metrics">تصفير القياسات</button>
+    <button id="export-metrics">تصدير النتيجة</button>
+  </div>
+
+  <div class="bench-layout">
+    <section class="bench-grid-card" id="grid-card"><div id="grid" class="bench-grid-host" dir="ltr"></div></section>
+    <aside class="bench-panel">
+      <h2>1 — الاختبار الآلي</h2>
+      <button id="run-auto-tests" class="primary-test">تشغيل الاختبارات الآلية</button>
+      <p class="small">يختبر التحديد، 100 قفزة، لصق 1000×6، Undo/Redo الخاص بالـERP، الحماية، الأعمدة، حذف/استرجاع، Sort، وتغيير الحجم.</p>
+
+      <h2>2 — اختبارك بعينك</h2>
+      <ol class="manual-tests" dir="rtl">
+        <li>اضغط <b>تحديد Basket</b> ثم اسحب الشريط فوق/تحت بعنف 20 مرة، واضغط <b>فحص التحديد</b>.</li>
+        <li>جرّب Zoom: <b>100 → 90 → 67 → 100</b>، ونصف الشاشة وRTL. لا نقبل بياض أو انتقال التحديد.</li>
+        <li>للـClipboard: <b>تجهيز اللصق</b> → <b>نسخ 1000×6</b> → Ctrl+V → <b>فحص اللصق</b>.</li>
+      </ol>
+      <div class="action-grid">
+        <button id="anchor-selection">تحديد Basket</button>
+        <button id="check-selection">فحص التحديد</button>
+        <button id="prepare-paste">تجهيز اللصق</button>
+        <button id="copy-payload">نسخ 1000×6</button>
+        <button id="verify-paste">فحص اللصق</button>
+        <button id="readonly-test">فحص الحماية</button>
+      </div>
+
+      <h2>النتيجة</h2>
+      <div id="bench-status" class="status">جاري تحميل RevoGrid…</div>
+      <div id="check-results"></div>
+      <h2>القياسات</h2>
+      <div class="metric-grid" id="bench-metrics"></div>
+      <p class="small">Undo/Redo هنا يتم اختباره بالطريقة التي سنملكها داخل الـERP لأن History الجاهز في RevoGrid Pro.</p>
+
+      <div class="hidden-actions" aria-hidden="true">
+        <button id="auto-scroll-kill"></button><button id="undo-test"></button><button id="redo-test"></button>
+        <button id="custom-column-cycle"></button><button id="delete-restore"></button><button id="sort-cycle"></button>
+      </div>
+    </aside>
+  </div>
+
+  <script src="./finalist-common.js"></script>
+  <script type="module" src="./revogrid-finalist.js"></script>
+</body>
+</html>

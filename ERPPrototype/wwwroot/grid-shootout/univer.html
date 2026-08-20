@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Univer 0.25.1 Torture</title>
+  <script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/rxjs@7.8.2/dist/bundles/rxjs.umd.min.js"></script>
+  <script src="https://unpkg.com/echarts@5.6.0/dist/echarts.min.js"></script>
+  <script src="https://unpkg.com/@univerjs/presets@0.25.1/lib/umd/index.js"></script>
+  <script src="https://unpkg.com/@univerjs/preset-sheets-core@0.25.1/lib/umd/index.js"></script>
+  <script src="https://unpkg.com/@univerjs/preset-sheets-core@0.25.1/lib/umd/locales/en-US.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/@univerjs/preset-sheets-core@0.25.1/lib/index.css" />
+  <link rel="stylesheet" href="./common.css" />
+</head>
+<body>
+  <div class="bench-topbar">
+    <h1>Univer 0.25.1</h1>
+    <a class="candidate-link" href="./index.html">Back</a>
+    <label>Rows <select id="row-count"><option>10000</option><option>50000</option><option>100000</option></select></label>
+    <button id="reload-grid">Reload</button>
+    <button id="copy-payload">Copy 1000×6</button>
+    <button id="toggle-split">Half width</button>
+    <button id="toggle-rtl">RTL</button>
+    <span class="spacer"></span>
+    <button id="reset-metrics">Reset metrics</button>
+    <button id="export-metrics">Export metrics</button>
+  </div>
+  <div class="bench-layout">
+    <section class="bench-grid-card" id="grid-card"><div id="grid" class="bench-grid-host"></div></section>
+    <aside class="bench-panel">
+      <h2>Live browser pressure</h2><div class="metric-grid" id="bench-metrics"></div>
+      <div id="bench-status" class="status">Loading pinned Univer UMD build…</div>
+      <h2>Killer cycle</h2>
+      <ol class="manual-tests">
+        <li>Select Basket column. Violently drag scrollbar top↔bottom 20×. Selection must remain logically correct.</li>
+        <li>30s wheel storm. Canvas should not go blank for a prolonged period.</li>
+        <li>Copy 1000×6 → Ctrl+V → Ctrl+Z → Ctrl+Y. Repeat near bottom.</li>
+        <li>Toggle half width 20× while selection exists.</li>
+        <li>Toggle RTL. This is a deliberate kill test because Univer 0.25.x still has rendering-layer RTL work in progress.</li>
+        <li>Zoom 100→90→80→75→70→67→100. Repeat at 50k and 100k.</li>
+      </ol>
+    </aside>
+  </div>
+  <script src="./common.js"></script>
+  <script src="./univer.js"></script>
+</body>
+</html>
