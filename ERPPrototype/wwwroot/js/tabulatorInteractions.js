@@ -151,6 +151,204 @@
          * Non-navigation layout, structural changes, mouse selection and full
          * redraws keep Tabulator's original behavior.
          */
+        /*
+         * Tabulator SelectRange subscribes layoutChange() directly to both
+         * cell-height and scroll-vertical. During a Virtual DOM refill every
+         * rendered cell can emit cell-height, so the stock handler repeatedly
+         * clearTimeout()/setTimeout() even when the sheet has no active range.
+         *
+         * Work Orders normally scrolls with no selection at all. In that case
+         * range geometry has nothing to update, so skip those two callbacks.
+         * When a real range exists, preserve Tabulator's delayed-layout model
+         * but keep ONE pending idle check for the whole burst instead of one
+         * timer reset per cell. The final layout still happens only after the
+         * geometry has been quiet for the same 200ms used by Tabulator 6.5.
+         *
+         * Scope is intentionally narrow: no row height, buffer, selection
+         * ownership, keyboard navigation, column layout, or rendering rules
+         * are changed here.
+         */
+        optimizeRangeLayoutChanges: function (
+            elementId,
+            table
+        ) {
+            const rangeModule =
+                table?.modules?.selectRange;
+            const eventBus =
+                table?.eventBus;
+
+            if (
+                !rangeModule ||
+                !eventBus?.events ||
+                rangeModule.__udsRangeLayoutChangesOptimized === true
+            ) {
+                return false;
+            }
+
+            const watchedEvents = [
+                "cell-height",
+                "scroll-vertical"
+            ];
+
+            const stockSubscriptions = [];
+
+            for (const eventName of watchedEvents) {
+                const subscriptions =
+                    eventBus.events[eventName];
+
+                if (!Array.isArray(subscriptions)) {
+                    continue;
+                }
+
+                for (const subscription of subscriptions) {
+                    const callback =
+                        subscription?.callback;
+
+                    if (
+                        typeof callback === "function" &&
+                        callback.name === "bound layoutChange"
+                    ) {
+                        stockSubscriptions.push({
+                            eventName,
+                            callback,
+                            priority:
+                                Number.isFinite(subscription.priority)
+                                    ? subscription.priority
+                                    : 10000
+                        });
+                        break;
+                    }
+                }
+            }
+
+            /*
+             * Do not alter Tabulator internals unless both performance-path
+             * subscriptions were identified unambiguously. This keeps a future
+             * Tabulator upgrade fail-safe instead of partially patching events.
+             */
+            if (stockSubscriptions.length !== watchedEvents.length) {
+                return false;
+            }
+
+            for (const subscription of stockSubscriptions) {
+                eventBus.unsubscribe(
+                    subscription.eventName,
+                    subscription.callback
+                );
+            }
+
+            if (rangeModule.layoutChangeTimeout) {
+                window.clearTimeout(rangeModule.layoutChangeTimeout);
+                rangeModule.layoutChangeTimeout = null;
+            }
+
+            let pendingTimer = null;
+            let lastGeometryChangeAt = 0;
+            const idleDelayMs = 200;
+
+            const tableIsCurrent = function () {
+                return window.tabulatorTest
+                    ?.tables?.[elementId] === table;
+            };
+
+            const hasRealRange = function () {
+                const activeRange =
+                    rangeModule.activeRange;
+
+                return Boolean(
+                    activeRange &&
+                    activeRange.destroyed !== true &&
+                    activeRange.initialized === true &&
+                    Array.isArray(rangeModule.ranges) &&
+                    rangeModule.ranges.includes(activeRange)
+                );
+            };
+
+            const hideOverlayIfNeeded = function () {
+                const overlay =
+                    rangeModule.overlay;
+
+                if (
+                    overlay &&
+                    overlay.style.visibility !== "hidden"
+                ) {
+                    overlay.style.visibility = "hidden";
+                }
+            };
+
+            const scheduleFinalLayout = function () {
+                if (pendingTimer !== null) {
+                    return;
+                }
+
+                const waitUntilIdle = function () {
+                    pendingTimer = null;
+
+                    if (!tableIsCurrent()) {
+                        return;
+                    }
+
+                    if (!hasRealRange()) {
+                        hideOverlayIfNeeded();
+                        return;
+                    }
+
+                    const elapsed =
+                        window.performance?.now
+                            ? window.performance.now() - lastGeometryChangeAt
+                            : Date.now() - lastGeometryChangeAt;
+
+                    if (elapsed < idleDelayMs) {
+                        pendingTimer = window.setTimeout(
+                            waitUntilIdle,
+                            Math.max(1, idleDelayMs - elapsed)
+                        );
+                        return;
+                    }
+
+                    rangeModule.layoutRanges?.();
+                };
+
+                pendingTimer = window.setTimeout(
+                    waitUntilIdle,
+                    idleDelayMs
+                );
+            };
+
+            const optimizedLayoutChange = function () {
+                if (!tableIsCurrent()) {
+                    return;
+                }
+
+                if (!hasRealRange()) {
+                    hideOverlayIfNeeded();
+                    return;
+                }
+
+                hideOverlayIfNeeded();
+                lastGeometryChangeAt =
+                    window.performance?.now
+                        ? window.performance.now()
+                        : Date.now();
+
+                scheduleFinalLayout();
+            };
+
+            for (const subscription of stockSubscriptions) {
+                eventBus.subscribe(
+                    subscription.eventName,
+                    optimizedLayoutChange,
+                    subscription.priority
+                );
+            }
+
+            rangeModule.__udsRangeLayoutChangesOptimized = true;
+            rangeModule.__udsRangeLayoutChangeHandler =
+                optimizedLayoutChange;
+
+            return true;
+        },
+
         deferScrolledKeyboardRangeLayout: function (
             elementId,
             table

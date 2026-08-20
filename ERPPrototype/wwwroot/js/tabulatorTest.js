@@ -452,6 +452,16 @@ window.tabulatorTest = {
              * Install the Arrow optimization here so it is active on the
              * real Work Orders grid, not before the holder exists.
              */
+            /*
+             * Range geometry is irrelevant while no range is selected. Avoid
+             * Tabulator's per-cell timer churn during Virtual DOM scrolling,
+             * then install the existing Arrow-specific range optimization.
+             */
+            window.tabulatorTest.optimizeRangeLayoutChanges(
+                elementId,
+                table
+            );
+
             window.tabulatorTest.deferScrolledKeyboardRangeLayout(
                 elementId,
                 table
