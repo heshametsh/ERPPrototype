@@ -1,0 +1,45 @@
+{
+  "gate": "5B-1",
+  "name": "RevoGrid Cell Edit Change Engine Binding",
+  "date": "2026-08-21",
+  "revoGridTarget": "Community 4.25.2",
+  "productionCutover": false,
+  "workOrdersRouteModified": false,
+  "gate5aDefaultBehaviorModified": false,
+  "scope": {
+    "cellEditBinding": true,
+    "dirty": true,
+    "undoRedo": true,
+    "pasteBinding": false,
+    "saveBinding": false,
+    "rangeMutationDuringGate": "blocked"
+  },
+  "architecture": {
+    "engine": "wwwroot/js/revoGridChangeEngine.js",
+    "bridge": "wwwroot/js/revoGridChangeBridge.js",
+    "pageAdapter": "wwwroot/js/revoGridGate5B1.js",
+    "identity": "session ClientKey",
+    "replay": "mutate stable row objects then RevoGrid refresh; no full source replacement",
+    "yearSwitch": "Clean-only handshake; edit locked during load; successful switch clears old History"
+  },
+  "testsBeforeDelivery": {
+    "changeEngineNode": "14/14 PASS",
+    "bridgeNode": "PASS",
+    "javascriptSyntax": "PASS",
+    "dotnetBuild": "not run in review container; dotnet SDK unavailable",
+    "requiredUserRuntime": "Gate 5B-1 manual browser test"
+  },
+  "files": [
+    "Components/Pages/WorkOrdersRevoGridGate5B1.razor",
+    "Components/Pages/WorkOrdersRevoGridNativeGate5A.razor",
+    "Components/Pages/WorkOrdersRevoGridNativeGate5A.razor.cs",
+    "Components/Pages/WorkOrdersRevoGridNativeGate5A.razor.css",
+    "wwwroot/js/revoGridChangeEngine.js",
+    "wwwroot/js/revoGridChangeBridge.js",
+    "wwwroot/js/revoGridGate5B1.js",
+    "Documentation/08_DECISIONS_LOG.md",
+    "Documentation/06_REGRESSION_TEST_CHECKLIST.md",
+    "GATE5B0_CHANGE_ENGINE_MANIFEST.json",
+    "GATE5B1_EDIT_BINDING_MANIFEST.json"
+  ]
+}

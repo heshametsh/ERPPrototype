@@ -368,3 +368,28 @@
 - **Migration rule:** preserve existing Work Orders business/server contracts and frozen visual sizes. Reimplement required interaction behavior using public RevoGrid APIs; do not mechanically port Tabulator internals.
 - **Rollback:** keep the current Tabulator route intact until the RevoGrid cutover checkpoint passes full regression.
 
+
+## DEC-031 — One RevoGrid Change Engine owns session change history
+
+- **Date:** 2026-08-21
+- **Status:** Accepted by user for Gate 5B foundation
+- **Decision:** Build one grid-independent Change Engine before wiring RevoGrid Edit/Paste/Delete/Insert/Custom Columns. User data changes must enter the same transaction/history model rather than each feature creating its own Undo/Dirty logic.
+- **Identity:** `ClientKey` is the stable row identity inside the browser session. Database `Id` may appear after the first Save and must not require re-keying History. `DisplayOrder` remains the separate ordering value used to place rows between existing rows.
+- **Dirty rule:** Dirty means current value differs from the last server-accepted Baseline. Returning to the Baseline removes Dirty without deleting History.
+- **History rule:** Save does not clear Undo/Redo. A new user edit after Undo clears Redo. A multi-cell Paste is one transaction.
+- **Year rule:** Dirty blocks dataset/year replacement. When the sheet is Clean and the employee changes year, the old year's Undo/Redo History is cleared and the new year starts as a new dataset session.
+- **Save rule:** The server remains authoritative. A successful Save advances the Baseline only for the accepted Save snapshot; a failed Save leaves Baseline, Dirty, and History unchanged.
+- **Memory rule:** History uses a configurable memory budget, not only a transaction count. The newest single transaction remains undoable even if that transaction alone exceeds the configured budget.
+- **Architecture constraint:** Gate 5B foundation is implemented as a pure browser module with no RevoGrid binding. RevoGrid event integration is a later client of this engine after the standalone engine passes its own regression.
+- **Reference rule:** RevoGrid Community public events/source are the implementation base. RevoGrid Pro Event/History architecture is used only as a behavioral/ownership reference; no proprietary code is copied. Tabulator remains a lessons-only reference.
+
+## DEC-032 — Gate 5B-1 uses one RevoGrid-to-Change-Engine bridge for Cell Edit
+
+- **Date:** 2026-08-21
+- **Status:** Accepted for Gate 5B-1 qualification
+- **Decision:** Cell Edit is the first real RevoGrid client of the standalone Change Engine. The bridge captures `beforeedit`, lets RevoGrid apply the value, then finalizes from `afteredit`. Undo/Redo replays the engine transaction against the same row objects and refreshes RevoGrid without replacing the full source.
+- **Session identity:** Gate 5B-1 assigns each loaded row a session `ClientKey`; database `Id` and ordering `DisplayOrder` remain separate responsibilities.
+- **Scope guard:** Range mutations, including Paste, are blocked in Gate 5B-1 so they cannot change data outside the engine before the Paste binding gate is implemented.
+- **Keyboard rule:** Grid Ctrl+Z/Ctrl+Y uses the Change Engine only after a cell edit is committed. While the text editor is still open, keyboard undo/redo remains owned by the editor.
+- **Year rule:** A year switch starts only when the engine is Clean. Editing is locked during the dataset-load handshake; successful replacement resets the engine to the new dataset and clears old History. Failure keeps the old dataset session active.
+- **Production constraint:** `/work-orders` remains Tabulator and Gate 5A behavior remains unchanged when `EnableChangeEngine` is false. No database Save is added in Gate 5B-1.

@@ -1,0 +1,193 @@
+.native-gate5a {
+    height: calc(100dvh - 84px);
+    min-height: 560px;
+    display: grid;
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    gap: 8px;
+    padding: 10px 12px 12px;
+    background: #f5f7fa;
+    direction: rtl;
+}
+
+.native-gate5a__header {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    min-width: 0;
+    padding: 10px 12px;
+    background: #fff;
+    border: 1px solid #dfe4ea;
+    border-radius: 8px;
+}
+
+.native-gate5a__identity {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    margin-inline-end: auto;
+}
+
+.native-gate5a__identity strong {
+    font-size: 15px;
+    line-height: 1.35;
+}
+
+.native-gate5a__identity span {
+    color: #667085;
+    font-size: 11px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.native-gate5a__scope {
+    display: flex;
+    align-items: end;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.native-gate5a__scope > div,
+.native-gate5a__scope > label {
+    display: grid;
+    gap: 3px;
+}
+
+.native-gate5a__scope span {
+    color: #667085;
+    font-size: 10px;
+}
+
+.native-gate5a__scope strong {
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.native-gate5a__scope select {
+    min-width: 86px;
+    height: 30px;
+    padding-inline: 8px;
+    border: 1px solid #cfd6df;
+    border-radius: 6px;
+    background: #fff;
+    font: inherit;
+}
+
+.native-gate5a__statusbar {
+    min-height: 34px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    overflow-x: auto;
+    white-space: nowrap;
+    padding: 5px 9px;
+    background: #fff;
+    border: 1px solid #dfe4ea;
+    border-radius: 7px;
+    color: #475467;
+    font-size: 11px;
+}
+
+.native-gate5a__statusbar b {
+    color: #101828;
+}
+
+.native-gate5a__operation-message {
+    color: #b54708;
+}
+
+.native-gate5a__statusbar button {
+    margin-inline-start: auto;
+    height: 26px;
+    padding-inline: 9px;
+    border: 1px solid #cfd6df;
+    border-radius: 5px;
+    background: #fff;
+    color: #344054;
+    font: inherit;
+    cursor: pointer;
+}
+
+.native-gate5a__statusbar button:disabled {
+    opacity: .45;
+    cursor: default;
+}
+
+.native-gate5a__grid-shell {
+    position: relative;
+    min-height: 0;
+    overflow: hidden;
+    background: #fff;
+    border: 1px solid #cfd6df;
+    border-radius: 7px;
+}
+
+.native-gate5a__grid-host {
+    position: absolute;
+    inset: 0;
+    min-width: 0;
+    min-height: 0;
+}
+
+.native-gate5a__loading {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    display: grid;
+    place-items: center;
+    background: rgb(255 255 255 / .84);
+    color: #344054;
+    font-size: 13px;
+}
+
+.native-gate5a__note {
+    color: #667085;
+    font-size: 10px;
+    line-height: 1.45;
+    padding-inline: 3px;
+}
+
+.native-gate5a__error {
+    padding: 12px;
+    border: 1px solid #f3b8b5;
+    border-radius: 7px;
+    background: #fff4f3;
+    color: #b42318;
+    font-size: 13px;
+}
+
+@media (max-width: 900px) {
+    .native-gate5a {
+        height: calc(100dvh - 76px);
+        padding: 8px;
+    }
+
+    .native-gate5a__header {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .native-gate5a__identity {
+        margin-inline-end: 0;
+    }
+
+    .native-gate5a__scope {
+        width: 100%;
+    }
+}
+
+.native-gate5a__change-engine-state b[data-dirty="true"] {
+    color: #b54708;
+}
+
+.native-gate5a__change-engine-controls {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.native-gate5a__change-engine-controls button {
+    margin-inline-start: 0;
+}

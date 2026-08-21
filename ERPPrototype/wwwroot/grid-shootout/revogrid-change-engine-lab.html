@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>RevoGrid Change Engine — Gate 5B-0</title>
+    <style>
+        :root { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+        body { margin: 0; background: #f6f7f9; color: #18202a; }
+        main { max-width: 960px; margin: 32px auto; padding: 0 20px; }
+        header, section { background: white; border: 1px solid #dfe3e8; border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+        h1 { margin: 0 0 8px; font-size: 22px; }
+        p { margin: 6px 0; line-height: 1.7; }
+        .summary { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 14px; }
+        .summary strong { font-size: 20px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { text-align: right; padding: 10px; border-bottom: 1px solid #e7e9ed; vertical-align: top; }
+        th { font-size: 13px; color: #56616f; }
+        .pass { color: #16794b; font-weight: 700; }
+        .fail { color: #b42318; font-weight: 700; }
+        pre { direction: ltr; text-align: left; white-space: pre-wrap; word-break: break-word; font-size: 12px; }
+        button { font: inherit; padding: 8px 14px; border-radius: 8px; border: 1px solid #c7ccd3; background: white; cursor: pointer; }
+    </style>
+</head>
+<body>
+<main>
+    <header>
+        <h1>Gate 5B-0 — Change Engine Foundation</h1>
+        <p>اختبار مباشر للمحرك فقط. لا يوجد RevoGrid ولا Edit/Paste binding في هذه الصفحة.</p>
+        <button id="rerun" type="button">إعادة الاختبار</button>
+        <div class="summary" id="summary"></div>
+    </header>
+
+    <section>
+        <table>
+            <thead>
+            <tr>
+                <th>الاختبار</th>
+                <th>النتيجة</th>
+                <th>الزمن</th>
+            </tr>
+            </thead>
+            <tbody id="results"></tbody>
+        </table>
+    </section>
+
+    <section id="errors" hidden>
+        <h2>تفاصيل الأخطاء</h2>
+        <pre id="error-log"></pre>
+    </section>
+</main>
+<script type="module">
+    import { runRevoGridChangeEngineSelfTests } from "/js/revoGridChangeEngineSelfTest.js";
+
+    const summary = document.getElementById("summary");
+    const results = document.getElementById("results");
+    const errors = document.getElementById("errors");
+    const errorLog = document.getElementById("error-log");
+
+    function render() {
+        const report = runRevoGridChangeEngineSelfTests();
+
+        summary.innerHTML = `
+            <span>الإجمالي <strong>${report.total}</strong></span>
+            <span>PASS <strong class="pass">${report.passed}</strong></span>
+            <span>FAIL <strong class="${report.failed ? "fail" : "pass"}">${report.failed}</strong></span>
+        `;
+
+        results.replaceChildren(...report.results.map(item => {
+            const row = document.createElement("tr");
+            const name = document.createElement("td");
+            const status = document.createElement("td");
+            const duration = document.createElement("td");
+
+            name.textContent = item.name;
+            status.textContent = item.status;
+            status.className = item.status === "PASS" ? "pass" : "fail";
+            duration.textContent = `${item.durationMs.toFixed(2)} ms`;
+
+            row.append(name, status, duration);
+            return row;
+        }));
+
+        const failures = report.results.filter(item => item.status === "FAIL");
+        errors.hidden = failures.length === 0;
+        errorLog.textContent = failures
+            .map(item => `${item.name}\n${item.error}`)
+            .join("\n\n");
+    }
+
+    document.getElementById("rerun").addEventListener("click", render);
+    render();
+</script>
+</body>
+</html>

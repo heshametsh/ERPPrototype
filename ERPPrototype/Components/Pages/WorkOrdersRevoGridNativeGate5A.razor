@@ -1,0 +1,127 @@
+@page "/work-orders-revogrid-gate5a"
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@implements IAsyncDisposable
+
+@using ERPPrototype.Data
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.JSInterop
+
+@attribute [Authorize(Roles = AppRoles.Employee)]
+
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject UserManager<ApplicationUser> UserManager
+@inject WorkOrderService WorkOrderService
+@inject IJSRuntime JSRuntime
+@inject ILogger<WorkOrdersRevoGridNativeGate5A> Logger
+
+<PageTitle>@(EnableChangeEngine ? "RevoGrid Gate 5B-1" : "RevoGrid Native Gate 5A")</PageTitle>
+
+<div class="native-gate5a" data-testid="revogrid-native-gate5a">
+    <header class="native-gate5a__header">
+        <div class="native-gate5a__identity">
+            <strong>RevoGrid Community 4.25.2</strong>
+            <span>@(EnableChangeEngine
+                ? "Gate 5B-1 — Cell Edit → Change Engine / real data"
+                : "Gate 5A — clean native baseline / real data")</span>
+        </div>
+
+        <div class="native-gate5a__scope">
+            <div>
+                <span>الفرع</span>
+                <strong>@DisplayOrDash(BranchName)</strong>
+            </div>
+
+            <div>
+                <span>القسم</span>
+                <strong>@DisplayOrDash(DepartmentName)</strong>
+            </div>
+
+            <label>
+                <span>السنة</span>
+                <select @onchange="HandleYearChangedAsync"
+                        disabled="@(IsLoading || IsYearLoading)"
+                        data-testid="gate5a-year-selector">
+                    @foreach (var year in AvailableWorkYears)
+                    {
+                        <option value="@year"
+                                selected="@(year == SelectedWorkYear)">
+                            @year
+                        </option>
+                    }
+                </select>
+            </label>
+        </div>
+    </header>
+
+    @if (!string.IsNullOrWhiteSpace(ErrorMessage))
+    {
+        <div class="native-gate5a__error" role="alert">@ErrorMessage</div>
+    }
+    else
+    {
+        <div class="native-gate5a__statusbar">
+            <span><b>@Rows.Count.ToString("N0")</b> صف</span>
+            <span>Server <b>@FormatMilliseconds(ServerLoadMilliseconds)</b></span>
+
+            @if (Diagnostics is not null)
+            {
+                <span>Grid <b>@FormatMilliseconds(Diagnostics.ReadyMs)</b></span>
+                <span>Heap <b>@FormatMegabytes(Diagnostics.HeapMb)</b></span>
+                <span>Scroll <b>@Diagnostics.ScrollEvents</b></span>
+                <span>Selection <b>@Diagnostics.Selection</b></span>
+                <span>Dataset <b>@Diagnostics.WorkYear</b></span>
+                <span>Dataset switches <b>@Diagnostics.DatasetSwitches</b></span>
+            }
+
+            @if (!string.IsNullOrWhiteSpace(OperationMessage))
+            {
+                <span class="native-gate5a__operation-message">@OperationMessage</span>
+            }
+
+            @if (EnableChangeEngine)
+            {
+                <span class="native-gate5a__change-engine-state">
+                    Change Engine <b id="@ChangeStatusElementId">Clean</b>
+                </span>
+                <span>Undo <b id="@UndoCountElementId">0</b></span>
+                <span>Redo <b id="@RedoCountElementId">0</b></span>
+                <span class="native-gate5a__change-engine-controls">
+                    <button id="@UndoButtonId" type="button" disabled>Undo</button>
+                    <button id="@RedoButtonId" type="button" disabled>Redo</button>
+                </span>
+            }
+
+            <button type="button"
+                    @onclick="RefreshDiagnosticsAsync"
+                    disabled="@(!GridInitialized || IsYearLoading)">
+                تحديث القياس
+            </button>
+        </div>
+
+        <main class="native-gate5a__grid-shell">
+            @if (IsLoading || IsYearLoading)
+            {
+                <div class="native-gate5a__loading">
+                    @(IsYearLoading ? "جاري تحميل السنة المطلوبة…" : "جاري تحميل Work Orders الحقيقية…")
+                </div>
+            }
+
+            <div id="@GridElementId"
+                 class="native-gate5a__grid-host">
+            </div>
+        </main>
+
+        <footer class="native-gate5a__note">
+            @if (EnableChangeEngine)
+            {
+                <span>Gate 5B-1 يربط تعديل الخلية فقط بالمحرك. Undo/Redo يعملان من نفس History، والـPaste لم يدخل المحرك بعد. التعديلات ما زالت مؤقتة ولا تُحفظ في قاعدة البيانات.</span>
+            }
+            else
+            {
+                <span>السنة الحالية هي نقطة البداية في كل فتح جديد. اختيار السنة يستخدم الطريقة التي نجحت في الاختبار المعزول، ثم يبدّل RevoGrid Dataset مرة واحدة. أي تعديل داخل Gate 5A مؤقت ولا يُحفظ في قاعدة البيانات.</span>
+            }
+        </footer>
+    }
+</div>

@@ -1,0 +1,8 @@
+@page "/work-orders-revogrid-gate5b1"
+
+@using ERPPrototype.Data
+@using Microsoft.AspNetCore.Authorization
+
+@attribute [Authorize(Roles = AppRoles.Employee)]
+
+<WorkOrdersRevoGridNativeGate5A EnableChangeEngine="true" />

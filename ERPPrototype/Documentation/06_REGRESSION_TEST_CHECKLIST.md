@@ -678,6 +678,26 @@ Include:
 
 ### Gate 5B — real Save/ERP behavior
 
+#### Gate 5B-0 — Change Engine foundation
+
+- [x] Standalone browser lab passes all Change Engine self-tests before any RevoGrid Edit/Paste binding.
+- [x] Dirty is updated by touched-cell delta; no full-sheet scan is required for a normal cell/range change.
+- [x] Cell Edit and multi-cell Paste share one transaction model; Paste is one Undo action.
+- [x] Save acceptance moves Baseline without clearing History; failed Save changes neither Baseline nor History.
+- [x] Dirty blocks year/dataset replacement; Clean year switch clears the old dataset History.
+- [x] Temporary `ClientKey` remains the History identity after the server assigns a database `Id`.
+- [x] History enforces a configurable memory budget.
+
+#### Gate 5B-1 — Cell Edit binding
+
+- [ ] Real employee-scoped data loads at `/work-orders-revogrid-gate5b1`.
+- [ ] Editing one text cell changes Change Engine state from Clean to Dirty 1 and adds one Undo transaction.
+- [ ] Undo restores the previous value and Redo reapplies it; Ctrl+Z/Ctrl+Y match the buttons after the editor closes.
+- [ ] Returning the cell to the Baseline clears Dirty while History remains available.
+- [ ] Paste/range mutation is blocked in this gate and cannot bypass Dirty tracking.
+- [ ] Dirty blocks year change. After Undo returns to Clean, year change succeeds and clears the old History.
+- [ ] No browser page error, unexpected console error, failed request, or server 5xx appears during the test.
+
 - [ ] Dirty field deltas match the current Save contract.
 - [ ] Add/change/delete save through existing server authority.
 - [ ] Temporary row identity / saved Id / RowVersion reconciliation.

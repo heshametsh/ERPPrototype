@@ -1,0 +1,18 @@
+{
+  "date": "2026-08-20",
+  "type": "clean full replacement",
+  "route": "/work-orders-revogrid-gate5a",
+  "productionRouteChanged": false,
+  "revoGridVersion": "4.25.2",
+  "yearFix": {
+    "selectorRenderedDuringInitialAsyncLoad": false,
+    "optionIdentity": "@key=year",
+    "binding": "@bind:get/@bind:set",
+    "manualValueOnChange": false,
+    "selectorRenderKey": false,
+    "javascriptYearSync": false,
+    "persistLastSelectedYear": false,
+    "openYear": "current Saudi business year"
+  },
+  "gridSwitch": "replace source only after successful server load"
+}

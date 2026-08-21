@@ -1,0 +1,161 @@
+@page "/work-orders-revogrid-event-probe"
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@implements IAsyncDisposable
+
+@using ERPPrototype.Data
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.JSInterop
+
+@attribute [Authorize(Roles = AppRoles.Employee)]
+
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject UserManager<ApplicationUser> UserManager
+@inject WorkOrderService WorkOrderService
+@inject IJSRuntime JSRuntime
+@inject ILogger<WorkOrdersRevoGridEventProbe> Logger
+
+<PageTitle>RevoGrid 4.25.2 Event Probe</PageTitle>
+
+<div class="native-gate5a"
+     data-testid="revogrid-event-probe"
+     style="height:calc(100dvh - 84px);min-height:560px;display:flex;flex-direction:column;gap:8px;padding:10px 12px 12px;">
+    <header class="native-gate5a__header">
+        <div class="native-gate5a__identity">
+            <strong>RevoGrid Community 4.25.2</strong>
+            <span>Event Probe — manual edit/paste observation only</span>
+        </div>
+
+        <div class="native-gate5a__scope">
+            <div>
+                <span>الفرع</span>
+                <strong>@DisplayOrDash(BranchName)</strong>
+            </div>
+
+            <div>
+                <span>القسم</span>
+                <strong>@DisplayOrDash(DepartmentName)</strong>
+            </div>
+
+            <label>
+                <span>السنة</span>
+                <select @onchange="HandleYearChangedAsync"
+                        disabled="@(IsLoading || IsYearLoading)"
+                        data-testid="gate5a-year-selector">
+                    @foreach (var year in AvailableWorkYears)
+                    {
+                        <option value="@year"
+                                selected="@(year == SelectedWorkYear)">
+                            @year
+                        </option>
+                    }
+                </select>
+            </label>
+        </div>
+    </header>
+
+    @if (!string.IsNullOrWhiteSpace(ErrorMessage))
+    {
+        <div class="native-gate5a__error" role="alert">@ErrorMessage</div>
+    }
+    else
+    {
+        <div class="native-gate5a__statusbar">
+            <span><b>@Rows.Count.ToString("N0")</b> صف</span>
+            <span>Server <b>@FormatMilliseconds(ServerLoadMilliseconds)</b></span>
+
+            @if (Diagnostics is not null)
+            {
+                <span>Grid <b>@FormatMilliseconds(Diagnostics.ReadyMs)</b></span>
+                <span>Heap <b>@FormatMegabytes(Diagnostics.HeapMb)</b></span>
+                <span>Scroll <b>@Diagnostics.ScrollEvents</b></span>
+                <span>Selection <b>@Diagnostics.Selection</b></span>
+                <span>Dataset <b>@Diagnostics.WorkYear</b></span>
+                <span>Dataset switches <b>@Diagnostics.DatasetSwitches</b></span>
+            }
+
+            @if (!string.IsNullOrWhiteSpace(OperationMessage))
+            {
+                <span class="native-gate5a__operation-message">@OperationMessage</span>
+            }
+
+            <button type="button"
+                    @onclick="RefreshDiagnosticsAsync"
+                    disabled="@(!GridInitialized || IsYearLoading)">
+                تحديث القياس
+            </button>
+        </div>
+
+
+        <section class="event-probe"
+                 aria-label="RevoGrid event probe"
+                 style="flex:0 0 auto;">
+            <div class="event-probe__head">
+                <div>
+                    <strong>اختبار أحداث Revo 4.25.2</strong>
+                    <span>مراقبة فقط — لا Save ولا SQL</span>
+                </div>
+
+                <div class="event-probe__actions">
+                    <button id="event-probe-reset" type="button">
+                        ابدأ تسجيل جديد
+                    </button>
+                    <button id="event-probe-download" type="button">
+                        تنزيل التقرير
+                    </button>
+                </div>
+            </div>
+
+            <div class="event-probe__steps">
+                <span><b>1.</b> عدّل خلية واحدة يدويًا.</span>
+                <span><b>2.</b> اعمل Paste صغير 2×2 يدويًا.</span>
+                <span><b>3.</b> لما الاتنين يبقوا PASS نزّل التقرير.</span>
+            </div>
+
+            <div class="event-probe__results">
+                <div>
+                    <span>Cell Edit</span>
+                    <strong id="event-probe-cell-status" class="event-probe__waiting">WAITING</strong>
+                    <small id="event-probe-cell-detail">لم يتم تعديل خلية بعد.</small>
+                </div>
+
+                <div>
+                    <span>Paste 2×2</span>
+                    <strong id="event-probe-paste-status" class="event-probe__waiting">WAITING</strong>
+                    <small id="event-probe-paste-detail">لم يتم Paste بعد.</small>
+                </div>
+
+                <div>
+                    <span>Event sequence</span>
+                    <strong id="event-probe-event-count">0</strong>
+                    <small id="event-probe-sequence">—</small>
+                </div>
+            </div>
+
+            <details class="event-probe__details">
+                <summary>عرض آخر الأحداث</summary>
+                <pre id="event-probe-log">لا توجد أحداث بعد.</pre>
+            </details>
+        </section>
+
+        <main class="native-gate5a__grid-shell"
+              style="position:relative;flex:1 1 auto;min-height:220px;overflow:hidden;">
+            @if (IsLoading || IsYearLoading)
+            {
+                <div class="native-gate5a__loading">
+                    @(IsYearLoading ? "جاري تحميل السنة المطلوبة…" : "جاري تحميل Work Orders الحقيقية…")
+                </div>
+            }
+
+            <div id="@GridElementId"
+                 class="native-gate5a__grid-host"
+                 style="position:absolute;inset:0;min-width:0;min-height:0;">
+            </div>
+        </main>
+
+        <footer class="native-gate5a__note">
+            الصفحة دي Probe منفصل. أي تعديل أو Paste هنا مؤقت داخل المتصفح فقط ولا يُحفظ في قاعدة البيانات. Gate 5A الأساسي لم يتم تعديله.
+        </footer>
+    }
+</div>
