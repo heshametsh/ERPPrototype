@@ -1,7 +1,8 @@
-import * as nativeGate5A from "./revoGridNativeGate5A.js?v=20260821-explicit-year-final-1";
+import * as nativeGate5A from "./revoGridNativeGate5A.js?v=20260821-gate5b3-excel-filter-1";
 import { createRevoGridChangeBridge } from "./revoGridChangeBridge.js?v=20260821-gate5b2-paste-1";
 import { createRevoGridHistoryCoordinator } from "./revoGridHistoryCoordinator.js?v=20260821-minimal-reveal-1";
 import { createRevoGridHistoryFocus } from "./revoGridHistoryFocus.js?v=20260821-minimal-reveal-1";
+import { createRevoGridExcelFilter } from "./revoGridExcelFilter.js?v=20260821-gate5b3-excel-filter-1";
 
 const bindings = new Map();
 
@@ -49,6 +50,7 @@ function combinedState(state) {
 
 function renderState(state) {
     const current = combinedState(state);
+    const filterBusy = Boolean(state.excelFilter?.getState().filterBusy);
 
     if (state.statusElement) {
         state.statusElement.textContent = current.dirty
@@ -68,6 +70,7 @@ function renderState(state) {
     if (state.undoButton) {
         state.undoButton.disabled =
             state.datasetSwitchActive ||
+            filterBusy ||
             current.editLocked ||
             current.replayActive ||
             current.undoCount === 0;
@@ -76,6 +79,7 @@ function renderState(state) {
     if (state.redoButton) {
         state.redoButton.disabled =
             state.datasetSwitchActive ||
+            filterBusy ||
             current.editLocked ||
             current.replayActive ||
             current.redoCount === 0;
@@ -109,6 +113,11 @@ async function destroyBinding(elementId) {
     }
 
     try {
+        state.excelFilter?.destroy();
+    } catch {
+    }
+
+    try {
         state.historyCoordinator.destroy();
     } catch {
     }
@@ -136,6 +145,7 @@ export async function initialize(elementId, rows, customColumns, options) {
         grid,
         historyCoordinator: null,
         changeBridge: null,
+        excelFilter: null,
         datasetSwitchActive: false,
         handledHistoryKeyEvents: new WeakSet(),
         removers: [],
@@ -173,6 +183,16 @@ export async function initialize(elementId, rows, customColumns, options) {
         allowPaste: Boolean(value(options, "enablePaste", "EnablePaste", false)),
         onStateChange: () => renderState(state)
     });
+
+    if (Boolean(value(options, "enableExcelFilter", "EnableExcelFilter", false))) {
+        state.excelFilter = createRevoGridExcelFilter({
+            grid,
+            rows,
+            datasetKey: activeDatasetKey,
+            historyCoordinator: state.historyCoordinator,
+            onStateChange: () => renderState(state)
+        });
+    }
 
     addListener(state, state.undoButton, "click", async () => {
         await state.historyCoordinator.undo();
@@ -257,7 +277,8 @@ export async function beginDatasetSwitch(elementId) {
     if (
         current.activeDataCapture ||
         current.replayActive ||
-        current.saveActive
+        current.saveActive ||
+        state.excelFilter?.getState().filterBusy
     ) {
         return { allowed: false, reason: "busy" };
     }
@@ -292,15 +313,37 @@ export async function replaceDataset(elementId, rows, workYear) {
 
     const nextDatasetKey = datasetKey(workYear);
 
+    let filterSuspended = false;
+
     try {
         validateClientKeys(rows);
+
+        if (state.excelFilter) {
+            await state.excelFilter.suspendForDatasetSwitch();
+            filterSuspended = true;
+        }
+
         await nativeGate5A.replaceDataset(elementId, rows, workYear);
 
-        // Each year is a separate dataset session for Undo/Redo. View-state
-        // persistence per year is added when Filter/Sort/Columns are qualified;
-        // History itself never crosses the year boundary.
+        // Each year remains a separate History dataset. Filter view state is
+        // independent: first visit starts clean, while returning to a year in
+        // this page session restores that year's filter without restoring its
+        // old Undo stack.
         state.changeBridge.resetDataset(rows, nextDatasetKey);
         state.historyCoordinator.resetDataset(nextDatasetKey);
+
+        if (state.excelFilter) {
+            await state.excelFilter.resetDataset(rows, nextDatasetKey);
+            filterSuspended = false;
+        }
+    } catch (error) {
+        if (filterSuspended && state.excelFilter) {
+            try {
+                await state.excelFilter.resumeCurrentDataset();
+            } catch {
+            }
+        }
+        throw error;
     } finally {
         state.datasetSwitchActive = false;
         state.changeBridge.setEditLocked(false);

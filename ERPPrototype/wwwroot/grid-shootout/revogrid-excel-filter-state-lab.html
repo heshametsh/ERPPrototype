@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>RevoGrid Gate 5B-3 Filter State Lab</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 24px; color: #1f2937; }
+        h1 { font-size: 20px; }
+        #summary { font-weight: 700; margin: 12px 0; }
+        .pass { color: #067647; }
+        .fail { color: #b42318; }
+        li { margin: 5px 0; }
+    </style>
+</head>
+<body>
+    <h1>RevoGrid Gate 5B-3 — Excel Filter State Lab</h1>
+    <div id="summary">Running…</div>
+    <ol id="results"></ol>
+
+    <script type="module">
+        import {
+            collectFilterCandidates,
+            revoGridExcelFilterInternals
+        } from "/js/revoGridExcelFilter.js?v=20260821-gate5b3-excel-filter-1";
+
+        const {
+            normalizeFilterState,
+            statesEqual,
+            parseDateToken,
+            buildNativeFilterItems,
+            BLANK_TOKEN
+        } = revoGridExcelFilterInternals;
+
+        const results = [];
+        function test(name, predicate) {
+            let passed = false;
+            let error = null;
+            try { passed = Boolean(predicate()); } catch (ex) { error = ex; }
+            results.push({ name, passed, error });
+        }
+
+        const rows = [
+            { type: "401", basket: "Under Execution", date: "01/01/2026", custom: "A" },
+            { type: "402", basket: "Under Execution", date: "14/02/2026", custom: "B" },
+            { type: "401", basket: "Inspection", date: "02/03/2026", custom: "C" },
+            { type: "", basket: "Inspection", date: "", custom: "" }
+        ];
+
+        test("Duplicate selected values normalize once", () =>
+            JSON.stringify(normalizeFilterState({ type: ["401", "401", "402"] })) ===
+            JSON.stringify({ type: ["401", "402"] }));
+
+        test("Equivalent normalized filter states compare equal", () =>
+            statesEqual({ type: ["401", "401"] }, { type: ["401"] }));
+
+        test("Candidate list ignores its own active filter", () =>
+            JSON.stringify(collectFilterCandidates(
+                rows,
+                { type: ["401"], basket: ["Under Execution"] },
+                "type",
+                "values")) === JSON.stringify(["401", "402"]));
+
+        test("Candidate list respects other active filters", () =>
+            JSON.stringify(collectFilterCandidates(
+                rows,
+                { type: ["401"], basket: ["Under Execution"] },
+                "basket",
+                "values")) === JSON.stringify(["Inspection", "Under Execution"]));
+
+        test("Value filter can include blanks", () =>
+            collectFilterCandidates(rows, {}, "type", "values").includes(BLANK_TOKEN));
+
+        test("Date tree excludes blank dates", () =>
+            !collectFilterCandidates(rows, {}, "date", "date").includes(BLANK_TOKEN));
+
+        test("DD/MM/YYYY date parses for Year → Month → Day", () => {
+            const parsed = parseDateToken("14/02/2026");
+            return parsed?.year === 2026 && parsed?.month === 2 && parsed?.day === 14;
+        });
+
+        test("ISO date also parses for custom Date columns", () => {
+            const parsed = parseDateToken("2026-12-31");
+            return parsed?.year === 2026 && parsed?.month === 12 && parsed?.day === 31;
+        });
+
+        test("Each active field becomes one native Revo filter item", () => {
+            const items = buildNativeFilterItems({ type: ["401"], basket: ["Inspection"] });
+            return Object.keys(items).length === 2 &&
+                items.type.length === 1 &&
+                items.basket.length === 1;
+        });
+
+        const list = document.getElementById("results");
+        let passed = 0;
+        for (const result of results) {
+            const li = document.createElement("li");
+            li.className = result.passed ? "pass" : "fail";
+            li.textContent = `${result.passed ? "PASS" : "FAIL"} — ${result.name}${result.error ? `: ${result.error.message}` : ""}`;
+            list.appendChild(li);
+            if (result.passed) passed += 1;
+        }
+        const failed = results.length - passed;
+        const summary = document.getElementById("summary");
+        summary.textContent = `PASS ${passed} / FAIL ${failed}`;
+        summary.className = failed === 0 ? "pass" : "fail";
+    </script>
+</body>
+</html>

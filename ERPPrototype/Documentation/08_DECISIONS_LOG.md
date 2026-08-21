@@ -422,7 +422,7 @@
 ## DEC-035 — Gate 5B-2 Paste uses Revo's final range payload as one History action
 
 - **Date:** 2026-08-21
-- **Status:** Accepted implementation direction; manual runtime qualification pending.
+- **Status:** Accepted by user after manual runtime qualification.
 - **Decision:** Clipboard Paste is the second data client of the existing Sheet History + Change Engine foundation. A Paste of any size is one Sheet History entry containing only cells RevoGrid actually applies.
 - **Revo Community rule:** `clipboardrangepaste` identifies the action as Paste. The actual old/new capture is taken at `beforerangeedit`, after RevoGrid has already clipped the matrix to available rows/columns and skipped readonly cells. RevoGrid then applies the range and `afteredit` finalizes the transaction.
 - **ERP rule:** The bridge does not parse clipboard text, grow the sheet, reimplement Revo's readonly logic, or scan the whole dataset. It records only Revo's final applied range delta.
@@ -430,3 +430,17 @@
 - **Scope guard:** Gate 5B-1 keeps Paste blocked. Gate 5B-2 enables Clipboard Paste only; Autofill and other range mutations remain blocked until separately qualified.
 - **End-of-sheet rule:** Because the bridge captures Revo's already-transformed range, the approved product behavior remains native: Paste stops at the last available row and never creates rows automatically.
 - **Reference rule:** RevoGrid Pro Event Manager/History is used as an architectural reference: edit/paste/range flow is normalized before History, and bulk Paste is one transaction. No proprietary code is copied.
+
+## DEC-036 — Gate 5B-3 keeps Excel-like filter UX while Revo Community owns filtering
+
+- **Date:** 2026-08-21
+- **Status:** Approved implementation direction; manual runtime qualification pending.
+- **Decision:** Work Orders keeps the accepted Excel-like filtering experience instead of exposing Revo Community's condition-panel UI. The ERP layer owns only the picker UI and selected-value state; RevoGrid Community 4.25.2 `FilterPlugin` remains the engine that calculates and applies filtered/trimmed rows.
+- **Column capability rule:** `Work Order Number`, `Work Type`, `Assignment Date`, and `Basket` are Filter-only. `Work Order Value`, `Partial Amount`, and `Remaining Amount` are Sort-only. Custom `Text`, `Date`, and `Number` are Filter-only; custom `Money` is Sort-only.
+- **Date UX:** Date filters use the approved hierarchy `Year → Month → Day` with Search, Select All, Clear Filter, and Apply. Value filters use an Excel-like checkbox list and virtualize large option sets rather than rendering every Work Order number into the DOM.
+- **Native-engine boundary:** Gate 5B-3 does not patch Revo source, calculate `trimmedRows`, or reimplement virtualization. The native filter button is suppressed per column, the ERP header button supplies selected-value criteria through `grid.filter.multiFilterItems`, and the registered custom predicate runs inside Revo's native `runFiltering → setTrimmed` path.
+- **History/Dirty rule:** Apply or Clear is one `Sheet History` action. Filter state never enters `Change Engine` Dirty and never creates a database Save delta. Undo/Redo restores the previous/next filter state through the same Revo native filter path.
+- **Year rule:** A clean year switch clears History but preserves independent Filter view state per visited year for the lifetime of the page session. A year opened for the first time starts with no inherited filter.
+- **Data-change rule:** When Edit/Paste/Undo changes data while a filter is active, the same native filter criteria are reapplied so visible rows continue to reflect the current cell values; the filter criteria themselves are not recorded again.
+- **Revo source evidence:** Community 4.25.2 renders its native filter button only when grid filtering is enabled and `column.filter !== false`, while `FilterPlugin.getRowFilter` evaluates programmatic `multiFilterItems` against the column map independently of that header-button flag. This allows a custom ERP picker without replacing Revo's filter engine.
+- **Pro reference:** Revo Pro demonstrates the same architectural separation of enhanced filter UI/plugins from the grid/filter core. The exact Excel date tree is an ERP UX choice; no claim is made that Pro implements this exact tree and no proprietary source is used.

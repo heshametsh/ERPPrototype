@@ -1,5 +1,9 @@
 import { defineCustomElement as defineRevoGrid } from "https://cdn.jsdelivr.net/npm/@revolist/revogrid@4.25.2/standalone/revo-grid.js/+esm";
 import { defineCustomElement as defineFilterPanel } from "https://cdn.jsdelivr.net/npm/@revolist/revogrid@4.25.2/standalone/revogr-filter-panel.js/+esm";
+import {
+    createExcelFilterColumn,
+    createExcelFilterNativeConfig
+} from "./revoGridExcelFilter.js?v=20260821-gate5b3-excel-filter-1";
 
 const VERSION = "4.25.2";
 const states = new Map();
@@ -41,7 +45,7 @@ function customFilterType(dataType) {
         : "string";
 }
 
-function buildColumns(customColumns) {
+function buildLegacyGateColumns(customColumns) {
     const core = [
         { name: "Work Order Number", prop: "workOrderNumber", size: 220, sortable: true, filter: "string", autoSize: true },
         { name: "Work Type", prop: "workTypeCode", size: 130, sortable: true, filter: "string", autoSize: true },
@@ -68,6 +72,66 @@ function buildColumns(customColumns) {
         }));
 
     return core.concat(custom);
+}
+
+function buildExcelFilterGateColumns(customColumns) {
+    // Gate 5B-3 restores the approved Work Orders capability split:
+    // filter-only fields get the Excel-like ERP button, money fields are
+    // sort-only, and no column exposes Revo's condition-panel button.
+    const core = [
+        createExcelFilterColumn(
+            { name: "Work Order Number", prop: "workOrderNumber", size: 220, autoSize: true },
+            "values"),
+        createExcelFilterColumn(
+            { name: "Work Type", prop: "workTypeCode", size: 130, autoSize: true },
+            "values"),
+        createExcelFilterColumn(
+            { name: "Assignment Date", prop: "assignmentDate", size: 160, autoSize: true },
+            "date"),
+        { name: "Work Order Value", prop: "workOrderValue", size: 190, sortable: true, filter: false, autoSize: true },
+        { name: "Partial Amount", prop: "partialAmount", size: 180, sortable: true, filter: false, autoSize: true },
+        { name: "Remaining Amount", prop: "remainingAmount", size: 200, sortable: true, filter: false, readonly: true, autoSize: true },
+        createExcelFilterColumn(
+            { name: "Basket", prop: "basket", size: 330, autoSize: true },
+            "values")
+    ];
+
+    const custom = (Array.isArray(customColumns) ? customColumns : [])
+        .map(normalizeCustomColumn)
+        .filter(column => column.fieldKey && column.name)
+        .sort((a, b) =>
+            a.layoutOrder - b.layoutOrder ||
+            a.fieldKey.localeCompare(b.fieldKey))
+        .map(column => {
+            const normalizedType = String(column.dataType || "").toLowerCase();
+            if (normalizedType === "money") {
+                return {
+                    name: column.name,
+                    prop: column.fieldKey,
+                    size: 190,
+                    sortable: true,
+                    filter: false,
+                    autoSize: true
+                };
+            }
+
+            return createExcelFilterColumn(
+                {
+                    name: column.name,
+                    prop: column.fieldKey,
+                    size: 190,
+                    autoSize: true
+                },
+                normalizedType === "date" ? "date" : "values");
+        });
+
+    return core.concat(custom);
+}
+
+function buildColumns(customColumns, enableExcelFilter) {
+    return enableExcelFilter
+        ? buildExcelFilterGateColumns(customColumns)
+        : buildLegacyGateColumns(customColumns);
 }
 
 function addListener(state, target, type, handler, options) {
@@ -119,7 +183,10 @@ export async function initialize(elementId, rows, customColumns, options) {
     await customElements.whenDefined("revogr-filter-panel");
 
     const source = Array.isArray(rows) ? rows : [];
-    const columns = buildColumns(customColumns);
+    const enableExcelFilter = Boolean(
+        value(options, "enableExcelFilter", "EnableExcelFilter", false)
+    );
+    const columns = buildColumns(customColumns, enableExcelFilter);
     const startedAt = performance.now();
 
     const grid = document.createElement("revo-grid");
@@ -132,7 +199,9 @@ export async function initialize(elementId, rows, customColumns, options) {
     grid.range = true;
     grid.resize = true;
     grid.rowHeaders = true;
-    grid.filter = true;
+    grid.filter = enableExcelFilter
+        ? createExcelFilterNativeConfig()
+        : true;
     grid.useClipboard = true;
     grid.rtl = Boolean(value(options, "rtl", "Rtl", true));
     grid.autoSizeColumn = true;
@@ -153,7 +222,8 @@ export async function initialize(elementId, rows, customColumns, options) {
         removers: [],
         observer: null,
         initializationCount: (initializationCounts.get(elementId) || 0) + 1,
-        version: String(value(options, "version", "Version", VERSION) || VERSION)
+        version: String(value(options, "version", "Version", VERSION) || VERSION),
+        excelFilterEnabled: enableExcelFilter
     };
 
     addListener(state, grid, "viewportscroll", () => {
@@ -236,7 +306,8 @@ export async function getDiagnostics(elementId) {
         domNodes: document.getElementsByTagName("*").length,
         initializationCount: state.initializationCount,
         longTasks: state.longTasks,
-        longTaskMaxMs: state.longTaskMaxMs
+        longTaskMaxMs: state.longTaskMaxMs,
+        excelFilterEnabled: state.excelFilterEnabled
     };
 }
 

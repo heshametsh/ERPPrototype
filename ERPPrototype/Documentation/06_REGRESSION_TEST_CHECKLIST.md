@@ -741,3 +741,22 @@ Include:
 - [ ] Gate 5B-1 still blocks Paste, proving the previous accepted gate remains isolated.
 - [ ] Non-Paste range mutation/Autofill remains blocked in Gate 5B-2 until it receives a separate qualification gate.
 - [ ] No browser page error, unexpected console error, failed request, or server 5xx appears during Paste/Undo/Redo tests.
+
+#### Gate 5B-3 — Excel-like Filter over native Revo FilterPlugin
+
+- [ ] `/grid-shootout/revogrid-excel-filter-state-lab.html` reports **PASS 9 / FAIL 0**.
+- [ ] `/work-orders-revogrid-gate5b3` loads the same real employee/year dataset as Gate 5B-2.
+- [ ] Filter buttons exist only on Work Order Number, Work Type, Assignment Date, Basket, and custom Text/Date/Number columns.
+- [ ] Work Order Value, Partial Amount, Remaining Amount, and custom Money expose native Sort only and no Filter button.
+- [ ] Work Order Number / Work Type / Basket open an Excel-like checkbox list with Search, Select All, Clear Filter, and Apply.
+- [ ] Work Order Number remains responsive with a large unique-value set; the popup virtualizes option rows rather than rendering all values at once.
+- [ ] Assignment Date opens `Year → Month → Day`; selecting a year/month/day filters the sheet correctly through Revo's native filter engine.
+- [ ] Custom Date uses the same date hierarchy; custom Text/Number use the checkbox-value picker.
+- [ ] Applying or clearing one filter increments Sheet History by exactly one and leaves Change Engine `Clean` when no data cells were edited.
+- [ ] Ctrl+Z restores the previous filter state; Ctrl+Y reapplies it. Filter replay does not create another History entry.
+- [ ] With multiple filters active, opening a field lists values that satisfy the other active filters while excluding that field's own condition from its candidate list.
+- [ ] Editing/Pasting a filtered field causes the current native filter criteria to be reapplied without recording a second filter action.
+- [ ] Filter year 2026, switch clean to a first-visit 2025: 2025 starts unfiltered. Return to 2026: its filter view is restored, but the old 2026 Undo stack is not restored across the year boundary.
+- [ ] Gate 5B-2 remains unchanged and still passes its accepted Edit/Paste/Undo behavior.
+- [ ] No Revo source file is patched and no ERP code directly calculates `trimmedRows`.
+- [ ] No browser page error, unexpected console error, failed request, or server 5xx appears during Filter/Undo/Redo/year-switch tests.

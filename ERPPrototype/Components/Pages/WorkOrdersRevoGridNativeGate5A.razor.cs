@@ -24,6 +24,9 @@ public partial class WorkOrdersRevoGridNativeGate5A
     [Parameter]
     public bool EnablePaste { get; set; }
 
+    [Parameter]
+    public bool EnableExcelFilter { get; set; }
+
     // Saudi Arabia is UTC+3 all year. The page always opens on the
     // current Saudi business year and does not persist the last selected year.
     private static int CurrentBusinessYear =>
@@ -203,8 +206,8 @@ public partial class WorkOrdersRevoGridNativeGate5A
         try
         {
             var gridModulePath = EnableChangeEngine
-                ? "./js/revoGridGate5B1.js?v=20260821-gate5b2-paste-1"
-                : "./js/revoGridNativeGate5A.js?v=20260821-explicit-year-final-1";
+                ? "./js/revoGridGate5B1.js?v=20260821-gate5b3-excel-filter-1"
+                : "./js/revoGridNativeGate5A.js?v=20260821-gate5b3-excel-filter-1";
 
             GridModule ??=
                 await JSRuntime.InvokeAsync<IJSObjectReference>(
@@ -222,6 +225,7 @@ public partial class WorkOrdersRevoGridNativeGate5A
                     WorkYear = SelectedWorkYear,
                     Rtl = true,
                     EnablePaste,
+                    EnableExcelFilter,
                     ChangeStatusElementId,
                     UndoCountElementId,
                     RedoCountElementId,
