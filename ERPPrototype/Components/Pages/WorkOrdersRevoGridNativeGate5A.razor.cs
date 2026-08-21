@@ -17,6 +17,7 @@ public partial class WorkOrdersRevoGridNativeGate5A
     private const string RedoCountElementId = "revogrid-gate5b1-redo-count";
     private const string UndoButtonId = "revogrid-gate5b1-undo";
     private const string RedoButtonId = "revogrid-gate5b1-redo";
+    private const string RowCountElementId = "revogrid-gate5b-row-count";
 
     [Parameter]
     public bool EnableChangeEngine { get; set; }
@@ -29,6 +30,9 @@ public partial class WorkOrdersRevoGridNativeGate5A
 
     [Parameter]
     public bool EnableHeaderActions { get; set; }
+
+    [Parameter]
+    public bool EnableRowStructure { get; set; }
 
     // Saudi Arabia is UTC+3 all year. The page always opens on the
     // current Saudi business year and does not persist the last selected year.
@@ -209,8 +213,8 @@ public partial class WorkOrdersRevoGridNativeGate5A
         try
         {
             var gridModulePath = EnableChangeEngine
-                ? "./js/revoGridGate5B1.js?v=20260821-gate5b4-header-sort-1"
-                : "./js/revoGridNativeGate5A.js?v=20260821-gate5b4-header-sort-1";
+                ? "./js/revoGridGate5B1.js?v=20260821-gate5b5-filter-refresh-1"
+                : "./js/revoGridNativeGate5A.js?v=20260821-gate5b5-filter-refresh-1";
 
             GridModule ??=
                 await JSRuntime.InvokeAsync<IJSObjectReference>(
@@ -230,6 +234,8 @@ public partial class WorkOrdersRevoGridNativeGate5A
                     EnablePaste,
                     EnableExcelFilter,
                     EnableHeaderActions,
+                    EnableRowStructure,
+                    RowCountElementId,
                     ChangeStatusElementId,
                     UndoCountElementId,
                     RedoCountElementId,

@@ -29,7 +29,9 @@ internal sealed class WebApplicationProcess : IAsyncDisposable
         string projectRoot,
         string connectionString,
         string artifactDirectory,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        int? fixedPort = null,
+        string configuration = "Release")
     {
         var projectPath = Path.Combine(projectRoot, "ERPPrototype.csproj");
         if (!File.Exists(projectPath))
@@ -41,7 +43,12 @@ internal sealed class WebApplicationProcess : IAsyncDisposable
 
         Directory.CreateDirectory(artifactDirectory);
 
-        var port = ReserveTcpPort();
+        var port = fixedPort ?? ReserveTcpPort();
+        if (fixedPort.HasValue)
+        {
+            EnsureTcpPortAvailable(fixedPort.Value);
+        }
+
         var baseUri = new Uri($"http://127.0.0.1:{port}");
         var logPath = Path.Combine(artifactDirectory, "web-application.log");
         var output = new StringBuilder();
@@ -61,7 +68,7 @@ internal sealed class WebApplicationProcess : IAsyncDisposable
         startInfo.ArgumentList.Add("--project");
         startInfo.ArgumentList.Add(projectPath);
         startInfo.ArgumentList.Add("--configuration");
-        startInfo.ArgumentList.Add("Release");
+        startInfo.ArgumentList.Add(configuration);
         startInfo.ArgumentList.Add("--no-launch-profile");
 
         startInfo.Environment["ASPNETCORE_ENVIRONMENT"] = "E2ETest";
@@ -192,6 +199,32 @@ internal sealed class WebApplicationProcess : IAsyncDisposable
             $"ERPPrototype did not become ready at {BaseUri}. " +
             $"Log: {logPath}",
             lastException);
+    }
+
+    private static void EnsureTcpPortAvailable(int port)
+    {
+        var listener = new TcpListener(IPAddress.Loopback, port);
+
+        try
+        {
+            listener.Start();
+        }
+        catch (SocketException exception)
+        {
+            throw new InvalidOperationException(
+                $"TCP port {port} is already in use. Close the running ERPPrototype process and retry.",
+                exception);
+        }
+        finally
+        {
+            try
+            {
+                listener.Stop();
+            }
+            catch
+            {
+            }
+        }
     }
 
     private static int ReserveTcpPort()

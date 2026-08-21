@@ -1,0 +1,41 @@
+{
+  "name": "ERP RevoGrid Gate 5B-5 — Insert/Delete Rows",
+  "date": "2026-08-21",
+  "base": "Latest accepted Gate 5B-4 state supplied by the user",
+  "revogrid": {
+    "community_version": "4.25.2",
+    "source_modified": false
+  },
+  "business_behavior": [
+    "Insert Above/Below is allowed while Filter/Sort is active.",
+    "The inserted row stays visibly above/below the chosen row in the current working snapshot.",
+    "Edit/Paste/Insert do not auto-reapply Filter or Sort underneath the employee.",
+    "Opening the Excel-like Filter picker reads current row values.",
+    "Delete removes only selected visible row identities.",
+    "ClientKey remains row identity; DisplayOrder remains persistent ordering.",
+    "Normal DisplayOrder insertion uses a midpoint; exhausted gaps rebalance only a bounded neighborhood first.",
+    "Insert and multi-row Delete each record one Sheet History action.",
+    "Structural Insert/Delete/DisplayOrder changes participate in Change Engine Dirty state.",
+    "No database Save is added in this gate."
+  ],
+  "verification": {
+    "javascript_syntax": "PASS",
+    "existing_change_engine_tests": "31/31 PASS",
+    "gate5b5_structure_logic_tests": "12/12 PASS",
+    "dotnet_build": "Not available in the assistant runtime; must be run on the user's machine."
+  },
+  "files": [
+    "Components/Pages/WorkOrdersRevoGridGate5B5.razor",
+    "Components/Pages/WorkOrdersRevoGridNativeGate5A.razor",
+    "Components/Pages/WorkOrdersRevoGridNativeGate5A.razor.cs",
+    "wwwroot/js/revoGridChangeEngine.js",
+    "wwwroot/js/revoGridChangeBridge.js",
+    "wwwroot/js/revoGridExcelFilter.js",
+    "wwwroot/js/revoGridSort.js",
+    "wwwroot/js/revoGridGate5B1.js",
+    "wwwroot/js/revoGridRowStructure.js",
+    "wwwroot/grid-shootout/revogrid-row-structure-state-lab.html",
+    "Documentation/06_REGRESSION_TEST_CHECKLIST.md",
+    "Documentation/08_DECISIONS_LOG.md"
+  ]
+}

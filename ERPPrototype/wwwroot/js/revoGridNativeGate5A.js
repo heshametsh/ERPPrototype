@@ -3,7 +3,7 @@ import { defineCustomElement as defineFilterPanel } from "https://cdn.jsdelivr.n
 import {
     createExcelFilterColumn,
     createExcelFilterNativeConfig
-} from "./revoGridExcelFilter.js?v=20260821-gate5b4-header-sort-1";
+} from "./revoGridExcelFilter.js?v=20260821-gate5b5-filter-refresh-1";
 import { createSortOnlyColumn } from "./revoGridSort.js?v=20260821-gate5b4-header-sort-1";
 
 const VERSION = "4.25.2";

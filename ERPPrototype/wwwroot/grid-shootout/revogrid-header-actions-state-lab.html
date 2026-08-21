@@ -25,14 +25,20 @@
             getNextErpSortOrder,
             normalizeSortState,
             sortStatesEqual
-        } from "/js/revoGridSort.js?v=20260821-gate5b4-header-sort-1";
+        } from "/js/revoGridSort.js?v=20260821-gate5b4-keyboard-sort-1";
         import {
             createRevoGridColumnSelection,
             getVisibleColumnSelectionRange
-        } from "/js/revoGridColumnSelection.js?v=20260821-gate5b4-header-sort-1";
+        } from "/js/revoGridColumnSelection.js?v=20260821-gate5b4-keyboard-sort-1";
         import {
-            excelFilterHeaderTemplate
-        } from "/js/revoGridExcelFilter.js?v=20260821-gate5b4-header-sort-1";
+            excelFilterHeaderTemplate,
+            eventTargetsElement
+        } from "/js/revoGridExcelFilter.js?v=20260821-gate5b4-keyboard-sort-1";
+        import {
+            createRevoGridSelectionLifecycle,
+            isSingleCellRange,
+            logicalCellTarget
+        } from "/js/revoGridSelectionLifecycle.js?v=20260821-gate5b4-keyboard-sort-1";
 
         const results = [];
         async function test(name, action) {
@@ -57,6 +63,14 @@
                 this.sortCalls = [];
                 this.focusCalls = [];
                 this.clearFocusCalls = 0;
+                this.focusState = null;
+                this.rangeState = null;
+                this.selectionStore = {
+                    set: (key, value) => {
+                        if (key === "focus") this.focusState = value;
+                        if (key === "range") this.rangeState = value;
+                    }
+                };
             }
 
             async getColumns() { return this.columns; }
@@ -65,8 +79,26 @@
             }
             async setCellsFocus(start, end, colType, rowType) {
                 this.focusCalls.push({ start, end, colType, rowType });
+                this.focusState = { ...start };
+                this.rangeState = { x: start.x, y: start.y, x1: end.x, y1: end.y };
             }
-            async clearFocus() { this.clearFocusCalls += 1; }
+            async clearFocus() {
+                this.clearFocusCalls += 1;
+                this.focusState = null;
+                this.rangeState = null;
+            }
+            async getProviders() {
+                return {
+                    selection: {
+                        get focusedStore() {
+                            return this._owner.focusState
+                                ? { entity: { store: this._owner.selectionStore } }
+                                : null;
+                        },
+                        _owner: this
+                    }
+                };
+            }
 
             async updateColumnSorting(column, order, additive) {
                 this.sortCalls.push({ type: "sort", column, order, additive });
@@ -109,6 +141,23 @@
             return new CustomEvent("headerclick", {
                 cancelable: true,
                 detail: { prop, originalEvent }
+            });
+        }
+
+        function beforeHeaderEvent(prop, pathItems = []) {
+            const originalEvent = {
+                target: pathItems[0] ?? null,
+                composedPath: () => pathItems,
+                preventDefault() {}
+            };
+            return new CustomEvent("beforeheaderclick", {
+                cancelable: true,
+                detail: {
+                    index: 0,
+                    column: { prop },
+                    originalEvent,
+                    providers: {}
+                }
             });
         }
 
@@ -170,15 +219,179 @@
                 button.props.style.background === "transparent";
         });
 
+        await test("Filter popup keyboard ownership recognizes its own search input", () => {
+            const popup = document.createElement("section");
+            const input = document.createElement("input");
+            popup.appendChild(input);
+            const inside = {
+                target: input,
+                composedPath: () => [input, popup, document.body, document, window]
+            };
+            const outsideNode = document.createElement("div");
+            const outside = {
+                target: outsideNode,
+                composedPath: () => [outsideNode, document.body, document, window]
+            };
+            return eventTargetsElement(inside, popup) &&
+                !eventTargetsElement(outside, popup);
+        });
+
         await test("Header body selects only currently visible rows", async () => {
+            const grid = new FakeGrid(200);
+            const controller = createRevoGridColumnSelection({ grid });
+
+            // Exercise the same documented event shape emitted by Revo v4.
+            grid.dispatchEvent(beforeHeaderEvent("basket"));
+            await waitFor(() => grid.focusCalls.length === 1);
+
+            controller.destroy();
+            const focus = grid.focusCalls[0];
+            return focus.start.y === 0 && focus.end.y === 199 &&
+                focus.start.x === 0 && focus.end.x === 0;
+        });
+
+        await test("Whole-column selection keeps range but removes synthetic first-cell focus", async () => {
             const grid = new FakeGrid(200);
             const controller = createRevoGridColumnSelection({ grid });
             await controller.selectVisibleColumn("basket");
             controller.destroy();
-            const focus = grid.focusCalls[0];
-            return grid.focusCalls.length === 1 &&
-                focus.start.y === 0 && focus.end.y === 199 &&
-                focus.start.x === 0 && focus.end.x === 0;
+            return grid.rangeState?.x === 0 && grid.rangeState?.y === 0 &&
+                grid.rangeState?.x1 === 0 && grid.rangeState?.y1 === 199 &&
+                grid.focusState === null;
+        });
+
+        await test("Single-cell range is eligible for logical focus preservation", () =>
+            isSingleCellRange({ x: 2, y: 4, x1: 2, y1: 4 }) &&
+            !isSingleCellRange({ x: 2, y: 4, x1: 2, y1: 6 }));
+
+        await test("Logical cell target uses ClientKey + column prop", () => {
+            const target = logicalCellTarget(
+                { model: { clientKey: "row:abc" }, column: { prop: "basket" } },
+                { x: 0, y: 0, x1: 0, y1: 0 }
+            );
+            return target?.clientKey === "row:abc" && target?.field === "basket";
+        });
+
+        await test("Filter lifecycle can preserve the same logical cell when its row moves", async () => {
+            const rows = [
+                { clientKey: "row:a" },
+                { clientKey: "row:b" },
+                { clientKey: "row:c" }
+            ];
+            const grid = {
+                rows: [...rows],
+                focusCalls: [],
+                clearFocusCalls: 0,
+                async getFocused() {
+                    return {
+                        model: rows[1],
+                        column: { prop: "basket" },
+                        rowIndex: 1,
+                        colIndex: 0,
+                        colType: "rgCol",
+                        rowType: "rgRow"
+                    };
+                },
+                async getSelectedRange() {
+                    return { x: 0, y: 1, x1: 0, y1: 1, colType: "rgCol", rowType: "rgRow" };
+                },
+                async getVisibleSource() { return this.rows; },
+                async getColumns() { return [{ prop: "basket" }]; },
+                async setCellsFocus(start, end, colType, rowType) {
+                    this.focusCalls.push({ start, end, colType, rowType });
+                },
+                async clearFocus() { this.clearFocusCalls += 1; }
+            };
+            const lifecycle = createRevoGridSelectionLifecycle({ grid });
+            await lifecycle.runWithPreservedCellSelection(async () => {
+                grid.rows = [rows[1], rows[2], rows[0]];
+            });
+            const focus = grid.focusCalls.at(-1);
+            return focus?.start?.y === 0 && focus?.start?.x === 0 &&
+                grid.clearFocusCalls === 0;
+        });
+
+        await test("Sort visible-only policy keeps the cell only when it remains on screen", async () => {
+            const rows = Array.from({ length: 20 }, (_, i) => ({ clientKey: `row:${i}` }));
+            const selected = rows[2];
+            let focusModel = selected;
+            const grid = {
+                rows: [...rows],
+                focusCalls: [],
+                clearFocusCalls: 0,
+                async getFocused() {
+                    return { model: focusModel, column: { prop: "basket" } };
+                },
+                async getSelectedRange() { return { x: 0, y: 2, x1: 0, y1: 2 }; },
+                async getVisibleSource() { return this.rows; },
+                async getColumns() { return [{ prop: "basket" }]; },
+                async getProviders() {
+                    return {
+                        column: {
+                            getColumnByProp: prop => prop === "basket" ? { prop: "basket" } : null,
+                            getColumnIndexByProp: () => 0
+                        },
+                        dimension: {
+                            stores: {
+                                rgRow: { getCurrentState: () => ({ originItemSize: 20, sizes: {}, realSize: 400 }) },
+                                rgCol: { getCurrentState: () => ({ originItemSize: 100, sizes: {}, realSize: 100 }) }
+                            },
+                            getViewPortPos: ({ coordinate, dimension }) =>
+                                dimension === "rgRow" ? coordinate * 20 : coordinate * 100
+                        },
+                        viewport: {
+                            stores: {
+                                rgRow: { lastCoordinate: 0, store: { get: key => key === "virtualSize" ? 100 : 100 } },
+                                rgCol: { lastCoordinate: 0, store: { get: key => key === "virtualSize" ? 100 : 100 } }
+                            }
+                        }
+                    };
+                },
+                async setCellsFocus(start, end, colType, rowType) {
+                    this.focusCalls.push({ start, end, colType, rowType });
+                },
+                async clearFocus() { this.clearFocusCalls += 1; }
+            };
+
+            const lifecycle = createRevoGridSelectionLifecycle({ grid });
+            await lifecycle.runWithPreservedCellSelection(async () => {
+                // row:2 moves from y=2 to y=4; 20px rows + 100px viewport => still visible.
+                grid.rows = rows.filter((_, i) => i !== 2);
+                grid.rows.splice(4, 0, selected);
+            }, { restorePolicy: "visible-only" });
+            const visibleFocus = grid.focusCalls.at(-1);
+            const keptVisible = visibleFocus?.start?.y === 4 && grid.clearFocusCalls === 0;
+
+            grid.focusCalls.length = 0;
+            await lifecycle.runWithPreservedCellSelection(async () => {
+                // Same Work Order moves to y=15, outside the unchanged viewport.
+                grid.rows = rows.filter((_, i) => i !== 2);
+                grid.rows.splice(15, 0, selected);
+            }, { restorePolicy: "visible-only" });
+
+            return keptVisible && grid.focusCalls.length === 0 && grid.clearFocusCalls === 1;
+        });
+
+        await test("Filter lifecycle clears cell focus when the selected Work Order is hidden", async () => {
+            const selected = { clientKey: "row:b" };
+            const grid = {
+                rows: [{ clientKey: "row:a" }, selected],
+                focusCalls: [],
+                clearFocusCalls: 0,
+                async getFocused() { return { model: selected, column: { prop: "basket" } }; },
+                async getSelectedRange() { return { x: 0, y: 1, x1: 0, y1: 1 }; },
+                async getVisibleSource() { return this.rows; },
+                async getColumns() { return [{ prop: "basket" }]; },
+                async setCellsFocus(start, end, colType, rowType) {
+                    this.focusCalls.push({ start, end, colType, rowType });
+                },
+                async clearFocus() { this.clearFocusCalls += 1; }
+            };
+            const lifecycle = createRevoGridSelectionLifecycle({ grid });
+            await lifecycle.runWithPreservedCellSelection(async () => {
+                grid.rows = [{ clientKey: "row:a" }];
+            });
+            return grid.focusCalls.length === 0 && grid.clearFocusCalls === 1;
         });
 
         await test("Empty filtered result clears focus instead of selecting hidden rows", async () => {
@@ -278,6 +491,9 @@
             button.className = "erp-revo-sort-button";
             button.setAttribute("data-erp-sort-prop", "workOrderValue");
 
+            // Selection sees the early event and must stand down for the
+            // dedicated control. Sort then receives the normal headerclick.
+            grid.dispatchEvent(beforeHeaderEvent("workOrderValue", [button]));
             grid.dispatchEvent(headerEvent("workOrderValue", [button]));
             await waitFor(() => history.entries.length === 1 && !sort.getState().sortBusy);
             await new Promise(resolve => setTimeout(resolve, 0));
@@ -292,7 +508,7 @@
             const selection = createRevoGridColumnSelection({ grid });
             const button = document.createElement("button");
             button.setAttribute("data-erp-filter-prop", "basket");
-            grid.dispatchEvent(headerEvent("basket", [button]));
+            grid.dispatchEvent(beforeHeaderEvent("basket", [button]));
             await new Promise(resolve => setTimeout(resolve, 0));
             const ok = grid.focusCalls.length === 0;
             selection.destroy();

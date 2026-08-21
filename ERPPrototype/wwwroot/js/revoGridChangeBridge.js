@@ -549,6 +549,21 @@ export function createRevoGridChangeBridge(options) {
         notifyState();
     }
 
+    function replaceRowIndex(rows) {
+        rowByClientKey = buildRowIndex(rows);
+        notifyState();
+    }
+
+    function applyRowChanges(changes) {
+        const state = engine.applyExternalRowChanges(changes, datasetKey);
+        notifyState();
+        return state;
+    }
+
+    function getDirtyRows() {
+        return engine.getDirtyRows();
+    }
+
     function getState() {
         return {
             ...engine.getState(),
@@ -588,8 +603,11 @@ export function createRevoGridChangeBridge(options) {
     return Object.freeze({
         setEditLocked,
         resetDataset,
+        replaceRowIndex,
+        applyRowChanges,
         getState,
         getDirtyCells,
+        getDirtyRows,
         destroy
     });
 }

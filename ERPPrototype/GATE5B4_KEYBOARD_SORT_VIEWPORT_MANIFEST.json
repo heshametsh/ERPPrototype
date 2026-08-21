@@ -1,0 +1,29 @@
+{
+  "name": "Gate 5B-4 Keyboard Ownership + Sort Viewport Fix",
+  "date": "2026-08-21",
+  "revogrid": {
+    "community_version": "4.25.2",
+    "source_modified": false
+  },
+  "changes": [
+    "When keyboard input originates inside the ERP Excel-like filter popup, RevoGrid keyboard proxies are cancelled while the original browser KeyboardEvent is left untouched so typing stays inside the filter.",
+    "Sort preserves the same logical selected Work Order only while that cell remains inside the current viewport.",
+    "If Sort moves the selected Work Order outside the current viewport, cell focus is cleared and the sheet does not scroll after it.",
+    "Filter keeps its previously approved behavior: if the selected Work Order remains in the filtered result, selection is restored; if it is filtered out, selection is cleared.",
+    "No RevoGrid Community source file is modified."
+  ],
+  "verification": [
+    "JavaScript syntax check passed for all modified modules.",
+    "Internal behavior checks passed 6/6 for popup keyboard ownership and visible/off-screen sort selection policy.",
+    "Browser lab extended for the new behavior; final runtime verification remains on the user's .NET environment."
+  ],
+  "files": [
+    "Components/Pages/WorkOrdersRevoGridNativeGate5A.razor.cs",
+    "wwwroot/js/revoGridGate5B1.js",
+    "wwwroot/js/revoGridExcelFilter.js",
+    "wwwroot/js/revoGridHistoryFocus.js",
+    "wwwroot/js/revoGridSelectionLifecycle.js",
+    "wwwroot/js/revoGridSort.js",
+    "wwwroot/grid-shootout/revogrid-header-actions-state-lab.html"
+  ]
+}

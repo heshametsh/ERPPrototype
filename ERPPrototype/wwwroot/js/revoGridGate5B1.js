@@ -1,10 +1,12 @@
-import * as nativeGate5A from "./revoGridNativeGate5A.js?v=20260821-gate5b4-header-sort-1";
-import { createRevoGridChangeBridge } from "./revoGridChangeBridge.js?v=20260821-gate5b2-paste-1";
+import * as nativeGate5A from "./revoGridNativeGate5A.js?v=20260821-gate5b5-filter-refresh-1";
+import { createRevoGridChangeBridge } from "./revoGridChangeBridge.js?v=20260821-gate5b5-row-structure-2";
 import { createRevoGridHistoryCoordinator } from "./revoGridHistoryCoordinator.js?v=20260821-minimal-reveal-1";
-import { createRevoGridHistoryFocus } from "./revoGridHistoryFocus.js?v=20260821-minimal-reveal-1";
-import { createRevoGridExcelFilter } from "./revoGridExcelFilter.js?v=20260821-gate5b4-header-sort-1";
-import { createRevoGridSort } from "./revoGridSort.js?v=20260821-gate5b4-header-sort-1";
-import { createRevoGridColumnSelection } from "./revoGridColumnSelection.js?v=20260821-gate5b4-header-sort-1";
+import { createRevoGridHistoryFocus } from "./revoGridHistoryFocus.js?v=20260821-gate5b4-keyboard-sort-1";
+import { createRevoGridExcelFilter } from "./revoGridExcelFilter.js?v=20260821-gate5b5-filter-refresh-1";
+import { createRevoGridSort } from "./revoGridSort.js?v=20260821-gate5b5-row-structure-2";
+import { createRevoGridColumnSelection } from "./revoGridColumnSelection.js?v=20260821-gate5b4-keyboard-sort-1";
+import { createRevoGridSelectionLifecycle } from "./revoGridSelectionLifecycle.js?v=20260821-gate5b4-keyboard-sort-1";
+import { createRevoGridRowStructure } from "./revoGridRowStructure.js?v=20260821-gate5b5-row-structure-2";
 
 const bindings = new Map();
 
@@ -54,10 +56,11 @@ function renderState(state) {
     const current = combinedState(state);
     const filterBusy = Boolean(state.excelFilter?.getState().filterBusy);
     const sortBusy = Boolean(state.sortController?.getState().sortBusy);
+    const structureBusy = Boolean(state.rowStructure?.getState().structureBusy);
 
     if (state.statusElement) {
         state.statusElement.textContent = current.dirty
-            ? `Dirty ${current.dirtyCellCount}`
+            ? `Dirty ${current.dirtyCount ?? current.dirtyCellCount}`
             : "Clean";
         state.statusElement.dataset.dirty = current.dirty ? "true" : "false";
     }
@@ -70,11 +73,18 @@ function renderState(state) {
         state.redoCountElement.textContent = String(current.redoCount);
     }
 
+    if (state.rowCountElement && state.rowStructure) {
+        state.rowCountElement.textContent = Number(
+            state.rowStructure.getState().rowCount ?? 0
+        ).toLocaleString();
+    }
+
     if (state.undoButton) {
         state.undoButton.disabled =
             state.datasetSwitchActive ||
             filterBusy ||
             sortBusy ||
+            structureBusy ||
             current.editLocked ||
             current.replayActive ||
             current.undoCount === 0;
@@ -85,6 +95,7 @@ function renderState(state) {
             state.datasetSwitchActive ||
             filterBusy ||
             sortBusy ||
+            structureBusy ||
             current.editLocked ||
             current.replayActive ||
             current.redoCount === 0;
@@ -133,6 +144,11 @@ async function destroyBinding(elementId) {
     }
 
     try {
+        state.rowStructure?.destroy();
+    } catch {
+    }
+
+    try {
         state.historyCoordinator.destroy();
     } catch {
     }
@@ -163,6 +179,8 @@ export async function initialize(elementId, rows, customColumns, options) {
         excelFilter: null,
         sortController: null,
         columnSelection: null,
+        selectionLifecycle: null,
+        rowStructure: null,
         datasetSwitchActive: false,
         handledHistoryKeyEvents: new WeakSet(),
         removers: [],
@@ -180,6 +198,9 @@ export async function initialize(elementId, rows, customColumns, options) {
         ),
         redoButton: findElement(
             value(options, "redoButtonId", "RedoButtonId", "")
+        ),
+        rowCountElement: findElement(
+            value(options, "rowCountElementId", "RowCountElementId", "")
         )
     };
 
@@ -201,12 +222,15 @@ export async function initialize(elementId, rows, customColumns, options) {
         onStateChange: () => renderState(state)
     });
 
+    state.selectionLifecycle = createRevoGridSelectionLifecycle({ grid });
+
     if (Boolean(value(options, "enableExcelFilter", "EnableExcelFilter", false))) {
         state.excelFilter = createRevoGridExcelFilter({
             grid,
             rows,
             datasetKey: activeDatasetKey,
             historyCoordinator: state.historyCoordinator,
+            selectionLifecycle: state.selectionLifecycle,
             onStateChange: () => renderState(state)
         });
     }
@@ -216,9 +240,23 @@ export async function initialize(elementId, rows, customColumns, options) {
             grid,
             datasetKey: activeDatasetKey,
             historyCoordinator: state.historyCoordinator,
+            selectionLifecycle: state.selectionLifecycle,
             onStateChange: () => renderState(state)
         });
         state.columnSelection = createRevoGridColumnSelection({ grid });
+    }
+
+    if (Boolean(value(options, "enableRowStructure", "EnableRowStructure", false))) {
+        state.rowStructure = createRevoGridRowStructure({
+            grid,
+            rows,
+            datasetKey: activeDatasetKey,
+            historyCoordinator: state.historyCoordinator,
+            changeBridge: state.changeBridge,
+            excelFilter: state.excelFilter,
+            sortController: state.sortController,
+            onStateChange: () => renderState(state)
+        });
     }
 
     addListener(state, state.undoButton, "click", async () => {
@@ -233,10 +271,21 @@ export async function initialize(elementId, rows, customColumns, options) {
         const detail = event.detail;
         const original = detail?.original;
 
-        if (
-            !original ||
-            !(original.ctrlKey || original.metaKey)
-        ) {
+        if (!original) {
+            return;
+        }
+
+        // The Excel-like filter popup is an external text UI. RevoGrid 4.25.2
+        // has several overlay-selection instances listening to document keydown.
+        // Cancel each Revo proxy event, but deliberately DO NOT preventDefault()
+        // on the original KeyboardEvent so the employee can type normally into
+        // Search/checkbox controls without editing the selected sheet cell.
+        if (state.excelFilter?.ownsKeyboardEvent?.(original)) {
+            event.preventDefault();
+            return;
+        }
+
+        if (!(original.ctrlKey || original.metaKey)) {
             return;
         }
 
@@ -306,10 +355,16 @@ export async function beginDatasetSwitch(elementId) {
         current.replayActive ||
         current.saveActive ||
         state.excelFilter?.getState().filterBusy ||
-        state.sortController?.getState().sortBusy
+        state.sortController?.getState().sortBusy ||
+        state.rowStructure?.getState().structureBusy
     ) {
         return { allowed: false, reason: "busy" };
     }
+
+    // A year switch replaces the entire Work Orders dataset. Selection never
+    // crosses that boundary: clear cell/range/column selection before the
+    // source starts changing.
+    await state.grid.clearFocus();
 
     state.datasetSwitchActive = true;
     state.changeBridge.setEditLocked(true);
@@ -375,6 +430,10 @@ export async function replaceDataset(elementId, rows, workYear) {
             await state.sortController.resetDataset(nextDatasetKey);
             sortSuspended = false;
         }
+
+        if (state.rowStructure) {
+            await state.rowStructure.resetDataset(rows, nextDatasetKey);
+        }
     } catch (error) {
         if (filterSuspended && state.excelFilter) {
             try {
@@ -414,6 +473,15 @@ export function getDirtyCells(elementId) {
     return state.changeBridge.getDirtyCells();
 }
 
+export function getDirtyRows(elementId) {
+    const state = bindings.get(elementId);
+    if (!state) {
+        throw new Error(`Gate 5B state '${elementId}' was not found.`);
+    }
+
+    return state.changeBridge.getDirtyRows();
+}
+
 export function refreshChangeStateUi(elementId) {
     const state = bindings.get(elementId);
     if (!state) {
@@ -429,7 +497,12 @@ export async function getDiagnostics(elementId) {
 
     return {
         ...native,
-        changeEngine: state ? combinedState(state) : null
+        changeEngine: state ? combinedState(state) : null,
+        dirtyRows: state ? state.changeBridge.getDirtyRows() : [],
+        dirtyCells: state ? state.changeBridge.getDirtyCells() : [],
+        filter: state?.excelFilter?.getState?.() ?? null,
+        sort: state?.sortController?.getState?.() ?? null,
+        rowStructure: state?.rowStructure?.getState?.() ?? null
     };
 }
 

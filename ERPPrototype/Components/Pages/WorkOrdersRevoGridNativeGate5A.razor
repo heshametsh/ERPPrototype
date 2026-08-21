@@ -16,13 +16,15 @@
 @inject IJSRuntime JSRuntime
 @inject ILogger<WorkOrdersRevoGridNativeGate5A> Logger
 
-<PageTitle>@(EnableHeaderActions ? "RevoGrid Gate 5B-4" : EnableExcelFilter ? "RevoGrid Gate 5B-3" : EnablePaste ? "RevoGrid Gate 5B-2" : EnableChangeEngine ? "RevoGrid Gate 5B-1" : "RevoGrid Native Gate 5A")</PageTitle>
+<PageTitle>@(EnableRowStructure ? "RevoGrid Gate 5B-5" : EnableHeaderActions ? "RevoGrid Gate 5B-4" : EnableExcelFilter ? "RevoGrid Gate 5B-3" : EnablePaste ? "RevoGrid Gate 5B-2" : EnableChangeEngine ? "RevoGrid Gate 5B-1" : "RevoGrid Native Gate 5A")</PageTitle>
 
 <div class="native-gate5a" data-testid="revogrid-native-gate5a">
     <header class="native-gate5a__header">
         <div class="native-gate5a__identity">
             <strong>RevoGrid Community 4.25.2</strong>
-            <span>@(EnableHeaderActions
+            <span>@(EnableRowStructure
+                ? "Gate 5B-5 — Insert/Delete Rows → Change Engine + Sheet History"
+                : EnableHeaderActions
                 ? "Gate 5B-4 — Excel-like Filter + dedicated Sort + visible-column selection → Sheet History"
                 : EnableExcelFilter
                     ? "Gate 5B-3 — Excel-like Filter → Revo native Filter Engine → Sheet History"
@@ -68,7 +70,7 @@
     else
     {
         <div class="native-gate5a__statusbar">
-            <span><b>@Rows.Count.ToString("N0")</b> صف</span>
+            <span><b id="@RowCountElementId">@Rows.Count.ToString("N0")</b> صف</span>
             <span>Server <b>@FormatMilliseconds(ServerLoadMilliseconds)</b></span>
 
             @if (Diagnostics is not null)
@@ -120,7 +122,11 @@
         </main>
 
         <footer class="native-gate5a__note">
-            @if (EnableHeaderActions)
+            @if (EnableRowStructure)
+            {
+                <span>Gate 5B-5 يضيف Insert/Delete من قائمة الكليك اليمين. الصف الجديد يأخذ ClientKey مؤقت وDisplayOrder بين جيرانه، ويظل ظاهرًا في لقطة Filter/Sort الحالية حتى يطبق الموظف Filter/Sort من جديد. Insert/Delete يدخلان Dirty وSheet History ولا يوجد Save لقاعدة البيانات بعد.</span>
+            }
+            else if (EnableHeaderActions)
             {
                 <span>Gate 5B-4 يفصل تفاعل رأس العمود: الضغط على اسم الهيدر يحدد العمود للصفوف الظاهرة فقط، زر الفلتر يفتح Excel-like Filter، وزر الـSort المخصص يستدعي Revo SortingPlugin من الـAPI الرسمي. Filter/Sort لا يدخلان Dirty وكلاهما يدخل Sheet History.</span>
             }

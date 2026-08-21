@@ -255,6 +255,7 @@ function waitForSortApply(grid, trigger) {
 export function createRevoGridSort(options) {
     const grid = options?.grid;
     const historyCoordinator = options?.historyCoordinator;
+    const selectionLifecycle = options?.selectionLifecycle;
     if (!grid || typeof grid.addEventListener !== "function") {
         throw new Error("A RevoGrid element is required.");
     }
@@ -270,7 +271,6 @@ export function createRevoGridSort(options) {
     let activeState = null;
     let destroyed = false;
     let applying = false;
-    let refreshScheduled = false;
     const viewStateByDataset = new Map([[datasetKey, null]]);
     const sortColumns = getSortColumns(grid);
     const removers = [];
@@ -286,7 +286,10 @@ export function createRevoGridSort(options) {
         removers.push(() => target.removeEventListener(type, handler, listenerOptions));
     }
 
-    async function applyNativeState(nextState, { remember = true } = {}) {
+    async function applyNativeState(
+        nextState,
+        { remember = true, preserveSelection = true } = {}
+    ) {
         if (destroyed) {
             return;
         }
@@ -298,26 +301,40 @@ export function createRevoGridSort(options) {
         notifyState();
 
         try {
-            await waitForSortApply(grid, async () => {
-                if (!normalized) {
-                    await grid.clearSorting();
-                    return;
-                }
+            const applySort = async () => {
+                await waitForSortApply(grid, async () => {
+                    if (!normalized) {
+                        await grid.clearSorting();
+                        return;
+                    }
 
-                const column = sortColumns.get(normalized.field);
-                if (!column) {
-                    throw new Error(`Sort column '${normalized.field}' is not available.`);
-                }
+                    const column = sortColumns.get(normalized.field);
+                    if (!column) {
+                        throw new Error(`Sort column '${normalized.field}' is not available.`);
+                    }
 
-                await grid.updateColumnSorting(
-                    {
-                        prop: normalized.field,
-                        cellCompare: column.cellCompare
-                    },
-                    normalized.order,
-                    false
+                    await grid.updateColumnSorting(
+                        {
+                            prop: normalized.field,
+                            cellCompare: column.cellCompare
+                        },
+                        normalized.order,
+                        false
+                    );
+                });
+            };
+
+            if (
+                preserveSelection &&
+                typeof selectionLifecycle?.runWithPreservedCellSelection === "function"
+            ) {
+                await selectionLifecycle.runWithPreservedCellSelection(
+                    applySort,
+                    { restorePolicy: "visible-only" }
                 );
-            });
+            } else {
+                await applySort();
+            }
 
             activeState = normalized;
             if (remember) {
@@ -407,35 +424,16 @@ export function createRevoGridSort(options) {
         void commitUserSort(field);
     };
 
-    function scheduleRefresh() {
-        if (!activeState || applying || destroyed || refreshScheduled) {
-            return;
-        }
-
-        refreshScheduled = true;
-        queueMicrotask(() => {
-            refreshScheduled = false;
-            if (!activeState || applying || destroyed) {
-                return;
-            }
-            void applyNativeState(activeState, { remember: false });
-        });
-    }
-
-    const refreshAfterHistoryReplay = event => {
-        if (event.detail?.entry?.adapterKey === HISTORY_ADAPTER_KEY) {
-            return;
-        }
-        scheduleRefresh();
-    };
-
+    // ERP sort semantics are snapshot-based for data mutations. Edit, Paste,
+    // Insert/Delete and data History replay do not reshuffle rows underneath
+    // the employee. RevoGrid's native SortingPlugin is invoked again only when
+    // the employee explicitly changes/clears Sort or when Sort History itself
+    // is replayed.
     addListener(grid, "headerclick", onHeaderClick);
-    addListener(grid, "afteredit", scheduleRefresh);
-    addListener(grid, "erpaftersheethistoryreplay", refreshAfterHistoryReplay);
 
     async function suspendForDatasetSwitch() {
         const remembered = cloneValue(activeState);
-        await applyNativeState(null, { remember: false });
+        await applyNativeState(null, { remember: false, preserveSelection: false });
         activeState = remembered;
         setVisualState(sortColumns, remembered);
     }
@@ -448,7 +446,7 @@ export function createRevoGridSort(options) {
         if (!viewStateByDataset.has(datasetKey)) {
             viewStateByDataset.set(datasetKey, null);
         }
-        await applyNativeState(restored);
+        await applyNativeState(restored, { preserveSelection: false });
     }
 
     async function resumeCurrentDataset() {

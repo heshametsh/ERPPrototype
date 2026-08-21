@@ -755,7 +755,7 @@ Include:
 - [ ] Applying or clearing one filter increments Sheet History by exactly one and leaves Change Engine `Clean` when no data cells were edited.
 - [ ] Ctrl+Z restores the previous filter state; Ctrl+Y reapplies it. Filter replay does not create another History entry.
 - [ ] With multiple filters active, opening a field lists values that satisfy the other active filters while excluding that field's own condition from its candidate list.
-- [ ] Editing/Pasting a filtered field causes the current native filter criteria to be reapplied without recording a second filter action.
+- [ ] Editing/Pasting a filtered field does **not** remove or add visible rows underneath the employee. Reopening the Filter picker reads the current edited values; explicit Apply/Clear recalculates the visible result.
 - [ ] Filter year 2026, switch clean to a first-visit 2025: 2025 starts unfiltered. Return to 2026: its filter view is restored, but the old 2026 Undo stack is not restored across the year boundary.
 - [ ] Gate 5B-2 remains unchanged and still passes its accepted Edit/Paste/Undo behavior.
 - [ ] No Revo source file is patched and no ERP code directly calculates `trimmedRows`.
@@ -774,7 +774,25 @@ Include:
 - [ ] Sort controls exist only on Work Order Value, Partial Amount, Remaining Amount, and custom Money columns. Filter-only columns have no Sort control.
 - [ ] First Sort click is descending (largest to smallest), second is ascending, third clears Sort and returns to natural source order. Only one Sort column is active at a time.
 - [ ] Each Sort transition adds exactly one Sheet History action and leaves Change Engine Clean. Ctrl+Z/Ctrl+Y restores Sort through the same native Revo path without recording replay.
-- [ ] With Filter + Sort active together, editing/pasting a relevant value leaves the correct filtered set and reapplies the current Sort without creating extra Filter/Sort History entries.
+- [ ] With Filter + Sort active together, editing/pasting does **not** reshuffle or hide rows underneath the employee. Explicit Filter/Sort interaction recalculates the view and creates only the corresponding view History action.
+- [ ] With a Filter active, change/insert a visible row so it no longer matches. It must stay visible until Apply is pressed again. Re-applying the same filter values must refresh the result, add exactly one History action only when the visible snapshot changes, Undo must restore the pre-Apply working snapshot, and Redo must refresh it again.
 - [ ] History order remains coherent across mixed actions such as Edit → Paste → Filter → Sort; each Ctrl+Z reverses only the latest sheet action.
 - [ ] Sort/Filter 2026, switch clean to a first-visit 2025: 2025 starts with no inherited Sort/Filter. Return to 2026: its view state returns but its old History does not.
 - [ ] No Revo source file is patched; Sort uses public `updateColumnSorting/clearSorting`, selection uses `getVisibleSource/setCellsFocus`, and Filter active state is rendered from native `hasFilter`. No browser page error, unexpected console error, failed request, or server 5xx appears.
+
+
+#### Gate 5B-5 — Insert/Delete Rows + structural Dirty/History
+
+- [ ] `/grid-shootout/revogrid-row-structure-state-lab.html` reports **PASS 12 / FAIL 0**.
+- [ ] `/work-orders-revogrid-gate5b5` loads the same real employee/year dataset as Gate 5B-4.
+- [ ] Right-click a selected row and Insert Above/Below: exactly one blank row appears in the requested visible position and row count increases by one.
+- [ ] The new row gets a unique temporary `ClientKey`; loaded rows keep their existing session ClientKeys. Database `Id` is still not required before Save.
+- [ ] Normal Insert allocates `DisplayOrder` between the target row's real source neighbors. Repeated insertion into a depleted local gap redistributes only the necessary neighborhood.
+- [ ] With Filter active, Insert remains visible under/above the target until the employee explicitly applies/changes Filter again. Editing the new row does not make it disappear automatically.
+- [ ] With Sort active, Insert remains in the requested visible position while the employee edits it. Edit/Paste/Undo do not auto-resort the sheet; explicit Sort interaction recalculates ordering.
+- [ ] Opening Filter after edits/insert reads the current values. Values no longer present in the current data are not kept as stale picker candidates.
+- [ ] Delete Selected Rows removes exactly the selected visible row identities, including under Filter/Sort; hidden rows are never deleted implicitly.
+- [ ] One Insert adds exactly one Sheet History entry and structural Dirty. Ctrl+Z removes that unsaved row and returns the structural delta to Baseline; Ctrl+Y restores the same ClientKey/DisplayOrder row.
+- [ ] One multi-row Delete adds exactly one Sheet History entry. Undo restores the same rows to their prior source/proxy/visible positions; Redo removes the same identities again.
+- [ ] Dirty blocks year switching after Insert/Delete. Undo back to Clean allows the year switch and old History is cleared as already approved.
+- [ ] No Revo Community source file is patched and `/work-orders` remains on Tabulator. No browser page error, unexpected console error, failed request, or server 5xx appears during the qualification.

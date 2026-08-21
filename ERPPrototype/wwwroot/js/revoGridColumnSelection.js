@@ -39,6 +39,29 @@ export function getVisibleColumnSelectionRange(visibleRowCount, columnIndex) {
     };
 }
 
+
+export async function detachActiveCellFromRange(grid) {
+    if (!grid || typeof grid.getProviders !== "function") {
+        return false;
+    }
+
+    const providers = await grid.getProviders();
+    const focusedStore = providers?.selection?.focusedStore;
+    const store = focusedStore?.entity?.store;
+    if (!store || typeof store.set !== "function") {
+        return false;
+    }
+
+    // Revo's public setCellsFocus() intentionally creates a focused start cell
+    // plus a range. For ERP whole-column selection we keep the native range,
+    // but remove only the synthetic start-cell focus. The selection range stays
+    // in Revo's own selection store and no individual cell appears active.
+    store.set("focus", null);
+    store.set("edit", null);
+    store.set("nextFocus", null);
+    return true;
+}
+
 export function createRevoGridColumnSelection(options) {
     const grid = options?.grid;
     if (!grid || typeof grid.addEventListener !== "function") {
@@ -91,35 +114,49 @@ export function createRevoGridColumnSelection(options) {
                 colType,
                 "rgRow"
             );
+
+            // Whole-column selection is a separate selection mode. Keep the
+            // Revo-native range, but do not invent an active first cell that
+            // the employee never clicked.
+            await detachActiveCellFromRange(grid);
         } finally {
             selecting = false;
         }
     }
 
-    const onHeaderClick = event => {
+    const onBeforeHeaderClick = event => {
         const originalEvent = event.detail?.originalEvent;
         if (isHeaderControlClick(originalEvent)) {
             return;
         }
 
-        const prop = event.detail?.prop;
+        // Revo Community v4 fires beforeheaderclick with the full
+        // InitialHeaderClick payload. The clicked column lives on
+        // detail.column; headerclick is a later notification and is not the
+        // correct interception point for replacing the default header action.
+        const prop = event.detail?.column?.prop;
         if (prop === undefined || prop === null || String(prop) === "") {
             return;
         }
 
-        // Header body owns selection. Sort/Filter are dedicated controls.
+        // Header body owns selection. Filter/Sort controls are allowed to
+        // continue through Revo's normal header-click path.
         event.preventDefault();
         originalEvent?.preventDefault?.();
-        void selectVisibleColumn(prop);
+
+        // Let Revo finish the current header event before applying the range.
+        queueMicrotask(() => {
+            void selectVisibleColumn(prop);
+        });
     };
 
-    grid.addEventListener("headerclick", onHeaderClick);
+    grid.addEventListener("beforeheaderclick", onBeforeHeaderClick);
 
     function destroy() {
         if (destroyed) {
             return;
         }
-        grid.removeEventListener("headerclick", onHeaderClick);
+        grid.removeEventListener("beforeheaderclick", onBeforeHeaderClick);
         destroyed = true;
     }
 

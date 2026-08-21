@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>RevoGrid Gate 5B-5 Row Structure State Lab</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 24px; color: #1f2937; }
+        h1 { font-size: 20px; }
+        #summary { font-weight: 700; margin: 12px 0; }
+        .pass { color: #067647; }
+        .fail { color: #b42318; }
+        li { margin: 5px 0; }
+    </style>
+</head>
+<body>
+    <h1>RevoGrid Gate 5B-5 — Insert/Delete State Lab</h1>
+    <div id="summary">Running…</div>
+    <ol id="results"></ol>
+
+    <script type="module">
+        import {
+            planDisplayOrderInsertion,
+            composeViewAfterInsert,
+            composeViewAfterDelete
+        } from "/js/revoGridRowStructure.js?v=20260821-gate5b5-row-structure-2";
+        import { createRevoGridChangeEngine } from "/js/revoGridChangeEngine.js?v=20260821-gate5b5-row-structure-2";
+        import { collectFilterCandidates } from "/js/revoGridExcelFilter.js?v=20260821-gate5b5-row-structure-2";
+
+        const results = [];
+        async function test(name, action) {
+            let passed = false;
+            let error = null;
+            try { passed = Boolean(await action()); } catch (ex) { error = ex; }
+            results.push({ name, passed, error });
+        }
+
+        await test("DisplayOrder uses midpoint when a normal gap exists", () => {
+            const rows = [
+                { clientKey: "a", displayOrder: 1_000_000_000 },
+                { clientKey: "b", displayOrder: 2_000_000_000 }
+            ];
+            const plan = planDisplayOrderInsertion(rows, 1);
+            return plan.newOrder === 1_500_000_000 && plan.adjustments.length === 0;
+        });
+
+        await test("Insert at the end uses the normal DisplayOrder step", () => {
+            const plan = planDisplayOrderInsertion([
+                { clientKey: "a", displayOrder: 1_000_000_000 }
+            ], 1);
+            return plan.newOrder === 2_000_000_000;
+        });
+
+        await test("An exhausted tiny gap triggers bounded redistribution", () => {
+            const plan = planDisplayOrderInsertion([
+                { clientKey: "a", displayOrder: 1_000_000_000 },
+                { clientKey: "b", displayOrder: 1_000_000_001 },
+                { clientKey: "c", displayOrder: 2_000_000_000 }
+            ], 1);
+            return Number.isInteger(plan.newOrder) && plan.adjustments.length > 0;
+        });
+
+        await test("Insert below a filtered/sorted row stays visible directly below it", () => {
+            const view = {
+                sourceKeys: ["a", "b", "c", "d"],
+                proxyKeys: ["d", "b", "a", "c"],
+                visibleKeys: ["d", "b"]
+            };
+            const next = composeViewAfterInsert(view, "b", "new", "below");
+            return next.sourceKeys.join(",") === "a,b,new,c,d" &&
+                next.proxyKeys.join(",") === "d,b,new,a,c" &&
+                next.visibleKeys.join(",") === "d,b,new";
+        });
+
+        await test("Insert above a visible row is placed above in the current snapshot", () => {
+            const view = {
+                sourceKeys: ["a", "b", "c"],
+                proxyKeys: ["c", "b", "a"],
+                visibleKeys: ["c", "b"]
+            };
+            const next = composeViewAfterInsert(view, "b", "new", "above");
+            return next.sourceKeys.join(",") === "a,new,b,c" &&
+                next.proxyKeys.join(",") === "c,new,b,a" &&
+                next.visibleKeys.join(",") === "c,new,b";
+        });
+
+        await test("Delete removes only the requested visible row identities", () => {
+            const view = {
+                sourceKeys: ["a", "b", "c", "d"],
+                proxyKeys: ["d", "b", "a", "c"],
+                visibleKeys: ["d", "b"]
+            };
+            const next = composeViewAfterDelete(view, ["b"]);
+            return next.sourceKeys.join(",") === "a,c,d" &&
+                next.proxyKeys.join(",") === "d,a,c" &&
+                next.visibleKeys.join(",") === "d";
+        });
+
+        await test("A new unsaved row makes the Change Engine structurally Dirty", () => {
+            const engine = createRevoGridChangeEngine({ datasetKey: "work-orders:2026" });
+            engine.applyExternalRowChanges([{
+                clientKey: "temp:1",
+                before: { exists: false, displayOrder: null },
+                after: { exists: true, displayOrder: 1_500_000_000 }
+            }], "work-orders:2026");
+            const state = engine.getState();
+            return state.dirty && state.dirtyRowCount === 1;
+        });
+
+        await test("Undoing an unsaved Insert returns structural Dirty to Clean", () => {
+            const engine = createRevoGridChangeEngine({ datasetKey: "work-orders:2026" });
+            engine.applyExternalRowChanges([{
+                clientKey: "temp:1",
+                before: { exists: false, displayOrder: null },
+                after: { exists: true, displayOrder: 1_500_000_000 }
+            }], "work-orders:2026");
+            engine.applyExternalRowChanges([{
+                clientKey: "temp:1",
+                before: { exists: true, displayOrder: 1_500_000_000 },
+                after: { exists: false, displayOrder: null }
+            }], "work-orders:2026");
+            return !engine.getState().dirty;
+        });
+
+        await test("Deleting an existing row makes the Change Engine structurally Dirty", () => {
+            const engine = createRevoGridChangeEngine({ datasetKey: "work-orders:2026" });
+            engine.applyExternalRowChanges([{
+                clientKey: "row:1",
+                before: { exists: true, displayOrder: 1_000_000_000 },
+                after: { exists: false, displayOrder: null }
+            }], "work-orders:2026");
+            return engine.getState().dirtyRowCount === 1;
+        });
+
+        await test("Undoing Delete returns structural Dirty to Clean", () => {
+            const engine = createRevoGridChangeEngine({ datasetKey: "work-orders:2026" });
+            engine.applyExternalRowChanges([{
+                clientKey: "row:1",
+                before: { exists: true, displayOrder: 1_000_000_000 },
+                after: { exists: false, displayOrder: null }
+            }], "work-orders:2026");
+            engine.applyExternalRowChanges([{
+                clientKey: "row:1",
+                before: { exists: false, displayOrder: null },
+                after: { exists: true, displayOrder: 1_000_000_000 }
+            }], "work-orders:2026");
+            return !engine.getState().dirty;
+        });
+
+        await test("DisplayOrder redistribution is tracked only for affected rows", () => {
+            const engine = createRevoGridChangeEngine({ datasetKey: "work-orders:2026" });
+            engine.applyExternalRowChanges([
+                {
+                    clientKey: "row:a",
+                    before: { exists: true, displayOrder: 100 },
+                    after: { exists: true, displayOrder: 90 }
+                },
+                {
+                    clientKey: "temp:new",
+                    before: { exists: false, displayOrder: null },
+                    after: { exists: true, displayOrder: 95 }
+                }
+            ], "work-orders:2026");
+            return engine.getState().dirtyRowCount === 2;
+        });
+
+        await test("Opening Filter reads current edited values, not the old snapshot values", () => {
+            const rows = [
+                { value: "1" },
+                { value: "1" },
+                { value: "1" }
+            ];
+            rows[0].value = "2";
+            rows[1].value = "3";
+            rows[2].value = "2";
+            const candidates = collectFilterCandidates(rows, {}, "value", "values");
+            return !candidates.includes("1") && candidates.includes("2") && candidates.includes("3");
+        });
+
+        const list = document.getElementById("results");
+        let passed = 0;
+        for (const result of results) {
+            const li = document.createElement("li");
+            li.className = result.passed ? "pass" : "fail";
+            li.textContent = `${result.passed ? "PASS" : "FAIL"} — ${result.name}${result.error ? `: ${result.error.message}` : ""}`;
+            list.appendChild(li);
+            if (result.passed) passed += 1;
+        }
+        const failed = results.length - passed;
+        const summary = document.getElementById("summary");
+        summary.textContent = `PASS ${passed} / FAIL ${failed}`;
+        summary.className = failed === 0 ? "pass" : "fail";
+    </script>
+</body>
+</html>

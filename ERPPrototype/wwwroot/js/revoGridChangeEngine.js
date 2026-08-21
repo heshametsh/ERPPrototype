@@ -108,6 +108,23 @@ function cloneCellOperation(operation) {
     };
 }
 
+function normalizeRowState(input, name) {
+    const exists = Boolean(input?.exists);
+    return {
+        exists,
+        displayOrder: exists
+            ? Number(input?.displayOrder ?? 0)
+            : null
+    };
+}
+
+function rowStatesEqual(left, right) {
+    const a = normalizeRowState(left, "left");
+    const b = normalizeRowState(right, "right");
+    return a.exists === b.exists &&
+        (!a.exists || a.displayOrder === b.displayOrder);
+}
+
 export function createRevoGridChangeEngine(options = {}) {
     let datasetKey = requireText(
         options.datasetKey ?? "initial",
@@ -123,6 +140,8 @@ export function createRevoGridChangeEngine(options = {}) {
     // Undo/Redo history is intentionally owned by Sheet History.
     const trackedCells = new Map();
     const dirtyKeys = new Set();
+    const trackedRows = new Map();
+    const dirtyRowKeys = new Set();
     const pendingCaptures = new Map();
 
     let pendingSave = null;
@@ -192,9 +211,73 @@ export function createRevoGridChangeEngine(options = {}) {
         );
     }
 
+    function isRowPendingSave(clientKey) {
+        return Boolean(
+            pendingSave?.rows?.some(row => row.clientKey === clientKey)
+        );
+    }
+
+    function isCellDirtyRelevant(clientKey) {
+        const row = trackedRows.get(clientKey);
+        if (!row) {
+            return true;
+        }
+
+        // A new unsaved row is already structurally Dirty as a whole, while a
+        // deleted row is not part of the next update payload. Keep cell state
+        // available for History replay, but do not double-count it as Dirty.
+        return row.baseline.exists && row.current.exists;
+    }
+
+    function refreshCellsForRow(clientKey) {
+        for (const [key, tracked] of trackedCells.entries()) {
+            if (tracked.clientKey === clientKey) {
+                refreshDirtyForKey(key);
+            }
+        }
+    }
+
+    function refreshDirtyForRow(clientKey) {
+        const tracked = trackedRows.get(clientKey);
+        if (!tracked) {
+            dirtyRowKeys.delete(clientKey);
+            return;
+        }
+
+        if (rowStatesEqual(tracked.current, tracked.baseline)) {
+            dirtyRowKeys.delete(clientKey);
+
+            // A row whose Baseline is "does not exist" has been completely
+            // undone/cancelled. Any cell tracker for that temporary row is now
+            // meaningless and must not become Dirty after the row state is
+            // released.
+            if (!tracked.baseline.exists && !tracked.current.exists) {
+                for (const [key, cell] of trackedCells.entries()) {
+                    if (cell.clientKey === clientKey && !isKeyPendingSave(key)) {
+                        dirtyKeys.delete(key);
+                        trackedCells.delete(key);
+                    }
+                }
+            }
+
+            if (!isRowPendingSave(clientKey)) {
+                trackedRows.delete(clientKey);
+            }
+        } else {
+            dirtyRowKeys.add(clientKey);
+        }
+
+        refreshCellsForRow(clientKey);
+    }
+
     function refreshDirtyForKey(key) {
         const tracked = trackedCells.get(key);
         if (!tracked) {
+            dirtyKeys.delete(key);
+            return;
+        }
+
+        if (!isCellDirtyRelevant(tracked.clientKey)) {
             dirtyKeys.delete(key);
             return;
         }
@@ -437,6 +520,87 @@ export function createRevoGridChangeEngine(options = {}) {
         return getState();
     }
 
+    /**
+     * Accept a structural row transition applied by the official row adapter.
+     * The Change Engine owns only structural Baseline/Dirty state; RevoGrid
+     * remains responsible for rendering and visible row projection.
+     */
+    function applyExternalRowChanges(changes, expectedDatasetKey = undefined) {
+        assertDataset(expectedDatasetKey);
+
+        const rawChanges = Array.isArray(changes) ? changes : [];
+        if (rawChanges.length === 0) {
+            return getState();
+        }
+
+        const seen = new Set();
+        const normalized = rawChanges.map(change => {
+            const clientKey = requireText(change?.clientKey, "clientKey");
+            if (seen.has(clientKey)) {
+                throw new RevoGridChangeEngineError(
+                    "DUPLICATE_ROW",
+                    `Row '${clientKey}' appears more than once in the same structural transition.`
+                );
+            }
+            seen.add(clientKey);
+
+            return {
+                clientKey,
+                before: normalizeRowState(change?.before, "before"),
+                after: normalizeRowState(change?.after, "after")
+            };
+        });
+
+        for (const operation of normalized) {
+            const tracked = trackedRows.get(operation.clientKey);
+            if (tracked && !rowStatesEqual(tracked.current, operation.before)) {
+                throw new RevoGridChangeEngineError(
+                    "STALE_ROW_CURRENT",
+                    `Current row state for '${operation.clientKey}' does not match the expected transition start.`,
+                    {
+                        clientKey: operation.clientKey,
+                        engineCurrent: cloneValue(tracked.current),
+                        expectedBefore: cloneValue(operation.before)
+                    }
+                );
+            }
+        }
+
+        for (const operation of normalized) {
+            let tracked = trackedRows.get(operation.clientKey);
+            if (!tracked) {
+                tracked = {
+                    clientKey: operation.clientKey,
+                    baseline: cloneValue(operation.before),
+                    current: cloneValue(operation.before)
+                };
+                trackedRows.set(operation.clientKey, tracked);
+            }
+
+            tracked.current = cloneValue(operation.after);
+            refreshDirtyForRow(operation.clientKey);
+        }
+
+        revision += 1;
+        return getState();
+    }
+
+    function getDirtyRows() {
+        const result = [];
+        for (const clientKey of dirtyRowKeys) {
+            const tracked = trackedRows.get(clientKey);
+            if (!tracked) {
+                continue;
+            }
+            result.push({
+                clientKey,
+                baseline: cloneValue(tracked.baseline),
+                current: cloneValue(tracked.current)
+            });
+        }
+        return result;
+    }
+
     function getDirtyCells() {
         const result = [];
 
@@ -481,12 +645,19 @@ export function createRevoGridChangeEngine(options = {}) {
             value: cloneValue(cell.current)
         }));
 
+        const rows = getDirtyRows().map(row => ({
+            clientKey: row.clientKey,
+            baseline: cloneValue(row.baseline),
+            state: cloneValue(row.current)
+        }));
+
         pendingSave = {
             id: saveId,
             datasetKey,
             startedAt: new Date().toISOString(),
             revision,
-            cells
+            cells,
+            rows
         };
 
         return cloneValue(pendingSave);
@@ -528,6 +699,21 @@ export function createRevoGridChangeEngine(options = {}) {
             refreshDirtyForKey(key);
         }
 
+        for (const saved of accepted.rows ?? []) {
+            let tracked = trackedRows.get(saved.clientKey);
+            if (!tracked) {
+                tracked = {
+                    clientKey: saved.clientKey,
+                    baseline: cloneValue(saved.state),
+                    current: cloneValue(saved.state)
+                };
+                trackedRows.set(saved.clientKey, tracked);
+            } else {
+                tracked.baseline = cloneValue(saved.state);
+            }
+            refreshDirtyForRow(saved.clientKey);
+        }
+
         revision += 1;
         return cloneValue(accepted);
     }
@@ -547,6 +733,9 @@ export function createRevoGridChangeEngine(options = {}) {
         for (const saved of rejected.cells) {
             refreshDirtyForKey(saved.key);
         }
+        for (const saved of rejected.rows ?? []) {
+            refreshDirtyForRow(saved.clientKey);
+        }
 
         return true;
     }
@@ -557,7 +746,7 @@ export function createRevoGridChangeEngine(options = {}) {
             "datasetKey"
         );
 
-        if (dirtyKeys.size > 0 && options.force !== true) {
+        if ((dirtyKeys.size > 0 || dirtyRowKeys.size > 0) && options.force !== true) {
             throw new RevoGridChangeEngineError(
                 "DIRTY_DATASET",
                 "Dataset cannot be replaced while unsaved changes exist."
@@ -574,6 +763,8 @@ export function createRevoGridChangeEngine(options = {}) {
         datasetKey = normalizedDatasetKey;
         trackedCells.clear();
         dirtyKeys.clear();
+        trackedRows.clear();
+        dirtyRowKeys.clear();
         pendingCaptures.clear();
         revision += 1;
 
@@ -581,12 +772,17 @@ export function createRevoGridChangeEngine(options = {}) {
     }
 
     function getState() {
+        const dirtyCellCount = dirtyKeys.size;
+        const dirtyRowCount = dirtyRowKeys.size;
         return {
             datasetKey,
             revision,
-            dirty: dirtyKeys.size > 0,
-            dirtyCellCount: dirtyKeys.size,
+            dirty: dirtyCellCount > 0 || dirtyRowCount > 0,
+            dirtyCount: dirtyCellCount + dirtyRowCount,
+            dirtyCellCount,
+            dirtyRowCount,
             trackedCellCount: trackedCells.size,
+            trackedRowCount: trackedRows.size,
             pendingCaptureCount: pendingCaptures.size,
             saveActive: Boolean(pendingSave)
         };
@@ -597,11 +793,13 @@ export function createRevoGridChangeEngine(options = {}) {
         cancelCapture,
         finalizeAfter,
         applyExternalChanges,
+        applyExternalRowChanges,
         beginSave,
         acceptSave,
         rejectSave,
         resetDataset,
         getDirtyCells,
+        getDirtyRows,
         getState
     });
 }

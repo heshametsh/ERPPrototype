@@ -60,6 +60,26 @@ export function calculateMinimalRevealCoordinate({
     return Math.abs(next - current) > 0.5 ? next : null;
 }
 
+export function itemIntersectsViewport({
+    currentCoordinate,
+    viewportSize,
+    itemStart,
+    itemSize
+}) {
+    const current = Math.max(0, finiteNumber(currentCoordinate));
+    const viewport = positiveNumber(viewportSize);
+    const start = Math.max(0, finiteNumber(itemStart));
+    const size = positiveNumber(itemSize);
+
+    if (!viewport || !size) {
+        return false;
+    }
+
+    const end = start + size;
+    const viewportEnd = current + viewport;
+    return end > current && start < viewportEnd;
+}
+
 function getDimensionState(providers, dimension) {
     const store = providers?.dimension?.stores?.[dimension];
     return typeof store?.getCurrentState === "function"
@@ -118,6 +138,29 @@ function planDimensionReveal(providers, dimension, index) {
     });
 }
 
+function isDimensionItemVisible(providers, dimension, index) {
+    const dimensionState = getDimensionState(providers, dimension);
+    const viewportState = getViewportState(providers, dimension);
+
+    if (
+        !dimensionState ||
+        !viewportState ||
+        typeof providers?.dimension?.getViewPortPos !== "function"
+    ) {
+        return false;
+    }
+
+    return itemIntersectsViewport({
+        currentCoordinate: viewportState.currentCoordinate,
+        viewportSize: viewportState.viewportSize,
+        itemStart: providers.dimension.getViewPortPos({
+            coordinate: index,
+            dimension
+        }),
+        itemSize: getItemSize(dimensionState, index)
+    });
+}
+
 /**
  * RevoGrid History focus/reveal feedback.
  *
@@ -135,15 +178,15 @@ export function createRevoGridHistoryFocus(options) {
         throw new Error("A compatible RevoGrid element is required.");
     }
 
-    async function focusTarget(target) {
+    async function resolveTarget(target) {
         if (!target) {
-            return false;
+            return null;
         }
 
         const clientKey = String(target.clientKey ?? "").trim();
         const field = String(target.field ?? "").trim();
         if (!clientKey || !field) {
-            return false;
+            return null;
         }
 
         const visibleRows = await grid.getVisibleSource();
@@ -152,10 +195,9 @@ export function createRevoGridHistoryFocus(options) {
                 String(row?.clientKey ?? "") === clientKey)
             : -1;
 
-        // A row hidden by a Filter is intentionally not force-revealed here.
-        // When Filter joins Sheet History, its own adapter restores its state.
+        // A row removed by Filter is not a valid focus target.
         if (y < 0) {
-            return false;
+            return null;
         }
 
         const providers = typeof grid.getProviders === "function"
@@ -191,12 +233,45 @@ export function createRevoGridHistoryFocus(options) {
         }
 
         if (!column || x < 0) {
+            return null;
+        }
+
+        return { x, y, colType, providers };
+    }
+
+    async function isTargetVisible(target) {
+        const resolved = await resolveTarget(target);
+        if (!resolved?.providers) {
             return false;
         }
 
+        if (!isDimensionItemVisible(resolved.providers, "rgRow", resolved.y)) {
+            return false;
+        }
+
+        // Pinned columns are always horizontally visible. The central viewport
+        // must also contain the target column before we keep a non-revealing
+        // selection after a view-only operation such as Sort.
+        if (
+            resolved.colType === "rgCol" &&
+            !isDimensionItemVisible(resolved.providers, "rgCol", resolved.x)
+        ) {
+            return false;
+        }
+
+        return true;
+    }
+
+    async function focusTarget(target, { reveal = true } = {}) {
+        const resolved = await resolveTarget(target);
+        if (!resolved) {
+            return false;
+        }
+
+        const { x, y, colType, providers } = resolved;
+
         // Selection is independent from scrolling in RevoGrid. Move the
-        // selection first. If the cell is already on-screen, this is the only
-        // visible action and the viewport remains exactly where it was.
+        // selection first. View-only callers may explicitly request no reveal.
         await grid.setCellsFocus(
             { x, y },
             { x, y },
@@ -204,7 +279,7 @@ export function createRevoGridHistoryFocus(options) {
             "rgRow"
         );
 
-        if (!providers || typeof grid.scrollToCoordinate !== "function") {
+        if (!reveal || !providers || typeof grid.scrollToCoordinate !== "function") {
             return true;
         }
 
@@ -215,8 +290,6 @@ export function createRevoGridHistoryFocus(options) {
             scroll.y = yCoordinate;
         }
 
-        // Pinned columns are already visible by definition. Only the central
-        // rgCol viewport participates in horizontal scrolling.
         if (colType === "rgCol") {
             const xCoordinate = planDimensionReveal(providers, "rgCol", x);
             if (xCoordinate !== null) {
@@ -232,6 +305,7 @@ export function createRevoGridHistoryFocus(options) {
     }
 
     return Object.freeze({
-        focusTarget
+        focusTarget,
+        isTargetVisible
     });
 }

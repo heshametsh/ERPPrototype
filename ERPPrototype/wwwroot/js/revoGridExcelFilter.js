@@ -5,6 +5,7 @@ const POPUP_STYLE_ID = "erp-revogrid-excel-filter-style";
 const POPUP_CLASS = "erp-revo-excel-filter";
 const FILTER_BUTTON_CLASS = "erp-revo-excel-filter-button";
 const ACTIVE_FILTER_PROP = "hasFilter";
+const FILTER_TRIMMED_TYPE = "filter";
 const VIRTUAL_THRESHOLD = 250;
 const VIRTUAL_ROW_HEIGHT = 30;
 const VIRTUAL_OVERSCAN = 7;
@@ -26,6 +27,22 @@ const MONTH_NAMES = Object.freeze([
 ]);
 
 const nativeSelectionSets = new WeakMap();
+
+export function eventTargetsElement(originalEvent, element) {
+    if (!originalEvent || !(element instanceof Element)) {
+        return false;
+    }
+
+    const path = typeof originalEvent.composedPath === "function"
+        ? originalEvent.composedPath()
+        : [];
+    if (path.includes(element)) {
+        return true;
+    }
+
+    const target = originalEvent.target;
+    return target instanceof Node && element.contains(target);
+}
 
 function requireText(value, name) {
     const normalized = String(value ?? "").trim();
@@ -225,6 +242,39 @@ function rowMatchesOtherFilters(row, compiled, excludedField) {
         }
     }
     return true;
+}
+
+function rowClientKey(row) {
+    const key = String(row?.clientKey ?? "").trim();
+    return key || null;
+}
+
+function normalizeFilterViewDelta(input) {
+    const uniqueKeys = values => {
+        const output = [];
+        const seen = new Set();
+        for (const value of Array.isArray(values) ? values : []) {
+            const key = String(value ?? "").trim();
+            if (!key || seen.has(key)) {
+                continue;
+            }
+            seen.add(key);
+            output.push(key);
+        }
+        return output;
+    };
+
+    const forceVisible = uniqueKeys(input?.forceVisible);
+    const visibleSet = new Set(forceVisible);
+    const forceHidden = uniqueKeys(input?.forceHidden)
+        .filter(key => !visibleSet.has(key));
+
+    return { forceVisible, forceHidden };
+}
+
+function hasFilterViewDelta(input) {
+    const delta = normalizeFilterViewDelta(input);
+    return delta.forceVisible.length > 0 || delta.forceHidden.length > 0;
 }
 
 function compareTokens(left, right) {
@@ -917,6 +967,7 @@ function renderDateTree(ui, candidates, selected, expandedYears, expandedMonths)
 export function createRevoGridExcelFilter(options) {
     const grid = options?.grid;
     const historyCoordinator = options?.historyCoordinator;
+    const selectionLifecycle = options?.selectionLifecycle;
     if (!grid || typeof grid.addEventListener !== "function") {
         throw new Error("A RevoGrid element is required.");
     }
@@ -936,6 +987,7 @@ export function createRevoGridExcelFilter(options) {
     let destroyed = false;
     let applying = false;
     let popupState = null;
+    const ownedKeyboardEvents = new WeakSet();
     const viewStateByDataset = new Map([[datasetKey, {}]]);
     const filterColumns = getFilterColumns(grid);
     const removers = [];
@@ -959,7 +1011,76 @@ export function createRevoGridExcelFilter(options) {
         popupState = null;
     }
 
-    async function applyNativeState(nextState, { remember = true } = {}) {
+    async function captureFilterViewDelta(filterState) {
+        const source = await grid.getSource("rgRow");
+        const store = await grid.getSourceStore("rgRow");
+        const currentFilterTrim = store.get("trimmed")?.[FILTER_TRIMMED_TYPE] ?? {};
+        const compiled = compileFilterState(filterState);
+        const forceVisible = [];
+        const forceHidden = [];
+
+        source.forEach((row, index) => {
+            const key = rowClientKey(row);
+            if (!key) {
+                return;
+            }
+
+            const nativeVisible = rowMatchesOtherFilters(row, compiled, null);
+            const snapshotVisible = !Boolean(currentFilterTrim[index]);
+
+            if (snapshotVisible && !nativeVisible) {
+                forceVisible.push(key);
+            } else if (!snapshotVisible && nativeVisible) {
+                forceHidden.push(key);
+            }
+        });
+
+        return normalizeFilterViewDelta({ forceVisible, forceHidden });
+    }
+
+    async function restoreFilterViewDelta(filterState, viewDelta) {
+        const delta = normalizeFilterViewDelta(viewDelta);
+        if (!hasFilterViewDelta(delta)) {
+            return;
+        }
+
+        const providers = await grid.getProviders();
+        if (!providers?.data || typeof providers.data.setTrimmed !== "function") {
+            throw new Error("RevoGrid DataProvider is not available for filter History replay.");
+        }
+
+        const source = await grid.getSource("rgRow");
+        const compiled = compileFilterState(filterState);
+        const forceVisible = new Set(delta.forceVisible);
+        const forceHidden = new Set(delta.forceHidden);
+        const hidden = {};
+
+        source.forEach((row, index) => {
+            const key = rowClientKey(row);
+            let visible = rowMatchesOtherFilters(row, compiled, null);
+
+            if (key && forceVisible.has(key)) {
+                visible = true;
+            }
+            if (key && forceHidden.has(key)) {
+                visible = false;
+            }
+            if (!visible) {
+                hidden[index] = true;
+            }
+        });
+
+        // Revo still owns the filter trimmed store. History only restores the
+        // small identity delta needed to recreate the employee's previous
+        // working snapshot; it never stores or replaces the whole dataset.
+        providers.data.setTrimmed({ [FILTER_TRIMMED_TYPE]: hidden }, "rgRow");
+        await grid.refresh("rgRow");
+    }
+
+    async function applyNativeState(
+        nextState,
+        { remember = true, preserveSelection = true, viewDelta = null } = {}
+    ) {
         if (destroyed) {
             return;
         }
@@ -968,14 +1089,30 @@ export function createRevoGridExcelFilter(options) {
         applying = true;
         notifyState();
         try {
-            await waitForFilterApply(grid, () => {
-                // RevoGrid 4.25.2 FilterPlugin watches this property and runs
-                // its own runFiltering -> setTrimmed path. We only provide the
-                // selected-value criteria; we never calculate trimmed rows.
-                grid.filter = {
-                    multiFilterItems: buildNativeFilterItems(normalized)
-                };
-            });
+            const applyFilter = async () => {
+                await waitForFilterApply(grid, () => {
+                    // RevoGrid 4.25.2 FilterPlugin watches this property and runs
+                    // its own runFiltering -> setTrimmed path. We only provide the
+                    // selected-value criteria; we never replace its filter engine.
+                    grid.filter = {
+                        multiFilterItems: buildNativeFilterItems(normalized)
+                    };
+                });
+
+                if (hasFilterViewDelta(viewDelta)) {
+                    await restoreFilterViewDelta(normalized, viewDelta);
+                }
+            };
+
+            if (
+                preserveSelection &&
+                typeof selectionLifecycle?.runWithPreservedCellSelection === "function"
+            ) {
+                await selectionLifecycle.runWithPreservedCellSelection(applyFilter);
+            } else {
+                await applyFilter();
+            }
+
             activeState = normalized;
             if (remember) {
                 viewStateByDataset.set(datasetKey, cloneValue(activeState));
@@ -989,12 +1126,19 @@ export function createRevoGridExcelFilter(options) {
     async function commitUserState(nextState, label) {
         const before = normalizeFilterState(activeState);
         const after = normalizeFilterState(nextState);
-        if (statesEqual(before, after)) {
+        const beforeViewDelta = await captureFilterViewDelta(before);
+
+        // Pressing Apply with the same checkbox selection is still a real action
+        // when Edit/Paste/Insert changed which rows currently belong to that
+        // filter. If the working snapshot already matches the native result, it
+        // remains a no-op and does not pollute Undo History.
+        if (statesEqual(before, after) && !hasFilterViewDelta(beforeViewDelta)) {
             closePopup();
             return false;
         }
 
         await applyNativeState(after);
+        const afterViewDelta = await captureFilterViewDelta(after);
 
         try {
             historyCoordinator.record({
@@ -1002,10 +1146,15 @@ export function createRevoGridExcelFilter(options) {
                 kind: "filter",
                 label,
                 focusTarget: null,
-                payload: { before, after }
+                payload: {
+                    before,
+                    after,
+                    beforeViewDelta,
+                    afterViewDelta
+                }
             });
         } catch (error) {
-            await applyNativeState(before);
+            await applyNativeState(before, { viewDelta: beforeViewDelta });
             throw error;
         }
 
@@ -1017,10 +1166,14 @@ export function createRevoGridExcelFilter(options) {
         HISTORY_ADAPTER_KEY,
         {
             apply: async (entry, direction) => {
-                const target = direction === "undo"
+                const isUndo = direction === "undo";
+                const target = isUndo
                     ? entry?.payload?.before
                     : entry?.payload?.after;
-                await applyNativeState(target ?? {});
+                const viewDelta = isUndo
+                    ? entry?.payload?.beforeViewDelta
+                    : entry?.payload?.afterViewDelta;
+                await applyNativeState(target ?? {}, { viewDelta });
             }
         }
     );
@@ -1048,6 +1201,16 @@ export function createRevoGridExcelFilter(options) {
         );
 
         const ui = createBasePopup(definition.title, definition.kind);
+
+        // RevoGrid intentionally clears cell focus when mouseup/touchend
+        // finishes outside the grid. The ERP filter popup lives in document.body,
+        // so mark interactions inside that popup as handled. This preserves the
+        // employee's selected cell until the filter result itself decides whether
+        // that logical Work Order is still visible.
+        const keepGridSelection = event => event.preventDefault();
+        ui.popup.addEventListener("mouseup", keepGridSelection);
+        ui.popup.addEventListener("touchend", keepGridSelection, { passive: false });
+
         const expandedYears = new Set();
         const expandedMonths = new Set();
         popupState = {
@@ -1148,34 +1311,27 @@ export function createRevoGridExcelFilter(options) {
     };
 
     const onDocumentKeyDown = event => {
+        // RevoGrid listens for keyboard input at document level. The filter
+        // popup intentionally lives outside the grid, so mark its keyboard
+        // events before Revo's overlay proxies see them. We block only Revo's
+        // proxy event later; the original KeyboardEvent is left untouched so
+        // normal typing, Backspace, arrows, Enter, etc. still work in the popup.
+        if (popupState && eventTargetsElement(event, popupState.ui.popup)) {
+            ownedKeyboardEvents.add(event);
+        }
+
         if (event.key === "Escape") {
             closePopup();
         }
     };
 
-    const refreshAfterDataMutation = () => {
-        if (Object.keys(activeState).length === 0 || applying || destroyed) {
-            return;
-        }
-        queueMicrotask(() => {
-            if (!applying && !destroyed) {
-                void applyNativeState(activeState);
-            }
-        });
-    };
-
-    const refreshAfterHistoryReplay = event => {
-        if (event.detail?.entry?.adapterKey === HISTORY_ADAPTER_KEY) {
-            return;
-        }
-        refreshAfterDataMutation();
-    };
+    // ERP filter semantics are intentionally snapshot-based. Edits, Paste and
+    // row Insert/Delete do not re-run the active filter underneath the employee.
+    // RevoGrid evaluates current row values only when the employee explicitly
+    // applies/clears a filter again (or History replays a filter action).
 
     addListener(grid, "headerclick", onHeaderClick);
     addListener(grid, "viewportscroll", closePopup);
-    addListener(grid, "afteredit", refreshAfterDataMutation);
-    addListener(grid, "afterpasteapply", refreshAfterDataMutation);
-    addListener(grid, "erpaftersheethistoryreplay", refreshAfterHistoryReplay);
     addListener(document, "pointerdown", onDocumentPointerDown, true);
     addListener(document, "keydown", onDocumentKeyDown, true);
     addListener(window, "resize", closePopup, { passive: true });
@@ -1186,7 +1342,7 @@ export function createRevoGridExcelFilter(options) {
         // before Revo receives the next year's source. This prevents one year's
         // filter from being transiently applied to another dataset.
         const remembered = cloneValue(activeState);
-        await applyNativeState({}, { remember: false });
+        await applyNativeState({}, { remember: false, preserveSelection: false });
         activeState = remembered;
     }
 
@@ -1199,11 +1355,32 @@ export function createRevoGridExcelFilter(options) {
         if (!viewStateByDataset.has(datasetKey)) {
             viewStateByDataset.set(datasetKey, {});
         }
-        await applyNativeState(restored);
+        await applyNativeState(restored, { preserveSelection: false });
     }
 
     async function resumeCurrentDataset() {
         await applyNativeState(activeState);
+    }
+
+    function ownsKeyboardEvent(originalEvent) {
+        if (!originalEvent) {
+            return false;
+        }
+
+        // WeakSet keeps ownership true for the whole physical key event even
+        // if Escape closes the popup before all Revo overlay proxies run.
+        if (ownedKeyboardEvents.has(originalEvent)) {
+            return true;
+        }
+
+        return Boolean(
+            popupState &&
+            eventTargetsElement(originalEvent, popupState.ui.popup)
+        );
+    }
+
+    function replaceRows(nextRows) {
+        rows = Array.isArray(nextRows) ? nextRows : [];
     }
 
     function getState() {
@@ -1241,8 +1418,10 @@ export function createRevoGridExcelFilter(options) {
         suspendForDatasetSwitch,
         resetDataset,
         resumeCurrentDataset,
+        replaceRows,
         getState,
         getFilterState,
+        ownsKeyboardEvent,
         destroy
     });
 }
@@ -1254,6 +1433,8 @@ export const revoGridExcelFilterInternals = Object.freeze({
     normalizeToken,
     normalizeFilterState,
     statesEqual,
+    normalizeFilterViewDelta,
+    hasFilterViewDelta,
     parseDateToken,
     buildNativeFilterItems
 });
