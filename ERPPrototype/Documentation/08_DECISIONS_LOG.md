@@ -434,7 +434,7 @@
 ## DEC-036 — Gate 5B-3 keeps Excel-like filter UX while Revo Community owns filtering
 
 - **Date:** 2026-08-21
-- **Status:** Approved implementation direction; manual runtime qualification pending.
+- **Status:** Functionally accepted by user; active-filter header indication is completed by DEC-037.
 - **Decision:** Work Orders keeps the accepted Excel-like filtering experience instead of exposing Revo Community's condition-panel UI. The ERP layer owns only the picker UI and selected-value state; RevoGrid Community 4.25.2 `FilterPlugin` remains the engine that calculates and applies filtered/trimmed rows.
 - **Column capability rule:** `Work Order Number`, `Work Type`, `Assignment Date`, and `Basket` are Filter-only. `Work Order Value`, `Partial Amount`, and `Remaining Amount` are Sort-only. Custom `Text`, `Date`, and `Number` are Filter-only; custom `Money` is Sort-only.
 - **Date UX:** Date filters use the approved hierarchy `Year → Month → Day` with Search, Select All, Clear Filter, and Apply. Value filters use an Excel-like checkbox list and virtualize large option sets rather than rendering every Work Order number into the DOM.
@@ -444,3 +444,19 @@
 - **Data-change rule:** When Edit/Paste/Undo changes data while a filter is active, the same native filter criteria are reapplied so visible rows continue to reflect the current cell values; the filter criteria themselves are not recorded again.
 - **Revo source evidence:** Community 4.25.2 renders its native filter button only when grid filtering is enabled and `column.filter !== false`, while `FilterPlugin.getRowFilter` evaluates programmatic `multiFilterItems` against the column map independently of that header-button flag. This allows a custom ERP picker without replacing Revo's filter engine.
 - **Pro reference:** Revo Pro demonstrates the same architectural separation of enhanced filter UI/plugins from the grid/filter core. The exact Excel date tree is an ERP UX choice; no claim is made that Pro implements this exact tree and no proprietary source is used.
+
+
+## DEC-037 — Gate 5B-4 separates Header Selection, Filter, and Sort without patching Revo
+
+- **Date:** 2026-08-21
+- **Status:** Implemented for isolated runtime qualification.
+- **Decision:** A Work Orders data-column header has three distinct responsibilities. Clicking the header body selects that column across the rows currently visible in the Revo view. Clicking the Filter button opens the ERP Excel-like picker. Clicking the dedicated Sort button changes sorting. The whole header is no longer an implicit Sort target in Gate 5B-4.
+- **Visible-selection rule:** whole-column selection uses Revo Community public `getVisibleSource("rgRow")` and `setCellsFocus(...)`. If a filter leaves 200 visible rows from a 4,000-row dataset, header selection covers only those 200 visible rows. Hidden/trimmed rows are never silently included.
+- **Filter-active rule:** the Filter button never disappears after Apply. Revo Community `FilterPlugin` already owns the column `hasFilter` flag when native filtering is applied; the ERP template only renders that native state as a clearly active funnel. No duplicate ERP filter-active state is introduced.
+- **Sort engine rule:** only approved Money columns expose Sort. The dedicated ERP Sort control calls Revo Community public `updateColumnSorting(...)` / `clearSorting()`; Revo `SortingPlugin` continues to own comparator selection, proxy-index ordering, viewport refresh, and `aftersortingapply`. ERP code does not reorder `source`.
+- **Sort cycle:** Work Orders numeric sorting follows the approved business UX: first click `desc` (largest to smallest), second click `asc`, third click returns to natural source order. Only one Sort column is active at a time.
+- **History/Dirty rule:** one user Sort transition is one Sheet History action. Undo/Redo replays through the same native sorting API and does not record itself again. Sort is view state only and never enters Change Engine Dirty or Save payload.
+- **Year rule:** Sort view state is independent per visited year for the current page session, matching Filter view-state ownership. A first visit to a year starts unsorted. A clean year switch clears the old History; returning to a visited year restores its Sort/Filter view without restoring the old Undo stack.
+- **Interaction rule:** clicks on Filter/Sort controls are excluded from whole-column selection. A plain header-body click is Selection only. This separation keeps each feature owner explicit and avoids the Tabulator-style coupling being retired.
+- **Community source evidence:** exact 4.25.2 source shows `SortingPlugin` triggers implicit header sorting only when `column.sortable` is true; the public grid API exposes `updateColumnSorting`, `clearSorting`, `getVisibleSource`, and `setCellsFocus`. The filter plugin updates `hasFilter` itself when applying native filter state. Gate 5B-4 uses those public/native boundaries and does not patch Revo source.
+- **Pro reference:** Revo Pro documents a dedicated `ColumnSelectionPlugin` that reacts to header interaction and integrates with selection/data stores. Pro/Community sorting retains a separate `SortingPlugin`. Gate 5B-4 follows that responsibility split while keeping the ERP-specific visible-only selection and dedicated icon UX. No proprietary source is used or copied.

@@ -3,7 +3,8 @@ import { defineCustomElement as defineFilterPanel } from "https://cdn.jsdelivr.n
 import {
     createExcelFilterColumn,
     createExcelFilterNativeConfig
-} from "./revoGridExcelFilter.js?v=20260821-gate5b3-excel-filter-1";
+} from "./revoGridExcelFilter.js?v=20260821-gate5b4-header-sort-1";
+import { createSortOnlyColumn } from "./revoGridSort.js?v=20260821-gate5b4-header-sort-1";
 
 const VERSION = "4.25.2";
 const states = new Map();
@@ -74,7 +75,7 @@ function buildLegacyGateColumns(customColumns) {
     return core.concat(custom);
 }
 
-function buildExcelFilterGateColumns(customColumns) {
+function buildExcelFilterGateColumns(customColumns, enableHeaderActions) {
     // Gate 5B-3 restores the approved Work Orders capability split:
     // filter-only fields get the Excel-like ERP button, money fields are
     // sort-only, and no column exposes Revo's condition-panel button.
@@ -88,9 +89,15 @@ function buildExcelFilterGateColumns(customColumns) {
         createExcelFilterColumn(
             { name: "Assignment Date", prop: "assignmentDate", size: 160, autoSize: true },
             "date"),
-        { name: "Work Order Value", prop: "workOrderValue", size: 190, sortable: true, filter: false, autoSize: true },
-        { name: "Partial Amount", prop: "partialAmount", size: 180, sortable: true, filter: false, autoSize: true },
-        { name: "Remaining Amount", prop: "remainingAmount", size: 200, sortable: true, filter: false, readonly: true, autoSize: true },
+        enableHeaderActions
+            ? createSortOnlyColumn({ name: "Work Order Value", prop: "workOrderValue", size: 190, autoSize: true }, "number")
+            : { name: "Work Order Value", prop: "workOrderValue", size: 190, sortable: true, filter: false, autoSize: true },
+        enableHeaderActions
+            ? createSortOnlyColumn({ name: "Partial Amount", prop: "partialAmount", size: 180, autoSize: true }, "number")
+            : { name: "Partial Amount", prop: "partialAmount", size: 180, sortable: true, filter: false, autoSize: true },
+        enableHeaderActions
+            ? createSortOnlyColumn({ name: "Remaining Amount", prop: "remainingAmount", size: 200, readonly: true, autoSize: true }, "number")
+            : { name: "Remaining Amount", prop: "remainingAmount", size: 200, sortable: true, filter: false, readonly: true, autoSize: true },
         createExcelFilterColumn(
             { name: "Basket", prop: "basket", size: 330, autoSize: true },
             "values")
@@ -105,14 +112,19 @@ function buildExcelFilterGateColumns(customColumns) {
         .map(column => {
             const normalizedType = String(column.dataType || "").toLowerCase();
             if (normalizedType === "money") {
-                return {
+                const definition = {
                     name: column.name,
                     prop: column.fieldKey,
                     size: 190,
-                    sortable: true,
-                    filter: false,
                     autoSize: true
                 };
+                return enableHeaderActions
+                    ? createSortOnlyColumn(definition, "number")
+                    : {
+                        ...definition,
+                        sortable: true,
+                        filter: false
+                    };
             }
 
             return createExcelFilterColumn(
@@ -128,9 +140,9 @@ function buildExcelFilterGateColumns(customColumns) {
     return core.concat(custom);
 }
 
-function buildColumns(customColumns, enableExcelFilter) {
+function buildColumns(customColumns, enableExcelFilter, enableHeaderActions) {
     return enableExcelFilter
-        ? buildExcelFilterGateColumns(customColumns)
+        ? buildExcelFilterGateColumns(customColumns, enableHeaderActions)
         : buildLegacyGateColumns(customColumns);
 }
 
@@ -186,7 +198,14 @@ export async function initialize(elementId, rows, customColumns, options) {
     const enableExcelFilter = Boolean(
         value(options, "enableExcelFilter", "EnableExcelFilter", false)
     );
-    const columns = buildColumns(customColumns, enableExcelFilter);
+    const enableHeaderActions = Boolean(
+        value(options, "enableHeaderActions", "EnableHeaderActions", false)
+    );
+    const columns = buildColumns(
+        customColumns,
+        enableExcelFilter,
+        enableHeaderActions
+    );
     const startedAt = performance.now();
 
     const grid = document.createElement("revo-grid");

@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>RevoGrid Gate 5B-4 Header Actions Lab</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 24px; color: #1f2937; }
+        h1 { font-size: 20px; }
+        #summary { font-weight: 700; margin: 12px 0; }
+        .pass { color: #067647; }
+        .fail { color: #b42318; }
+        li { margin: 5px 0; }
+    </style>
+</head>
+<body>
+    <h1>RevoGrid Gate 5B-4 — Header Selection / Filter State / Sort State Lab</h1>
+    <div id="summary">Running…</div>
+    <ol id="results"></ol>
+
+    <script type="module">
+        import {
+            createSortOnlyColumn,
+            createRevoGridSort,
+            getNextErpSortOrder,
+            normalizeSortState,
+            sortStatesEqual
+        } from "/js/revoGridSort.js?v=20260821-gate5b4-header-sort-1";
+        import {
+            createRevoGridColumnSelection,
+            getVisibleColumnSelectionRange
+        } from "/js/revoGridColumnSelection.js?v=20260821-gate5b4-header-sort-1";
+        import {
+            excelFilterHeaderTemplate
+        } from "/js/revoGridExcelFilter.js?v=20260821-gate5b4-header-sort-1";
+
+        const results = [];
+        async function test(name, action) {
+            let passed = false;
+            let error = null;
+            try { passed = Boolean(await action()); } catch (ex) { error = ex; }
+            results.push({ name, passed, error });
+        }
+
+        function fakeH(tag, props, children = []) {
+            return { tag, props: props || {}, children: Array.isArray(children) ? children : [children] };
+        }
+
+        class FakeGrid extends EventTarget {
+            constructor(visibleRows = 200) {
+                super();
+                this.visibleRows = visibleRows;
+                this.columns = [
+                    { name: "Basket", prop: "basket" },
+                    createSortOnlyColumn({ name: "Work Order Value", prop: "workOrderValue" }, "number")
+                ];
+                this.sortCalls = [];
+                this.focusCalls = [];
+                this.clearFocusCalls = 0;
+            }
+
+            async getColumns() { return this.columns; }
+            async getVisibleSource() {
+                return Array.from({ length: this.visibleRows }, (_, i) => ({ i }));
+            }
+            async setCellsFocus(start, end, colType, rowType) {
+                this.focusCalls.push({ start, end, colType, rowType });
+            }
+            async clearFocus() { this.clearFocusCalls += 1; }
+
+            async updateColumnSorting(column, order, additive) {
+                this.sortCalls.push({ type: "sort", column, order, additive });
+                this.dispatchEvent(new CustomEvent("aftersortingapply", {
+                    detail: { sorting: { [column.prop]: order } }
+                }));
+            }
+
+            async clearSorting() {
+                this.sortCalls.push({ type: "clear" });
+                this.dispatchEvent(new CustomEvent("aftersortingapply", {
+                    detail: { sorting: undefined }
+                }));
+            }
+        }
+
+        function fakeHistory() {
+            const adapters = new Map();
+            const entries = [];
+            return {
+                entries,
+                registerAdapter(key, adapter) {
+                    adapters.set(key, adapter);
+                    return () => adapters.delete(key);
+                },
+                record(entry) { entries.push(entry); },
+                async replay(index, direction) {
+                    const entry = entries[index];
+                    await adapters.get(entry.adapterKey).apply(entry, direction);
+                }
+            };
+        }
+
+        function headerEvent(prop, pathItems) {
+            const originalEvent = {
+                target: pathItems[0] ?? null,
+                composedPath: () => pathItems,
+                preventDefault() {}
+            };
+            return new CustomEvent("headerclick", {
+                cancelable: true,
+                detail: { prop, originalEvent }
+            });
+        }
+
+        async function waitFor(predicate, timeoutMs = 1000) {
+            const started = performance.now();
+            while (!predicate()) {
+                if (performance.now() - started > timeoutMs) {
+                    throw new Error("Timed out waiting for async header action.");
+                }
+                await new Promise(resolve => setTimeout(resolve, 0));
+            }
+        }
+
+        await test("Sort cycle is none → desc → asc → natural", () =>
+            getNextErpSortOrder(undefined) === "desc" &&
+            getNextErpSortOrder("desc") === "asc" &&
+            getNextErpSortOrder("asc") === undefined);
+
+        await test("Only valid one-column sort states normalize", () =>
+            JSON.stringify(normalizeSortState({ field: "workOrderValue", order: "desc" })) ===
+                JSON.stringify({ field: "workOrderValue", order: "desc" }) &&
+            normalizeSortState({ field: "workOrderValue", order: "sideways" }) === null);
+
+        await test("Equivalent sort states compare equal", () =>
+            sortStatesEqual(
+                { field: "workOrderValue", order: "desc" },
+                { field: "workOrderValue", order: "desc" }));
+
+        await test("Visible 200-row column range is exactly y=0..199", () => {
+            const range = getVisibleColumnSelectionRange(200, 3);
+            return range?.start?.x === 3 && range.start.y === 0 &&
+                range.end.x === 3 && range.end.y === 199;
+        });
+
+        await test("Zero visible rows creates no column range", () =>
+            getVisibleColumnSelectionRange(0, 2) === null);
+
+        await test("Active filter icon remains visible and clearly active", () => {
+            const tree = excelFilterHeaderTemplate(fakeH, {
+                name: "Basket",
+                prop: "basket",
+                hasFilter: true
+            });
+            const button = tree.children[1];
+            return button.props["aria-pressed"] === "true" &&
+                button.props.style.opacity === "1" &&
+                button.props.style.background === "#d8eefc" &&
+                button.props.style.color === "#0b5f8a";
+        });
+
+        await test("Inactive filter icon stays present in normal state", () => {
+            const tree = excelFilterHeaderTemplate(fakeH, {
+                name: "Basket",
+                prop: "basket",
+                hasFilter: false
+            });
+            const button = tree.children[1];
+            return button.props["aria-pressed"] === "false" &&
+                button.props.style.background === "transparent";
+        });
+
+        await test("Header body selects only currently visible rows", async () => {
+            const grid = new FakeGrid(200);
+            const controller = createRevoGridColumnSelection({ grid });
+            await controller.selectVisibleColumn("basket");
+            controller.destroy();
+            const focus = grid.focusCalls[0];
+            return grid.focusCalls.length === 1 &&
+                focus.start.y === 0 && focus.end.y === 199 &&
+                focus.start.x === 0 && focus.end.x === 0;
+        });
+
+        await test("Empty filtered result clears focus instead of selecting hidden rows", async () => {
+            const grid = new FakeGrid(0);
+            const controller = createRevoGridColumnSelection({ grid });
+            await controller.selectVisibleColumn("basket");
+            controller.destroy();
+            return grid.focusCalls.length === 0 && grid.clearFocusCalls === 1;
+        });
+
+        await test("Sort icon uses Revo native sorting API and records one History action", async () => {
+            const grid = new FakeGrid(200);
+            const history = fakeHistory();
+            const sort = createRevoGridSort({
+                grid,
+                datasetKey: "work-orders:2026",
+                historyCoordinator: history
+            });
+            const button = document.createElement("button");
+            button.className = "erp-revo-sort-button";
+            button.setAttribute("data-erp-sort-prop", "workOrderValue");
+
+            grid.dispatchEvent(headerEvent("workOrderValue", [button]));
+            await waitFor(() => history.entries.length === 1 && !sort.getState().sortBusy);
+
+            const state = sort.getSortState();
+            const ok = grid.sortCalls.length === 1 &&
+                grid.sortCalls[0].type === "sort" &&
+                grid.sortCalls[0].order === "desc" &&
+                state.field === "workOrderValue" && state.order === "desc" &&
+                history.entries.length === 1;
+            sort.destroy();
+            return ok;
+        });
+
+        await test("Second sort click reverses; third click clears to natural order", async () => {
+            const grid = new FakeGrid(200);
+            const history = fakeHistory();
+            const sort = createRevoGridSort({
+                grid,
+                datasetKey: "work-orders:2026",
+                historyCoordinator: history
+            });
+            const button = document.createElement("button");
+            button.className = "erp-revo-sort-button";
+            button.setAttribute("data-erp-sort-prop", "workOrderValue");
+
+            for (let expected = 1; expected <= 3; expected += 1) {
+                grid.dispatchEvent(headerEvent("workOrderValue", [button]));
+                await waitFor(() => history.entries.length === expected && !sort.getState().sortBusy);
+            }
+
+            const ok = grid.sortCalls.map(x => x.type === "clear" ? "clear" : x.order).join(",") ===
+                    "desc,asc,clear" &&
+                sort.getSortState() === null &&
+                history.entries.length === 3;
+            sort.destroy();
+            return ok;
+        });
+
+        await test("Sort History replay uses the same native API and does not record again", async () => {
+            const grid = new FakeGrid(200);
+            const history = fakeHistory();
+            const sort = createRevoGridSort({
+                grid,
+                datasetKey: "work-orders:2026",
+                historyCoordinator: history
+            });
+            const button = document.createElement("button");
+            button.className = "erp-revo-sort-button";
+            button.setAttribute("data-erp-sort-prop", "workOrderValue");
+
+            grid.dispatchEvent(headerEvent("workOrderValue", [button]));
+            await waitFor(() => history.entries.length === 1 && !sort.getState().sortBusy);
+            await history.replay(0, "undo");
+            const afterUndo = sort.getSortState();
+            await history.replay(0, "redo");
+            const afterRedo = sort.getSortState();
+
+            const ok = history.entries.length === 1 &&
+                afterUndo === null &&
+                afterRedo?.field === "workOrderValue" && afterRedo?.order === "desc";
+            sort.destroy();
+            return ok;
+        });
+
+        await test("Sort control click does not become whole-column selection", async () => {
+            const grid = new FakeGrid(200);
+            const history = fakeHistory();
+            const sort = createRevoGridSort({
+                grid,
+                datasetKey: "work-orders:2026",
+                historyCoordinator: history
+            });
+            const selection = createRevoGridColumnSelection({ grid });
+            const button = document.createElement("button");
+            button.className = "erp-revo-sort-button";
+            button.setAttribute("data-erp-sort-prop", "workOrderValue");
+
+            grid.dispatchEvent(headerEvent("workOrderValue", [button]));
+            await waitFor(() => history.entries.length === 1 && !sort.getState().sortBusy);
+            await new Promise(resolve => setTimeout(resolve, 0));
+            const ok = grid.focusCalls.length === 0;
+            selection.destroy();
+            sort.destroy();
+            return ok;
+        });
+
+        await test("Filter control click does not become whole-column selection", async () => {
+            const grid = new FakeGrid(200);
+            const selection = createRevoGridColumnSelection({ grid });
+            const button = document.createElement("button");
+            button.setAttribute("data-erp-filter-prop", "basket");
+            grid.dispatchEvent(headerEvent("basket", [button]));
+            await new Promise(resolve => setTimeout(resolve, 0));
+            const ok = grid.focusCalls.length === 0;
+            selection.destroy();
+            return ok;
+        });
+
+        const list = document.getElementById("results");
+        let passed = 0;
+        for (const result of results) {
+            const li = document.createElement("li");
+            li.className = result.passed ? "pass" : "fail";
+            li.textContent = `${result.passed ? "PASS" : "FAIL"} — ${result.name}${result.error ? `: ${result.error.message}` : ""}`;
+            list.appendChild(li);
+            if (result.passed) passed += 1;
+        }
+        const failed = results.length - passed;
+        const summary = document.getElementById("summary");
+        summary.textContent = `PASS ${passed} / FAIL ${failed}`;
+        summary.className = failed === 0 ? "pass" : "fail";
+    </script>
+</body>
+</html>

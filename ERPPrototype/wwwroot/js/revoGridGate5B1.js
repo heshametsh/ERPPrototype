@@ -1,8 +1,10 @@
-import * as nativeGate5A from "./revoGridNativeGate5A.js?v=20260821-gate5b3-excel-filter-1";
+import * as nativeGate5A from "./revoGridNativeGate5A.js?v=20260821-gate5b4-header-sort-1";
 import { createRevoGridChangeBridge } from "./revoGridChangeBridge.js?v=20260821-gate5b2-paste-1";
 import { createRevoGridHistoryCoordinator } from "./revoGridHistoryCoordinator.js?v=20260821-minimal-reveal-1";
 import { createRevoGridHistoryFocus } from "./revoGridHistoryFocus.js?v=20260821-minimal-reveal-1";
-import { createRevoGridExcelFilter } from "./revoGridExcelFilter.js?v=20260821-gate5b3-excel-filter-1";
+import { createRevoGridExcelFilter } from "./revoGridExcelFilter.js?v=20260821-gate5b4-header-sort-1";
+import { createRevoGridSort } from "./revoGridSort.js?v=20260821-gate5b4-header-sort-1";
+import { createRevoGridColumnSelection } from "./revoGridColumnSelection.js?v=20260821-gate5b4-header-sort-1";
 
 const bindings = new Map();
 
@@ -51,6 +53,7 @@ function combinedState(state) {
 function renderState(state) {
     const current = combinedState(state);
     const filterBusy = Boolean(state.excelFilter?.getState().filterBusy);
+    const sortBusy = Boolean(state.sortController?.getState().sortBusy);
 
     if (state.statusElement) {
         state.statusElement.textContent = current.dirty
@@ -71,6 +74,7 @@ function renderState(state) {
         state.undoButton.disabled =
             state.datasetSwitchActive ||
             filterBusy ||
+            sortBusy ||
             current.editLocked ||
             current.replayActive ||
             current.undoCount === 0;
@@ -80,6 +84,7 @@ function renderState(state) {
         state.redoButton.disabled =
             state.datasetSwitchActive ||
             filterBusy ||
+            sortBusy ||
             current.editLocked ||
             current.replayActive ||
             current.redoCount === 0;
@@ -118,6 +123,16 @@ async function destroyBinding(elementId) {
     }
 
     try {
+        state.sortController?.destroy();
+    } catch {
+    }
+
+    try {
+        state.columnSelection?.destroy();
+    } catch {
+    }
+
+    try {
         state.historyCoordinator.destroy();
     } catch {
     }
@@ -146,6 +161,8 @@ export async function initialize(elementId, rows, customColumns, options) {
         historyCoordinator: null,
         changeBridge: null,
         excelFilter: null,
+        sortController: null,
+        columnSelection: null,
         datasetSwitchActive: false,
         handledHistoryKeyEvents: new WeakSet(),
         removers: [],
@@ -192,6 +209,16 @@ export async function initialize(elementId, rows, customColumns, options) {
             historyCoordinator: state.historyCoordinator,
             onStateChange: () => renderState(state)
         });
+    }
+
+    if (Boolean(value(options, "enableHeaderActions", "EnableHeaderActions", false))) {
+        state.sortController = createRevoGridSort({
+            grid,
+            datasetKey: activeDatasetKey,
+            historyCoordinator: state.historyCoordinator,
+            onStateChange: () => renderState(state)
+        });
+        state.columnSelection = createRevoGridColumnSelection({ grid });
     }
 
     addListener(state, state.undoButton, "click", async () => {
@@ -278,7 +305,8 @@ export async function beginDatasetSwitch(elementId) {
         current.activeDataCapture ||
         current.replayActive ||
         current.saveActive ||
-        state.excelFilter?.getState().filterBusy
+        state.excelFilter?.getState().filterBusy ||
+        state.sortController?.getState().sortBusy
     ) {
         return { allowed: false, reason: "busy" };
     }
@@ -314,6 +342,7 @@ export async function replaceDataset(elementId, rows, workYear) {
     const nextDatasetKey = datasetKey(workYear);
 
     let filterSuspended = false;
+    let sortSuspended = false;
 
     try {
         validateClientKeys(rows);
@@ -321,6 +350,11 @@ export async function replaceDataset(elementId, rows, workYear) {
         if (state.excelFilter) {
             await state.excelFilter.suspendForDatasetSwitch();
             filterSuspended = true;
+        }
+
+        if (state.sortController) {
+            await state.sortController.suspendForDatasetSwitch();
+            sortSuspended = true;
         }
 
         await nativeGate5A.replaceDataset(elementId, rows, workYear);
@@ -336,10 +370,21 @@ export async function replaceDataset(elementId, rows, workYear) {
             await state.excelFilter.resetDataset(rows, nextDatasetKey);
             filterSuspended = false;
         }
+
+        if (state.sortController) {
+            await state.sortController.resetDataset(nextDatasetKey);
+            sortSuspended = false;
+        }
     } catch (error) {
         if (filterSuspended && state.excelFilter) {
             try {
                 await state.excelFilter.resumeCurrentDataset();
+            } catch {
+            }
+        }
+        if (sortSuspended && state.sortController) {
+            try {
+                await state.sortController.resumeCurrentDataset();
             } catch {
             }
         }

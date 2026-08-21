@@ -136,18 +136,21 @@ export function excelFilterHeaderTemplate(h, column) {
             type: "button",
             class: FILTER_BUTTON_CLASS,
             "data-erp-filter-prop": prop,
-            "aria-label": `Filter ${String(column?.name ?? prop)}`,
-            title: `Filter ${String(column?.name ?? prop)}`,
+            "aria-label": `Filter ${String(column?.name ?? prop)}${active ? " (active)" : ""}`,
+            "aria-pressed": active ? "true" : "false",
+            title: active
+                ? `Filter ${String(column?.name ?? prop)} (active)`
+                : `Filter ${String(column?.name ?? prop)}`,
             style: {
                 display: "inline-grid",
                 placeItems: "center",
                 width: "20px",
                 height: "20px",
                 padding: "0",
-                border: "0",
+                border: active ? "1px solid #6aaed6" : "1px solid transparent",
                 borderRadius: "3px",
-                background: active ? "rgba(255,255,255,.22)" : "transparent",
-                color: active ? "#ffffff" : "currentColor",
+                background: active ? "#d8eefc" : "transparent",
+                color: active ? "#0b5f8a" : "currentColor",
                 opacity: active ? "1" : ".78",
                 cursor: "pointer",
                 flex: "0 0 auto"

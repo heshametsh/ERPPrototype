@@ -16,14 +16,16 @@
 @inject IJSRuntime JSRuntime
 @inject ILogger<WorkOrdersRevoGridNativeGate5A> Logger
 
-<PageTitle>@(EnableExcelFilter ? "RevoGrid Gate 5B-3" : EnablePaste ? "RevoGrid Gate 5B-2" : EnableChangeEngine ? "RevoGrid Gate 5B-1" : "RevoGrid Native Gate 5A")</PageTitle>
+<PageTitle>@(EnableHeaderActions ? "RevoGrid Gate 5B-4" : EnableExcelFilter ? "RevoGrid Gate 5B-3" : EnablePaste ? "RevoGrid Gate 5B-2" : EnableChangeEngine ? "RevoGrid Gate 5B-1" : "RevoGrid Native Gate 5A")</PageTitle>
 
 <div class="native-gate5a" data-testid="revogrid-native-gate5a">
     <header class="native-gate5a__header">
         <div class="native-gate5a__identity">
             <strong>RevoGrid Community 4.25.2</strong>
-            <span>@(EnableExcelFilter
-                ? "Gate 5B-3 — Excel-like Filter → Revo native Filter Engine → Sheet History"
+            <span>@(EnableHeaderActions
+                ? "Gate 5B-4 — Excel-like Filter + dedicated Sort + visible-column selection → Sheet History"
+                : EnableExcelFilter
+                    ? "Gate 5B-3 — Excel-like Filter → Revo native Filter Engine → Sheet History"
                 : EnablePaste
                     ? "Gate 5B-2 — Cell Edit + Paste → Sheet History / real data"
                     : EnableChangeEngine
@@ -118,7 +120,11 @@
         </main>
 
         <footer class="native-gate5a__note">
-            @if (EnableExcelFilter)
+            @if (EnableHeaderActions)
+            {
+                <span>Gate 5B-4 يفصل تفاعل رأس العمود: الضغط على اسم الهيدر يحدد العمود للصفوف الظاهرة فقط، زر الفلتر يفتح Excel-like Filter، وزر الـSort المخصص يستدعي Revo SortingPlugin من الـAPI الرسمي. Filter/Sort لا يدخلان Dirty وكلاهما يدخل Sheet History.</span>
+            }
+            else if (EnableExcelFilter)
             {
                 <span>Gate 5B-3 يضيف واجهة فلتر شبيهة Excel فوق Revo Community FilterPlugin: Work Order Number / Work Type / Assignment Date / Basket وCustom Text-Date-Number فقط. الفلتر لا يدخل Dirty، لكنه يدخل Sheet History كحركة واحدة عند Apply أو Clear. أعمدة المبالغ تظل Sort فقط.</span>
             }

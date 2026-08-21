@@ -760,3 +760,21 @@ Include:
 - [ ] Gate 5B-2 remains unchanged and still passes its accepted Edit/Paste/Undo behavior.
 - [ ] No Revo source file is patched and no ERP code directly calculates `trimmedRows`.
 - [ ] No browser page error, unexpected console error, failed request, or server 5xx appears during Filter/Undo/Redo/year-switch tests.
+
+
+#### Gate 5B-4 — Header selection + active Filter state + dedicated native Sort
+
+- [ ] `/grid-shootout/revogrid-header-actions-state-lab.html` reports **PASS 14 / FAIL 0**.
+- [ ] `/work-orders-revogrid-gate5b4` loads the same real employee/year dataset as Gate 5B-3.
+- [ ] With no filter, each approved Filter column shows a normal visible funnel. After Apply, the same funnel remains visible and becomes clearly active; Clear/Undo returns it to normal.
+- [ ] A plain click on a data-column header body selects that column and does **not** Sort.
+- [ ] With 4,000 total rows filtered to 200 visible rows, a header-body click selects exactly the 200 visible cells in that column and never includes the 3,800 hidden rows.
+- [ ] Clicking the Filter control opens Filter only and does not trigger whole-column selection or Sort.
+- [ ] Clicking the Sort control triggers Sort only and does not trigger whole-column selection or Filter.
+- [ ] Sort controls exist only on Work Order Value, Partial Amount, Remaining Amount, and custom Money columns. Filter-only columns have no Sort control.
+- [ ] First Sort click is descending (largest to smallest), second is ascending, third clears Sort and returns to natural source order. Only one Sort column is active at a time.
+- [ ] Each Sort transition adds exactly one Sheet History action and leaves Change Engine Clean. Ctrl+Z/Ctrl+Y restores Sort through the same native Revo path without recording replay.
+- [ ] With Filter + Sort active together, editing/pasting a relevant value leaves the correct filtered set and reapplies the current Sort without creating extra Filter/Sort History entries.
+- [ ] History order remains coherent across mixed actions such as Edit → Paste → Filter → Sort; each Ctrl+Z reverses only the latest sheet action.
+- [ ] Sort/Filter 2026, switch clean to a first-visit 2025: 2025 starts with no inherited Sort/Filter. Return to 2026: its view state returns but its old History does not.
+- [ ] No Revo source file is patched; Sort uses public `updateColumnSorting/clearSorting`, selection uses `getVisibleSource/setCellsFocus`, and Filter active state is rendered from native `hasFilter`. No browser page error, unexpected console error, failed request, or server 5xx appears.

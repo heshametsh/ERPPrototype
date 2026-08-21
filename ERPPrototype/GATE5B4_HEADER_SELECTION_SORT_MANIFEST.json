@@ -1,0 +1,46 @@
+{
+  "gate": "5B-4",
+  "date": "2026-08-21",
+  "purpose": "Separate whole-column selection, Excel-like Filter control, and dedicated Sort control while keeping Revo Community 4.25.2 native engines intact.",
+  "route": "/work-orders-revogrid-gate5b4",
+  "lab": "/grid-shootout/revogrid-header-actions-state-lab.html",
+  "revoVersion": "4.25.2",
+  "rules": {
+    "headerBody": "Select the clicked column across currently visible rgRow rows only.",
+    "filteredSelection": "Hidden/trimmed rows are excluded via getVisibleSource(rgRow).",
+    "filterButton": "Open ERP Excel-like filter UI only; active state is rendered from Revo native hasFilter.",
+    "sortButton": "Call Revo public updateColumnSorting/clearSorting only.",
+    "sortCycle": ["desc", "asc", "natural"],
+    "sortScope": "Work Order Value, Partial Amount, Remaining Amount, and custom Money only.",
+    "history": "Each Filter/Sort transition is one Sheet History action; replay is not re-recorded.",
+    "dirty": "Filter, Sort, and selection are view state and never create Change Engine Dirty/Save deltas.",
+    "yearState": "Filter/Sort view state is per-year for the current page session; History never crosses a year boundary.",
+    "sourcePatch": false
+  },
+  "communitySourceReview": [
+    "revo-grid.tsx public getVisibleSource",
+    "revo-grid.tsx public setCellsFocus",
+    "revo-grid.tsx public updateColumnSorting",
+    "revo-grid.tsx public clearSorting",
+    "sorting.plugin.ts implicit header sort requires column.sortable",
+    "sorting.plugin.ts sorts proxy indexes rather than ERP mutating source",
+    "filter.plugin.ts owns hasFilter during native filter apply"
+  ],
+  "proArchitectureReference": [
+    "ColumnSelectionPlugin separates header-based column selection",
+    "SortingPlugin remains a separate sorting owner"
+  ],
+  "files": [
+    "Components/Pages/WorkOrdersRevoGridGate5B4.razor",
+    "Components/Pages/WorkOrdersRevoGridNativeGate5A.razor",
+    "Components/Pages/WorkOrdersRevoGridNativeGate5A.razor.cs",
+    "wwwroot/js/revoGridColumnSelection.js",
+    "wwwroot/js/revoGridSort.js",
+    "wwwroot/js/revoGridExcelFilter.js",
+    "wwwroot/js/revoGridNativeGate5A.js",
+    "wwwroot/js/revoGridGate5B1.js",
+    "wwwroot/grid-shootout/revogrid-header-actions-state-lab.html",
+    "Documentation/06_REGRESSION_TEST_CHECKLIST.md",
+    "Documentation/08_DECISIONS_LOG.md"
+  ]
+}
