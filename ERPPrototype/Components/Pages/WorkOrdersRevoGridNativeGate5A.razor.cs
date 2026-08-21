@@ -200,7 +200,7 @@ public partial class WorkOrdersRevoGridNativeGate5A
         try
         {
             var gridModulePath = EnableChangeEngine
-                ? "./js/revoGridGate5B1.js?v=20260821-gate5b1-edit-3-undo-dedupe"
+                ? "./js/revoGridGate5B1.js?v=20260821-gate5b1-history-foundation-1"
                 : "./js/revoGridNativeGate5A.js?v=20260821-explicit-year-final-1";
 
             GridModule ??=

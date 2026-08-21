@@ -1,5 +1,6 @@
 import * as nativeGate5A from "./revoGridNativeGate5A.js?v=20260821-explicit-year-final-1";
 import { createRevoGridChangeBridge } from "./revoGridChangeBridge.js";
+import { createRevoGridHistoryCoordinator } from "./revoGridHistoryCoordinator.js";
 
 const bindings = new Map();
 
@@ -38,36 +39,45 @@ function findElement(id) {
     return id ? document.getElementById(id) : null;
 }
 
+function combinedState(state) {
+    return {
+        ...state.changeBridge.getState(),
+        ...state.historyCoordinator.getState()
+    };
+}
+
 function renderState(state) {
-    const engineState = state.bridge.getState();
+    const current = combinedState(state);
 
     if (state.statusElement) {
-        state.statusElement.textContent = engineState.dirty
-            ? `Dirty ${engineState.dirtyCellCount}`
+        state.statusElement.textContent = current.dirty
+            ? `Dirty ${current.dirtyCellCount}`
             : "Clean";
-        state.statusElement.dataset.dirty = engineState.dirty ? "true" : "false";
+        state.statusElement.dataset.dirty = current.dirty ? "true" : "false";
     }
 
     if (state.undoCountElement) {
-        state.undoCountElement.textContent = String(engineState.undoCount);
+        state.undoCountElement.textContent = String(current.undoCount);
     }
 
     if (state.redoCountElement) {
-        state.redoCountElement.textContent = String(engineState.redoCount);
+        state.redoCountElement.textContent = String(current.redoCount);
     }
 
     if (state.undoButton) {
         state.undoButton.disabled =
             state.datasetSwitchActive ||
-            engineState.editLocked ||
-            engineState.undoCount === 0;
+            current.editLocked ||
+            current.replayActive ||
+            current.undoCount === 0;
     }
 
     if (state.redoButton) {
         state.redoButton.disabled =
             state.datasetSwitchActive ||
-            engineState.editLocked ||
-            engineState.redoCount === 0;
+            current.editLocked ||
+            current.replayActive ||
+            current.redoCount === 0;
     }
 }
 
@@ -93,7 +103,12 @@ async function destroyBinding(elementId) {
     }
 
     try {
-        state.bridge.destroy();
+        state.changeBridge.destroy();
+    } catch {
+    }
+
+    try {
+        state.historyCoordinator.destroy();
     } catch {
     }
 
@@ -112,9 +127,14 @@ export async function initialize(elementId, rows, customColumns, options) {
         throw new Error(`RevoGrid '${elementId}' was not created.`);
     }
 
+    const activeDatasetKey = datasetKey(
+        value(options, "workYear", "WorkYear", 0)
+    );
+
     const state = {
         grid,
-        bridge: null,
+        historyCoordinator: null,
+        changeBridge: null,
         datasetSwitchActive: false,
         handledHistoryKeyEvents: new WeakSet(),
         removers: [],
@@ -135,23 +155,30 @@ export async function initialize(elementId, rows, customColumns, options) {
         )
     };
 
-    state.bridge = createRevoGridChangeBridge({
+    state.historyCoordinator = createRevoGridHistoryCoordinator({
+        grid,
+        datasetKey: activeDatasetKey,
+        onStateChange: () => renderState(state)
+    });
+
+    state.changeBridge = createRevoGridChangeBridge({
         grid,
         rows,
-        datasetKey: datasetKey(value(options, "workYear", "WorkYear", 0)),
+        datasetKey: activeDatasetKey,
+        historyCoordinator: state.historyCoordinator,
         onStateChange: () => renderState(state)
     });
 
     addListener(state, state.undoButton, "click", async () => {
-        await state.bridge.undo();
+        await state.historyCoordinator.undo();
     });
 
     addListener(state, state.redoButton, "click", async () => {
-        await state.bridge.redo();
+        await state.historyCoordinator.redo();
     });
 
-    // Gate 5B-1 qualifies Cell Edit only. Range mutations (including Paste)
-    // must not bypass the Change Engine and create an invisible unsaved state.
+    // Gate 5B-1 still qualifies Cell Edit only. Range mutations (including
+    // Paste) must not bypass the new Sheet History/Change Engine split.
     addListener(state, grid, "beforerangeedit", event => {
         event.preventDefault();
     });
@@ -168,8 +195,7 @@ export async function initialize(elementId, rows, customColumns, options) {
         }
 
         // KeyboardEvent.code is layout-independent. On an Arabic Windows
-        // keyboard, event.key is not "z"/"y" even though the physical
-        // Ctrl+Z / Ctrl+Y shortcut was pressed.
+        // keyboard, event.key is not "z"/"y" for the same physical shortcut.
         const code = String(original.code || "");
         const key = String(original.key || "").toLowerCase();
         const isZ = code === "KeyZ" || key === "z" || key === "ئ";
@@ -181,31 +207,34 @@ export async function initialize(elementId, rows, customColumns, options) {
             return;
         }
 
-        // RevoGrid 4.25.2 renders more than one overlay-selection instance.
-        // Every overlay listens to the same document KeyboardEvent and emits
-        // its own beforekeydown event. One physical Ctrl+Z can therefore reach
-        // this binding multiple times. De-duplicate by the original browser
-        // KeyboardEvent so one key press replays exactly one transaction.
+        // RevoGrid 4.25.2 has multiple overlay-selection instances. They can
+        // emit more than one beforekeydown for one physical key press.
         if (state.handledHistoryKeyEvents.has(original)) {
             event.preventDefault();
             return;
         }
         state.handledHistoryKeyEvents.add(original);
 
-        // While the text editor itself is open, leave Ctrl+Z/Ctrl+Y to the
-        // editor. Grid history starts after the cell edit has been committed.
+        // While the text editor itself is open, keep Ctrl+Z/Ctrl+Y owned by
+        // the editor. Sheet History begins after the cell edit is committed.
         if (state.datasetSwitchActive || detail?.edit) {
             return;
         }
 
-        // RevoGrid checks defaultPrevented immediately after beforekeydown,
-        // so prevent synchronously and run our replay afterward.
+        // A second physical shortcut while one replay is still applying must
+        // not start another history move or leak to the browser.
+        if (state.historyCoordinator.getState().replayActive) {
+            event.preventDefault();
+            original.preventDefault();
+            return;
+        }
+
         event.preventDefault();
         original.preventDefault();
 
         void (wantsUndo
-            ? state.bridge.undo()
-            : state.bridge.redo());
+            ? state.historyCoordinator.undo()
+            : state.historyCoordinator.redo());
     };
 
     addListener(state, grid, "beforekeydown", beforeKeyDown);
@@ -220,22 +249,22 @@ export async function beginDatasetSwitch(elementId) {
         return { allowed: false, reason: "not-initialized" };
     }
 
-    const engineState = state.bridge.getState();
+    const current = combinedState(state);
 
-    if (engineState.dirty) {
+    if (current.dirty) {
         return { allowed: false, reason: "dirty" };
     }
 
     if (
-        engineState.activeCellCapture ||
-        engineState.replayActive ||
-        engineState.saveActive
+        current.activeCellCapture ||
+        current.replayActive ||
+        current.saveActive
     ) {
         return { allowed: false, reason: "busy" };
     }
 
     state.datasetSwitchActive = true;
-    state.bridge.setEditLocked(true);
+    state.changeBridge.setEditLocked(true);
     renderState(state);
 
     return { allowed: true, reason: null };
@@ -248,7 +277,7 @@ export function cancelDatasetSwitch(elementId) {
     }
 
     state.datasetSwitchActive = false;
-    state.bridge.setEditLocked(false);
+    state.changeBridge.setEditLocked(false);
     renderState(state);
 }
 
@@ -262,13 +291,20 @@ export async function replaceDataset(elementId, rows, workYear) {
         throw new Error("Dataset replacement requires beginDatasetSwitch first.");
     }
 
+    const nextDatasetKey = datasetKey(workYear);
+
     try {
         validateClientKeys(rows);
         await nativeGate5A.replaceDataset(elementId, rows, workYear);
-        state.bridge.resetDataset(rows, datasetKey(workYear));
+
+        // Each year is a separate dataset session for Undo/Redo. View-state
+        // persistence per year is added when Filter/Sort/Columns are qualified;
+        // History itself never crosses the year boundary.
+        state.changeBridge.resetDataset(rows, nextDatasetKey);
+        state.historyCoordinator.resetDataset(nextDatasetKey);
     } finally {
         state.datasetSwitchActive = false;
-        state.bridge.setEditLocked(false);
+        state.changeBridge.setEditLocked(false);
         renderState(state);
     }
 }
@@ -279,7 +315,7 @@ export function getChangeState(elementId) {
         throw new Error(`Gate 5B-1 state '${elementId}' was not found.`);
     }
 
-    return state.bridge.getState();
+    return combinedState(state);
 }
 
 export function getDirtyCells(elementId) {
@@ -288,7 +324,7 @@ export function getDirtyCells(elementId) {
         throw new Error(`Gate 5B-1 state '${elementId}' was not found.`);
     }
 
-    return state.bridge.getDirtyCells();
+    return state.changeBridge.getDirtyCells();
 }
 
 export function refreshChangeStateUi(elementId) {
@@ -306,7 +342,7 @@ export async function getDiagnostics(elementId) {
 
     return {
         ...native,
-        changeEngine: state?.bridge.getState() ?? null
+        changeEngine: state ? combinedState(state) : null
     };
 }
 

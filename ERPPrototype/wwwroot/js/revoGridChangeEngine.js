@@ -1,4 +1,3 @@
-const DEFAULT_MAX_HISTORY_BYTES = 32 * 1024 * 1024;
 const CELL_SET = "cell-set";
 
 export class RevoGridChangeEngineError extends Error {
@@ -99,22 +98,13 @@ function cellKey(clientKey, field) {
     return `${clientKey.length}:${clientKey}${field}`;
 }
 
-function estimateBytes(value) {
-    try {
-        const json = JSON.stringify(value);
-        return json ? json.length * 2 : 0;
-    } catch {
-        return 512;
-    }
-}
-
-function cloneCellChange(change) {
+function cloneCellOperation(operation) {
     return {
         type: CELL_SET,
-        clientKey: change.clientKey,
-        field: change.field,
-        before: cloneValue(change.before),
-        after: cloneValue(change.after)
+        clientKey: operation.clientKey,
+        field: operation.field,
+        before: cloneValue(operation.before),
+        after: cloneValue(operation.after)
     };
 }
 
@@ -129,20 +119,13 @@ export function createRevoGridChangeEngine(options = {}) {
             ? options.equals
             : defaultEquals;
 
-    const maxHistoryBytes = Math.max(
-        1024,
-        Number(options.maxHistoryBytes) || DEFAULT_MAX_HISTORY_BYTES
-    );
-
+    // Change Engine owns only the current server Baseline/Dirty delta.
+    // Undo/Redo history is intentionally owned by Sheet History.
     const trackedCells = new Map();
     const dirtyKeys = new Set();
     const pendingCaptures = new Map();
-    const undoStack = [];
-    const redoStack = [];
 
-    let pendingReplay = null;
     let pendingSave = null;
-    let historyBytes = 0;
     let revision = 0;
 
     function assertDataset(expectedDatasetKey) {
@@ -203,6 +186,12 @@ export function createRevoGridChangeEngine(options = {}) {
         };
     }
 
+    function isKeyPendingSave(key) {
+        return Boolean(
+            pendingSave?.cells?.some(cell => cell.key === key)
+        );
+    }
+
     function refreshDirtyForKey(key) {
         const tracked = trackedCells.get(key);
         if (!tracked) {
@@ -212,102 +201,49 @@ export function createRevoGridChangeEngine(options = {}) {
 
         if (equals(tracked.current, tracked.baseline)) {
             dirtyKeys.delete(key);
-        } else {
-            dirtyKeys.add(key);
+
+            // A cell that is back at the server Baseline is no longer part of
+            // the live Dirty delta. Keep it temporarily only if an in-flight
+            // Save snapshot still needs its current value to resolve safely.
+            if (!isKeyPendingSave(key)) {
+                trackedCells.delete(key);
+            }
+            return;
         }
+
+        dirtyKeys.add(key);
     }
 
-    function updateCurrent(change, value) {
-        const key = cellKey(change.clientKey, change.field);
+    function updateCurrent(operation, expectedBefore, nextValue) {
+        const key = cellKey(operation.clientKey, operation.field);
         let tracked = trackedCells.get(key);
 
         if (!tracked) {
             tracked = {
-                clientKey: change.clientKey,
-                field: change.field,
-                baseline: cloneValue(change.before),
-                current: cloneValue(change.before)
+                clientKey: operation.clientKey,
+                field: operation.field,
+                baseline: cloneValue(expectedBefore),
+                current: cloneValue(expectedBefore)
             };
             trackedCells.set(key, tracked);
+        } else if (!equals(tracked.current, expectedBefore)) {
+            throw new RevoGridChangeEngineError(
+                "STALE_CURRENT",
+                `Current value for '${operation.clientKey}/${operation.field}' does not match the expected transition start.`,
+                {
+                    clientKey: operation.clientKey,
+                    field: operation.field,
+                    engineCurrent: cloneValue(tracked.current),
+                    expectedBefore: cloneValue(expectedBefore)
+                }
+            );
         }
 
-        tracked.current = cloneValue(value);
+        tracked.current = cloneValue(nextValue);
         refreshDirtyForKey(key);
     }
 
-    function applyTransactionState(transaction, direction) {
-        const useAfter = direction === "redo";
-
-        for (const operation of transaction.operations) {
-            if (operation.type !== CELL_SET) {
-                throw new RevoGridChangeEngineError(
-                    "UNSUPPORTED_OPERATION",
-                    `Unsupported operation type '${operation.type}'.`
-                );
-            }
-
-            updateCurrent(
-                operation,
-                useAfter ? operation.after : operation.before
-            );
-        }
-
-        revision += 1;
-    }
-
-    function removeTransactionBytes(transaction) {
-        historyBytes = Math.max(
-            0,
-            historyBytes - Number(transaction.estimatedBytes || 0)
-        );
-    }
-
-    function addTransactionBytes(transaction) {
-        historyBytes += Number(transaction.estimatedBytes || 0);
-    }
-
-    function clearRedo() {
-        for (const transaction of redoStack) {
-            removeTransactionBytes(transaction);
-        }
-        redoStack.length = 0;
-    }
-
-    function enforceHistoryBudget() {
-        // Keep the newest transaction even when a single large Paste exceeds
-        // the configured budget. It is better to keep that action undoable
-        // than to silently record an action the employee cannot undo.
-        while (
-            historyBytes > maxHistoryBytes &&
-            undoStack.length > 1
-        ) {
-            const removed = undoStack.shift();
-            removeTransactionBytes(removed);
-        }
-    }
-
-    function buildTransaction(capture, operations) {
-        const transaction = {
-            id: createId("tx"),
-            datasetKey,
-            kind: capture.kind,
-            label: capture.label,
-            createdAt: new Date().toISOString(),
-            operations: operations.map(cloneCellChange)
-        };
-
-        transaction.estimatedBytes = estimateBytes(transaction);
-        return transaction;
-    }
-
     function captureBefore(input) {
-        if (pendingReplay) {
-            throw new RevoGridChangeEngineError(
-                "REPLAY_ACTIVE",
-                "A new user change cannot be captured while an Undo/Redo replay is active."
-            );
-        }
-
         assertDataset(input?.datasetKey);
 
         const rawChanges = Array.isArray(input?.changes)
@@ -415,128 +351,90 @@ export function createRevoGridChangeEngine(options = {}) {
             return {
                 recorded: false,
                 reason: "no-op",
-                transaction: null
+                changeSet: null
             };
         }
 
-        // A real user edit after Undo creates a new branch, so Redo history
-        // is invalid from this point, matching spreadsheet behavior.
-        clearRedo();
-
-        const transaction = buildTransaction(capture, operations);
-
-        for (const operation of transaction.operations) {
-            updateCurrent(operation, operation.after);
+        for (const operation of operations) {
+            updateCurrent(operation, operation.before, operation.after);
         }
 
-        undoStack.push(transaction);
-        addTransactionBytes(transaction);
-        enforceHistoryBudget();
         revision += 1;
 
         return {
             recorded: true,
             reason: null,
-            transaction: cloneValue(transaction)
+            changeSet: {
+                id: createId("change"),
+                datasetKey,
+                kind: capture.kind,
+                label: capture.label,
+                createdAt: new Date().toISOString(),
+                operations: operations.map(cloneCellOperation)
+            }
         };
     }
 
-    function createReplayPlan(direction) {
-        if (pendingReplay) {
-            throw new RevoGridChangeEngineError(
-                "REPLAY_ACTIVE",
-                "Another Undo/Redo replay is already active."
-            );
+    /**
+     * Accept a transition that was applied through the official Sheet History
+     * replay path (or another controlled grid adapter). This updates only
+     * Baseline/Dirty ownership; it does not create or move History entries.
+     */
+    function applyExternalChanges(changes, expectedDatasetKey = undefined) {
+        assertDataset(expectedDatasetKey);
+
+        const rawChanges = Array.isArray(changes) ? changes : [];
+        if (rawChanges.length === 0) {
+            return getState();
         }
 
-        if (pendingCaptures.size > 0) {
-            throw new RevoGridChangeEngineError(
-                "CAPTURE_ACTIVE",
-                "Undo/Redo cannot start while a user edit is waiting for its after-event."
-            );
+        const seen = new Set();
+        const normalized = rawChanges.map(change => {
+            const clientKey = requireText(change?.clientKey, "clientKey");
+            const field = requireText(change?.field, "field");
+            const key = cellKey(clientKey, field);
+
+            if (seen.has(key)) {
+                throw new RevoGridChangeEngineError(
+                    "DUPLICATE_CELL",
+                    `Cell '${clientKey}/${field}' appears more than once in the same external transition.`
+                );
+            }
+            seen.add(key);
+
+            return {
+                type: CELL_SET,
+                clientKey,
+                field,
+                before: cloneValue(change.before),
+                after: cloneValue(change.after)
+            };
+        });
+
+        // Validate every transition before mutating engine state.
+        for (const operation of normalized) {
+            const key = cellKey(operation.clientKey, operation.field);
+            const tracked = trackedCells.get(key);
+            if (tracked && !equals(tracked.current, operation.before)) {
+                throw new RevoGridChangeEngineError(
+                    "STALE_CURRENT",
+                    `Current value for '${operation.clientKey}/${operation.field}' does not match the expected transition start.`,
+                    {
+                        clientKey: operation.clientKey,
+                        field: operation.field,
+                        engineCurrent: cloneValue(tracked.current),
+                        expectedBefore: cloneValue(operation.before)
+                    }
+                );
+            }
         }
 
-        const stack = direction === "undo" ? undoStack : redoStack;
-        const transaction = stack.at(-1);
-
-        if (!transaction) {
-            return null;
+        for (const operation of normalized) {
+            updateCurrent(operation, operation.before, operation.after);
         }
 
-        const replayId = createId("replay");
-        const operations = transaction.operations.map(operation => ({
-            type: CELL_SET,
-            clientKey: operation.clientKey,
-            field: operation.field,
-            value: cloneValue(
-                direction === "undo"
-                    ? operation.before
-                    : operation.after
-            )
-        }));
-
-        pendingReplay = {
-            id: replayId,
-            direction,
-            transactionId: transaction.id,
-            transaction
-        };
-
-        return {
-            replayId,
-            direction,
-            transactionId: transaction.id,
-            operations
-        };
-    }
-
-    function planUndo() {
-        return createReplayPlan("undo");
-    }
-
-    function planRedo() {
-        return createReplayPlan("redo");
-    }
-
-    function commitReplay(replayId) {
-        const normalizedReplayId = requireText(replayId, "replayId");
-
-        if (!pendingReplay || pendingReplay.id !== normalizedReplayId) {
-            throw new RevoGridChangeEngineError(
-                "REPLAY_NOT_FOUND",
-                `Replay '${normalizedReplayId}' is not active.`
-            );
-        }
-
-        const { direction, transaction } = pendingReplay;
-        const from = direction === "undo" ? undoStack : redoStack;
-        const to = direction === "undo" ? redoStack : undoStack;
-        const currentTop = from.at(-1);
-
-        if (!currentTop || currentTop.id !== transaction.id) {
-            throw new RevoGridChangeEngineError(
-                "HISTORY_CHANGED",
-                "History changed while Undo/Redo was being applied."
-            );
-        }
-
-        from.pop();
-        to.push(transaction);
-        applyTransactionState(transaction, direction);
-        pendingReplay = null;
-
-        return cloneValue(transaction);
-    }
-
-    function cancelReplay(replayId) {
-        const normalizedReplayId = requireText(replayId, "replayId");
-
-        if (!pendingReplay || pendingReplay.id !== normalizedReplayId) {
-            return false;
-        }
-
-        pendingReplay = null;
-        return true;
+        revision += 1;
+        return getState();
     }
 
     function getDirtyCells() {
@@ -567,15 +465,16 @@ export function createRevoGridChangeEngine(options = {}) {
             );
         }
 
-        if (pendingCaptures.size > 0 || pendingReplay) {
+        if (pendingCaptures.size > 0) {
             throw new RevoGridChangeEngineError(
                 "ENGINE_BUSY",
-                "Save cannot start while an edit or Undo/Redo replay is incomplete."
+                "Save cannot start while a user edit is waiting for its after-event."
             );
         }
 
         const saveId = createId("save");
         const cells = getDirtyCells().map(cell => ({
+            key: cellKey(cell.clientKey, cell.field),
             clientKey: cell.clientKey,
             field: cell.field,
             baseline: cloneValue(cell.baseline),
@@ -605,11 +504,13 @@ export function createRevoGridChangeEngine(options = {}) {
 
         assertDataset(pendingSave.datasetKey);
 
-        // The server accepted exactly the snapshot sent at beginSave(). If the
-        // employee changed a cell while the request was in flight, current stays
-        // newer than the accepted baseline and therefore remains Dirty.
-        for (const saved of pendingSave.cells) {
-            const key = cellKey(saved.clientKey, saved.field);
+        const accepted = pendingSave;
+        pendingSave = null;
+
+        // Server accepted exactly the snapshot sent by beginSave(). If a newer
+        // browser edit exists, it remains current and therefore remains Dirty.
+        for (const saved of accepted.cells) {
+            const key = saved.key;
             let tracked = trackedCells.get(key);
 
             if (!tracked) {
@@ -627,10 +528,7 @@ export function createRevoGridChangeEngine(options = {}) {
             refreshDirtyForKey(key);
         }
 
-        const accepted = pendingSave;
-        pendingSave = null;
         revision += 1;
-
         return cloneValue(accepted);
     }
 
@@ -641,7 +539,15 @@ export function createRevoGridChangeEngine(options = {}) {
             return false;
         }
 
+        const rejected = pendingSave;
         pendingSave = null;
+
+        // Cells that returned to the old Baseline while Save was in flight can
+        // now be released because no accepted snapshot needs them anymore.
+        for (const saved of rejected.cells) {
+            refreshDirtyForKey(saved.key);
+        }
+
         return true;
     }
 
@@ -658,10 +564,10 @@ export function createRevoGridChangeEngine(options = {}) {
             );
         }
 
-        if (pendingCaptures.size > 0 || pendingReplay || pendingSave) {
+        if (pendingCaptures.size > 0 || pendingSave) {
             throw new RevoGridChangeEngineError(
                 "ENGINE_BUSY",
-                "Dataset cannot be replaced while an edit, replay, or Save is incomplete."
+                "Dataset cannot be replaced while an edit or Save is incomplete."
             );
         }
 
@@ -669,9 +575,6 @@ export function createRevoGridChangeEngine(options = {}) {
         trackedCells.clear();
         dirtyKeys.clear();
         pendingCaptures.clear();
-        undoStack.length = 0;
-        redoStack.length = 0;
-        historyBytes = 0;
         revision += 1;
 
         return getState();
@@ -683,44 +586,22 @@ export function createRevoGridChangeEngine(options = {}) {
             revision,
             dirty: dirtyKeys.size > 0,
             dirtyCellCount: dirtyKeys.size,
-            undoCount: undoStack.length,
-            redoCount: redoStack.length,
-            historyBytes,
-            maxHistoryBytes,
-            historyOverBudget:
-                historyBytes > maxHistoryBytes,
+            trackedCellCount: trackedCells.size,
             pendingCaptureCount: pendingCaptures.size,
-            replayActive: Boolean(pendingReplay),
             saveActive: Boolean(pendingSave)
         };
-    }
-
-    function getHistorySnapshot() {
-        return {
-            undo: undoStack.map(transaction => cloneValue(transaction)),
-            redo: redoStack.map(transaction => cloneValue(transaction))
-        };
-    }
-
-    function isReplayActive() {
-        return Boolean(pendingReplay);
     }
 
     return Object.freeze({
         captureBefore,
         cancelCapture,
         finalizeAfter,
-        planUndo,
-        planRedo,
-        commitReplay,
-        cancelReplay,
+        applyExternalChanges,
         beginSave,
         acceptSave,
         rejectSave,
         resetDataset,
         getDirtyCells,
-        getState,
-        getHistorySnapshot,
-        isReplayActive
+        getState
     });
 }

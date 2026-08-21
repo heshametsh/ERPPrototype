@@ -678,22 +678,26 @@ Include:
 
 ### Gate 5B — real Save/ERP behavior
 
-#### Gate 5B-0 — Change Engine foundation
+#### Gate 5B foundation — Change Engine + Sheet History split
 
-- [x] Standalone browser lab passes all Change Engine self-tests before any RevoGrid Edit/Paste binding.
+- [x] Change Engine owns only Baseline/Dirty/Save state; it has no Undo/Redo stacks.
+- [x] Sheet History owns Undo/Redo order and a configurable memory budget.
 - [x] Dirty is updated by touched-cell delta; no full-sheet scan is required for a normal cell/range change.
-- [x] Cell Edit and multi-cell Paste share one transaction model; Paste is one Undo action.
-- [x] Save acceptance moves Baseline without clearing History; failed Save changes neither Baseline nor History.
+- [x] Returning a touched cell to Baseline removes it from Dirty tracking memory when it is no longer needed.
+- [x] Multi-cell data changes can be represented as one History entry, so a later Paste remains one Undo action.
+- [x] Save acceptance moves Baseline without requiring History to be cleared; failed Save does not change Baseline/Dirty.
 - [x] Dirty blocks year/dataset replacement; Clean year switch clears the old dataset History.
-- [x] Temporary `ClientKey` remains the History identity after the server assigns a database `Id`.
-- [x] History enforces a configurable memory budget.
+- [x] Temporary `ClientKey` remains the session row identity after the server later assigns a database `Id`.
+- [x] One History Coordinator replay path delegates to feature-owned adapters and does not record replay as a new action.
+- [x] Successful Cell Edit Undo/Redo can return RevoGrid focus to the affected visible cell through public APIs.
 
 #### Gate 5B-1 — Cell Edit binding
 
 - [ ] Real employee-scoped data loads at `/work-orders-revogrid-gate5b1`.
 - [ ] Editing one text cell changes Change Engine state from Clean to Dirty 1 and adds one Undo transaction.
-- [ ] Undo restores the previous value and Redo reapplies it; Ctrl+Z/Ctrl+Y match the buttons after the editor closes.
-- [ ] Returning the cell to the Baseline clears Dirty while History remains available.
+- [ ] Undo restores only the latest separate edit, Redo reapplies it, and Ctrl+Z/Ctrl+Y match the buttons after the editor closes.
+- [ ] Returning the cell to the Baseline clears Dirty and releases the clean Dirty tracker while Sheet History remains available.
+- [ ] Undo/Redo returns selection to the affected visible cell.
 - [ ] Paste/range mutation is blocked in this gate and cannot bypass Dirty tracking.
 - [ ] Dirty blocks year change. After Undo returns to Clean, year change succeeds and clears the old History.
 - [ ] No browser page error, unexpected console error, failed request, or server 5xx appears during the test.

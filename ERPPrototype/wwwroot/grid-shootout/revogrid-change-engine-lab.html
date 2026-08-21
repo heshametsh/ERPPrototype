@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>RevoGrid Change Engine — Gate 5B-0</title>
+    <title>RevoGrid Sheet History + Change Engine — Gate 5B-1</title>
     <style>
         :root { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
         body { margin: 0; background: #f6f7f9; color: #18202a; }
@@ -25,8 +25,8 @@
 <body>
 <main>
     <header>
-        <h1>Gate 5B-0 — Change Engine Foundation</h1>
-        <p>اختبار مباشر للمحرك فقط. لا يوجد RevoGrid ولا Edit/Paste binding في هذه الصفحة.</p>
+        <h1>Gate 5B-1 — Sheet History + Change Engine Foundation</h1>
+        <p>اختبار مباشر لفصل Sheet History عن Change Engine ومسار Replay. لا توجد قاعدة بيانات في هذه الصفحة.</p>
         <button id="rerun" type="button">إعادة الاختبار</button>
         <div class="summary" id="summary"></div>
     </header>
@@ -57,8 +57,8 @@
     const errors = document.getElementById("errors");
     const errorLog = document.getElementById("error-log");
 
-    function render() {
-        const report = runRevoGridChangeEngineSelfTests();
+    async function render() {
+        const report = await runRevoGridChangeEngineSelfTests();
 
         summary.innerHTML = `
             <span>الإجمالي <strong>${report.total}</strong></span>
@@ -88,8 +88,8 @@
             .join("\n\n");
     }
 
-    document.getElementById("rerun").addEventListener("click", render);
-    render();
+    document.getElementById("rerun").addEventListener("click", () => void render());
+    void render();
 </script>
 </body>
 </html>

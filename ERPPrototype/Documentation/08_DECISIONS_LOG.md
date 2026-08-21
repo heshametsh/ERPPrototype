@@ -372,7 +372,7 @@
 ## DEC-031 — One RevoGrid Change Engine owns session change history
 
 - **Date:** 2026-08-21
-- **Status:** Accepted by user for Gate 5B foundation
+- **Status:** Partially superseded by DEC-033. Dirty/Baseline/ClientKey/Save rules remain; History ownership moved out of Change Engine.
 - **Decision:** Build one grid-independent Change Engine before wiring RevoGrid Edit/Paste/Delete/Insert/Custom Columns. User data changes must enter the same transaction/history model rather than each feature creating its own Undo/Dirty logic.
 - **Identity:** `ClientKey` is the stable row identity inside the browser session. Database `Id` may appear after the first Save and must not require re-keying History. `DisplayOrder` remains the separate ordering value used to place rows between existing rows.
 - **Dirty rule:** Dirty means current value differs from the last server-accepted Baseline. Returning to the Baseline removes Dirty without deleting History.
@@ -386,10 +386,24 @@
 ## DEC-032 — Gate 5B-1 uses one RevoGrid-to-Change-Engine bridge for Cell Edit
 
 - **Date:** 2026-08-21
-- **Status:** Accepted for Gate 5B-1 qualification
+- **Status:** Partially superseded by DEC-033. Before/After Cell Edit binding remains; direct Undo/Redo ownership/replay moved to Sheet History.
 - **Decision:** Cell Edit is the first real RevoGrid client of the standalone Change Engine. The bridge captures `beforeedit`, lets RevoGrid apply the value, then finalizes from `afteredit`. Undo/Redo replays the engine transaction against the same row objects and refreshes RevoGrid without replacing the full source.
 - **Session identity:** Gate 5B-1 assigns each loaded row a session `ClientKey`; database `Id` and ordering `DisplayOrder` remain separate responsibilities.
 - **Scope guard:** Range mutations, including Paste, are blocked in Gate 5B-1 so they cannot change data outside the engine before the Paste binding gate is implemented.
 - **Keyboard rule:** Grid Ctrl+Z/Ctrl+Y uses the Change Engine only after a cell edit is committed. While the text editor is still open, keyboard undo/redo remains owned by the editor.
 - **Year rule:** A year switch starts only when the engine is Clean. Editing is locked during the dataset-load handshake; successful replacement resets the engine to the new dataset and clears old History. Failure keeps the old dataset session active.
 - **Production constraint:** `/work-orders` remains Tabulator and Gate 5A behavior remains unchanged when `EnableChangeEngine` is false. No database Save is added in Gate 5B-1.
+
+
+## DEC-033 — Separate Sheet History from Dirty/Save ownership
+
+- **Date:** 2026-08-21
+- **Status:** Accepted by user
+- **Decision:** `Sheet History` owns the ordered Undo/Redo timeline for reversible sheet actions. `Change Engine` owns only server Baseline, live Dirty delta, Save handshake, and dataset-change safety.
+- **Replay rule:** Undo/Redo uses one History Coordinator path. The coordinator delegates each entry to the feature adapter that owns that state, emits one explicit replay lifecycle, and prevents replay from being recorded as a new user action.
+- **Feature ownership:** Cell Edit uses the data adapter. Later Paste, Filter/Sort, Columns, Insert/Delete and other reversible features must register their own adapter rather than adding feature logic into the History core.
+- **Dirty rule:** Only cells whose current value differs from the last accepted server Baseline remain in Dirty memory. If a touched cell returns to Baseline, its Dirty tracker is released unless an in-flight Save still needs it.
+- **Focus rule:** After a successful Undo/Redo, the coordinator asks RevoGrid through public focus/scroll APIs to return selection to the affected cell when that target is currently visible/focusable. Focus feedback must not undo a successful replay if the target is temporarily hidden.
+- **Year rule:** History never crosses a Work Year boundary. Dirty still blocks year change. Per-year Filter/Sort/Column view state is session-only and will be qualified with those feature adapters; first visit to a year starts with no inherited view changes.
+- **Revo reference:** Community public Events/APIs remain the implementation base. Revo Pro Event Manager/History/plugin ownership is an architectural reference only; no proprietary source code is used.
+- **Supersedes:** DEC-031 History ownership and DEC-032 direct Change-Engine Undo/Redo replay details.

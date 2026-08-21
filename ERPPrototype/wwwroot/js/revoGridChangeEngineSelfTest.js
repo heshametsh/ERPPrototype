@@ -2,6 +2,14 @@ import {
     createRevoGridChangeEngine,
     RevoGridChangeEngineError
 } from "./revoGridChangeEngine.js";
+import {
+    createRevoGridSheetHistory,
+    RevoGridSheetHistoryError
+} from "./revoGridSheetHistory.js";
+import {
+    createRevoGridHistoryCoordinator,
+    revoGridSheetHistoryEvents
+} from "./revoGridHistoryCoordinator.js";
 
 function assert(condition, message) {
     if (!condition) {
@@ -11,24 +19,27 @@ function assert(condition, message) {
 
 function expectEngineError(action, code) {
     let thrown = null;
-
     try {
         action();
     } catch (error) {
         thrown = error;
     }
-
-    assert(
-        thrown instanceof RevoGridChangeEngineError,
-        `Expected RevoGridChangeEngineError '${code}'.`
-    );
-    assert(
-        thrown.code === code,
-        `Expected error '${code}', got '${thrown.code}'.`
-    );
+    assert(thrown instanceof RevoGridChangeEngineError, `Expected engine error '${code}'.`);
+    assert(thrown.code === code, `Expected engine error '${code}', got '${thrown.code}'.`);
 }
 
-function record(engine, kind, changes, applied = null) {
+function expectHistoryError(action, code) {
+    let thrown = null;
+    try {
+        action();
+    } catch (error) {
+        thrown = error;
+    }
+    assert(thrown instanceof RevoGridSheetHistoryError, `Expected history error '${code}'.`);
+    assert(thrown.code === code, `Expected history error '${code}', got '${thrown.code}'.`);
+}
+
+function recordChange(engine, kind, changes, applied = null) {
     const captureId = engine.captureBefore({
         kind,
         label: kind,
@@ -50,360 +61,358 @@ function record(engine, kind, changes, applied = null) {
     );
 }
 
-function testCellEditDirtyUndoRedo() {
+function testChangeEngineOwnsDirtyNotHistory() {
     const engine = createRevoGridChangeEngine({ datasetKey: "2026" });
-
-    const result = record(engine, "cell-edit", [
-        {
-            clientKey: "db:10",
-            field: "basket",
-            before: "Inspection",
-            after: "ModifyEstimate"
-        }
+    const result = recordChange(engine, "cell-edit", [
+        { clientKey: "row:1", field: "basket", before: "A", after: "B" }
     ]);
 
-    assert(result.recorded, "Cell edit was not recorded.");
-    assert(engine.getState().dirtyCellCount === 1, "Dirty cell was not tracked.");
-    assert(engine.getState().undoCount === 1, "Undo transaction was not created.");
-
-    const undo = engine.planUndo();
-    assert(undo?.operations.length === 1, "Undo replay plan is wrong.");
-    assert(undo.operations[0].value === "Inspection", "Undo value is wrong.");
-    assert(engine.isReplayActive(), "Replay guard did not activate.");
-    engine.commitReplay(undo.replayId);
-
-    assert(engine.getState().dirtyCellCount === 0, "Undo should return to baseline.");
-    assert(engine.getState().redoCount === 1, "Redo transaction was not created.");
-
-    const redo = engine.planRedo();
-    assert(redo.operations[0].value === "ModifyEstimate", "Redo value is wrong.");
-    engine.commitReplay(redo.replayId);
-
-    assert(engine.getState().dirtyCellCount === 1, "Redo should restore Dirty state.");
-    assert(engine.getState().undoCount === 1, "Redo did not restore Undo history.");
+    assert(result.recorded, "Edit was not finalized.");
+    assert(result.changeSet.operations.length === 1, "Change Set is wrong.");
+    assert(engine.getState().dirtyCellCount === 1, "Dirty delta was not tracked.");
+    assert(engine.getState().undoCount === undefined, "Change Engine must not own Undo stack.");
 }
 
-
-function testSeparateEditsUndoOneTransactionAtATime() {
+function testReturnToBaselinePrunesDirtyTracker() {
     const engine = createRevoGridChangeEngine({ datasetKey: "2026" });
-
-    record(engine, "cell-edit", [
-        { clientKey: "db:21", field: "basket", before: "A", after: "B" }
-    ]);
-    record(engine, "cell-edit", [
-        { clientKey: "db:22", field: "notes", before: "N1", after: "N2" }
-    ]);
-    record(engine, "cell-edit", [
-        { clientKey: "db:23", field: "workOrderNumber", before: "100", after: "101" }
+    recordChange(engine, "cell-edit", [
+        { clientKey: "row:2", field: "basket", before: "A", after: "B" }
     ]);
 
-    assert(engine.getState().undoCount === 3, "Three separate edits must create three Undo transactions.");
-
-    const undo3 = engine.planUndo();
-    assert(undo3.operations.length === 1, "One Undo must contain only the newest separate edit.");
-    assert(undo3.operations[0].clientKey === "db:23", "First Undo targeted the wrong transaction.");
-    engine.commitReplay(undo3.replayId);
-    assert(engine.getState().undoCount === 2, "One Undo must remove exactly one transaction from Undo history.");
-    assert(engine.getState().redoCount === 1, "One Undo must add exactly one transaction to Redo history.");
-
-    const undo2 = engine.planUndo();
-    assert(undo2.operations.length === 1, "Second Undo must still contain one separate edit.");
-    assert(undo2.operations[0].clientKey === "db:22", "Second Undo targeted the wrong transaction.");
-    engine.commitReplay(undo2.replayId);
-    assert(engine.getState().undoCount === 1, "Second Undo must leave one older transaction.");
-    assert(engine.getState().redoCount === 2, "Second Undo must produce two Redo transactions.");
-}
-
-function testPasteIsOneTransaction() {
-    const engine = createRevoGridChangeEngine({ datasetKey: "2026" });
-    const changes = [
-        ["db:1", "basket", "A", "B"],
-        ["db:1", "partialAmount", 10, 20],
-        ["db:2", "basket", "C", "D"],
-        ["db:2", "partialAmount", 30, 40]
-    ].map(([clientKey, field, before, after]) => ({
-        clientKey,
-        field,
-        before,
-        after
-    }));
-
-    const result = record(engine, "paste", changes);
-
-    assert(result.recorded, "Paste was not recorded.");
-    assert(result.transaction.operations.length === 4, "Paste lost cells.");
-    assert(engine.getState().undoCount === 1, "Paste must be one Undo transaction.");
-    assert(engine.getState().dirtyCellCount === 4, "Paste Dirty count is wrong.");
-
-    const undo = engine.planUndo();
-    assert(undo.operations.length === 4, "Paste Undo must replay all cells together.");
-    engine.commitReplay(undo.replayId);
-    assert(engine.getState().dirtyCellCount === 0, "Paste Undo did not restore baseline.");
-}
-
-function testAppliedSubsetOnlyRecordsAppliedCells() {
-    const engine = createRevoGridChangeEngine({ datasetKey: "2026" });
-
-    const captureId = engine.captureBefore({
-        kind: "range-edit",
-        changes: [
-            {
-                clientKey: "db:1",
-                field: "basket",
-                before: "A",
-                proposedAfter: "B"
-            },
-            {
-                clientKey: "db:1",
-                field: "remainingAmount",
-                before: 100,
-                proposedAfter: 50
-            }
-        ]
-    });
-
-    const result = engine.finalizeAfter(captureId, [
-        {
-            clientKey: "db:1",
-            field: "basket",
-            after: "B"
-        }
+    engine.applyExternalChanges([
+        { clientKey: "row:2", field: "basket", before: "B", after: "A" }
     ]);
-
-    assert(result.transaction.operations.length === 1, "Ignored/read-only cell was recorded.");
-    assert(engine.getState().dirtyCellCount === 1, "Subset Dirty count is wrong.");
-}
-
-function testReturnToBaselineClearsDirtyWithoutDeletingHistory() {
-    const engine = createRevoGridChangeEngine({ datasetKey: "2026" });
-
-    record(engine, "cell-edit", [
-        { clientKey: "db:5", field: "basket", before: "A", after: "B" }
-    ]);
-    record(engine, "cell-edit", [
-        { clientKey: "db:5", field: "basket", before: "B", after: "A" }
-    ]);
-
-    assert(!engine.getState().dirty, "Returning to baseline must clear Dirty.");
-    assert(engine.getState().undoCount === 2, "History must remain after returning to baseline.");
-}
-
-function testNewEditAfterUndoClearsRedo() {
-    const engine = createRevoGridChangeEngine({ datasetKey: "2026" });
-
-    record(engine, "cell-edit", [
-        { clientKey: "db:8", field: "basket", before: "A", after: "B" }
-    ]);
-
-    const undo = engine.planUndo();
-    engine.commitReplay(undo.replayId);
-    assert(engine.getState().redoCount === 1, "Redo must exist after Undo.");
-
-    record(engine, "cell-edit", [
-        { clientKey: "db:8", field: "basket", before: "A", after: "C" }
-    ]);
-
-    assert(engine.getState().redoCount === 0, "New user edit must clear Redo branch.");
-}
-
-function testSaveMovesBaselineButKeepsHistory() {
-    const engine = createRevoGridChangeEngine({ datasetKey: "2026" });
-
-    record(engine, "cell-edit", [
-        { clientKey: "db:11", field: "basket", before: "A", after: "B" }
-    ]);
-
-    const save = engine.beginSave();
-    assert(save.cells.length === 1, "Save delta should contain one dirty cell.");
-    engine.acceptSave(save.id);
-
-    assert(!engine.getState().dirty, "Successful Save must accept the new baseline.");
-    assert(engine.getState().undoCount === 1, "Save must not clear Undo history.");
-
-    const undo = engine.planUndo();
-    engine.commitReplay(undo.replayId);
-
-    assert(engine.getState().dirty, "Undo after Save must become Dirty again.");
-    const dirty = engine.getDirtyCells();
-    assert(dirty[0].baseline === "B", "Saved baseline should be B.");
-    assert(dirty[0].current === "A", "Undo after Save should restore A.");
-}
-
-function testInFlightSaveDoesNotLoseNewerEdit() {
-    const engine = createRevoGridChangeEngine({ datasetKey: "2026" });
-
-    record(engine, "cell-edit", [
-        { clientKey: "db:12", field: "basket", before: "A", after: "B" }
-    ]);
-
-    const save = engine.beginSave();
-
-    record(engine, "cell-edit", [
-        { clientKey: "db:12", field: "basket", before: "B", after: "C" }
-    ]);
-
-    engine.acceptSave(save.id);
-
-    const dirty = engine.getDirtyCells();
-    assert(dirty.length === 1, "Newer edit during Save must remain Dirty.");
-    assert(dirty[0].baseline === "B", "Server-accepted value must become baseline.");
-    assert(dirty[0].current === "C", "Newer browser value must remain current.");
-}
-
-function testRejectedSaveChangesNothing() {
-    const engine = createRevoGridChangeEngine({ datasetKey: "2026" });
-
-    record(engine, "cell-edit", [
-        { clientKey: "db:13", field: "basket", before: "A", after: "B" }
-    ]);
-
-    const save = engine.beginSave();
-    engine.rejectSave(save.id);
-
-    const dirty = engine.getDirtyCells();
-    assert(dirty[0].baseline === "A", "Failed Save must not move baseline.");
-    assert(dirty[0].current === "B", "Failed Save must keep current edit.");
-    assert(engine.getState().undoCount === 1, "Failed Save must keep history.");
-}
-
-function testCleanDatasetSwitchClearsHistory() {
-    const engine = createRevoGridChangeEngine({ datasetKey: "2026" });
-
-    record(engine, "cell-edit", [
-        { clientKey: "db:15", field: "basket", before: "A", after: "B" }
-    ]);
-    const save = engine.beginSave();
-    engine.acceptSave(save.id);
-
-    assert(!engine.getState().dirty, "Precondition: dataset must be clean.");
-    assert(engine.getState().undoCount === 1, "Precondition: old-year history must exist.");
-
-    engine.resetDataset("2025");
 
     const state = engine.getState();
-    assert(state.datasetKey === "2025", "Dataset key did not change.");
-    assert(state.undoCount === 0 && state.redoCount === 0, "Year switch must clear old History.");
-    assert(state.dirtyCellCount === 0, "Year switch must start clean.");
+    assert(!state.dirty, "Returning to Baseline must clear Dirty.");
+    assert(state.trackedCellCount === 0, "Clean touched cell should be released from Dirty memory.");
 }
 
-function testDirtyDatasetSwitchIsRejected() {
+function testMultiCellProducesOneChangeSet() {
     const engine = createRevoGridChangeEngine({ datasetKey: "2026" });
-
-    record(engine, "cell-edit", [
-        { clientKey: "db:16", field: "basket", before: "A", after: "B" }
+    const result = recordChange(engine, "paste", [
+        { clientKey: "r1", field: "a", before: "1", after: "11" },
+        { clientKey: "r1", field: "b", before: "2", after: "22" },
+        { clientKey: "r2", field: "a", before: "3", after: "33" },
+        { clientKey: "r2", field: "b", before: "4", after: "44" }
     ]);
 
-    expectEngineError(() => engine.resetDataset("2025"), "DIRTY_DATASET");
-    assert(engine.getState().datasetKey === "2026", "Rejected year switch changed dataset.");
+    assert(result.changeSet.operations.length === 4, "Multi-cell Change Set must contain all applied cells.");
+    assert(engine.getState().dirtyCellCount === 4, "Four changed cells should be Dirty.");
 }
 
-function testClientKeyDoesNotDependOnDatabaseId() {
+function testAppliedSubsetOnly() {
     const engine = createRevoGridChangeEngine({ datasetKey: "2026" });
-    const clientKey = "temp:7f0d-session-row";
+    const result = recordChange(
+        engine,
+        "paste",
+        [
+            { clientKey: "r1", field: "a", before: "1", after: "11" },
+            { clientKey: "r1", field: "readonly", before: "2", after: "22" }
+        ],
+        [
+            { clientKey: "r1", field: "a", before: "1", after: "11" }
+        ]
+    );
 
-    record(engine, "cell-edit", [
-        { clientKey, field: "workOrderNumber", before: "", after: "233039311" }
+    assert(result.changeSet.operations.length === 1, "Only applied cells should enter the Change Set.");
+    assert(engine.getState().dirtyCellCount === 1, "Only applied cell should be Dirty.");
+}
+
+function testSaveMovesBaselineThenHistoryReplayCanBecomeDirty() {
+    const engine = createRevoGridChangeEngine({ datasetKey: "2026" });
+    recordChange(engine, "cell-edit", [
+        { clientKey: "r3", field: "basket", before: "A", after: "B" }
     ]);
 
     const save = engine.beginSave();
     engine.acceptSave(save.id);
+    assert(!engine.getState().dirty, "Successful Save must advance Baseline.");
+    assert(engine.getState().trackedCellCount === 0, "Clean saved cell should be released.");
 
-    const history = engine.getHistorySnapshot();
-    assert(
-        history.undo[0].operations[0].clientKey === clientKey,
-        "Save must not re-key History when the server later assigns a database Id."
-    );
-}
-
-function testStaleBeforeIsRejected() {
-    const engine = createRevoGridChangeEngine({ datasetKey: "2026" });
-
-    record(engine, "cell-edit", [
-        { clientKey: "db:20", field: "basket", before: "A", after: "B" }
+    // Simulate Sheet History Undo after Save: current B -> old value A.
+    engine.applyExternalChanges([
+        { clientKey: "r3", field: "basket", before: "B", after: "A" }
     ]);
-
-    expectEngineError(
-        () => engine.captureBefore({
-            kind: "cell-edit",
-            changes: [
-                {
-                    clientKey: "db:20",
-                    field: "basket",
-                    before: "A",
-                    proposedAfter: "C"
-                }
-            ]
-        }),
-        "STALE_BEFORE"
-    );
+    const dirty = engine.getDirtyCells();
+    assert(dirty.length === 1, "Undo after Save must become Dirty again.");
+    assert(dirty[0].baseline === "B", "New Baseline must be the server-saved value B.");
+    assert(dirty[0].current === "A", "Replay target must be A.");
 }
 
-function testNoOpDoesNotCreateHistory() {
+function testInFlightSaveKeepsNewerEditSafely() {
     const engine = createRevoGridChangeEngine({ datasetKey: "2026" });
-
-    const result = record(engine, "cell-edit", [
-        { clientKey: "db:21", field: "basket", before: "A", after: "A" }
+    recordChange(engine, "cell-edit", [
+        { clientKey: "r4", field: "basket", before: "A", after: "B" }
     ]);
+    const save = engine.beginSave();
 
-    assert(!result.recorded, "No-op edit should not be recorded.");
-    assert(engine.getState().undoCount === 0, "No-op edit created Undo history.");
-    assert(!engine.getState().dirty, "No-op edit created Dirty state.");
+    recordChange(engine, "cell-edit", [
+        { clientKey: "r4", field: "basket", before: "B", after: "A" }
+    ]);
+    assert(!engine.getState().dirty, "Browser can temporarily return to old Baseline while Save is in flight.");
+    assert(engine.getState().trackedCellCount === 1, "In-flight Save must retain the touched cell until server result.");
+
+    engine.acceptSave(save.id);
+    const dirty = engine.getDirtyCells();
+    assert(dirty.length === 1, "Newer browser value must remain Dirty after server accepts older snapshot.");
+    assert(dirty[0].baseline === "B", "Accepted server snapshot should become Baseline B.");
+    assert(dirty[0].current === "A", "Current browser value A must be preserved.");
 }
 
-function testHistoryBudgetEvictsOldestButKeepsNewest() {
-    const engine = createRevoGridChangeEngine({
+function testRejectedSaveKeepsOriginalBaseline() {
+    const engine = createRevoGridChangeEngine({ datasetKey: "2026" });
+    recordChange(engine, "cell-edit", [
+        { clientKey: "r5", field: "basket", before: "A", after: "B" }
+    ]);
+    const save = engine.beginSave();
+    engine.rejectSave(save.id);
+    const dirty = engine.getDirtyCells();
+    assert(dirty[0].baseline === "A" && dirty[0].current === "B", "Failed Save changed Baseline/Current.");
+}
+
+function testDatasetRulesStayInChangeEngine() {
+    const engine = createRevoGridChangeEngine({ datasetKey: "2026" });
+    recordChange(engine, "cell-edit", [
+        { clientKey: "r6", field: "basket", before: "A", after: "B" }
+    ]);
+    expectEngineError(() => engine.resetDataset("2025"), "DIRTY_DATASET");
+
+    engine.applyExternalChanges([
+        { clientKey: "r6", field: "basket", before: "B", after: "A" }
+    ]);
+    engine.resetDataset("2025");
+    assert(engine.getState().datasetKey === "2025", "Clean dataset switch failed.");
+}
+
+function testStaleTransitionRejected() {
+    const engine = createRevoGridChangeEngine({ datasetKey: "2026" });
+    recordChange(engine, "cell-edit", [
+        { clientKey: "r7", field: "basket", before: "A", after: "B" }
+    ]);
+    expectEngineError(() => engine.applyExternalChanges([
+        { clientKey: "r7", field: "basket", before: "A", after: "C" }
+    ]), "STALE_CURRENT");
+}
+
+function testNoOpCreatesNoDirty() {
+    const engine = createRevoGridChangeEngine({ datasetKey: "2026" });
+    const result = recordChange(engine, "cell-edit", [
+        { clientKey: "r8", field: "basket", before: "A", after: "A" }
+    ]);
+    assert(!result.recorded, "No-op should not produce a Change Set.");
+    assert(!engine.getState().dirty, "No-op created Dirty state.");
+}
+
+function historyEntry(label, payload = {}) {
+    return {
+        adapterKey: "data-cell-set",
+        kind: "cell-edit",
+        label,
+        focusTarget: { clientKey: `row:${label}`, field: "basket" },
+        payload
+    };
+}
+
+function testSheetHistorySeparatesTransactions() {
+    const history = createRevoGridSheetHistory({ datasetKey: "2026" });
+    history.record(historyEntry("1"));
+    history.record(historyEntry("2"));
+    history.record(historyEntry("3"));
+
+    const firstUndo = history.planUndo();
+    assert(firstUndo.entry.label === "3", "First Undo must target latest separate action only.");
+    history.commitReplay(firstUndo.replayId);
+    assert(history.getState().undoCount === 2 && history.getState().redoCount === 1, "One Undo must move exactly one entry.");
+
+    const secondUndo = history.planUndo();
+    assert(secondUndo.entry.label === "2", "Second Undo must target the next action.");
+    history.commitReplay(secondUndo.replayId);
+}
+
+function testSheetHistoryNewActionClearsRedo() {
+    const history = createRevoGridSheetHistory({ datasetKey: "2026" });
+    history.record(historyEntry("A"));
+    history.record(historyEntry("B"));
+    const undo = history.planUndo();
+    history.commitReplay(undo.replayId);
+    assert(history.getState().redoCount === 1, "Redo precondition failed.");
+    history.record(historyEntry("C"));
+    assert(history.getState().redoCount === 0, "New action after Undo must clear Redo.");
+}
+
+function testSheetHistoryMultiCellPayloadIsOneAction() {
+    const history = createRevoGridSheetHistory({ datasetKey: "2026" });
+    history.record(historyEntry("paste", {
+        operations: [1, 2, 3, 4].map(value => ({ value }))
+    }));
+    assert(history.getState().undoCount === 1, "One Paste payload must be one History entry.");
+}
+
+function testSheetHistoryMemoryBudget() {
+    const history = createRevoGridSheetHistory({
         datasetKey: "2026",
         maxHistoryBytes: 1024
     });
+    history.record(historyEntry("A", { text: "A".repeat(2500) }));
+    history.record(historyEntry("B", { text: "B".repeat(2500) }));
+    history.record(historyEntry("C", { text: "C".repeat(2500) }));
+    assert(history.getState().undoCount === 1, "History budget should evict oldest entries.");
+    assert(history.getState().historyOverBudget, "Newest oversized entry should remain undoable.");
+}
 
-    const largeA = "A".repeat(2500);
-    const largeB = "B".repeat(2500);
-    const largeC = "C".repeat(2500);
+function testSheetHistoryDatasetReset() {
+    const history = createRevoGridSheetHistory({ datasetKey: "2026" });
+    history.record(historyEntry("A"));
+    history.resetDataset("2025");
+    const state = history.getState();
+    assert(state.datasetKey === "2025", "History dataset did not change.");
+    assert(state.undoCount === 0 && state.redoCount === 0, "Year switch must clear History.");
+}
 
-    record(engine, "cell-edit", [
-        { clientKey: "db:30", field: "basket", before: "", after: largeA }
-    ]);
-    record(engine, "cell-edit", [
-        { clientKey: "db:31", field: "basket", before: "", after: largeB }
-    ]);
-    record(engine, "cell-edit", [
-        { clientKey: "db:32", field: "basket", before: "", after: largeC }
-    ]);
+function testSheetHistoryReplayGuard() {
+    const history = createRevoGridSheetHistory({ datasetKey: "2026" });
+    history.record(historyEntry("A"));
+    const plan = history.planUndo();
+    expectHistoryError(() => history.record(historyEntry("B")), "REPLAY_ACTIVE");
+    history.cancelReplay(plan.replayId);
+}
 
-    const state = engine.getState();
-    assert(state.undoCount === 1, "History budget should evict oldest transactions.");
-    assert(state.historyOverBudget, "Single oversized newest transaction should be retained and reported.");
+class MockGrid extends EventTarget {
+    constructor() {
+        super();
+        this.visibleRows = [
+            { clientKey: "row:1", basket: "B" },
+            { clientKey: "row:2", basket: "X" }
+        ];
+        this.columns = [
+            { prop: "workOrderNumber" },
+            { prop: "basket" }
+        ];
+        this.calls = [];
+    }
 
-    const undo = engine.planUndo();
-    assert(undo.transactionId, "Newest oversized transaction should remain undoable.");
+    async getVisibleSource() {
+        return this.visibleRows;
+    }
+
+    async getColumns() {
+        return this.columns;
+    }
+
+    async scrollToRow(y) {
+        this.calls.push(["scrollToRow", y]);
+    }
+
+    async scrollToColumnProp(prop, colType) {
+        this.calls.push(["scrollToColumnProp", prop, colType]);
+    }
+
+    async setCellsFocus(start, end, colType, rowType) {
+        this.calls.push(["setCellsFocus", start, end, colType, rowType]);
+    }
+}
+
+async function testCoordinatorUsesOneReplayPathAndFocusesTarget() {
+    const grid = new MockGrid();
+    const coordinator = createRevoGridHistoryCoordinator({
+        grid,
+        datasetKey: "2026"
+    });
+
+    const lifecycle = [];
+    grid.addEventListener(revoGridSheetHistoryEvents.beforeReplay, () => lifecycle.push("before"));
+    grid.addEventListener(revoGridSheetHistoryEvents.afterReplay, () => lifecycle.push("after"));
+
+    let appliedDirection = null;
+    coordinator.registerAdapter("data-cell-set", {
+        async apply(_entry, direction) {
+            appliedDirection = direction;
+            grid.visibleRows[0].basket = direction === "undo" ? "A" : "B";
+        }
+    });
+
+    coordinator.record({
+        adapterKey: "data-cell-set",
+        kind: "cell-edit",
+        label: "basket",
+        focusTarget: { clientKey: "row:1", field: "basket" },
+        payload: { operations: [{ before: "A", after: "B" }] }
+    });
+
+    await coordinator.undo();
+
+    assert(appliedDirection === "undo", "Coordinator did not delegate replay to the registered adapter.");
+    assert(lifecycle.join(",") === "before,after", "Replay lifecycle events are wrong.");
+    assert(coordinator.getState().redoCount === 1, "Coordinator did not commit one Undo.");
+    const focusCall = grid.calls.find(call => call[0] === "setCellsFocus");
+    assert(Boolean(focusCall), "Successful replay did not return focus to the affected cell.");
+    assert(focusCall[1].x === 1 && focusCall[1].y === 0, "Focused coordinates are wrong.");
+}
+
+
+async function testCoordinatorRejectsOverlappingReplay() {
+    const grid = new MockGrid();
+    const coordinator = createRevoGridHistoryCoordinator({ grid, datasetKey: "2026" });
+
+    let release;
+    const wait = new Promise(resolve => { release = resolve; });
+    coordinator.registerAdapter("data-cell-set", {
+        async apply() {
+            await wait;
+        }
+    });
+    coordinator.record(historyEntry("A"));
+
+    const first = coordinator.undo();
+    await Promise.resolve();
+    const second = await coordinator.undo();
+    assert(second === false, "A second Undo must not start while replay is active.");
+    release();
+    await first;
+    assert(coordinator.getState().redoCount === 1, "The first replay did not complete normally.");
+}
+
+async function testCoordinatorCanceledReplayDoesNotMoveHistory() {
+    const grid = new MockGrid();
+    const coordinator = createRevoGridHistoryCoordinator({ grid, datasetKey: "2026" });
+    coordinator.registerAdapter("data-cell-set", { async apply() {} });
+    coordinator.record(historyEntry("A"));
+    grid.addEventListener(revoGridSheetHistoryEvents.beforeReplay, event => event.preventDefault(), { once: true });
+    const changed = await coordinator.undo();
+    assert(!changed, "Canceled replay should report false.");
+    assert(coordinator.getState().undoCount === 1, "Canceled replay moved History.");
 }
 
 const TESTS = [
-    ["Cell Edit → Dirty → Undo/Redo", testCellEditDirtyUndoRedo],
-    ["Separate edits undo one transaction at a time", testSeparateEditsUndoOneTransactionAtATime],
-    ["Paste 2×2 = one transaction", testPasteIsOneTransaction],
-    ["Applied subset only", testAppliedSubsetOnlyRecordsAppliedCells],
-    ["Return to Baseline clears Dirty", testReturnToBaselineClearsDirtyWithoutDeletingHistory],
-    ["New edit after Undo clears Redo", testNewEditAfterUndoClearsRedo],
-    ["Save moves Baseline, keeps History", testSaveMovesBaselineButKeepsHistory],
-    ["Edit during Save is not lost", testInFlightSaveDoesNotLoseNewerEdit],
-    ["Failed Save keeps Baseline/History", testRejectedSaveChangesNothing],
-    ["Clean year switch clears old History", testCleanDatasetSwitchClearsHistory],
-    ["Dirty year switch is rejected", testDirtyDatasetSwitchIsRejected],
-    ["ClientKey survives server Id assignment", testClientKeyDoesNotDependOnDatabaseId],
-    ["Stale before-value is rejected", testStaleBeforeIsRejected],
-    ["No-op creates no History", testNoOpDoesNotCreateHistory],
-    ["History uses a memory budget", testHistoryBudgetEvictsOldestButKeepsNewest]
+    ["Change Engine owns Dirty, not History", testChangeEngineOwnsDirtyNotHistory],
+    ["Return to Baseline prunes Dirty tracker", testReturnToBaselinePrunesDirtyTracker],
+    ["Multi-cell change stays one Change Set", testMultiCellProducesOneChangeSet],
+    ["Applied subset only", testAppliedSubsetOnly],
+    ["Save Baseline + replay after Save", testSaveMovesBaselineThenHistoryReplayCanBecomeDirty],
+    ["In-flight Save keeps newer browser value", testInFlightSaveKeepsNewerEditSafely],
+    ["Rejected Save keeps original Baseline", testRejectedSaveKeepsOriginalBaseline],
+    ["Dirty/Clean dataset rules", testDatasetRulesStayInChangeEngine],
+    ["Stale replay transition rejected", testStaleTransitionRejected],
+    ["No-op creates no Dirty", testNoOpCreatesNoDirty],
+    ["Sheet History separates transactions", testSheetHistorySeparatesTransactions],
+    ["New action after Undo clears Redo", testSheetHistoryNewActionClearsRedo],
+    ["Multi-cell payload is one History action", testSheetHistoryMultiCellPayloadIsOneAction],
+    ["Sheet History uses memory budget", testSheetHistoryMemoryBudget],
+    ["Year/dataset switch clears Sheet History", testSheetHistoryDatasetReset],
+    ["Sheet History blocks record during replay", testSheetHistoryReplayGuard],
+    ["Coordinator replay path + focus", testCoordinatorUsesOneReplayPathAndFocusesTarget],
+    ["Coordinator blocks overlapping replay", testCoordinatorRejectsOverlappingReplay],
+    ["Canceled replay leaves History untouched", testCoordinatorCanceledReplayDoesNotMoveHistory]
 ];
 
-export function runRevoGridChangeEngineSelfTests() {
+export async function runRevoGridChangeEngineSelfTests() {
     const results = [];
 
     for (const [name, test] of TESTS) {
         const startedAt = performance.now();
-
         try {
-            test();
+            await test();
             results.push({
                 name,
                 status: "PASS",
@@ -421,8 +430,8 @@ export function runRevoGridChangeEngineSelfTests() {
     }
 
     return {
-        engine: "RevoGrid Change Engine Foundation",
-        version: "Gate 5B-0",
+        engine: "RevoGrid Sheet History + Change Engine Foundation",
+        version: "Gate 5B-1 History Refactor",
         passed: results.filter(result => result.status === "PASS").length,
         failed: results.filter(result => result.status === "FAIL").length,
         total: results.length,
