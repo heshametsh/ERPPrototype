@@ -21,6 +21,16 @@ function isCellEditDetail(detail) {
     );
 }
 
+function isRangeEditDetail(detail) {
+    return Boolean(
+        detail &&
+        detail.data &&
+        typeof detail.data === "object" &&
+        detail.models &&
+        typeof detail.models === "object"
+    );
+}
+
 function buildRowIndex(rows) {
     const index = new Map();
 
@@ -64,9 +74,68 @@ function valuesEqual(left, right) {
     }
 }
 
+function createIntentId() {
+    if (
+        globalThis.crypto &&
+        typeof globalThis.crypto.randomUUID === "function"
+    ) {
+        return `paste:${globalThis.crypto.randomUUID()}`;
+    }
+
+    return `paste:${Date.now().toString(36)}:${Math.random()
+        .toString(36)
+        .slice(2)}`;
+}
+
+/**
+ * Convert RevoGrid's final pre-apply range payload into ERP cell changes.
+ * RevoGrid has already clipped the matrix to the available sheet bounds and
+ * removed readonly cells before beforerangeedit reaches this bridge.
+ */
+function buildRangeCaptureChanges(detail) {
+    if (!isRangeEditDetail(detail)) {
+        return [];
+    }
+
+    const changes = [];
+    const rowIndexes = Object.keys(detail.data)
+        .map(value => Number(value))
+        .filter(Number.isInteger)
+        .sort((left, right) => left - right);
+
+    for (const rowIndex of rowIndexes) {
+        const proposedRow = detail.data[rowIndex] ?? detail.data[String(rowIndex)];
+        const model = detail.models[rowIndex] ?? detail.models[String(rowIndex)];
+
+        if (!model) {
+            throw new Error(`Paste row ${rowIndex} has no RevoGrid source model.`);
+        }
+
+        const clientKey = requireText(model.clientKey, `models[${rowIndex}].clientKey`);
+        const fields = Object.keys(proposedRow || {});
+
+        for (const field of fields) {
+            if (!field) {
+                continue;
+            }
+
+            changes.push({
+                rowIndex,
+                clientKey,
+                field,
+                before: model[field],
+                proposedAfter: proposedRow[field]
+            });
+        }
+    }
+
+    return changes;
+}
+
 export function createRevoGridChangeBridge(options) {
     const grid = options?.grid;
     const historyCoordinator = options?.historyCoordinator;
+    const allowPaste = Boolean(options?.allowPaste);
 
     if (!grid || typeof grid.addEventListener !== "function") {
         throw new Error("A RevoGrid element is required.");
@@ -84,6 +153,7 @@ export function createRevoGridChangeBridge(options) {
     let editLocked = false;
     let destroyed = false;
     let activeCapture = null;
+    let pendingPasteIntent = null;
 
     const engine = createRevoGridChangeEngine({ datasetKey });
 
@@ -143,10 +213,9 @@ export function createRevoGridChangeBridge(options) {
                 row[transition.field] = transition.after;
             }
 
-            // Keep RevoGrid as the renderer/state host. We do not replace the
-            // full source and we do not synthesize a fake user edit. The Sheet
-            // History coordinator emits one explicit replay lifecycle that
-            // future ERP adapters can observe without recursively recording it.
+            // RevoGrid stays the renderer/state host. Sheet History replay is
+            // one controlled data transition; it must not re-enter the user
+            // edit capture path as a new action.
             await grid.refresh("rgRow");
             engine.applyExternalChanges(transitions, datasetKey);
             notifyState();
@@ -170,6 +239,57 @@ export function createRevoGridChangeBridge(options) {
             apply: applyDataHistoryEntry
         });
 
+    function rollbackRecordedChangeSet(changeSet) {
+        const reverse = changeSet.operations.map(operation => ({
+            clientKey: operation.clientKey,
+            field: operation.field,
+            before: operation.after,
+            after: operation.before
+        }));
+
+        for (const operation of reverse) {
+            const row = rowByClientKey.get(operation.clientKey);
+            if (row) {
+                row[operation.field] = operation.after;
+            }
+        }
+
+        engine.applyExternalChanges(reverse, datasetKey);
+        void grid.refresh("rgRow");
+        notifyState();
+    }
+
+    function recordFinalizedChange(result) {
+        if (!result?.recorded || !result.changeSet) {
+            return;
+        }
+
+        const firstOperation = result.changeSet.operations[0];
+
+        try {
+            historyCoordinator.record({
+                adapterKey: DATA_CELL_SET_ADAPTER,
+                kind: result.changeSet.kind,
+                label: result.changeSet.label,
+                focusTarget: firstOperation
+                    ? {
+                        clientKey: firstOperation.clientKey,
+                        field: firstOperation.field
+                    }
+                    : null,
+                payload: {
+                    operations: result.changeSet.operations
+                }
+            });
+        } catch (error) {
+            // History is required for every accepted Gate 5B data change. If
+            // recording fails, restore the whole transaction rather than leave
+            // a silent change the employee cannot Undo.
+            rollbackRecordedChangeSet(result.changeSet);
+            throw error;
+        }
+    }
+
     const beforeEdit = event => {
         if (destroyed || !isCellEditDetail(event.detail)) {
             return;
@@ -180,9 +300,9 @@ export function createRevoGridChangeBridge(options) {
             return;
         }
 
-        if (activeCapture) {
+        if (activeCapture || pendingPasteIntent) {
             event.preventDefault();
-            throw new Error("A previous cell edit is still waiting for afteredit.");
+            throw new Error("Another data change is still waiting for its after-event.");
         }
 
         const detail = event.detail;
@@ -206,6 +326,7 @@ export function createRevoGridChangeBridge(options) {
         });
 
         activeCapture = {
+            type: "cell-edit",
             captureId,
             clientKey,
             field
@@ -226,82 +347,183 @@ export function createRevoGridChangeBridge(options) {
         });
     };
 
-    const afterEdit = event => {
-        if (destroyed || !isCellEditDetail(event.detail)) {
-            return;
-        }
-
-        const detail = event.detail;
-        const clientKey = requireText(
-            detail.model.clientKey,
-            "model.clientKey"
-        );
-        const field = requireText(detail.prop, "prop");
-
-        if (!activeCapture) {
+    const clipboardRangePaste = event => {
+        if (destroyed) {
             return;
         }
 
         if (
-            activeCapture.clientKey !== clientKey ||
-            activeCapture.field !== field
+            !allowPaste ||
+            editLocked ||
+            historyCoordinator.getState().replayActive ||
+            activeCapture ||
+            pendingPasteIntent
         ) {
-            const staleCapture = activeCapture;
-            activeCapture = null;
-            engine.cancelCapture(staleCapture.captureId);
-            throw new Error(
-                `afteredit target '${clientKey}/${field}' does not match pending capture '${staleCapture.clientKey}/${staleCapture.field}'.`
+            event.preventDefault();
+            return;
+        }
+
+        const intentId = createIntentId();
+        pendingPasteIntent = { id: intentId };
+
+        // clipboardrangepaste identifies the operation as Paste, but the final
+        // data payload is captured later in beforerangeedit. That lets any
+        // earlier/later RevoGrid clipboard listener finish its transformation
+        // before ERP records old/new values.
+        queueMicrotask(() => {
+            if (pendingPasteIntent?.id === intentId) {
+                pendingPasteIntent = null;
+                notifyState();
+            }
+        });
+    };
+
+    const beforeRangeEdit = event => {
+        if (destroyed || !isRangeEditDetail(event.detail)) {
+            return;
+        }
+
+        // Gate 5B-2 qualifies Clipboard Paste only. Autofill and any other
+        // range mutation stay blocked until they get their own explicit gate.
+        if (
+            !allowPaste ||
+            !pendingPasteIntent ||
+            editLocked ||
+            historyCoordinator.getState().replayActive ||
+            activeCapture
+        ) {
+            event.preventDefault();
+            return;
+        }
+
+        const intent = pendingPasteIntent;
+        pendingPasteIntent = null;
+
+        let changes;
+        try {
+            changes = buildRangeCaptureChanges(event.detail);
+        } catch (error) {
+            event.preventDefault();
+            throw error;
+        }
+
+        if (changes.length === 0) {
+            return;
+        }
+
+        const captureId = engine.captureBefore({
+            datasetKey,
+            kind: "paste",
+            label: "Paste",
+            changes: changes.map(change => ({
+                clientKey: change.clientKey,
+                field: change.field,
+                before: change.before,
+                proposedAfter: change.proposedAfter
+            }))
+        });
+
+        activeCapture = {
+            type: "paste",
+            captureId,
+            pasteIntentId: intent.id,
+            targets: changes.map(change => ({
+                clientKey: change.clientKey,
+                field: change.field
+            }))
+        };
+
+        // If another listener cancels the final Revo range edit after ERP has
+        // captured it, discard the capture instead of leaving the engine busy.
+        queueMicrotask(() => {
+            if (
+                event.defaultPrevented &&
+                activeCapture?.captureId === captureId
+            ) {
+                engine.cancelCapture(captureId);
+                activeCapture = null;
+                notifyState();
+            }
+        });
+    };
+
+    const afterEdit = event => {
+        if (destroyed) {
+            return;
+        }
+
+        if (isCellEditDetail(event.detail)) {
+            if (!activeCapture || activeCapture.type !== "cell-edit") {
+                return;
+            }
+
+            const detail = event.detail;
+            const clientKey = requireText(
+                detail.model.clientKey,
+                "model.clientKey"
             );
+            const field = requireText(detail.prop, "prop");
+
+            if (
+                activeCapture.clientKey !== clientKey ||
+                activeCapture.field !== field
+            ) {
+                const staleCapture = activeCapture;
+                activeCapture = null;
+                engine.cancelCapture(staleCapture.captureId);
+                throw new Error(
+                    `afteredit target '${clientKey}/${field}' does not match pending capture '${staleCapture.clientKey}/${staleCapture.field}'.`
+                );
+            }
+
+            const capture = activeCapture;
+            activeCapture = null;
+
+            const result = engine.finalizeAfter(capture.captureId, [{
+                clientKey,
+                field,
+                after: detail.model[field]
+            }]);
+
+            recordFinalizedChange(result);
+            notifyState();
+            return;
+        }
+
+        if (!isRangeEditDetail(event.detail)) {
+            return;
+        }
+
+        if (!activeCapture || activeCapture.type !== "paste") {
+            return;
         }
 
         const capture = activeCapture;
         activeCapture = null;
 
-        const result = engine.finalizeAfter(capture.captureId, [{
-            clientKey,
-            field,
-            after: detail.model[field]
-        }]);
-
-        if (result.recorded && result.changeSet) {
-            try {
-                historyCoordinator.record({
-                    adapterKey: DATA_CELL_SET_ADAPTER,
-                    kind: result.changeSet.kind,
-                    label: result.changeSet.label,
-                    focusTarget: { clientKey, field },
-                    payload: {
-                        operations: result.changeSet.operations
-                    }
-                });
-            } catch (error) {
-                // History is a required part of an accepted user edit. If it
-                // cannot be recorded, restore both the visible row and Dirty
-                // state rather than leave an un-undoable silent change.
-                const reverse = result.changeSet.operations.map(operation => ({
-                    clientKey: operation.clientKey,
-                    field: operation.field,
-                    before: operation.after,
-                    after: operation.before
-                }));
-
-                for (const operation of reverse) {
-                    const row = rowByClientKey.get(operation.clientKey);
-                    if (row) {
-                        row[operation.field] = operation.after;
-                    }
-                }
-                engine.applyExternalChanges(reverse, datasetKey);
-                void grid.refresh("rgRow");
-                notifyState();
-                throw error;
+        const applied = capture.targets.map(target => {
+            const row = rowByClientKey.get(target.clientKey);
+            if (!row) {
+                throw new Error(
+                    `Row '${target.clientKey}' disappeared before Paste afteredit.`
+                );
             }
-        }
 
+            return {
+                clientKey: target.clientKey,
+                field: target.field,
+                after: row[target.field]
+            };
+        });
+
+        const result = engine.finalizeAfter(capture.captureId, applied);
+        recordFinalizedChange(result);
         notifyState();
     };
 
     grid.addEventListener("beforeedit", beforeEdit);
+    grid.addEventListener("clipboardrangepaste", clipboardRangePaste);
+    grid.addEventListener("beforerangeedit", beforeRangeEdit);
     grid.addEventListener("afteredit", afterEdit);
 
     function setEditLocked(locked) {
@@ -310,8 +532,8 @@ export function createRevoGridChangeBridge(options) {
     }
 
     function resetDataset(rows, nextDatasetKey) {
-        if (activeCapture) {
-            throw new Error("Dataset cannot change while a cell edit is incomplete.");
+        if (activeCapture || pendingPasteIntent) {
+            throw new Error("Dataset cannot change while a data edit is incomplete.");
         }
 
         const normalizedDatasetKey = requireText(
@@ -331,7 +553,10 @@ export function createRevoGridChangeBridge(options) {
         return {
             ...engine.getState(),
             editLocked,
-            activeCellCapture: Boolean(activeCapture)
+            pasteEnabled: allowPaste,
+            activeDataCapture: Boolean(activeCapture || pendingPasteIntent),
+            activeCellCapture: activeCapture?.type === "cell-edit",
+            activePasteCapture: activeCapture?.type === "paste" || Boolean(pendingPasteIntent)
         };
     }
 
@@ -344,12 +569,16 @@ export function createRevoGridChangeBridge(options) {
             return;
         }
 
+        pendingPasteIntent = null;
+
         if (activeCapture) {
             engine.cancelCapture(activeCapture.captureId);
             activeCapture = null;
         }
 
         grid.removeEventListener("beforeedit", beforeEdit);
+        grid.removeEventListener("clipboardrangepaste", clipboardRangePaste);
+        grid.removeEventListener("beforerangeedit", beforeRangeEdit);
         grid.removeEventListener("afteredit", afterEdit);
         unregisterDataHistoryAdapter();
         rowByClientKey.clear();

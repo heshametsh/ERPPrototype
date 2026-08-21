@@ -16,15 +16,17 @@
 @inject IJSRuntime JSRuntime
 @inject ILogger<WorkOrdersRevoGridNativeGate5A> Logger
 
-<PageTitle>@(EnableChangeEngine ? "RevoGrid Gate 5B-1" : "RevoGrid Native Gate 5A")</PageTitle>
+<PageTitle>@(EnablePaste ? "RevoGrid Gate 5B-2" : EnableChangeEngine ? "RevoGrid Gate 5B-1" : "RevoGrid Native Gate 5A")</PageTitle>
 
 <div class="native-gate5a" data-testid="revogrid-native-gate5a">
     <header class="native-gate5a__header">
         <div class="native-gate5a__identity">
             <strong>RevoGrid Community 4.25.2</strong>
-            <span>@(EnableChangeEngine
-                ? "Gate 5B-1 — Cell Edit → Change Engine / real data"
-                : "Gate 5A — clean native baseline / real data")</span>
+            <span>@(EnablePaste
+                ? "Gate 5B-2 — Cell Edit + Paste → Sheet History / real data"
+                : EnableChangeEngine
+                    ? "Gate 5B-1 — Cell Edit → Change Engine / real data"
+                    : "Gate 5A — clean native baseline / real data")</span>
         </div>
 
         <div class="native-gate5a__scope">
@@ -114,9 +116,13 @@
         </main>
 
         <footer class="native-gate5a__note">
-            @if (EnableChangeEngine)
+            @if (EnablePaste)
             {
-                <span>Gate 5B-1 يربط تعديل الخلية فقط بالمحرك. Undo/Redo يعملان من نفس History، والـPaste لم يدخل المحرك بعد. التعديلات ما زالت مؤقتة ولا تُحفظ في قاعدة البيانات.</span>
+                <span>Gate 5B-2 يربط Cell Edit وPaste بنفس Sheet History وChange Engine. الـPaste مهما كان حجمه يسجل كعملية Undo واحدة، ولا يوجد Save لقاعدة البيانات في هذه المرحلة.</span>
+            }
+            else if (EnableChangeEngine)
+            {
+                <span>Gate 5B-1 يربط تعديل الخلية فقط بالمحرك. Undo/Redo يعملان من نفس History، والـPaste يظل مقفولًا في هذا المسار المرجعي.</span>
             }
             else
             {

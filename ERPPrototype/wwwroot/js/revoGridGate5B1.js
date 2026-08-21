@@ -1,6 +1,7 @@
 import * as nativeGate5A from "./revoGridNativeGate5A.js?v=20260821-explicit-year-final-1";
-import { createRevoGridChangeBridge } from "./revoGridChangeBridge.js";
-import { createRevoGridHistoryCoordinator } from "./revoGridHistoryCoordinator.js";
+import { createRevoGridChangeBridge } from "./revoGridChangeBridge.js?v=20260821-gate5b2-paste-1";
+import { createRevoGridHistoryCoordinator } from "./revoGridHistoryCoordinator.js?v=20260821-minimal-reveal-1";
+import { createRevoGridHistoryFocus } from "./revoGridHistoryFocus.js?v=20260821-minimal-reveal-1";
 
 const bindings = new Map();
 
@@ -155,9 +156,12 @@ export async function initialize(elementId, rows, customColumns, options) {
         )
     };
 
+    const historyFocus = createRevoGridHistoryFocus({ grid });
+
     state.historyCoordinator = createRevoGridHistoryCoordinator({
         grid,
         datasetKey: activeDatasetKey,
+        focusTarget: target => historyFocus.focusTarget(target),
         onStateChange: () => renderState(state)
     });
 
@@ -166,6 +170,7 @@ export async function initialize(elementId, rows, customColumns, options) {
         rows,
         datasetKey: activeDatasetKey,
         historyCoordinator: state.historyCoordinator,
+        allowPaste: Boolean(value(options, "enablePaste", "EnablePaste", false)),
         onStateChange: () => renderState(state)
     });
 
@@ -175,12 +180,6 @@ export async function initialize(elementId, rows, customColumns, options) {
 
     addListener(state, state.redoButton, "click", async () => {
         await state.historyCoordinator.redo();
-    });
-
-    // Gate 5B-1 still qualifies Cell Edit only. Range mutations (including
-    // Paste) must not bypass the new Sheet History/Change Engine split.
-    addListener(state, grid, "beforerangeedit", event => {
-        event.preventDefault();
     });
 
     const beforeKeyDown = event => {
@@ -256,7 +255,7 @@ export async function beginDatasetSwitch(elementId) {
     }
 
     if (
-        current.activeCellCapture ||
+        current.activeDataCapture ||
         current.replayActive ||
         current.saveActive
     ) {

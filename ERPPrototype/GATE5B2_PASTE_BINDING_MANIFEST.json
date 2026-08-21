@@ -1,0 +1,33 @@
+{
+  "name": "ERP Prototype RevoGrid Gate 5B-2 Paste Binding",
+  "date": "2026-08-21",
+  "base": "Latest user-applied Gate 5B-1 Sheet History + Minimal Reveal state",
+  "scope": [
+    "Add isolated /work-orders-revogrid-gate5b2 route",
+    "Enable Clipboard Paste only on Gate 5B-2",
+    "Capture RevoGrid final beforerangeedit payload after native clipping/readonly handling",
+    "Record one Paste as one Sheet History transaction",
+    "Reuse existing data-cell-set replay adapter for Undo/Redo",
+    "Keep Gate 5B-1 Paste blocked",
+    "Keep non-Paste range mutations/autofill blocked"
+  ],
+  "not_changed": [
+    "/work-orders production Tabulator route",
+    "Database Save",
+    "Change Engine Baseline/Dirty ownership",
+    "Sheet History core ownership",
+    "Minimal reveal focus algorithm",
+    "RevoGrid native clipboard parsing/bounds/readonly behavior"
+  ],
+  "reference": {
+    "community": "RevoGrid Community 4.25.2 source: clipboardrangepaste -> beforerangeedit -> dataProvider.setRangeData -> afteredit; native transform clips to available bounds and skips readonly cells",
+    "pro": "EventManagerPlugin normalizes cell/range/paste edits; History/Audit documentation treats bulk Paste as one transaction. Architecture only; no proprietary code copied."
+  },
+  "verification": {
+    "javascript_syntax": "PASS",
+    "node_self_tests": "31/31 PASS",
+    "paste_5000_bridge_test": "PASS as one History action + one Undo",
+    "dotnet_build": "NOT RUN in assistant environment; .NET SDK unavailable",
+    "real_browser_runtime": "PENDING user Clean Build/manual Gate 5B-2 test"
+  }
+}

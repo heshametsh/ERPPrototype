@@ -407,3 +407,26 @@
 - **Year rule:** History never crosses a Work Year boundary. Dirty still blocks year change. Per-year Filter/Sort/Column view state is session-only and will be qualified with those feature adapters; first visit to a year starts with no inherited view changes.
 - **Revo reference:** Community public Events/APIs remain the implementation base. Revo Pro Event Manager/History/plugin ownership is an architectural reference only; no proprietary source code is used.
 - **Supersedes:** DEC-031 History ownership and DEC-032 direct Change-Engine Undo/Redo replay details.
+
+## DEC-034 — Undo/Redo selection uses minimal reveal, never unconditional scroll
+
+- **Date:** 2026-08-21
+- **Status:** Accepted by user
+- **Decision:** بعد Undo/Redo ينتقل تحديد RevoGrid إلى الخلية المتأثرة، لكن الشاشة لا تتحرك إذا كانت الخلية ظاهرة بالفعل. إذا كانت الخلية خارج الـviewport بالكامل، يتحرك الشيت بأقل مسافة لازمة لإظهارها عند أقرب حافة.
+- **Revo source evidence:** في Community 4.25.2، `setCellsFocus` منفصل عن `scrollToCoordinate`. أما `scrollToRow` و`scrollToColumnProp` فيحوّلان رقم الصف/العمود إلى بداية العنصر ثم يطلبان Scroll مباشر، لذلك استدعاؤهما دائمًا بعد History replay يسبب قفزة غير لازمة حتى عندما تكون الخلية ظاهرة.
+- **Implementation boundary:** منطق Focus/Reveal يعيش في Adapter مستقل عن Sheet History core. يستخدم `getProviders()` الرسمي لقراءة Dimension/Viewport state، ثم يستدعي Revo public APIs فقط. الـHistory لا يملك حسابات Scroll.
+- **Visibility rule:** وجود أي جزء من الخلية داخل الـviewport يعني أنها ظاهرة؛ يتم تغيير التحديد فقط بدون تحريك الشاشة. الأعمدة المثبتة لا تسبب Horizontal Scroll.
+- **Hidden target:** إذا كان الصف غير ظاهر بسبب Filter، لا يلغي Focus adapter الفلتر من نفسه. عندما يدخل Filter في Sheet History، Filter adapter هو المسؤول عن إرجاع حالته حسب ترتيب History.
+- **Simple example:** لو الموظف عند الصف 100 والخلية التي يرجعها Undo ظاهرة أسفل نفس الشاشة، يتغير التحديد فقط. لو الخلية في الصف 400 خارج الشاشة، يتحرك الشيت فقط حتى يظهر الصف 400 عند أقرب طرف بدل وضعه في منتصف الشاشة أو أعلىها بلا داعٍ.
+
+## DEC-035 — Gate 5B-2 Paste uses Revo's final range payload as one History action
+
+- **Date:** 2026-08-21
+- **Status:** Accepted implementation direction; manual runtime qualification pending.
+- **Decision:** Clipboard Paste is the second data client of the existing Sheet History + Change Engine foundation. A Paste of any size is one Sheet History entry containing only cells RevoGrid actually applies.
+- **Revo Community rule:** `clipboardrangepaste` identifies the action as Paste. The actual old/new capture is taken at `beforerangeedit`, after RevoGrid has already clipped the matrix to available rows/columns and skipped readonly cells. RevoGrid then applies the range and `afteredit` finalizes the transaction.
+- **ERP rule:** The bridge does not parse clipboard text, grow the sheet, reimplement Revo's readonly logic, or scan the whole dataset. It records only Revo's final applied range delta.
+- **History rule:** One Paste = one Undo/Redo action. Separate Paste operations remain separate actions. Undo/Redo reuses the same `data-cell-set` replay adapter as Cell Edit.
+- **Scope guard:** Gate 5B-1 keeps Paste blocked. Gate 5B-2 enables Clipboard Paste only; Autofill and other range mutations remain blocked until separately qualified.
+- **End-of-sheet rule:** Because the bridge captures Revo's already-transformed range, the approved product behavior remains native: Paste stops at the last available row and never creates rows automatically.
+- **Reference rule:** RevoGrid Pro Event Manager/History is used as an architectural reference: edit/paste/range flow is normalized before History, and bulk Paste is one transaction. No proprietary code is copied.

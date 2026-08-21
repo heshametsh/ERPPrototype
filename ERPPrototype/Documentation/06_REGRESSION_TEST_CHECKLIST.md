@@ -719,3 +719,25 @@ Include:
 - [ ] Manual Split 100% is at least as comfortable as the accepted Lab.
 - [ ] Only after PASS: switch `/work-orders`, then remove obsolete Tabulator runtime in a separate cleanup checkpoint.
 
+
+#### Gate 5B-1 — Undo/Redo minimal reveal regression
+
+- [ ] عدّل 3 خلايا ظاهرة داخل نفس الشاشة، ثم انتقل بيدك إلى خلية أخرى. كل Ctrl+Z يرجع تعديلًا واحدًا ويغيّر التحديد للخلية المتأثرة **بدون أي Scroll** طالما الخلية ظاهرة.
+- [ ] كرر نفس الاختبار بـCtrl+Y؛ لا يحدث تحريك رأسي أو أفقي غير مطلوب.
+- [ ] عدّل خلية، ابتعد عنها حتى تصبح خارج الشاشة بالكامل، ثم Undo. يتحرك الشيت بأقل مسافة لازمة فقط حتى تظهر الخلية عند أقرب حافة ثم يظهر التحديد عليها.
+- [ ] اختبر خلية ظاهرة جزئيًا عند أعلى/أسفل الـviewport؛ Undo يغيّر التحديد ولا يحرك الشاشة.
+- [ ] اختبر عمودًا خارج الشاشة أفقيًا؛ يتحرك أفقيًا بأقل مسافة لازمة فقط. العمود الظاهر أو المثبت لا يسبب Horizontal Scroll.
+- [ ] بعد Undo/Redo لا يتغير Undo/Redo count إلا بمقدار عملية واحدة، ولا يتأثر Dirty إلا بنتيجة البيانات الفعلية.
+
+#### Gate 5B-2 — Paste binding
+
+- [ ] `/work-orders-revogrid-gate5b2` loads the same real employee/year dataset as Gate 5B-1.
+- [ ] Paste 2×2 into four editable cells changes four cells, makes the correct Dirty count, and adds **one** Undo entry.
+- [ ] Ctrl+Z once restores the whole 2×2 Paste; Ctrl+Y once reapplies the whole 2×2 Paste.
+- [ ] Two separate Paste actions create two separate Undo entries; one Undo restores only the latest Paste.
+- [ ] Paste across a readonly column changes only writable cells and History/Dirty contain only those applied cells.
+- [ ] Paste at the end of the sheet truncates to available rows and never creates rows automatically.
+- [ ] Undo/Redo after Paste uses the same minimal-reveal focus rule: no viewport movement when the target is already visible; minimum movement only when needed.
+- [ ] Gate 5B-1 still blocks Paste, proving the previous accepted gate remains isolated.
+- [ ] Non-Paste range mutation/Autofill remains blocked in Gate 5B-2 until it receives a separate qualification gate.
+- [ ] No browser page error, unexpected console error, failed request, or server 5xx appears during Paste/Undo/Redo tests.

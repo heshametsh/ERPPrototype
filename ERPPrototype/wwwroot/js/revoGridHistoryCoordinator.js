@@ -79,57 +79,6 @@ export function createRevoGridHistoryCoordinator(options) {
         return recorded;
     }
 
-    async function focusTarget(target) {
-        if (!target || destroyed) {
-            return false;
-        }
-
-        try {
-            const visibleRows = await grid.getVisibleSource();
-            const y = Array.isArray(visibleRows)
-                ? visibleRows.findIndex(row =>
-                    String(row?.clientKey ?? "") === target.clientKey)
-                : -1;
-
-            if (y < 0) {
-                return false;
-            }
-
-            const columns = await grid.getColumns();
-            const column = Array.isArray(columns)
-                ? columns.find(item => String(item?.prop ?? "") === target.field)
-                : null;
-
-            if (!column) {
-                return false;
-            }
-
-            const colType = column.pin || "rgCol";
-            const sameTypeColumns = columns.filter(item =>
-                (item.pin || "rgCol") === colType);
-            const x = sameTypeColumns.findIndex(item =>
-                String(item?.prop ?? "") === target.field);
-
-            if (x < 0) {
-                return false;
-            }
-
-            await grid.scrollToRow(y);
-            await grid.scrollToColumnProp(target.field, colType);
-            await grid.setCellsFocus(
-                { x, y },
-                { x, y },
-                colType,
-                "rgRow"
-            );
-            return true;
-        } catch {
-            // Focus is feedback only. A successful data/state Undo must not be
-            // rolled back just because a target is currently not focusable.
-            return false;
-        }
-    }
-
     async function replay(direction) {
         if (destroyed) {
             return false;
@@ -187,7 +136,17 @@ export function createRevoGridHistoryCoordinator(options) {
                 }
             }));
 
-            await focusTarget(plan.entry.focusTarget);
+            if (typeof options?.focusTarget === "function") {
+                try {
+                    await options.focusTarget(plan.entry.focusTarget, {
+                        direction,
+                        entry: cloneValue(plan.entry)
+                    });
+                } catch {
+                    // Focus/reveal is feedback only. A successful replay must
+                    // stay committed even if the target cannot be focused.
+                }
+            }
             return true;
         } catch (error) {
             history.cancelReplay(plan.replayId);

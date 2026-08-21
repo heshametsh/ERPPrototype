@@ -10,6 +10,11 @@ import {
     createRevoGridHistoryCoordinator,
     revoGridSheetHistoryEvents
 } from "./revoGridHistoryCoordinator.js";
+import {
+    calculateMinimalRevealCoordinate,
+    createRevoGridHistoryFocus
+} from "./revoGridHistoryFocus.js";
+import { createRevoGridChangeBridge } from "./revoGridChangeBridge.js";
 
 function assert(condition, message) {
     if (!condition) {
@@ -283,13 +288,18 @@ class MockGrid extends EventTarget {
         super();
         this.visibleRows = [
             { clientKey: "row:1", basket: "B" },
-            { clientKey: "row:2", basket: "X" }
+            { clientKey: "row:2", basket: "X" },
+            { clientKey: "row:3", basket: "Y" },
+            { clientKey: "row:4", basket: "Z" }
         ];
         this.columns = [
             { prop: "workOrderNumber" },
-            { prop: "basket" }
+            { prop: "basket" },
+            { prop: "notes" }
         ];
         this.calls = [];
+        this.rowViewport = { current: 0, size: 66 };
+        this.colViewport = { current: 0, size: 200 };
     }
 
     async getVisibleSource() {
@@ -300,12 +310,69 @@ class MockGrid extends EventTarget {
         return this.columns;
     }
 
-    async scrollToRow(y) {
-        this.calls.push(["scrollToRow", y]);
+    async getProviders() {
+        const makeViewport = state => ({
+            get lastCoordinate() {
+                return state.current;
+            },
+            store: {
+                get(key) {
+                    if (key === "virtualSize" || key === "clientSize") {
+                        return state.size;
+                    }
+                    return undefined;
+                }
+            }
+        });
+        const makeDimension = (originItemSize, count) => ({
+            getCurrentState() {
+                return {
+                    sizes: {},
+                    originItemSize,
+                    realSize: originItemSize * count
+                };
+            }
+        });
+
+        return {
+            column: {
+                getColumnByProp: prop =>
+                    this.columns.find(column => String(column?.prop ?? "") === String(prop)),
+                getColumnIndexByProp: (prop, colType) =>
+                    this.columns
+                        .filter(column => (column.pin || "rgCol") === colType)
+                        .findIndex(column => String(column?.prop ?? "") === String(prop))
+            },
+            dimension: {
+                stores: {
+                    rgRow: makeDimension(22, this.visibleRows.length),
+                    rgCol: makeDimension(100, this.columns.length)
+                },
+                getViewPortPos({ coordinate, dimension }) {
+                    return coordinate * (dimension === "rgRow" ? 22 : 100);
+                }
+            },
+            viewport: {
+                stores: {
+                    rgRow: makeViewport(this.rowViewport),
+                    rgCol: makeViewport(this.colViewport)
+                }
+            }
+        };
     }
 
-    async scrollToColumnProp(prop, colType) {
-        this.calls.push(["scrollToColumnProp", prop, colType]);
+    async refresh(type) {
+        this.calls.push(["refresh", type]);
+    }
+
+    async scrollToCoordinate(cell) {
+        this.calls.push(["scrollToCoordinate", { ...cell }]);
+        if (typeof cell?.y === "number") {
+            this.rowViewport.current = cell.y;
+        }
+        if (typeof cell?.x === "number") {
+            this.colViewport.current = cell.x;
+        }
     }
 
     async setCellsFocus(start, end, colType, rowType) {
@@ -313,11 +380,107 @@ class MockGrid extends EventTarget {
     }
 }
 
+function testMinimalRevealKeepsVisibleViewportStill() {
+    assert(
+        calculateMinimalRevealCoordinate({
+            currentCoordinate: 0,
+            viewportSize: 66,
+            itemStart: 22,
+            itemSize: 22,
+            contentSize: 220
+        }) === null,
+        "A visible cell must not move the viewport."
+    );
+
+    assert(
+        calculateMinimalRevealCoordinate({
+            currentCoordinate: 30,
+            viewportSize: 44,
+            itemStart: 22,
+            itemSize: 22,
+            contentSize: 220
+        }) === null,
+        "A partially visible cell must not move the viewport."
+    );
+}
+
+function testMinimalRevealMovesOnlyToNearestEdge() {
+    const below = calculateMinimalRevealCoordinate({
+        currentCoordinate: 0,
+        viewportSize: 44,
+        itemStart: 66,
+        itemSize: 22,
+        contentSize: 220
+    });
+    assert(below === 44, `Below-cell minimal reveal expected 44, got ${below}.`);
+
+    const above = calculateMinimalRevealCoordinate({
+        currentCoordinate: 66,
+        viewportSize: 44,
+        itemStart: 22,
+        itemSize: 22,
+        contentSize: 220
+    });
+    assert(above === 22, `Above-cell minimal reveal expected 22, got ${above}.`);
+}
+
+async function testHistoryFocusVisibleCellDoesNotScroll() {
+    const grid = new MockGrid();
+    const focus = createRevoGridHistoryFocus({ grid });
+
+    await focus.focusTarget({ clientKey: "row:2", field: "basket" });
+
+    const focusCalls = grid.calls.filter(call => call[0] === "setCellsFocus");
+    const scrollCalls = grid.calls.filter(call => call[0] === "scrollToCoordinate");
+    assert(focusCalls.length === 1, "Visible target was not selected.");
+    assert(scrollCalls.length === 0, "Visible target must not move the viewport.");
+}
+
+async function testHistoryFocusOffscreenCellUsesMinimalScroll() {
+    const grid = new MockGrid();
+    grid.rowViewport.size = 44;
+    const focus = createRevoGridHistoryFocus({ grid });
+
+    await focus.focusTarget({ clientKey: "row:4", field: "basket" });
+
+    const scrollCall = grid.calls.find(call => call[0] === "scrollToCoordinate");
+    assert(Boolean(scrollCall), "Off-screen target did not request reveal scroll.");
+    assert(scrollCall[1].y === 44, `Expected minimal Y reveal 44, got ${scrollCall[1].y}.`);
+    assert(scrollCall[1].x === undefined, "Visible horizontal position must not move.");
+}
+
+async function testHistoryFocusOffscreenColumnUsesMinimalScroll() {
+    const grid = new MockGrid();
+    const focus = createRevoGridHistoryFocus({ grid });
+
+    await focus.focusTarget({ clientKey: "row:2", field: "notes" });
+
+    const scrollCall = grid.calls.find(call => call[0] === "scrollToCoordinate");
+    assert(Boolean(scrollCall), "Off-screen column did not request reveal scroll.");
+    assert(scrollCall[1].x === 100, `Expected minimal X reveal 100, got ${scrollCall[1].x}.`);
+    assert(scrollCall[1].y === undefined, "Visible vertical position must not move.");
+}
+
+async function testPinnedHistoryFocusNeverScrollsCentralViewport() {
+    const grid = new MockGrid();
+    grid.columns.unshift({ prop: "pinned", pin: "colPinStart" });
+    const focus = createRevoGridHistoryFocus({ grid });
+
+    await focus.focusTarget({ clientKey: "row:2", field: "pinned" });
+
+    assert(
+        !grid.calls.some(call => call[0] === "scrollToCoordinate"),
+        "Pinned target must not scroll the central viewport."
+    );
+}
+
 async function testCoordinatorUsesOneReplayPathAndFocusesTarget() {
     const grid = new MockGrid();
+    const historyFocus = createRevoGridHistoryFocus({ grid });
     const coordinator = createRevoGridHistoryCoordinator({
         grid,
-        datasetKey: "2026"
+        datasetKey: "2026",
+        focusTarget: target => historyFocus.focusTarget(target)
     });
 
     const lifecycle = [];
@@ -348,6 +511,7 @@ async function testCoordinatorUsesOneReplayPathAndFocusesTarget() {
     const focusCall = grid.calls.find(call => call[0] === "setCellsFocus");
     assert(Boolean(focusCall), "Successful replay did not return focus to the affected cell.");
     assert(focusCall[1].x === 1 && focusCall[1].y === 0, "Focused coordinates are wrong.");
+    assert(!grid.calls.some(call => call[0] === "scrollToCoordinate"), "Already visible replay target moved the viewport.");
 }
 
 
@@ -384,6 +548,224 @@ async function testCoordinatorCanceledReplayDoesNotMoveHistory() {
     assert(coordinator.getState().undoCount === 1, "Canceled replay moved History.");
 }
 
+
+class BridgeMockGrid extends EventTarget {
+    constructor(rows) {
+        super();
+        this.rows = rows;
+        this.calls = [];
+    }
+
+    async refresh(type) {
+        this.calls.push(["refresh", type]);
+    }
+}
+
+function dispatchGridEvent(grid, type, detail) {
+    const event = new CustomEvent(type, {
+        detail,
+        cancelable: true
+    });
+    grid.dispatchEvent(event);
+    return event;
+}
+
+function makeRangeDetail(rows, data) {
+    const models = {};
+    for (const key of Object.keys(data)) {
+        models[key] = rows[Number(key)];
+    }
+    return {
+        data,
+        models,
+        type: "rgRow",
+        colType: "rgCol",
+        range: { x: 0, y: 0, x1: 1, y1: Math.max(0, Object.keys(data).length - 1) },
+        newRange: { x: 0, y: 0, x1: 1, y1: Math.max(0, Object.keys(data).length - 1) },
+        oldRange: { x: 0, y: 0, x1: 0, y1: 0 }
+    };
+}
+
+function applyRevoPaste(grid, rows, data) {
+    const detail = makeRangeDetail(rows, data);
+    const pasteEvent = dispatchGridEvent(grid, "clipboardrangepaste", detail);
+    assert(!pasteEvent.defaultPrevented, "Qualified Paste was blocked at clipboardrangepaste.");
+
+    const beforeRange = dispatchGridEvent(grid, "beforerangeedit", detail);
+    assert(!beforeRange.defaultPrevented, "Qualified Paste was blocked at beforerangeedit.");
+
+    for (const [rowIndexText, changedRow] of Object.entries(data)) {
+        const row = rows[Number(rowIndexText)];
+        for (const [field, next] of Object.entries(changedRow)) {
+            row[field] = next;
+        }
+    }
+
+    dispatchGridEvent(grid, "afteredit", detail);
+}
+
+async function testPasteBridgeCreatesOneHistoryTransaction() {
+    const rows = [
+        { clientKey: "r1", a: "1", b: "2" },
+        { clientKey: "r2", a: "3", b: "4" }
+    ];
+    const grid = new BridgeMockGrid(rows);
+    const coordinator = createRevoGridHistoryCoordinator({ grid, datasetKey: "2026" });
+    const bridge = createRevoGridChangeBridge({
+        grid,
+        rows,
+        datasetKey: "2026",
+        historyCoordinator: coordinator,
+        allowPaste: true
+    });
+
+    applyRevoPaste(grid, rows, {
+        0: { a: "11", b: "22" },
+        1: { a: "33", b: "44" }
+    });
+
+    assert(coordinator.getState().undoCount === 1, "One 2x2 Paste must create one History entry.");
+    assert(bridge.getState().dirtyCellCount === 4, "2x2 Paste should make four cells Dirty.");
+
+    await coordinator.undo();
+    assert(rows[0].a === "1" && rows[0].b === "2", "Undo did not restore first pasted row.");
+    assert(rows[1].a === "3" && rows[1].b === "4", "Undo did not restore second pasted row.");
+    assert(bridge.getState().dirtyCellCount === 0, "Undo of unsaved Paste should return to Clean.");
+    assert(coordinator.getState().redoCount === 1, "Paste Undo should create one Redo entry.");
+
+    await coordinator.redo();
+    assert(rows[0].a === "11" && rows[0].b === "22", "Redo did not restore first pasted row.");
+    assert(rows[1].a === "33" && rows[1].b === "44", "Redo did not restore second pasted row.");
+
+    bridge.destroy();
+    coordinator.destroy();
+}
+
+
+async function testLargePaste5000StaysOneHistoryAction() {
+    const rows = Array.from({ length: 5000 }, (_, index) => ({
+        clientKey: `large:${index}`,
+        value: `old-${index}`
+    }));
+    const data = {};
+    for (let index = 0; index < rows.length; index++) {
+        data[index] = { value: `new-${index}` };
+    }
+
+    const grid = new BridgeMockGrid(rows);
+    const coordinator = createRevoGridHistoryCoordinator({ grid, datasetKey: "2026" });
+    const bridge = createRevoGridChangeBridge({
+        grid,
+        rows,
+        datasetKey: "2026",
+        historyCoordinator: coordinator,
+        allowPaste: true
+    });
+
+    applyRevoPaste(grid, rows, data);
+    assert(coordinator.getState().undoCount === 1, "Paste 5000 must remain one History action.");
+    assert(bridge.getState().dirtyCellCount === 5000, "Paste 5000 Dirty count is wrong.");
+
+    await coordinator.undo();
+    assert(rows[0].value === "old-0", "Paste 5000 Undo did not restore first cell.");
+    assert(rows[4999].value === "old-4999", "Paste 5000 Undo did not restore last cell.");
+    assert(!bridge.getState().dirty, "Paste 5000 Undo should return unsaved dataset to Clean.");
+
+    bridge.destroy();
+    coordinator.destroy();
+}
+
+async function testSeparatePastesStaySeparateHistoryActions() {
+    const rows = [
+        { clientKey: "r1", a: "1" },
+        { clientKey: "r2", a: "2" }
+    ];
+    const grid = new BridgeMockGrid(rows);
+    const coordinator = createRevoGridHistoryCoordinator({ grid, datasetKey: "2026" });
+    const bridge = createRevoGridChangeBridge({
+        grid,
+        rows,
+        datasetKey: "2026",
+        historyCoordinator: coordinator,
+        allowPaste: true
+    });
+
+    applyRevoPaste(grid, rows, { 0: { a: "10" } });
+    applyRevoPaste(grid, rows, { 1: { a: "20" } });
+    assert(coordinator.getState().undoCount === 2, "Two separate Paste actions must remain two History entries.");
+
+    await coordinator.undo();
+    assert(rows[0].a === "10", "Undo of second Paste must not touch first Paste.");
+    assert(rows[1].a === "2", "Undo should restore only the latest separate Paste.");
+    assert(coordinator.getState().undoCount === 1, "One Undo should remove one Paste action only.");
+
+    bridge.destroy();
+    coordinator.destroy();
+}
+
+function testGate5B1StillBlocksPaste() {
+    const rows = [{ clientKey: "r1", a: "1" }];
+    const grid = new BridgeMockGrid(rows);
+    const coordinator = createRevoGridHistoryCoordinator({ grid, datasetKey: "2026" });
+    const bridge = createRevoGridChangeBridge({
+        grid,
+        rows,
+        datasetKey: "2026",
+        historyCoordinator: coordinator,
+        allowPaste: false
+    });
+
+    const event = dispatchGridEvent(grid, "clipboardrangepaste", makeRangeDetail(rows, { 0: { a: "10" } }));
+    assert(event.defaultPrevented, "Gate 5B-1 must keep Paste blocked.");
+    assert(coordinator.getState().undoCount === 0, "Blocked Paste must not enter History.");
+    assert(!bridge.getState().dirty, "Blocked Paste must not create Dirty state.");
+
+    bridge.destroy();
+    coordinator.destroy();
+}
+
+function testNonPasteRangeMutationRemainsBlocked() {
+    const rows = [{ clientKey: "r1", a: "1" }];
+    const grid = new BridgeMockGrid(rows);
+    const coordinator = createRevoGridHistoryCoordinator({ grid, datasetKey: "2026" });
+    const bridge = createRevoGridChangeBridge({
+        grid,
+        rows,
+        datasetKey: "2026",
+        historyCoordinator: coordinator,
+        allowPaste: true
+    });
+
+    const rangeEvent = dispatchGridEvent(grid, "beforerangeedit", makeRangeDetail(rows, { 0: { a: "10" } }));
+    assert(rangeEvent.defaultPrevented, "Autofill/unqualified range mutation must remain blocked in Gate 5B-2.");
+    assert(!bridge.getState().dirty, "Blocked range mutation created Dirty state.");
+
+    bridge.destroy();
+    coordinator.destroy();
+}
+
+async function testCanceledClipboardPasteDoesNotLeaveEngineBusy() {
+    const rows = [{ clientKey: "r1", a: "1" }];
+    const grid = new BridgeMockGrid(rows);
+    const coordinator = createRevoGridHistoryCoordinator({ grid, datasetKey: "2026" });
+    const bridge = createRevoGridChangeBridge({
+        grid,
+        rows,
+        datasetKey: "2026",
+        historyCoordinator: coordinator,
+        allowPaste: true
+    });
+
+    grid.addEventListener("clipboardrangepaste", event => event.preventDefault(), { once: true });
+    const event = dispatchGridEvent(grid, "clipboardrangepaste", makeRangeDetail(rows, { 0: { a: "10" } }));
+    assert(event.defaultPrevented, "Test precondition: Paste should be canceled by later listener.");
+    await Promise.resolve();
+    assert(!bridge.getState().activeDataCapture, "Canceled Paste left a stale active capture.");
+
+    bridge.destroy();
+    coordinator.destroy();
+}
+
 const TESTS = [
     ["Change Engine owns Dirty, not History", testChangeEngineOwnsDirtyNotHistory],
     ["Return to Baseline prunes Dirty tracker", testReturnToBaselinePrunesDirtyTracker],
@@ -401,9 +783,21 @@ const TESTS = [
     ["Sheet History uses memory budget", testSheetHistoryMemoryBudget],
     ["Year/dataset switch clears Sheet History", testSheetHistoryDatasetReset],
     ["Sheet History blocks record during replay", testSheetHistoryReplayGuard],
+    ["Visible target keeps viewport still", testMinimalRevealKeepsVisibleViewportStill],
+    ["Off-screen target uses nearest-edge reveal", testMinimalRevealMovesOnlyToNearestEdge],
+    ["History focus selects visible cell without scroll", testHistoryFocusVisibleCellDoesNotScroll],
+    ["History focus minimally reveals off-screen cell", testHistoryFocusOffscreenCellUsesMinimalScroll],
+    ["History focus minimally reveals off-screen column", testHistoryFocusOffscreenColumnUsesMinimalScroll],
+    ["Pinned History target does not scroll central viewport", testPinnedHistoryFocusNeverScrollsCentralViewport],
     ["Coordinator replay path + focus", testCoordinatorUsesOneReplayPathAndFocusesTarget],
     ["Coordinator blocks overlapping replay", testCoordinatorRejectsOverlappingReplay],
-    ["Canceled replay leaves History untouched", testCoordinatorCanceledReplayDoesNotMoveHistory]
+    ["Canceled replay leaves History untouched", testCoordinatorCanceledReplayDoesNotMoveHistory],
+    ["Paste bridge records 2x2 as one History action", testPasteBridgeCreatesOneHistoryTransaction],
+    ["Paste 5000 stays one History action", testLargePaste5000StaysOneHistoryAction],
+    ["Separate Paste actions stay separate", testSeparatePastesStaySeparateHistoryActions],
+    ["Gate 5B-1 still blocks Paste", testGate5B1StillBlocksPaste],
+    ["Non-Paste range mutation stays blocked", testNonPasteRangeMutationRemainsBlocked],
+    ["Canceled Paste leaves no stale capture", testCanceledClipboardPasteDoesNotLeaveEngineBusy]
 ];
 
 export async function runRevoGridChangeEngineSelfTests() {
@@ -431,7 +825,7 @@ export async function runRevoGridChangeEngineSelfTests() {
 
     return {
         engine: "RevoGrid Sheet History + Change Engine Foundation",
-        version: "Gate 5B-1 History Refactor",
+        version: "Gate 5B-2 Paste Binding",
         passed: results.filter(result => result.status === "PASS").length,
         failed: results.filter(result => result.status === "FAIL").length,
         total: results.length,
