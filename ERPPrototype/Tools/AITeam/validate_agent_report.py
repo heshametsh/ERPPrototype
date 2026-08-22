@@ -17,6 +17,7 @@ def main() -> int:
     ap.add_argument("report", type=Path)
     ap.add_argument("--repo-root", type=Path, required=True)
     ap.add_argument("--expected-sha", required=True)
+    ap.add_argument("--expected-mission", default="PartialAmount-AI-Team-Canary")
     ap.add_argument("--lead-view", type=Path, default=None)
     args = ap.parse_args()
 
@@ -25,8 +26,10 @@ def main() -> int:
     for key in required:
         if key not in data:
             die(f"missing required field {key}")
-    if data["schemaVersion"] != 1 or data["mission"] != "PartialAmount-AI-Team-Canary":
-        die("wrong schemaVersion or mission")
+    if data["schemaVersion"] != 1:
+        die("wrong schemaVersion")
+    if str(data["mission"]) != args.expected_mission:
+        die(f"mission {data['mission']!r} does not match expected {args.expected_mission!r}")
     got = str(data["commitSha"])
     exp = args.expected_sha
     if not SHA.fullmatch(got) or not (got.lower().startswith(exp.lower()) or exp.lower().startswith(got.lower())):

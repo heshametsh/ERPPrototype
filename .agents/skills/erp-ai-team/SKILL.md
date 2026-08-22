@@ -1,184 +1,306 @@
 ---
 name: erp-ai-team
-description: Orchestrate the ERP Prototype AI review team from one Codex thread. Use when the user asks to review, audit, plan, or safely prepare a substantial ERP Prototype change with independent parallel reviewers. For review missions, spawn independent read-only subagents, validate evidence, then use a separate Lead Integrator. Do not modify runtime code unless the user explicitly moves the mission to implementation after reviewing the decision.
+description: Orchestrate ERP Prototype product/review missions and V2 qualification tests from one Codex thread. Use native Codex subagents for bounded independent reviewers, deterministic evidence/completion/cleanliness gates, a separate Lead, and concise user-facing results. Review/test mode never modifies runtime code.
 ---
 
-# ERP Prototype AI Team Orchestrator
+# ERP Prototype AI Team — Local Orchestrator V2
 
-Use this skill as the repo-local orchestration layer for ERP Prototype.
+This skill is the repo-local operating layer for the ERP Prototype AI team.
 
-## Core operating rule
+The user should issue one request in one Codex thread. The parent coordinates the rest. The user must not need to manually open reviewer chats.
 
-One parent Codex thread coordinates the mission. The user should not have to open reviewer chats manually.
+## 0. Safety and authority
 
-For an engineering review mission, the parent MUST explicitly use native Codex subagents. This skill is explicit authorization to delegate bounded, independent review work in parallel.
+- Read root `AGENTS.md` first.
+- Current checked-out code at the current Git commit is authority for **implemented reality**.
+- Approved Decisions are authority for **what should happen**, not proof that it is implemented.
+- Review/test missions are strictly read-only for repository files.
+- Only a later explicit implementation mission may authorize one Implementer to modify runtime code.
+- Maximum **three concurrent reviewer subagents**. No nested subagents.
+- Multiple implementation agents are forbidden.
 
-Keep the team small. Default to at most **three concurrent reviewer subagents**. Do not create nested subagents. Reviewers must not spawn children.
+## 1. Supported commands
 
-The purpose is independent evidence, not more opinions.
+Interpret these natural forms:
 
-## Repository sources of truth
+- `$erp-ai-team test AIT-01` — run one qualification mission from `.ai/test-missions/test-suite-v2.yaml`.
+- `$erp-ai-team test <id>` — same for any listed V2 mission.
+- `$erp-ai-team review <objective>` — run a normal review mission with dynamic routing.
+- `$erp-ai-team product <objective>` — use Product & ERP Partner track; do not force engineering reviewers.
 
-Before orchestration:
+If the user says `Run the PartialAmount AI Team Canary`, map it to `AIT-01` for backward compatibility.
 
-1. Read root `AGENTS.md`.
-2. Read `ERPPrototype/Documentation/AI_AGENT_WORKFLOW_V3.md` only as needed for workflow rules.
-3. Use `ERPPrototype/Documentation/brain/decisions-index.yaml` only as an index. Read the referenced decision text from `ERPPrototype/Documentation/08_DECISIONS_LOG.md`.
-4. Use `ERPPrototype/Documentation/brain/field-aliases.yaml` as a discovery aid, never as proof of current runtime behavior.
-5. Current checked-out code at the current Git commit is the authority for current implementation facts.
-6. Never use historical ChangeImpact as a routing hint for a new mission.
+Do not run the entire 10-mission qualification suite in one giant invocation. Run one mission at a time so failures are attributable and cost/credit use stays bounded.
 
-## Preflight
+## 2. V2 qualification-suite isolation
 
-Resolve and retain the exact current commit with `git rev-parse HEAD`.
+Router-visible mission inputs live in:
 
-Run the deterministic Project Brain validator before spawning reviewers:
+- `.ai/test-missions/test-suite-v2.yaml`
 
-- On Windows, prefer `py -3 ERPPrototype/Tools/ProjectBrain/validate_project_brain.py` when `py` exists.
-- Otherwise use `python ERPPrototype/Tools/ProjectBrain/validate_project_brain.py` when `python` exists.
+Evaluation-only expectations live in:
 
-If the validator fails, stop. Report the failure. Do not spawn reviewers.
+- `.ai/test-missions/oracles-v2.yaml`
 
-For the PartialAmount canary, also run the current deterministic mapper/canary tool before reviewers, but treat its result as tooling evidence only, not as reviewer conclusions:
+**Do not read `oracles-v2.yaml` before routing and reviewer completion.** It exists to reduce test contamination. After the mission has completed, the parent may read only the matching oracle entry to score the run.
 
-- `py -3 ERPPrototype/Tools/ProjectBrain/change_mapper_v1.py` or the equivalent `python` command.
+Before any V2 test mission, run the deterministic suite validator:
 
-If Python is unavailable, state `PREFLIGHT_BLOCKED: Python unavailable` and stop rather than simulating checks.
+- `py -3 ERPPrototype/Tools/AITeam/validate_test_suite.py .ai/test-missions/test-suite-v2.yaml --oracles .ai/test-missions/oracles-v2.yaml`
+- fall back to `python` only if `py -3` is unavailable.
 
-## Mission packet
+If validation fails, stop with `TEST_HARNESS_BLOCKED`.
 
-Build a compact **ephemeral** Mission Packet in parent-thread working context. Do not write it into durable Project Brain documentation.
+## 3. Preflight — current commit and Project Brain
 
-It must contain only:
+Resolve the exact current commit with `git rev-parse HEAD` and retain it for every artifact/finding.
 
-- Mission name.
-- Current commit SHA.
-- User-approved required behaviors or review objective.
-- `SourceDecision` references when applicable.
-- Relevant DecisionScope references.
-- Preflight result.
-- Explicit instruction that reviewers discover the current Change Map from current code.
+Run Project Brain validator before spawning reviewers:
 
-Required behaviors describe what the employee/program should experience, not a guessed technical path.
+- `py -3 ERPPrototype/Tools/ProjectBrain/validate_project_brain.py`
+- or equivalent `python` command.
 
-Never treat an old Mission Packet as project truth.
+For `AIT-01`, also run the deterministic PartialAmount mapper/canary as tooling evidence:
 
-## PartialAmount AI Team Canary
+- `py -3 ERPPrototype/Tools/ProjectBrain/change_mapper_v1.py`
 
-When the mission is `PartialAmount-AI-Team-Canary`, spawn these **three reviewers concurrently**:
+Do not pass prior AI-team reports to reviewers. A repeatability test means rediscovering facts independently, not replaying the previous conclusion.
 
-### Reviewer 1 — Change Mapper
+If Python is unavailable, stop rather than silently replacing deterministic gates with LLM judgment.
 
-Tell the child to:
+## 4. Deterministic Cleanliness Gate — mandatory
 
-- Read `AGENTS.md`.
-- Read `.ai/prompts/change-mapper-reviewer.md`.
-- Work at the exact current commit SHA.
-- Remain read-only.
-- Do not use web.
-- Do not read sibling reviewer output.
-- Do not spawn subagents.
-- Independently reconstruct the current dependency path.
-- Return one JSON object matching `.ai/schemas/reviewer-findings.schema.json` and no prose outside the JSON.
+Before any reviewer/product test starts, capture the repository state to an **OS temporary file outside the repository**:
 
-### Reviewer 2 — Architecture & Code Quality
+`repo_state_guard.py capture --repo-root <repo> --output <temp>/repo-before.json`
 
-Tell the child to:
+Use `py -3` or `python`.
 
-- Read `AGENTS.md`.
-- Read `.ai/prompts/architecture-reviewer.md`.
-- Work at the exact current commit SHA.
-- Remain read-only.
-- Do not use web.
-- Do not read sibling reviewer output.
-- Do not spawn subagents.
-- Review ownership, duplication, fragile coupling, split-brain logic, one-off patches, and maintainability.
-- Return one JSON object matching `.ai/schemas/reviewer-findings.schema.json` and no prose outside the JSON.
+The fingerprint covers:
+- HEAD;
+- staged/unstaged tracked diff against HEAD;
+- untracked file paths and content hashes.
 
-### Reviewer 3 — Regression & QA
+This supports a pre-existing dirty working tree: the requirement is **same state after the mission**, not necessarily clean at start.
 
-Tell the child to:
+After all reviewers/Lead finish — and before reporting PASS — run:
 
-- Read `AGENTS.md`.
-- Read `.ai/prompts/regression-reviewer.md`.
-- Work at the exact current commit SHA.
-- Remain read-only.
-- Do not use web.
-- Do not read sibling reviewer output.
-- Do not spawn subagents.
-- Build the regression surface from current code/tests only.
-- Return one JSON object matching `.ai/schemas/reviewer-findings.schema.json` and no prose outside the JSON.
+`repo_state_guard.py compare --repo-root <repo> --baseline <temp>/repo-before.json`
 
-Wait for all three. Close completed reviewer agents before starting the Lead so their slots are released.
+If it fails, the overall mission verdict is `FAIL` even if reviewer conclusions were good.
 
-## Finding Gate
+Reviewer JSON and temporary Mission artifacts must go to an OS temp directory such as `%TEMP%/erp-ai-team-<mission>-<sha>/`, never into runtime/project files.
 
-Do not pass malformed reviewer output to the Lead.
+## 5. Mission Packet — ephemeral only
 
-For each reviewer result:
+Build a compact Mission Packet in parent working context containing:
 
-1. Parse it as JSON.
-2. Require the fields and shapes defined by `.ai/schemas/reviewer-findings.schema.json`.
-3. Require `commitSha` to match the current mission SHA.
-4. Require every evidence location to be a real repository `file:line` at this commit.
-5. Reject a finding with empty Claim, Evidence, Impact, or Verification.
-6. Remove `confidenceTelemetry` before the Lead sees the report.
+- mission/test ID and name;
+- exact current commit SHA;
+- user objective;
+- Required Behaviors expressed as employee/program behavior, not guessed technical paths;
+- relevant Decision IDs/pointers;
+- explicit exclusions;
+- preflight status.
 
-When practical, use the existing deterministic checker `ERPPrototype/Tools/AITeam/validate_agent_report.py` by writing reviewer JSON to an OS temporary location, not to durable Project Brain files. If deterministic validation cannot run, do not silently downgrade it to subjective judgment: report `FINDING_GATE_BLOCKED` and stop before Lead integration.
+The Packet is not Project Brain and is never reused as current truth in a later mission.
 
-Confidence is telemetry only. Never use it to accept, reject, rank, or present a finding to the Lead.
+Historical ChangeImpact must never be used as a routing hint.
 
-## Lead integration
+## 6. Dynamic routing
 
-Only after all required reviewer reports pass the Finding Gate, spawn a **fourth, separate Lead Integrator subagent**. Do not let the parent itself substitute for the Lead review.
+For a normal review mission, choose the **smallest useful** reviewer set from current evidence and risk.
 
-Give the Lead:
+Available engineering specialists:
 
-- `.ai/prompts/lead-integrator.md`.
-- The three validated reviewer reports with `confidenceTelemetry` removed.
-- The exact mission commit SHA.
+- `change-mapper` -> `.ai/prompts/change-mapper-reviewer.md`
+- `behavior-legacy` -> `.ai/prompts/behavior-legacy-reviewer.md`
+- `revo` -> `.ai/prompts/revo-reviewer.md`
+- `architecture` -> `.ai/prompts/architecture-reviewer.md`
+- `regression` -> `.ai/prompts/regression-reviewer.md`
+- `data-integrity-security` -> `.ai/prompts/data-integrity-security-reviewer.md`
+- `performance-reliability` -> `.ai/prompts/performance-reliability-reviewer.md`
 
-Tell the Lead:
+Product track:
 
-- Read-only; no code changes.
-- No web.
-- Do not vote between agents.
-- Reconcile by evidence.
-- Preserve unresolved disagreements.
-- Verify suspicious evidence against current repository files when needed.
-- Do not spawn subagents.
-- Return the compact integrated verdict only.
+- `product-erp-partner` -> `.ai/prompts/product-erp-partner.md`
 
-Close the Lead when complete.
+Routing principles:
 
-## Parent final response
+- Tiny isolated visual/text request: do not summon a full specialist team.
+- Revo grid mechanics: Revo + regression; add mapper/architecture only when shared path/ownership uncertainty warrants them.
+- Validation/shared editing foundation: mapper + architecture + regression, and add Revo/legacy/data integrity only when the mission scope actually needs their evidence. Because max concurrency is 3, use a second targeted review wave only if unresolved evidence requires it.
+- Persistence/security: mapper/architecture/data-integrity-security as appropriate.
+- Large-grid/reconnect/offline/performance: performance-reliability plus only the relevant supporting roles.
+- Product ideation: Product Partner first; engineering starts after behavior is approved.
 
-The parent returns only:
+For V2 test missions, choose reviewers from the mission objective **without reading the oracle**. Record the selected role names in parent context before spawning them. Only after completion may the oracle evaluate routing economy.
 
-1. Whether deterministic preflight passed.
-2. Whether all three independent reviewer jobs completed and passed the Finding Gate.
-3. The Lead's verdict and material findings/gaps in concise language.
-4. A clear statement that no runtime files were modified.
+## 7. Independent reviewer execution
 
-For this canary, do **not** implement Validation or any code change even if reviewers recommend one.
+Spawn selected reviewers concurrently, up to three.
 
-## Token and Windows discipline
+Each child must receive:
 
-- Maximum three simultaneous reviewers.
-- One Lead only after reviewers finish.
-- No nested subagents.
-- Keep reviewer prompts bounded to their role and Mission Packet.
-- Do not paste full documentation into children; give file paths and let each read only what its role needs.
-- Avoid loading old audit reports unless the mission explicitly calls for legacy comparison.
-- Close completed agents promptly.
-- If the Codex app becomes sluggish, stop spawning and report the runtime problem. Do not increase fan-out.
+- exact mission name;
+- exact commit SHA;
+- compact Mission Packet;
+- its role prompt path;
+- explicit read-only instruction;
+- no sibling reports;
+- no old audit/ChangeImpact routing hints;
+- no subagents;
+- no web unless that mission explicitly permits it;
+- output requirement: one JSON object matching `.ai/schemas/reviewer-findings.schema.json`, maximum 5 material findings.
 
-## Product-design missions
+Do not paste entire documentation files into child prompts. Give pointers; let each role read only what it needs.
 
-Do not force engineering reviewers onto product ideation.
+Close completed child agents promptly.
 
-When the user asks what feature to build, how to improve an ERP workflow, or what Excel/major ERP products do better, use the project's Product Partner workflow first. Engineering review starts only after the user approves the intended behavior.
+## 8. Reviewer completion gate — mandatory
 
-## Implementation missions
+Every role selected by the parent is required unless the Mission Packet explicitly marked it optional **before spawning**.
 
-This skill does not grant automatic implementation authority. After review, if a behavior/architecture choice exists, return it to the user. Only after explicit user approval may a single Implementer modify code. Multiple implementation agents must never edit the same mission in parallel.
+Before Lead integration, run deterministic completion validation using:
+
+`validate_reviewer_completion.py --required <selected roles...> --passed <roles whose reports passed Finding Gate...>`
+
+If a required reviewer failed or is missing:
+
+- do not create a fake placeholder report;
+- do not return normal PASS;
+- normally stop before Lead with `FAIL` or `DEGRADED` only when the mission explicitly permits degraded evidence.
+
+## 9. Finding Gate — mandatory
+
+For every returned reviewer report:
+
+1. Write the raw JSON only to OS temp.
+2. Run `validate_agent_report.py` with:
+   - `--repo-root` current repo;
+   - `--expected-sha` exact current SHA;
+   - `--expected-mission` exact mission name;
+   - `--lead-view` a temp output path.
+3. The deterministic gate checks required fields, mission/SHA, and real `file:line` locations.
+4. `confidenceTelemetry` is stripped from Lead view.
+
+The gate proves metadata/evidence location exists. It does **not** prove the claim is semantically correct; Lead still interprets evidence.
+
+Confidence telemetry must never be shown to Lead, ranked, or used for acceptance. If retained later for calibration, store it separately from substantive judgment.
+
+## 10. Lead integration
+
+Only after all required reviewers pass Finding Gate and completion gate, spawn a separate Lead Integrator subagent.
+
+Give it:
+
+- `.ai/prompts/lead-integrator.md`;
+- exact mission name/SHA;
+- validated Lead-view reports only;
+- no confidence telemetry;
+- no old reviewer report from prior missions.
+
+Lead rules:
+
+- read-only;
+- no web unless explicitly required for a product mission;
+- no voting;
+- reconcile by evidence;
+- preserve unresolved disagreement;
+- never choose an open business/product behavior for the user;
+- return a compact structured result matching `.ai/schemas/lead-report.schema.json` when practical.
+
+Close Lead after completion.
+
+## 11. Telemetry — measure only what is real
+
+At mission start and end, record UTC timestamps in parent context or OS temp and report elapsed wall-clock time.
+
+Record:
+- mission ID/name;
+- commit SHA;
+- selected reviewer roles;
+- completed/passed reviewer roles;
+- overall wall-clock duration;
+- Lead verdict;
+- Cleanliness Gate result;
+- Finding Gate result;
+- routing score when a V2 oracle is evaluated.
+
+**Do not estimate token count or credits.** If Codex directly exposes usage/credits to the parent, it may be copied as observed telemetry. Otherwise report `usageTelemetry: unavailable`.
+
+## 12. Test oracle evaluation — after the mission only
+
+For `$erp-ai-team test AIT-xx`:
+
+After reviewer completion/Lead/Cleanliness Gate, read only that mission's entry from `.ai/test-missions/oracles-v2.yaml`.
+
+Score:
+
+- routing expectation versus roles actually selected;
+- success signals versus evidence-backed result;
+- whether a false PASS occurred despite missing evidence;
+- whether repo state remained unchanged.
+
+Do not rewrite reviewer conclusions to make them match the oracle. A failed benchmark is valuable evidence about the team.
+
+For `AIT-01` repeatability, compare only **material facts/gaps** with the prior human-known baseline after the independent run is complete. Do not feed the prior report into reviewers.
+
+## 13. Deterministic-only test missions
+
+### AIT-04 — malformed Finding Gate
+
+Do not spawn reviewers. Create a deliberately malformed reviewer JSON in OS temp (for example missing `evidence`) and run `validate_agent_report.py`. The test passes only if the gate rejects it and no Lead is spawned.
+
+### AIT-10 — reviewer failure policy
+
+Do not burn model credits merely to crash an Agent. Deterministically simulate selected required roles and a passed set missing one role using `validate_reviewer_completion.py`. The test passes only if the completion gate fails and normal PASS/Lead flow is blocked.
+
+## 14. Product Partner test
+
+For `AIT-08`, use one Product & ERP Partner subagent, not engineering reviewers.
+
+It may use external research only if available and useful, and must separate:
+- current ERP Prototype facts;
+- user workflow inference;
+- external Excel/ERP patterns.
+
+It must be willing to say "do not build this" or propose a simpler feature when justified.
+
+No implementation.
+
+## 15. Parent final response — user-first and concise
+
+For a test/review mission, report in this order:
+
+1. **النتيجة:** PASS / PASS_WITH_GAPS / DEGRADED / FAIL.
+2. **المهم للمستخدم:** 2–5 short concrete bullets in business/program behavior.
+3. **جودة فريق الـAI في الاختبار:** independence, evidence gate, cleanliness, routing economy.
+4. **الوقت:** observed wall-clock duration; usage only if directly available.
+5. **القرار المطلوب من المستخدم:** only if one truly exists; otherwise say none.
+6. **الخطوة التالية المقترحة:** one next test/fix, not a long roadmap.
+
+Technical evidence can follow only if the user asks or it is necessary to explain a failure.
+
+Never say "no files were modified" unless the deterministic Cleanliness Gate passed.
+
+## 16. Qualification policy before real use
+
+Do not declare the AI Team production-trusted after one good canary.
+
+Run qualification missions one by one. Recommended sequence:
+
+1. AIT-01 repeatability canary.
+2. AIT-04 Finding Gate negative test.
+3. AIT-10 reviewer-failure gate test.
+4. AIT-02 known-bug benchmark.
+5. AIT-03 legacy contamination trap.
+6. AIT-05 small-change routing economy.
+7. AIT-06 Save/data-integrity review.
+8. AIT-07 performance review.
+9. AIT-09 confirmation-bias resistance.
+10. AIT-08 Product Partner gap review.
+
+Only after several different mission types pass should the user consider a tiny real implementation mission.
+
+The purpose of testing is to improve the system, not to force every test to pass.

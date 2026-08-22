@@ -2,12 +2,13 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "mission", "commitSha", "verdict", "agreedFacts", "disagreements", "nextStep"],
+  "required": ["schemaVersion", "mission", "commitSha", "verdict", "userSummary", "agreedFacts", "disagreements", "systemQuality", "nextStep"],
   "properties": {
-    "schemaVersion": {"const": 1},
-    "mission": {"const": "PartialAmount-AI-Team-Canary"},
+    "schemaVersion": {"const": 2},
+    "mission": {"type": "string", "minLength": 1, "maxLength": 160},
     "commitSha": {"type": "string", "pattern": "^[0-9a-fA-F]{7,40}$"},
-    "verdict": {"type": "string", "enum": ["PASS", "PASS_WITH_GAPS", "FAIL"]},
+    "verdict": {"type": "string", "enum": ["PASS", "PASS_WITH_GAPS", "DEGRADED", "FAIL"]},
+    "userSummary": {"type": "string", "minLength": 1, "maxLength": 1200},
     "agreedFacts": {
       "type": "array", "maxItems": 8,
       "items": {
@@ -29,6 +30,17 @@
           "positions": {"type": "array", "minItems": 2, "items": {"type": "string", "minLength": 1}},
           "resolution": {"type": "string", "minLength": 1}
         }
+      }
+    },
+    "systemQuality": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["independence", "evidenceGate", "cleanlinessGate", "routingEfficiency"],
+      "properties": {
+        "independence": {"type": "string", "enum": ["PASS", "GAP", "FAIL"]},
+        "evidenceGate": {"type": "string", "enum": ["PASS", "GAP", "FAIL"]},
+        "cleanlinessGate": {"type": "string", "enum": ["PASS", "GAP", "FAIL"]},
+        "routingEfficiency": {"type": "string", "enum": ["PASS", "GAP", "FAIL", "NOT_TESTED"]}
       }
     },
     "nextStep": {"type": "string", "minLength": 1, "maxLength": 1000}

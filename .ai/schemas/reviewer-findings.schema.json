@@ -5,8 +5,8 @@
   "required": ["schemaVersion", "agentRole", "mission", "commitSha", "summary", "findings", "confidenceTelemetry"],
   "properties": {
     "schemaVersion": {"const": 1},
-    "agentRole": {"type": "string", "minLength": 1},
-    "mission": {"const": "PartialAmount-AI-Team-Canary"},
+    "agentRole": {"type": "string", "minLength": 1, "maxLength": 120},
+    "mission": {"type": "string", "minLength": 1, "maxLength": 160},
     "commitSha": {"type": "string", "pattern": "^[0-9a-fA-F]{7,40}$"},
     "summary": {"type": "string", "minLength": 1, "maxLength": 1200},
     "findings": {
@@ -41,7 +41,7 @@
     "confidenceTelemetry": {
       "type": "string",
       "enum": ["low", "medium", "high"],
-      "description": "Telemetry only. It must never be used as an acceptance gate or shown to the Lead during judgment."
+      "description": "Telemetry only. Never use it to accept, reject, rank, or present a finding to the Lead."
     }
   }
 }

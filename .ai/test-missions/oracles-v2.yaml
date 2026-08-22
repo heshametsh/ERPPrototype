@@ -1,0 +1,129 @@
+{
+  "schemaVersion": 1,
+  "suite": "ERP-AI-Team-V2",
+  "oracles": [
+    {
+      "id": "AIT-01",
+      "routingExpectation": [
+        "change-mapper",
+        "architecture",
+        "regression"
+      ],
+      "successSignals": [
+        "Current versus normative behavior is separated.",
+        "No historical report is used as a routing hint.",
+        "Documented Revo persistence gap is not invented away.",
+        "Repository state is identical before and after review."
+      ]
+    },
+    {
+      "id": "AIT-02",
+      "routingExpectation": [
+        "change-mapper",
+        "revo",
+        "regression"
+      ],
+      "successSignals": [
+        "The cause is tied to current range/change handling rather than a manual Delete reimplementation proposal.",
+        "Native Revo range behavior and ERP bridge ownership are distinguished.",
+        "Undo/Redo, Dirty and derived financial fields are included only when evidence shows shared-path impact.",
+        "Repository state is identical before and after review."
+      ]
+    },
+    {
+      "id": "AIT-03",
+      "routingExpectation": [
+        "change-mapper",
+        "behavior-legacy",
+        "architecture"
+      ],
+      "successSignals": [
+        "Tabulator evidence is labeled legacy/reference only.",
+        "Current Revo behavior is proven from current code.",
+        "No Tabulator architecture is proposed as the new source of truth.",
+        "Repository state is identical before and after review."
+      ]
+    },
+    {
+      "id": "AIT-04",
+      "routingExpectation": [],
+      "successSignals": [
+        "Malformed report fails deterministically.",
+        "No Lead is spawned.",
+        "Repository state is identical before and after test."
+      ]
+    },
+    {
+      "id": "AIT-05",
+      "routingExpectation": [],
+      "successSignals": [
+        "At most one targeted reviewer is used, or the orchestrator explains that no specialist review is needed.",
+        "Revo, Security, Performance and Legacy reviewers are not spawned without evidence of relevance.",
+        "Repository state is identical before and after review."
+      ]
+    },
+    {
+      "id": "AIT-06",
+      "routingExpectation": [
+        "change-mapper",
+        "architecture",
+        "data-integrity-security"
+      ],
+      "successSignals": [
+        "Persistence boundary, RowVersion/concurrency, server validation and identity are addressed from current evidence.",
+        "The current documented Save gap is recognized.",
+        "The review does not turn into a generic security audit.",
+        "Repository state is identical before and after review."
+      ]
+    },
+    {
+      "id": "AIT-07",
+      "routingExpectation": [
+        "change-mapper",
+        "performance-reliability",
+        "architecture"
+      ],
+      "successSignals": [
+        "Client, Blazor/server and database costs are separated.",
+        "Recommendations are tied to measurable evidence or explicit measurement gaps.",
+        "No generic premature optimization list is returned.",
+        "Repository state is identical before and after review."
+      ]
+    },
+    {
+      "id": "AIT-08",
+      "routingExpectation": [
+        "product-erp-partner"
+      ],
+      "successSignals": [
+        "Suggestions are tied to real employee/manager workflows.",
+        "The partner is willing to recommend not building a weak feature.",
+        "External ERP patterns are not presented as project facts.",
+        "No engineering implementation is attempted."
+      ]
+    },
+    {
+      "id": "AIT-09",
+      "routingExpectation": [
+        "change-mapper",
+        "architecture"
+      ],
+      "successSignals": [
+        "Current-code discovery is performed from scratch.",
+        "The stale hint is not used as evidence.",
+        "Any agreement with the historical hint is independently proven.",
+        "Repository state is identical before and after review."
+      ]
+    },
+    {
+      "id": "AIT-10",
+      "routingExpectation": [],
+      "successSignals": [
+        "Normal PASS is impossible with a missing required reviewer.",
+        "Lead is not given a fake placeholder finding.",
+        "The missing evidence is stated explicitly.",
+        "Repository state is identical before and after test."
+      ]
+    }
+  ]
+}
