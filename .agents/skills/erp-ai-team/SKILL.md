@@ -3,22 +3,30 @@ name: erp-ai-team
 description: Run ERP Prototype AI review/product qualification and real review missions from one Codex thread with dynamic specialists, deterministic evidence gates, persistent run tracking, and one-writer implementation policy.
 ---
 
-# ERP Prototype AI Team — Orchestrator V3.0
+# ERP Prototype AI Team — Orchestrator V3.2
 
 The user issues one command in one Codex thread. The parent orchestrates the team; the user must not open reviewer chats manually.
 
-## 0. Always load current operating config
+## 0. Dispatch before reading
 
-For every invocation:
-1. read root `AGENTS.md`;
-2. read `.ai/team-config.json`;
-3. use the paths/version from that config for this run.
+For `$erp-ai-team test <id>`, the **first tool action** must be the deterministic dispatcher below. Do not reread `AGENTS.md`, this `SKILL.md`, Project Brain, prompts, docs, suite, or team config before that call; this contract is already loaded and the dispatcher reads the minimum machine-readable config itself. Do not narrate a plan before dispatch.
+
+`powershell -NoProfile -ExecutionPolicy Bypass -File ERPPrototype/Tools/AITeam/AITeamDispatch.ps1 -TestId <id> -RepoRoot <repo>`
+
+If the dispatcher prints `AI_DISPATCH_COMPLETE=1`, report its result/evidence/trace paths and stop. If it prints `AI_DISPATCH_MODE=review` or `product`, continue with the returned mission metadata and then load only the context required below.
+
+For `review` or `product` commands, read root `AGENTS.md` and `.ai/team-config.json` once, then use the paths/version from config.
 
 `SKILL.md` is intentionally stable. Routing tuning, role prompts, schemas, qualification suite/oracles, and most harness behavior live in config/scripts and are read fresh each run. Do not require a Codex restart merely because one of those files changed. A refresh/new thread is only potentially needed when this Skill contract itself changes.
 
 The current workspace snapshot is authority for implemented reality. HEAD commit anchors it; `repo-before.json` fingerprints any pre-existing dirty state. Approved Decisions are normative intent, not proof of implementation.
 
 Review/test/product missions are read-only. Only a later explicit implementation mission may authorize one Implementer to modify runtime code.
+
+
+### Windows runtime compatibility
+
+The harness targets Windows PowerShell 5.1+ on the user's machine. Machine-owned timestamps are ISO-8601 UTC and must never be reformatted through the current locale. Path discovery must not depend on `System.IO.Path.GetRelativePath`. If final run closure fails, write an emergency FAIL closure instead of leaving `run.json`/`latest.json` stuck at `RUNNING`.
 
 ## 1. Commands
 
@@ -29,17 +37,15 @@ Review/test/product missions are read-only. Only a later explicit implementation
 
 Do not run the whole qualification suite as one opaque batch while the team is still being tuned.
 
-## 2. Immediate dispatch rule
+## 2. Immediate test dispatch rule
 
-For `test` commands, inspect `.ai/team-config.json` first.
+Every `test` command goes through `AITeamDispatch.ps1` as the first tool action. The dispatcher, not the model, decides whether the test is deterministic/review/product from the current V3 suite/config.
 
-If the requested ID is listed in `qualification.fastDeterministicTests`, do **not** open the suite, Project Brain, project documentation, role prompts, or spawn model agents. Immediately run:
+For configured fast deterministic tests it directly runs the deterministic harness and returns the final result. No model planning, project search, suite reading, Project Brain reading, role prompts, reviewers, or Lead are permitted before it completes.
 
-`powershell -NoProfile -ExecutionPolicy Bypass -File ERPPrototype/Tools/AITeam/run_deterministic_test.ps1 -TestId <id> -RepoRoot <repo>`
+For non-deterministic tests it returns only the router-visible mission metadata needed to continue. Historical reports/ChangeImpact and oracle content remain forbidden.
 
-Report the script result and the printed evidence/trace paths. No extra project search.
-
-This fast path exists because a zero-Agent test must not spend model minutes planning.
+This rule exists because deterministic dispatch should cost almost no model time, and because test-mode discovery must not depend on the model remembering which IDs are fast.
 
 ## 3. Persistent run lifecycle for non-deterministic missions
 

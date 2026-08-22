@@ -18,7 +18,7 @@ else {
     $RepoRoot = [System.IO.Path]::GetFullPath($RepoRoot)
 }
 
-function Get-UtcIso { return [DateTime]::UtcNow.ToString('o') }
+function Get-UtcIso { return [DateTime]::UtcNow.ToString('o', [System.Globalization.CultureInfo]::InvariantCulture) }
 function New-PhaseTimer { return [System.Diagnostics.Stopwatch]::StartNew() }
 
 $configPath = Join-Path $RepoRoot '.ai\team-config.json'
@@ -217,25 +217,36 @@ try {
     if (-not $passedOverall) { exit 1 }
 }
 catch {
+    $primaryError = $_.Exception
     $overall.Stop()
     try {
-        Add-AITeamTrace -RunDir $runDir -Event 'RUN_ERROR' -Phase 'orchestration' -Status 'FAIL' -Detail $_.Exception.Message | Out-Null
+        Add-AITeamTrace -RunDir $runDir -Event 'RUN_ERROR' -Phase 'orchestration' -Status 'FAIL' -Detail $primaryError.Message | Out-Null
         Write-AITeamJsonFile -Value ([pscustomobject][ordered]@{
             schemaVersion = 1
             testId = $TestId
             result = 'FAIL'
-            error = $_.Exception.Message
+            error = $primaryError.Message
             evidenceDirectory = $runDir
             traceFile = (Join-Path $runDir 'trace.jsonl')
         }) -Path (Join-Path $runDir 'result.json')
         if (-not $runCompleted) {
-            Complete-AITeamRun -RunDir $runDir -Result 'FAIL' -Summary $_.Exception.Message -PhaseMilliseconds $phaseMs | Out-Null
-            $runCompleted = $true
+            try {
+                Complete-AITeamRun -RunDir $runDir -Result 'FAIL' -Summary $primaryError.Message -PhaseMilliseconds $phaseMs | Out-Null
+                $runCompleted = $true
+            }
+            catch {
+                $closeError = $_.Exception.Message
+                Set-AITeamRunEmergencyFailure -RunDir $runDir -ErrorMessage "Primary error: $($primaryError.Message) | Finalization error: $closeError" | Out-Null
+                $runCompleted = $true
+            }
         }
     }
-    catch { }
+    catch {
+        $fallbackError = $_.Exception.Message
+        try { Set-AITeamRunEmergencyFailure -RunDir $runDir -ErrorMessage "Primary error: $($primaryError.Message) | Error handler failure: $fallbackError" | Out-Null } catch { }
+    }
     Write-Host "AI TEAM FAST TEST ${TestId}: FAIL"
     Write-Host "- evidence: $runDir"
     Write-Host "- trace: $(Join-Path $runDir 'trace.jsonl')"
-    throw
+    throw $primaryError
 }

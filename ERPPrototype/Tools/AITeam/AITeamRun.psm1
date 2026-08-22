@@ -14,7 +14,69 @@ function Write-AITeamJsonFile {
 }
 
 function Get-AITeamUtcIso {
-    return [DateTime]::UtcNow.ToString('o')
+    return [DateTime]::UtcNow.ToString('o', [System.Globalization.CultureInfo]::InvariantCulture)
+}
+
+function ConvertTo-AITeamUtcDateTime {
+    param([Parameter(Mandatory)]$Value)
+
+    if ($Value -is [DateTime]) {
+        $dt = [DateTime]$Value
+        if ($dt.Kind -eq [System.DateTimeKind]::Unspecified) {
+            return [DateTime]::SpecifyKind($dt, [System.DateTimeKind]::Utc)
+        }
+        return $dt.ToUniversalTime()
+    }
+
+    if ($Value -is [DateTimeOffset]) {
+        return ([DateTimeOffset]$Value).UtcDateTime
+    }
+
+    $text = ([string]$Value).Trim()
+    if ([string]::IsNullOrWhiteSpace($text)) {
+        throw 'AI Team timestamp is empty.'
+    }
+
+    $parsed = [DateTime]::MinValue
+    $roundTrip = [System.Globalization.DateTimeStyles]::RoundtripKind
+    if ([DateTime]::TryParseExact($text, 'o', [System.Globalization.CultureInfo]::InvariantCulture, $roundTrip, [ref]$parsed)) {
+        return $parsed.ToUniversalTime()
+    }
+
+    $styles = [System.Globalization.DateTimeStyles]::AssumeUniversal -bor [System.Globalization.DateTimeStyles]::AdjustToUniversal
+    if ([DateTime]::TryParse($text, [System.Globalization.CultureInfo]::InvariantCulture, $styles, [ref]$parsed)) {
+        return $parsed.ToUniversalTime()
+    }
+
+    throw "AI Team timestamp is not valid ISO/invariant UTC: $text"
+}
+
+function ConvertTo-AITeamUtcIsoString {
+    param([Parameter(Mandatory)]$Value)
+    return (ConvertTo-AITeamUtcDateTime -Value $Value).ToString('o', [System.Globalization.CultureInfo]::InvariantCulture)
+}
+
+function Get-AITeamRelativePath {
+    param(
+        [Parameter(Mandatory)][string]$BasePath,
+        [Parameter(Mandatory)][string]$TargetPath
+    )
+
+    $base = [System.IO.Path]::GetFullPath($BasePath)
+    $target = [System.IO.Path]::GetFullPath($TargetPath)
+    $trimChars = [char[]]@([System.IO.Path]::DirectorySeparatorChar, [System.IO.Path]::AltDirectorySeparatorChar)
+    $base = $base.TrimEnd($trimChars)
+
+    if ([string]::Equals($base, $target, [System.StringComparison]::OrdinalIgnoreCase)) {
+        return '.'
+    }
+
+    $prefix = $base + [System.IO.Path]::DirectorySeparatorChar
+    if (-not $target.StartsWith($prefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "Path is outside AI Team repository root. Base='$base' Target='$target'"
+    }
+
+    return $target.Substring($prefix.Length)
 }
 
 function Get-AITeamStateRoot {
@@ -63,7 +125,7 @@ function Get-AITeamHarnessManifest {
         'ERPPrototype\Tools\ProjectBrain\*.py'
     )) {
         foreach ($file in @(Get-ChildItem -LiteralPath (Join-Path $root (Split-Path $pattern -Parent)) -Filter (Split-Path $pattern -Leaf) -File -ErrorAction SilentlyContinue)) {
-            $rel = [System.IO.Path]::GetRelativePath($root, $file.FullName)
+            $rel = Get-AITeamRelativePath -BasePath $root -TargetPath $file.FullName
             if (-not $relativeFiles.Contains($rel)) { $relativeFiles.Add($rel) }
         }
     }
@@ -113,6 +175,7 @@ function Add-AITeamTrace {
     $tracePath = Join-Path $RunDir 'trace.jsonl'
     $record = [pscustomobject][ordered]@{
         utc = Get-AITeamUtcIso
+        utcTicks = [DateTime]::UtcNow.Ticks
         event = $Event
         phase = $Phase
         role = $Role
@@ -137,7 +200,7 @@ function Add-AITeamTrace {
                     mission = [string]$run.mission
                     result = [string]$run.result
                     runDirectory = [string]$run.runDirectory
-                    startedUtc = [string]$run.startedUtc
+                    startedUtc = ConvertTo-AITeamUtcIsoString -Value $run.startedUtc
                     updatedUtc = [string]$record.utc
                     lastEvent = [string]$record.event
                     phase = [string]$record.phase
@@ -188,7 +251,8 @@ function New-AITeamRun {
     $manifest = Get-AITeamHarnessManifest -RepoRoot $repo
     Write-AITeamJsonFile -Value $manifest -Path (Join-Path $runDir 'harness-manifest.json')
 
-    $startedUtc = Get-AITeamUtcIso
+    $startedNow = [DateTime]::UtcNow
+    $startedUtc = $startedNow.ToString('o', [System.Globalization.CultureInfo]::InvariantCulture)
     $run = [pscustomobject][ordered]@{
         schemaVersion = 1
         runId = $runId
@@ -201,6 +265,7 @@ function New-AITeamRun {
         runDirectory = $runDir
         teamVersion = $manifest.teamVersion
         startedUtc = $startedUtc
+        startedUtcTicks = [int64]$startedNow.Ticks
         endedUtc = $null
         result = 'RUNNING'
         elapsedMilliseconds = $null
@@ -266,11 +331,21 @@ function Get-AITeamTraceSummary {
         $event = [string]$record.event
         $role = [string]$record.role
         if ($event -eq 'REVIEWER_START' -and -not [string]::IsNullOrWhiteSpace($role)) {
-            $roleStarts[$role] = [DateTime]::Parse([string]$record.utc).ToUniversalTime()
+            if ($null -ne $record.PSObject.Properties['utcTicks'] -and $record.utcTicks) {
+                $roleStarts[$role] = [DateTime]::new([int64]$record.utcTicks, [System.DateTimeKind]::Utc)
+            }
+            else {
+                $roleStarts[$role] = ConvertTo-AITeamUtcDateTime -Value $record.utc
+            }
         }
         elseif ($event -eq 'REVIEWER_END' -and -not [string]::IsNullOrWhiteSpace($role)) {
             if ($roleStarts.ContainsKey($role)) {
-                $ended = [DateTime]::Parse([string]$record.utc).ToUniversalTime()
+                if ($null -ne $record.PSObject.Properties['utcTicks'] -and $record.utcTicks) {
+                    $ended = [DateTime]::new([int64]$record.utcTicks, [System.DateTimeKind]::Utc)
+                }
+                else {
+                    $ended = ConvertTo-AITeamUtcDateTime -Value $record.utc
+                }
                 $roleDurations += [pscustomobject][ordered]@{
                     role = $role
                     elapsedMilliseconds = [int64][Math]::Round(($ended - $roleStarts[$role]).TotalMilliseconds)
@@ -289,16 +364,28 @@ function Get-AITeamTraceSummary {
     $leadStartRows = @($records | Where-Object { [string]$_.event -eq 'LEAD_START' })
     $leadEndRows = @($records | Where-Object { [string]$_.event -eq 'LEAD_END' })
     if ($leadStartRows.Count -gt 0 -and $leadEndRows.Count -gt 0) {
-        $leadStart = [DateTime]::Parse([string]$leadStartRows[0].utc).ToUniversalTime()
-        $leadEnd = [DateTime]::Parse([string]$leadEndRows[$leadEndRows.Count - 1].utc).ToUniversalTime()
+        $leadStartRow = $leadStartRows[0]
+        $leadEndRow = $leadEndRows[$leadEndRows.Count - 1]
+        if ($null -ne $leadStartRow.PSObject.Properties['utcTicks'] -and $leadStartRow.utcTicks) {
+            $leadStart = [DateTime]::new([int64]$leadStartRow.utcTicks, [System.DateTimeKind]::Utc)
+        }
+        else {
+            $leadStart = ConvertTo-AITeamUtcDateTime -Value $leadStartRow.utc
+        }
+        if ($null -ne $leadEndRow.PSObject.Properties['utcTicks'] -and $leadEndRow.utcTicks) {
+            $leadEnd = [DateTime]::new([int64]$leadEndRow.utcTicks, [System.DateTimeKind]::Utc)
+        }
+        else {
+            $leadEnd = ConvertTo-AITeamUtcDateTime -Value $leadEndRow.utc
+        }
         $leadElapsed = [int64][Math]::Round(($leadEnd - $leadStart).TotalMilliseconds)
     }
     elseif ($leadStartRows.Count -ne $leadEndRows.Count) {
         $warnings += 'Lead trace has unmatched START/END.'
     }
 
-    $firstUtc = if ($records.Count -gt 0) { [string]$records[0].utc } else { $null }
-    $lastUtc = if ($records.Count -gt 0) { [string]$records[$records.Count - 1].utc } else { $null }
+    $firstUtc = if ($records.Count -gt 0) { ConvertTo-AITeamUtcIsoString -Value $records[0].utc } else { $null }
+    $lastUtc = if ($records.Count -gt 0) { ConvertTo-AITeamUtcIsoString -Value $records[$records.Count - 1].utc } else { $null }
 
     $summary = [pscustomobject][ordered]@{
         schemaVersion = 1
@@ -325,10 +412,51 @@ function Complete-AITeamRun {
     $runPath = Join-Path $RunDir 'run.json'
     $run = Get-Content -LiteralPath $runPath -Raw -Encoding UTF8 | ConvertFrom-Json
     $ended = [DateTime]::UtcNow
-    $started = [DateTime]::Parse([string]$run.startedUtc).ToUniversalTime()
+    if ($null -ne $run.PSObject.Properties['startedUtcTicks'] -and $run.startedUtcTicks) {
+        $started = [DateTime]::new([int64]$run.startedUtcTicks, [System.DateTimeKind]::Utc)
+    }
+    else {
+        $started = ConvertTo-AITeamUtcDateTime -Value $run.startedUtc
+    }
+    $startedUtcNormalized = $started.ToString('o', [System.Globalization.CultureInfo]::InvariantCulture)
     $elapsed = [int64][Math]::Round(($ended - $started).TotalMilliseconds)
     Add-AITeamTrace -RunDir $RunDir -Event 'RUN_END' -Phase 'orchestration' -Status $Result -Detail "elapsedMs=$elapsed" | Out-Null
     $traceSummary = Get-AITeamTraceSummary -RunDir $RunDir
+
+    # Observable cost/shape metrics owned by the harness. Model token/credit usage is
+    # deliberately not estimated: it is recorded only when Codex exposes it directly.
+    $artifactFiles = @(Get-ChildItem -LiteralPath $RunDir -File -Recurse -ErrorAction SilentlyContinue)
+    $artifactBytes = [int64](($artifactFiles | Measure-Object -Property Length -Sum).Sum)
+    $reviewerDurations = @($traceSummary.reviewerDurations)
+    $metrics = [pscustomobject][ordered]@{
+        schemaVersion = 1
+        teamVersion = [string]$run.teamVersion
+        missionId = [string]$run.missionId
+        commitSha = [string]$run.commitSha
+        result = $Result
+        orchestrationElapsedMilliseconds = $elapsed
+        phaseMilliseconds = $PhaseMilliseconds
+        traceEventCount = [int]$traceSummary.eventCount
+        reviewerCount = [int]$reviewerDurations.Count
+        reviewerDurations = $reviewerDurations
+        leadElapsedMilliseconds = $traceSummary.leadElapsedMilliseconds
+        artifactCount = [int]$artifactFiles.Count
+        artifactBytes = $artifactBytes
+        observabilityWarningCount = [int]@($traceSummary.warnings).Count
+        usageTelemetry = [pscustomobject][ordered]@{
+            status = 'unavailable-unless-codex-exposes-directly'
+            estimated = $false
+            note = 'Weekly allowance percentage and billable model usage are not scraped or inferred by the harness.'
+        }
+    }
+    Write-AITeamJsonFile -Value $metrics -Path (Join-Path $RunDir 'metrics.json')
+
+    # Recount once so the final artifact total includes metrics.json itself.
+    $artifactFiles = @(Get-ChildItem -LiteralPath $RunDir -File -Recurse -ErrorAction SilentlyContinue)
+    $artifactBytes = [int64](($artifactFiles | Measure-Object -Property Length -Sum).Sum)
+    $metrics.artifactCount = [int]$artifactFiles.Count
+    $metrics.artifactBytes = $artifactBytes
+    Write-AITeamJsonFile -Value $metrics -Path (Join-Path $RunDir 'metrics.json')
 
     $final = [ordered]@{
         schemaVersion = 1
@@ -341,13 +469,16 @@ function Complete-AITeamRun {
         stateRoot = [string]$run.stateRoot
         runDirectory = [string]$run.runDirectory
         teamVersion = [string]$run.teamVersion
-        startedUtc = [string]$run.startedUtc
-        endedUtc = $ended.ToString('o')
+        startedUtc = $startedUtcNormalized
+        endedUtc = $ended.ToString('o', [System.Globalization.CultureInfo]::InvariantCulture)
         result = $Result
         elapsedMilliseconds = $elapsed
         summary = $Summary
         phaseMilliseconds = $PhaseMilliseconds
         observabilityWarnings = @($traceSummary.warnings)
+        metricsFile = (Join-Path $RunDir 'metrics.json')
+        artifactCount = [int]$metrics.artifactCount
+        artifactBytes = [int64]$metrics.artifactBytes
         extra = $Extra
     }
     Write-AITeamJsonFile -Value ([pscustomobject]$final) -Path $runPath
@@ -363,8 +494,12 @@ function Complete-AITeamRun {
         teamVersion = [string]$run.teamVersion
         result = $Result
         elapsedMilliseconds = $elapsed
-        startedUtc = [string]$run.startedUtc
-        endedUtc = $ended.ToString('o')
+        reviewerCount = [int]$metrics.reviewerCount
+        artifactCount = [int]$metrics.artifactCount
+        artifactBytes = [int64]$metrics.artifactBytes
+        traceEventCount = [int]$metrics.traceEventCount
+        startedUtc = $startedUtcNormalized
+        endedUtc = $ended.ToString('o', [System.Globalization.CultureInfo]::InvariantCulture)
         runDirectory = [string]$run.runDirectory
     }
     $indexLine = $indexRecord | ConvertTo-Json -Compress -Depth 12
@@ -377,10 +512,10 @@ function Complete-AITeamRun {
         mission = [string]$run.mission
         result = $Result
         runDirectory = [string]$run.runDirectory
-        startedUtc = [string]$run.startedUtc
-        endedUtc = $ended.ToString('o')
+        startedUtc = $startedUtcNormalized
+        endedUtc = $ended.ToString('o', [System.Globalization.CultureInfo]::InvariantCulture)
         elapsedMilliseconds = $elapsed
-        updatedUtc = $ended.ToString('o')
+        updatedUtc = $ended.ToString('o', [System.Globalization.CultureInfo]::InvariantCulture)
     }
     Write-AITeamJsonFile -Value $latest -Path (Join-Path $state 'latest.json')
 
@@ -393,6 +528,9 @@ function Complete-AITeamRun {
         "Evidence: $RunDir",
         "Trace: $(Join-Path $RunDir 'trace.jsonl')",
         "Trace summary: $(Join-Path $RunDir 'trace-summary.json')",
+        "Metrics: $(Join-Path $RunDir 'metrics.json')",
+        "Artifacts: $($metrics.artifactCount) files / $($metrics.artifactBytes) bytes",
+        "Reviewers measured: $($metrics.reviewerCount)",
         "Observability warnings: $(@($traceSummary.warnings).Count)"
     )
     if (-not [string]::IsNullOrWhiteSpace($Summary)) {
@@ -403,4 +541,84 @@ function Complete-AITeamRun {
     return [pscustomobject]$final
 }
 
-Export-ModuleMember -Function Write-AITeamJsonFile, Get-AITeamStateRoot, Get-AITeamHarnessManifest, Add-AITeamTrace, New-AITeamRun, Get-AITeamPreviousRun, Get-AITeamTraceSummary, Complete-AITeamRun
+function Set-AITeamRunEmergencyFailure {
+    param(
+        [Parameter(Mandatory)][string]$RunDir,
+        [Parameter(Mandatory)][string]$ErrorMessage
+    )
+
+    $endedUtc = Get-AITeamUtcIso
+    $runPath = Join-Path $RunDir 'run.json'
+    $run = $null
+    try {
+        if (Test-Path -LiteralPath $runPath -PathType Leaf) {
+            $run = Get-Content -LiteralPath $runPath -Raw -Encoding UTF8 | ConvertFrom-Json
+        }
+    }
+    catch { }
+
+    $stateRoot = if ($null -ne $run -and $run.stateRoot) { [string]$run.stateRoot } else { '' }
+    $runId = if ($null -ne $run -and $run.runId) { [string]$run.runId } else { Split-Path -Leaf $RunDir }
+    $missionId = if ($null -ne $run -and $run.missionId) { [string]$run.missionId } else { 'unknown' }
+    $mission = if ($null -ne $run -and $run.mission) { [string]$run.mission } else { 'unknown' }
+    $startedUtc = $null
+    if ($null -ne $run -and $run.startedUtc) {
+        try { $startedUtc = ConvertTo-AITeamUtcIsoString -Value $run.startedUtc } catch { $startedUtc = $null }
+    }
+
+    $fallback = [pscustomobject][ordered]@{
+        schemaVersion = 1
+        runId = $runId
+        missionId = $missionId
+        mission = $mission
+        mode = if ($null -ne $run -and $run.mode) { [string]$run.mode } else { 'unknown' }
+        commitSha = if ($null -ne $run -and $run.commitSha) { [string]$run.commitSha } else { '' }
+        repoRoot = if ($null -ne $run -and $run.repoRoot) { [string]$run.repoRoot } else { '' }
+        stateRoot = $stateRoot
+        runDirectory = $RunDir
+        teamVersion = if ($null -ne $run -and $run.teamVersion) { [string]$run.teamVersion } else { 'unknown' }
+        startedUtc = $startedUtc
+        endedUtc = $endedUtc
+        result = 'FAIL'
+        elapsedMilliseconds = $null
+        summary = 'Emergency finalization after harness close failure.'
+        finalizationError = $ErrorMessage
+    }
+
+    try { Write-AITeamJsonFile -Value $fallback -Path $runPath } catch { }
+    try {
+        Add-AITeamTrace -RunDir $RunDir -Event 'RUN_FINALIZATION_FALLBACK' -Phase 'orchestration' -Status 'FAIL' -Detail $ErrorMessage | Out-Null
+    }
+    catch { }
+    try {
+        @(
+            'RESULT: FAIL',
+            "Mission: $missionId - $mission",
+            "Evidence: $RunDir",
+            "Trace: $(Join-Path $RunDir 'trace.jsonl')",
+            "Finalization error: $ErrorMessage"
+        ) | Set-Content -LiteralPath (Join-Path $RunDir 'summary.txt') -Encoding UTF8
+    }
+    catch { }
+    if (-not [string]::IsNullOrWhiteSpace($stateRoot)) {
+        try {
+            Write-AITeamJsonFile -Value ([pscustomobject][ordered]@{
+                schemaVersion = 1
+                runId = $runId
+                missionId = $missionId
+                mission = $mission
+                result = 'FAIL'
+                runDirectory = $RunDir
+                startedUtc = $startedUtc
+                endedUtc = $endedUtc
+                updatedUtc = $endedUtc
+                finalizationFallback = $true
+            }) -Path (Join-Path $stateRoot 'latest.json')
+        }
+        catch { }
+    }
+
+    return $fallback
+}
+
+Export-ModuleMember -Function Write-AITeamJsonFile, Get-AITeamStateRoot, Get-AITeamHarnessManifest, Add-AITeamTrace, New-AITeamRun, Get-AITeamPreviousRun, Get-AITeamTraceSummary, Complete-AITeamRun, Set-AITeamRunEmergencyFailure

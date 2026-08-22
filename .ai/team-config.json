@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "teamVersion": "3.0",
-  "operatingProfile": "quality-observability",
+  "teamVersion": "3.2",
+  "operatingProfile": "quality-observability-low-friction-ps51-safe",
   "maxConcurrentReviewers": 3,
   "maxReviewWaves": 2,
   "maxInitialContextFilesPerReviewer": 8,
@@ -76,5 +76,16 @@
     "oldChangeImpactMaySeedNewMap": false,
     "leadMustSemanticallyVerifyMaterialFacts": true,
     "confidenceVisibleToLead": false
+  },
+  "observability": {
+    "writeMetricsFile": true,
+    "compareSameMissionRuns": true,
+    "recordArtifactCountsAndBytes": true,
+    "recordModelUsageOnlyWhenDirectlyExposed": true,
+    "weeklyUsagePercentAutomation": "unsupported-by-harness",
+    "deterministicHarnessWarnAboveMilliseconds": 10000,
+    "timestampFormat": "ISO-8601-UTC-invariant",
+    "windowsPowerShellMinimum": "5.1",
+    "finalizationFallback": true
   }
 }

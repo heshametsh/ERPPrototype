@@ -80,3 +80,28 @@ Do not call the team trusted because tests pass. Look for:
 - improved or stable review depth while unnecessary context/time falls.
 
 A benchmark failure is useful; do not tune prompts to memorize the oracle answer.
+
+## V3.1 low-friction / cost-observability refinement
+
+- Every `$erp-ai-team test <id>` must dispatch through `AITeamDispatch.ps1` as the first tool action. The model does not reread AGENTS/SKILL/config/docs before deterministic tests.
+- The AI Team evidence root remains outside the repository, but `Setup-AITeamCodexSandbox.ps1` can add that exact directory as a Codex `writable_root` so routine evidence writes do not require repeated approval prompts.
+- Blanket auto-review is not enabled by default. It may invoke an approval subagent and is unnecessary when the required write boundary is known precisely.
+- Every completed run writes `metrics.json` with orchestration time, phase timings, reviewer/Lead timings, trace event count, artifact count/bytes, and observability warnings.
+- Weekly allowance percentage / billable usage is never scraped or guessed by the harness. Record it only if Codex exposes it directly; otherwise treat the product Usage & billing meter as the authoritative external measurement.
+- Optimization target: deterministic tests should have zero reviewers/Lead and minimal model preamble. Expensive review missions must justify every selected specialist.
+
+## V3.2 Windows runtime hardening
+
+AIT-04 on commit `c948abf` proved the functional deterministic gates but exposed two harness-runtime defects on the real Windows environment: locale-sensitive timestamp re-parsing during run finalization, and prior reliance on `System.IO.Path.GetRelativePath`, which is not available in Windows PowerShell 5.1/.NET Framework.
+
+V3.2 therefore requires:
+
+- machine timestamps are emitted and normalized as invariant ISO-8601 UTC;
+- trace/run duration calculations prefer stored UTC ticks and only fall back to invariant parsing;
+- repository-relative paths use a PowerShell-5.1-safe helper;
+- finalization failure must never leave a recorded run permanently `RUNNING`; a minimal emergency FAIL closure is required;
+- a zero-model local compatibility smoke test validates manifest generation and run finalization before the next qualification test;
+- the V3.1 deterministic dispatcher, stable run directory, trace/metrics history, and narrow Codex writable root remain part of the same cumulative patch.
+
+These changes affect the harness only. They do not change any qualification oracle, reviewer conclusion, ERP runtime code, or expected AIT-04 behavior.
+
