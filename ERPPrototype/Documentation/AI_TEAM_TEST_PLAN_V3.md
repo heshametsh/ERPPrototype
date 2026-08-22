@@ -105,3 +105,34 @@ V3.2 therefore requires:
 
 These changes affect the harness only. They do not change any qualification oracle, reviewer conclusion, ERP runtime code, or expected AIT-04 behavior.
 
+
+## V3.3 — Local-first execution and real usage telemetry
+
+V3.3 changes **where orchestration starts**, not the qualification oracle:
+
+- Normal command: `erp-ai-team test AIT-xx` from PowerShell.
+- AIT-04/AIT-10 execute entirely in deterministic PowerShell/Python code. Opening the Codex app is not required and no model call is permitted.
+- Review/product tests call Codex CLI only after deterministic preflight proves a model is required.
+- Codex CLI is authenticated with the user's ChatGPT plan; API billing is not required for this local path.
+- One low-effort router call selects the smallest useful engineering specialist set. Product-mode missions go directly to the Product Partner.
+- Selected reviewers run independently; Lead runs only after Finding + Completion gates pass.
+- Ordinary `codex exec` is used rather than `codex exec review`, because machine-readable schema validation is part of the harness contract.
+- `--json` event logs are kept per model call. `turn.completed` usage is aggregated into `model-usage.json` and `metrics.json` so direct input/cached/output token usage can be measured instead of guessed.
+- Weekly allowance percentage is not scraped or inferred. Optional UI snapshots can be recorded manually with `erp-ai-team allowance <remainingPercent>`.
+
+### Why
+
+The V3.2 AIT-04 harness itself completed in about one second, but launching the same deterministic test through a Codex chat still moved the visible weekly allowance. V3.3 reverses control:
+
+`PowerShell dispatcher -> deterministic work -> only then Codex when reasoning is necessary.`
+
+The AI is no longer paid to discover that AI was unnecessary.
+
+### First acceptance sequence
+
+1. Install the local command once with `Setup-AITeamLocalCommand.ps1`.
+2. Run `erp-ai-team doctor`.
+3. Run AIT-10 locally and verify it produces zero direct model tokens.
+4. Before the first model benchmark, install/login Codex CLI once with `erp-ai-team setup-codex`.
+5. Record the visible weekly remaining percentage manually, run AIT-02 once, then record the percentage again.
+6. Inspect `model-usage.json`, per-role event logs, reviewer durations, routing, and the visible allowance delta before deciding whether the team is economical enough for normal project work.

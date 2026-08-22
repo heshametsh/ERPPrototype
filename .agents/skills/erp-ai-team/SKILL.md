@@ -1,19 +1,19 @@
 ---
 name: erp-ai-team
-description: Run ERP Prototype AI review/product qualification and real review missions from one Codex thread with dynamic specialists, deterministic evidence gates, persistent run tracking, and one-writer implementation policy.
+description: ERP Prototype AI Team contract. V3.3 is local-first: PowerShell dispatches deterministic work without Codex and invokes Codex CLI only when model reasoning is actually required.
 ---
 
-# ERP Prototype AI Team — Orchestrator V3.2
+# ERP Prototype AI Team — Orchestrator V3.3
 
-The user issues one command in one Codex thread. The parent orchestrates the team; the user must not open reviewer chats manually.
+Normal qualification execution is **local-first**. The user should run `erp-ai-team test <id>` from PowerShell, not open a Codex chat just to dispatch a test. The local dispatcher performs deterministic work with zero Codex model calls and invokes Codex CLI only for missions that actually require AI reasoning. Reviewers and Lead are launched by the harness; the user never opens reviewer chats manually.
 
 ## 0. Dispatch before reading
 
-For `$erp-ai-team test <id>`, the **first tool action** must be the deterministic dispatcher below. Do not reread `AGENTS.md`, this `SKILL.md`, Project Brain, prompts, docs, suite, or team config before that call; this contract is already loaded and the dispatcher reads the minimum machine-readable config itself. Do not narrate a plan before dispatch.
+If a test command is nevertheless issued inside Codex, the **first tool action** must still be the dispatcher below. Do not reread `AGENTS.md`, Project Brain, prompts, docs, suite, or team config before that call and do not narrate a plan first.
 
 `powershell -NoProfile -ExecutionPolicy Bypass -File ERPPrototype/Tools/AITeam/AITeamDispatch.ps1 -TestId <id> -RepoRoot <repo>`
 
-If the dispatcher prints `AI_DISPATCH_COMPLETE=1`, report its result/evidence/trace paths and stop. If it prints `AI_DISPATCH_MODE=review` or `product`, continue with the returned mission metadata and then load only the context required below.
+The V3.3 dispatcher completes both deterministic and model-backed qualification missions itself and prints `AI_DISPATCH_COMPLETE=1`. Report its final result/evidence/trace paths and stop. Do not manually recreate its routing/reviewer work in the parent Codex thread.
 
 For `review` or `product` commands, read root `AGENTS.md` and `.ai/team-config.json` once, then use the paths/version from config.
 
@@ -30,10 +30,16 @@ The harness targets Windows PowerShell 5.1+ on the user's machine. Machine-owned
 
 ## 1. Commands
 
-- `$erp-ai-team test AIT-xx`
-- `$erp-ai-team review <objective>`
-- `$erp-ai-team product <objective>`
-- `$erp-ai-team latest` -> show latest run metadata/path through `AITeamRun.ps1 -Command Latest`
+PowerShell/local commands:
+- `erp-ai-team test AIT-xx`
+- `erp-ai-team latest`
+- `erp-ai-team history [AIT-xx]`
+- `erp-ai-team doctor`
+- `erp-ai-team setup-codex` (one-time CLI install/login for model missions)
+- `erp-ai-team usage` (direct token telemetry captured from Codex CLI JSON events)
+- `erp-ai-team allowance 79` (optional manual weekly-remaining snapshot; never scraped/inferred)
+
+Legacy `$erp-ai-team ...` inside the Codex app remains a fallback, not the preferred execution path.
 
 Do not run the whole qualification suite as one opaque batch while the team is still being tuned.
 
@@ -43,9 +49,9 @@ Every `test` command goes through `AITeamDispatch.ps1` as the first tool action.
 
 For configured fast deterministic tests it directly runs the deterministic harness and returns the final result. No model planning, project search, suite reading, Project Brain reading, role prompts, reviewers, or Lead are permitted before it completes.
 
-For non-deterministic tests it returns only the router-visible mission metadata needed to continue. Historical reports/ChangeImpact and oracle content remain forbidden.
+For non-deterministic tests the dispatcher invokes the local model runner, which uses one low-effort routing call, the minimum selected independent reviewers, and Lead only after deterministic gates pass. Direct Codex CLI JSON events are retained so token usage can be measured rather than guessed. Historical reports/ChangeImpact and oracle content remain forbidden.
 
-This rule exists because deterministic dispatch should cost almost no model time, and because test-mode discovery must not depend on the model remembering which IDs are fast.
+This rule exists because deterministic dispatch must cost zero model calls, while model-backed missions should spend allowance only on reasoning that cannot be replaced by deterministic code.
 
 ## 3. Persistent run lifecycle for non-deterministic missions
 

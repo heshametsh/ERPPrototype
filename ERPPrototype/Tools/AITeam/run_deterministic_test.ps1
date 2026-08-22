@@ -161,6 +161,19 @@ try {
     $passedOverall = $gatePass -and (-not $leadStarted) -and $clean.pass -and $routingScore.pass
     $resultValue = if ($passedOverall) { 'PASS' } else { 'FAIL' }
 
+    $noModelUsage = [pscustomobject][ordered]@{
+        status = 'no-model-used'
+        estimated = $false
+        modelCalls = 0
+        inputTokens = [int64]0
+        cachedInputTokens = [int64]0
+        outputTokens = [int64]0
+        reasoningTokens = [int64]0
+        weeklyAllowancePercent = $null
+        note = 'Deterministic fast path. No Codex model process is started by the harness.'
+    }
+    Write-AITeamJsonFile -Value $noModelUsage -Path (Join-Path $runDir 'model-usage.json')
+
     $result = [pscustomobject][ordered]@{
         schemaVersion = 2
         testId = $TestId
@@ -174,7 +187,7 @@ try {
         cleanlinessPass = $clean.pass
         routingOracleMatch = $routingScore.pass
         selectedReviewers = @()
-        usageTelemetry = 'unavailable'
+        usageTelemetry = $noModelUsage
         startedUtc = [string]$run.startedUtc
         endedUtc = Get-UtcIso
         phaseMilliseconds = $phaseMs
@@ -184,7 +197,7 @@ try {
         comparisonToPrevious = $null
     }
 
-    $final = Complete-AITeamRun -RunDir $runDir -Result $resultValue -Summary "gate=$gatePass; leadStarted=$leadStarted; cleanliness=$($clean.pass); routing=$($routingScore.pass)" -PhaseMilliseconds $phaseMs
+    $final = Complete-AITeamRun -RunDir $runDir -Result $resultValue -UsageTelemetry $noModelUsage -Summary "gate=$gatePass; leadStarted=$leadStarted; cleanliness=$($clean.pass); routing=$($routingScore.pass)" -PhaseMilliseconds $phaseMs
     $runCompleted = $true
     $result.orchestrationElapsedMilliseconds = [int64]$final.elapsedMilliseconds
 
@@ -207,6 +220,7 @@ try {
     Write-Host "AI TEAM FAST TEST ${TestId}: $($result.result)"
     Write-Host "- harness ms: $($phaseMs.harnessTotal)"
     Write-Host "- orchestration ms: $($final.elapsedMilliseconds)"
+    Write-Host "- Codex model calls: 0"
     Write-Host "- evidence: $runDir"
     Write-Host "- trace: $(Join-Path $runDir 'trace.jsonl')"
     if ($null -ne $comparison) {

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "teamVersion": "3.2",
-  "operatingProfile": "quality-observability-low-friction-ps51-safe",
+  "teamVersion": "3.3",
+  "operatingProfile": "local-first-measured-codex-on-demand-ps51-safe",
   "maxConcurrentReviewers": 3,
   "maxReviewWaves": 2,
   "maxInitialContextFilesPerReviewer": 8,
@@ -28,12 +28,14 @@
     "reviewer": ".ai/schemas/reviewer-findings.schema.json",
     "lead": ".ai/schemas/lead-report.schema.json",
     "product": ".ai/schemas/product-report.schema.json",
-    "missionPacket": ".ai/schemas/mission-packet.schema.json"
+    "missionPacket": ".ai/schemas/mission-packet.schema.json",
+    "routingPlan": ".ai/schemas/routing-plan.schema.json"
   },
   "prompts": {
     "commonReviewer": ".ai/prompts/_reviewer-common.md",
     "lead": ".ai/prompts/lead-integrator.md",
-    "product": ".ai/prompts/product-erp-partner.md"
+    "product": ".ai/prompts/product-erp-partner.md",
+    "missionRouter": ".ai/prompts/mission-router.md"
   },
   "roles": {
     "change-mapper": {
@@ -86,6 +88,26 @@
     "deterministicHarnessWarnAboveMilliseconds": 10000,
     "timestampFormat": "ISO-8601-UTC-invariant",
     "windowsPowerShellMinimum": "5.1",
-    "finalizationFallback": true
+    "finalizationFallback": true,
+    "recordDirectCodexTokenUsage": true,
+    "manualWeeklyAllowanceSnapshots": true
+  },
+  "localExecution": {
+    "commandName": "erp-ai-team",
+    "deterministicTestsUseCodex": false,
+    "requireCodexOnlyForModelMissions": true,
+    "userBin": "%LOCALAPPDATA%\\ERPPrototype\\AI-Team\\bin"
+  },
+  "codex": {
+    "sandbox": "read-only",
+    "ephemeral": true,
+    "routerReasoningEffort": "low",
+    "reviewerReasoningEffort": "medium",
+    "leadReasoningEffort": "medium",
+    "productReasoningEffort": "medium",
+    "model": "",
+    "captureJsonEvents": true,
+    "captureDirectTokenUsage": true,
+    "ordinaryExecOnly": true
   }
 }

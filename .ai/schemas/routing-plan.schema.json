@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "missionId", "selectedRoles", "excludedRoles", "reasoningSummary"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "missionId": { "type": "string", "minLength": 1, "maxLength": 80 },
+    "selectedRoles": {
+      "type": "array",
+      "maxItems": 3,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": [
+          "change-mapper",
+          "behavior-legacy",
+          "revo",
+          "architecture",
+          "regression",
+          "data-integrity-security",
+          "performance-reliability"
+        ]
+      }
+    },
+    "excludedRoles": {
+      "type": "array",
+      "maxItems": 7,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": [
+          "change-mapper",
+          "behavior-legacy",
+          "revo",
+          "architecture",
+          "regression",
+          "data-integrity-security",
+          "performance-reliability"
+        ]
+      }
+    },
+    "reasoningSummary": { "type": "string", "minLength": 1, "maxLength": 1200 }
+  }
+}

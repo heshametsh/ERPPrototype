@@ -406,6 +406,7 @@ function Complete-AITeamRun {
         [Parameter(Mandatory)][ValidateSet('PASS','PASS_WITH_GAPS','DEGRADED','FAIL','BLOCKED')][string]$Result,
         [string]$Summary = '',
         [AllowNull()][object]$PhaseMilliseconds = $null,
+        [AllowNull()][object]$UsageTelemetry = $null,
         [AllowNull()][object]$Extra = $null
     )
 
@@ -443,11 +444,19 @@ function Complete-AITeamRun {
         artifactCount = [int]$artifactFiles.Count
         artifactBytes = $artifactBytes
         observabilityWarningCount = [int]@($traceSummary.warnings).Count
-        usageTelemetry = [pscustomobject][ordered]@{
-            status = 'unavailable-unless-codex-exposes-directly'
-            estimated = $false
-            note = 'Weekly allowance percentage and billable model usage are not scraped or inferred by the harness.'
-        }
+        usageTelemetry = $(if ($null -ne $UsageTelemetry) {
+            $UsageTelemetry
+        } else {
+            [pscustomobject][ordered]@{
+                status = 'no-model-usage-recorded'
+                estimated = $false
+                inputTokens = [int64]0
+                cachedInputTokens = [int64]0
+                outputTokens = [int64]0
+                reasoningTokens = [int64]0
+                note = 'No Codex model call was made by this run, or direct model telemetry was not supplied.'
+            }
+        })
     }
     Write-AITeamJsonFile -Value $metrics -Path (Join-Path $RunDir 'metrics.json')
 
@@ -495,6 +504,9 @@ function Complete-AITeamRun {
         result = $Result
         elapsedMilliseconds = $elapsed
         reviewerCount = [int]$metrics.reviewerCount
+        inputTokens = $(if ($null -ne $metrics.usageTelemetry.PSObject.Properties['inputTokens']) { [int64]$metrics.usageTelemetry.inputTokens } else { [int64]0 })
+        cachedInputTokens = $(if ($null -ne $metrics.usageTelemetry.PSObject.Properties['cachedInputTokens']) { [int64]$metrics.usageTelemetry.cachedInputTokens } else { [int64]0 })
+        outputTokens = $(if ($null -ne $metrics.usageTelemetry.PSObject.Properties['outputTokens']) { [int64]$metrics.usageTelemetry.outputTokens } else { [int64]0 })
         artifactCount = [int]$metrics.artifactCount
         artifactBytes = [int64]$metrics.artifactBytes
         traceEventCount = [int]$metrics.traceEventCount
@@ -531,6 +543,7 @@ function Complete-AITeamRun {
         "Metrics: $(Join-Path $RunDir 'metrics.json')",
         "Artifacts: $($metrics.artifactCount) files / $($metrics.artifactBytes) bytes",
         "Reviewers measured: $($metrics.reviewerCount)",
+        "Direct Codex tokens: input=$($metrics.usageTelemetry.inputTokens) cached=$($metrics.usageTelemetry.cachedInputTokens) output=$($metrics.usageTelemetry.outputTokens)",
         "Observability warnings: $(@($traceSummary.warnings).Count)"
     )
     if (-not [string]::IsNullOrWhiteSpace($Summary)) {

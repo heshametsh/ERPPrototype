@@ -53,16 +53,13 @@ if ($fast -contains $TestId) {
     exit $code
 }
 
-# Router-visible data only. Do not expose hidden oracle content here.
-$dispatch = [pscustomobject][ordered]@{
-    schemaVersion = 1
-    testId = [string]$mission.id
-    name = [string]$mission.name
-    mode = [string]$mission.mode
-    objective = [string]$mission.objective
-    requiredDecisionRefs = @($mission.requiredDecisionRefs)
-    webPolicy = [string]$mission.webPolicy
-    teamVersion = [string]$config.teamVersion
-}
-$dispatch | ConvertTo-Json -Depth 12
-Write-Host "AI_DISPATCH_COMPLETE=0"
+# Non-deterministic missions are launched locally through Codex CLI only after the
+# deterministic dispatcher proves that a model is actually needed. Opening the
+# Codex desktop app is not part of normal test execution.
+$script = Join-Path $PSScriptRoot 'run_ai_test.ps1'
+$args = @('-NoProfile','-ExecutionPolicy','Bypass','-File',$script,'-TestId',$TestId,'-RepoRoot',$RepoRoot)
+if (-not [string]::IsNullOrWhiteSpace($StateRoot)) { $args += @('-StateRoot',$StateRoot) }
+& powershell.exe @args
+$code = $LASTEXITCODE
+Write-Host "AI_DISPATCH_COMPLETE=1"
+exit $code

@@ -336,3 +336,19 @@ Expected current-code evidence includes:
 - integration tests.
 
 The Canary must also recognize the documented Gate 5B-5 persistence gap: real Revo database Save/cutover is not implemented yet. Reporting that as a documented gap is success; inventing a Save path is failure.
+
+## V3.3 execution refinement — local dispatcher owns cost
+
+Normal AI-Team execution now begins outside the Codex desktop conversation:
+
+1. `erp-ai-team` is a user-local PowerShell command installed once from the repository.
+2. The deterministic dispatcher reads only machine config/suite metadata.
+3. Deterministic missions run without starting Codex at all.
+4. Model missions require Codex CLI authenticated through ChatGPT. The harness, not a parent chat, invokes model work.
+5. A low-effort router selects the smallest engineering specialist set; product missions route directly to Product Partner.
+6. Independent reviewers run read-only and concurrently up to the configured limit.
+7. Finding/Completion gates run before Lead. Failed/missing reviewers cannot be replaced with placeholders.
+8. Codex CLI JSON events are saved per call and direct token usage is aggregated. Weekly allowance percentage remains an external UI signal and is never guessed.
+9. The same run directory retains routing, model events, model usage, gates, Lead/product output, cleanliness, trace, metrics, and final result.
+
+This changes the control direction from `Codex -> discover whether AI is needed` to `deterministic harness -> invoke Codex only when AI is needed`.

@@ -83,7 +83,25 @@ try {
         throw 'Compatibility smoke: run.json was not closed correctly.'
     }
 
-    Write-Host 'AI TEAM RUNTIME COMPATIBILITY: PASS'
+    # V3.3 local-first file/config checks (no Codex model call).
+$configPath = Join-Path $RepoRoot '.ai\team-config.json'
+$config = Get-Content -LiteralPath $configPath -Raw -Encoding UTF8 | ConvertFrom-Json
+if ([string]$config.teamVersion -ne '3.3') { throw "Expected AI Team 3.3, found $($config.teamVersion)." }
+foreach ($rel in @(
+    'ERPPrototype\Tools\AITeam\AITeamCli.ps1',
+    'ERPPrototype\Tools\AITeam\AITeamCodex.psm1',
+    'ERPPrototype\Tools\AITeam\run_ai_test.ps1',
+    'ERPPrototype\Tools\AITeam\Setup-AITeamLocalCommand.ps1',
+    'ERPPrototype\Tools\AITeam\Setup-AITeamCodexCli.ps1',
+    '.ai\prompts\mission-router.md',
+    '.ai\schemas\routing-plan.schema.json'
+)) {
+    if (-not (Test-Path -LiteralPath (Join-Path $RepoRoot $rel) -PathType Leaf)) { throw "V3.3 required file missing: $rel" }
+}
+$routingSchema = Get-Content -LiteralPath (Join-Path $RepoRoot '.ai\schemas\routing-plan.schema.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+if ($null -eq $routingSchema) { throw 'Routing schema could not be parsed.' }
+
+Write-Host 'AI TEAM RUNTIME COMPATIBILITY: PASS'
     Write-Host "- PowerShell: $($PSVersionTable.PSVersion)"
     Write-Host "- Team version: $($manifest.teamVersion)"
     Write-Host '- Relative-path manifest: PASS'
