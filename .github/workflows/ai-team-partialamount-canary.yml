@@ -2,6 +2,11 @@ name: AI Team - PartialAmount Canary
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - codespaces-sync-2026-08-08
+    paths:
+      - ".github/workflows/ai-team-partialamount-canary.yml"
 
 permissions:
   contents: read
