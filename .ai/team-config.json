@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "teamVersion": "3.3",
+  "teamVersion": "3.3.3",
   "operatingProfile": "local-first-measured-codex-on-demand-ps51-safe",
   "maxConcurrentReviewers": 3,
   "maxReviewWaves": 2,

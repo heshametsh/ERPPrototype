@@ -13,6 +13,7 @@ else {
 }
 
 Import-Module (Join-Path $PSScriptRoot 'AITeamRun.psm1') -Force
+Import-Module (Join-Path $PSScriptRoot 'AITeamCodex.psm1') -Force
 
 $originalCulture = [System.Threading.Thread]::CurrentThread.CurrentCulture
 $originalUICulture = [System.Threading.Thread]::CurrentThread.CurrentUICulture
@@ -86,7 +87,7 @@ try {
     # V3.3 local-first file/config checks (no Codex model call).
 $configPath = Join-Path $RepoRoot '.ai\team-config.json'
 $config = Get-Content -LiteralPath $configPath -Raw -Encoding UTF8 | ConvertFrom-Json
-if ([string]$config.teamVersion -ne '3.3') { throw "Expected AI Team 3.3, found $($config.teamVersion)." }
+if ([string]$config.teamVersion -ne '3.3.3') { throw "Expected AI Team 3.3.3, found $($config.teamVersion)." }
 foreach ($rel in @(
     'ERPPrototype\Tools\AITeam\AITeamCli.ps1',
     'ERPPrototype\Tools\AITeam\AITeamCodex.psm1',
@@ -101,12 +102,31 @@ foreach ($rel in @(
 $routingSchema = Get-Content -LiteralPath (Join-Path $RepoRoot '.ai\schemas\routing-plan.schema.json') -Raw -Encoding UTF8 | ConvertFrom-Json
 if ($null -eq $routingSchema) { throw 'Routing schema could not be parsed.' }
 
+# V3.3.3: prove native STDERR from a successful process cannot abort the
+# harness under Windows PowerShell 5.1 / ErrorActionPreference=Stop.
+$nativeProbe = Invoke-AITeamNativeCapture -FilePath 'powershell.exe' -Arguments @(
+    '-NoProfile',
+    '-Command',
+    "[Console]::Error.WriteLine('AIT_NATIVE_STDERR_OK'); exit 0"
+)
+if ($nativeProbe.exitCode -ne 0 -or $nativeProbe.text -notmatch 'AIT_NATIVE_STDERR_OK') {
+    throw 'Native STDERR compatibility smoke failed.'
+}
+
+# V3.3.2: prove the official Codex installer wrapper parses under Windows
+# PowerShell without any network request or model call.
+$setupCodex = Join-Path $RepoRoot 'ERPPrototype\Tools\AITeam\Setup-AITeamCodexCli.ps1'
+& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $setupCodex -SelfTest | Out-Null
+if ($LASTEXITCODE -ne 0) { throw 'Codex installer wrapper self-test failed.' }
+
 Write-Host 'AI TEAM RUNTIME COMPATIBILITY: PASS'
     Write-Host "- PowerShell: $($PSVersionTable.PSVersion)"
     Write-Host "- Team version: $($manifest.teamVersion)"
     Write-Host '- Relative-path manifest: PASS'
     Write-Host '- Locale-independent UTC finalization: PASS'
     Write-Host '- Metrics/trace/latest/index closure: PASS'
+    Write-Host '- Codex installer wrapper (PowerShell 5.1 parse): PASS'
+    Write-Host '- Native STDERR capture (PowerShell 5.1): PASS'
 }
 finally {
     [System.Threading.Thread]::CurrentThread.CurrentCulture = $originalCulture

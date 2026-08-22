@@ -1,23 +1,104 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+function Get-AITeamCodexKnownPaths {
+    $paths = New-Object System.Collections.Generic.List[string]
+
+    if (-not [string]::IsNullOrWhiteSpace($env:CODEX_INSTALL_DIR)) {
+        $paths.Add((Join-Path $env:CODEX_INSTALL_DIR 'codex.exe'))
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) {
+        $paths.Add((Join-Path $env:LOCALAPPDATA 'Programs\OpenAI\Codex\bin\codex.exe'))
+    }
+
+    $codexHome = $null
+    if (-not [string]::IsNullOrWhiteSpace($env:CODEX_HOME)) {
+        $codexHome = $env:CODEX_HOME
+    }
+    elseif (-not [string]::IsNullOrWhiteSpace($env:USERPROFILE)) {
+        $codexHome = Join-Path $env:USERPROFILE '.codex'
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($codexHome)) {
+        $paths.Add((Join-Path $codexHome 'packages\standalone\current\bin\codex.exe'))
+        $paths.Add((Join-Path $codexHome 'packages\standalone\current\codex.exe'))
+    }
+
+    return @($paths | Select-Object -Unique)
+}
+
 function Get-AITeamCodexCommand {
     $cmd = Get-Command codex -ErrorAction SilentlyContinue | Select-Object -First 1
-    if ($null -eq $cmd) { return $null }
-    if ($cmd.Path) { return [string]$cmd.Path }
-    return [string]$cmd.Source
+    if ($null -ne $cmd) {
+        if ($cmd.Path) { return [string]$cmd.Path }
+        if ($cmd.Source) { return [string]$cmd.Source }
+    }
+
+    # The official Windows installer persists PATH for future shells, but the
+    # current parent shell can still have a stale PATH. Resolve the official
+    # standalone locations directly so setup/doctor work immediately.
+    foreach ($candidate in @(Get-AITeamCodexKnownPaths)) {
+        if (Test-Path -LiteralPath $candidate -PathType Leaf) {
+            return [System.IO.Path]::GetFullPath($candidate)
+        }
+    }
+
+    return $null
+}
+
+
+function Invoke-AITeamNativeCapture {
+    param(
+        [Parameter(Mandatory)][string]$FilePath,
+        [string[]]$Arguments = @()
+    )
+
+    # Windows PowerShell 5.1 can wrap native STDERR as NativeCommandError.
+    # With the harness-wide ErrorActionPreference=Stop, perfectly successful
+    # native commands such as `codex login status` can otherwise terminate the
+    # caller merely because Codex writes its status text to STDERR.
+    $previousPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        $items = @(& $FilePath @Arguments 2>&1)
+        $exitCode = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $previousPreference
+    }
+
+    $lines = New-Object System.Collections.Generic.List[string]
+    foreach ($item in @($items)) {
+        if ($item -is [System.Management.Automation.ErrorRecord]) {
+            if ($null -ne $item.Exception -and -not [string]::IsNullOrWhiteSpace([string]$item.Exception.Message)) {
+                $lines.Add([string]$item.Exception.Message)
+            }
+            else {
+                $lines.Add([string]$item)
+            }
+        }
+        else {
+            $lines.Add([string]$item)
+        }
+    }
+
+    $text = ([string](@($lines) -join "`n")).Trim()
+    return [pscustomobject][ordered]@{
+        exitCode = [int]$exitCode
+        lines = @($lines)
+        text = $text
+    }
 }
 
 function Get-AITeamCodexLoginStatus {
     $codex = Get-AITeamCodexCommand
     if (-not $codex) {
-        return [pscustomobject][ordered]@{ installed=$false; loggedIn=$false; command=$null; detail='Codex CLI is not installed or not on PATH.' }
+        return [pscustomobject][ordered]@{ installed=$false; loggedIn=$false; command=$null; detail='Codex CLI is not installed or discoverable.' }
     }
-    $text = & $codex login status 2>&1
-    $code = $LASTEXITCODE
-    $joined = ([string]($text -join "`n")).Trim()
-    $logged = ($code -eq 0 -and $joined -match '(?i)logged in|chatgpt')
-    return [pscustomobject][ordered]@{ installed=$true; loggedIn=$logged; command=$codex; detail=$joined; exitCode=$code }
+    $status = Invoke-AITeamNativeCapture -FilePath $codex -Arguments @('login','status')
+    $logged = ($status.exitCode -eq 0 -and $status.text -match '(?i)logged in|chatgpt')
+    return [pscustomobject][ordered]@{ installed=$true; loggedIn=$logged; command=$codex; detail=$status.text; exitCode=$status.exitCode }
 }
 
 function Get-AITeamCodexUsageFromEvents {
@@ -97,9 +178,19 @@ function Invoke-AITeamCodexExec {
     $args += '-'
 
     $sw = [System.Diagnostics.Stopwatch]::StartNew()
-    $prompt | & $codex @args 1> $EventsPath 2> $StderrPath
-    $code = $LASTEXITCODE
-    $sw.Stop()
+    $previousPreference = $ErrorActionPreference
+    try {
+        # Codex may legitimately emit diagnostics/status text to STDERR even
+        # when the process succeeds. Do not let Windows PowerShell 5.1 convert
+        # that stream into a terminating NativeCommandError.
+        $ErrorActionPreference = 'Continue'
+        $prompt | & $codex @args 1> $EventsPath 2> $StderrPath
+        $code = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $previousPreference
+        $sw.Stop()
+    }
     $usage = Get-AITeamCodexUsageFromEvents -EventsPath $EventsPath
 
     return [pscustomobject][ordered]@{
@@ -112,4 +203,4 @@ function Invoke-AITeamCodexExec {
     }
 }
 
-Export-ModuleMember -Function Get-AITeamCodexCommand, Get-AITeamCodexLoginStatus, Get-AITeamCodexUsageFromEvents, Invoke-AITeamCodexExec
+Export-ModuleMember -Function Get-AITeamCodexKnownPaths, Get-AITeamCodexCommand, Invoke-AITeamNativeCapture, Get-AITeamCodexLoginStatus, Get-AITeamCodexUsageFromEvents, Invoke-AITeamCodexExec
