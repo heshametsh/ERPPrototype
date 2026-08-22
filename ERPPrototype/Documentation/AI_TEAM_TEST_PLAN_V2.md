@@ -42,3 +42,22 @@ A single successful canary is insufficient. The team becomes eligible for a tiny
 - unchanged repository state after review;
 - sensible specialist routing;
 - separation of current code, normative Decisions, legacy behavior, and external product patterns.
+
+## V2.1 stabilization (after AIT-01 and AIT-04 baseline)
+
+Observed baseline before stabilization:
+
+- `AIT-01`: functionally successful but ~31 minutes wall-clock with 3 reviewers.
+- `AIT-04`: functionally successful but ~4 minutes despite requiring zero reviewers.
+- Codex repeatedly spent time locating a Python runtime before deterministic gates.
+- Final evidence was not always persisted as a complete before/after artifact pack.
+
+V2.1 changes the **test harness only**, not reviewer prompts or qualification oracles:
+
+- Windows-native PowerShell gates become the local Codex-App default.
+- `AIT-04` and `AIT-10` get a direct deterministic fast path with zero subagents and no Project Brain/document review.
+- Every run must leave a temp evidence pack with before/after cleanliness evidence and gate/Lead state.
+- Phase timing is recorded so transport/preflight/reviewer/Lead costs can be separated when the app exposes enough information.
+- Python remains only where an existing evidence collector specifically requires it (currently the optional `AIT-01` PartialAmount mapper rerun).
+
+The old AIT-01/AIT-04 timings remain the baseline; they are not erased or rewritten after stabilization.

@@ -1,9 +1,9 @@
 ---
 name: erp-ai-team
-description: Orchestrate ERP Prototype product/review missions and V2 qualification tests from one Codex thread. Use native Codex subagents for bounded independent reviewers, deterministic evidence/completion/cleanliness gates, a separate Lead, and concise user-facing results. Review/test mode never modifies runtime code.
+description: Orchestrate ERP Prototype product/review missions and V2 qualification tests from one Codex thread. V2.1 stabilizes the harness with Windows-native deterministic gates, fast deterministic-only tests, evidence packs, and phase timing while preserving reviewer prompts/oracles. Review/test mode never modifies runtime code.
 ---
 
-# ERP Prototype AI Team — Local Orchestrator V2
+# ERP Prototype AI Team — Local Orchestrator V2.1 (Stabilized Harness)
 
 This skill is the repo-local operating layer for the ERP Prototype AI team.
 
@@ -44,52 +44,49 @@ Evaluation-only expectations live in:
 
 **Do not read `oracles-v2.yaml` before routing and reviewer completion.** It exists to reduce test contamination. After the mission has completed, the parent may read only the matching oracle entry to score the run.
 
-Before any V2 test mission, run the deterministic suite validator:
+Before any V2 test mission, use the Windows-native deterministic gate entry point:
 
-- `py -3 ERPPrototype/Tools/AITeam/validate_test_suite.py .ai/test-missions/test-suite-v2.yaml --oracles .ai/test-missions/oracles-v2.yaml`
-- fall back to `python` only if `py -3` is unavailable.
+`powershell -NoProfile -ExecutionPolicy Bypass -File ERPPrototype/Tools/AITeam/AITeamGate.ps1 -Command ValidateSuite -Suite .ai/test-missions/test-suite-v2.yaml -Oracles .ai/test-missions/oracles-v2.yaml`
+
+Python versions remain fallback/reference only. Do not spend model time rediscovering a Python runtime merely to run deterministic gates.
 
 If validation fails, stop with `TEST_HARNESS_BLOCKED`.
+
+### 2.1 V2.1 fast dispatch
+
+After reading root `AGENTS.md` and this skill, if the command is `AIT-04` or `AIT-10`, **do not read project docs, Project Brain, reviewer prompts, or spawn any model agent.** Immediately run:
+
+`powershell -NoProfile -ExecutionPolicy Bypass -File ERPPrototype/Tools/AITeam/run_deterministic_test.ps1 -TestId <AIT-04|AIT-10> -RepoRoot <repo>`
+
+The script owns suite validation, repo-before/repo-after evidence, the negative gate, Lead-not-started evidence, oracle routing check, phase timing, and final result. The parent only reports the script result. This fast path exists to prevent a zero-Agent test from consuming minutes of LLM planning.
 
 ## 3. Preflight — current commit and Project Brain
 
 Resolve the exact current commit with `git rev-parse HEAD` and retain it for every artifact/finding.
 
-Run Project Brain validator before spawning reviewers:
+Run Project Brain validation with the Windows-native deterministic gate before spawning reviewers:
 
-- `py -3 ERPPrototype/Tools/ProjectBrain/validate_project_brain.py`
-- or equivalent `python` command.
+`powershell -NoProfile -ExecutionPolicy Bypass -File ERPPrototype/Tools/AITeam/AITeamGate.ps1 -Command ValidateBrain -RepoRoot <repo>`
 
-For `AIT-01`, also run the deterministic PartialAmount mapper/canary as tooling evidence:
-
-- `py -3 ERPPrototype/Tools/ProjectBrain/change_mapper_v1.py`
+For `AIT-01` only, the existing PartialAmount mapper/canary remains a Python tool. `AIT-01` already has a qualification baseline, so do not rerun it merely as preflight for unrelated tests. If `AIT-01` is explicitly rerun and no Python runtime is available, stop that canary rather than replacing the mapper with LLM judgment.
 
 Do not pass prior AI-team reports to reviewers. A repeatability test means rediscovering facts independently, not replaying the previous conclusion.
 
-If Python is unavailable, stop rather than silently replacing deterministic gates with LLM judgment.
-
 ## 4. Deterministic Cleanliness Gate — mandatory
 
-Before any reviewer/product test starts, capture the repository state to an **OS temporary file outside the repository**:
+Before any reviewer/product test starts, create one **OS-temp evidence directory outside the repository** and capture repository state through:
 
-`repo_state_guard.py capture --repo-root <repo> --output <temp>/repo-before.json`
+`powershell -NoProfile -ExecutionPolicy Bypass -File ERPPrototype/Tools/AITeam/AITeamGate.ps1 -Command CaptureRepo -RepoRoot <repo> -Output <temp>/repo-before.json`
 
-Use `py -3` or `python`.
+The fingerprint covers HEAD, tracked/staged working state, and untracked file paths/content hashes. A pre-existing dirty tree is allowed; the requirement is the **same state after the mission**.
 
-The fingerprint covers:
-- HEAD;
-- staged/unstaged tracked diff against HEAD;
-- untracked file paths and content hashes.
+After reviewers/Lead finish, capture/compare again and persist the evidence:
 
-This supports a pre-existing dirty working tree: the requirement is **same state after the mission**, not necessarily clean at start.
-
-After all reviewers/Lead finish — and before reporting PASS — run:
-
-`repo_state_guard.py compare --repo-root <repo> --baseline <temp>/repo-before.json`
+`powershell -NoProfile -ExecutionPolicy Bypass -File ERPPrototype/Tools/AITeam/AITeamGate.ps1 -Command CompareRepo -RepoRoot <repo> -Baseline <temp>/repo-before.json -Output <temp>/repo-after-and-cleanliness.json`
 
 If it fails, the overall mission verdict is `FAIL` even if reviewer conclusions were good.
 
-Reviewer JSON and temporary Mission artifacts must go to an OS temp directory such as `%TEMP%/erp-ai-team-<mission>-<sha>/`, never into runtime/project files.
+Every run must leave an auditable temp evidence pack containing, when applicable: `repo-before.json`, repo-after/cleanliness result, routing, each Finding Gate result, completion gate result, Lead started/not-started state, phase timing, and final result. Reviewer JSON and Mission artifacts remain outside the repository.
 
 ## 5. Mission Packet — ephemeral only
 
@@ -161,9 +158,9 @@ Close completed child agents promptly.
 
 Every role selected by the parent is required unless the Mission Packet explicitly marked it optional **before spawning**.
 
-Before Lead integration, run deterministic completion validation using:
+Before Lead integration, run deterministic completion validation through the Windows-native gate:
 
-`validate_reviewer_completion.py --required <selected roles...> --passed <roles whose reports passed Finding Gate...>`
+`powershell -NoProfile -ExecutionPolicy Bypass -File ERPPrototype/Tools/AITeam/AITeamGate.ps1 -Command ValidateCompletion -Required <selected roles...> -Passed <roles whose reports passed Finding Gate...> -Output <temp>/completion-gate.json`
 
 If a required reviewer failed or is missing:
 
@@ -176,11 +173,10 @@ If a required reviewer failed or is missing:
 For every returned reviewer report:
 
 1. Write the raw JSON only to OS temp.
-2. Run `validate_agent_report.py` with:
-   - `--repo-root` current repo;
-   - `--expected-sha` exact current SHA;
-   - `--expected-mission` exact mission name;
-   - `--lead-view` a temp output path.
+2. Run the Windows-native Finding Gate:
+
+   `powershell -NoProfile -ExecutionPolicy Bypass -File ERPPrototype/Tools/AITeam/AITeamGate.ps1 -Command ValidateReport -Report <raw.json> -RepoRoot <repo> -ExpectedSha <sha> -ExpectedMission <mission> -LeadView <lead.json> -Output <temp>/finding-gate-<role>.json`
+
 3. The deterministic gate checks required fields, mission/SHA, and real `file:line` locations.
 4. `confidenceTelemetry` is stripped from Lead view.
 
@@ -214,20 +210,24 @@ Close Lead after completion.
 
 ## 11. Telemetry — measure only what is real
 
-At mission start and end, record UTC timestamps in parent context or OS temp and report elapsed wall-clock time.
+At mission start and end, record UTC timestamps and persist phase timing in the temp evidence pack.
 
-Record:
-- mission ID/name;
-- commit SHA;
-- selected reviewer roles;
-- completed/passed reviewer roles;
-- overall wall-clock duration;
+Record at minimum:
+- mission ID/name and commit SHA;
+- preflight duration;
+- routing duration;
+- reviewer batch wall-clock duration (and per-reviewer duration only when Codex exposes it reliably);
+- Finding/Completion Gate duration;
+- Lead duration;
+- final cleanliness duration;
+- selected/completed reviewer roles;
 - Lead verdict;
-- Cleanliness Gate result;
-- Finding Gate result;
+- Cleanliness/Finding results;
 - routing score when a V2 oracle is evaluated.
 
-**Do not estimate token count or credits.** If Codex directly exposes usage/credits to the parent, it may be copied as observed telemetry. Otherwise report `usageTelemetry: unavailable`.
+A visible Codex `Reconnecting` period is transport/UI telemetry, not automatically reviewer reasoning time. Do not invent a split if the app does not expose it.
+
+**Do not estimate token count or credits.** If Codex directly exposes usage/credits to the parent, copy only observed values. Otherwise report `usageTelemetry: unavailable`.
 
 ## 12. Test oracle evaluation — after the mission only
 
@@ -250,11 +250,11 @@ For `AIT-01` repeatability, compare only **material facts/gaps** with the prior 
 
 ### AIT-04 — malformed Finding Gate
 
-Do not spawn reviewers. Create a deliberately malformed reviewer JSON in OS temp (for example missing `evidence`) and run `validate_agent_report.py`. The test passes only if the gate rejects it and no Lead is spawned.
+Use the V2.1 fast deterministic runner only. No reviewers, Lead, Project Brain reading, or model reasoning beyond dispatch. The test passes only if the actual Windows-native Finding Gate rejects the malformed report, Lead remains not-started, and repo-before/repo-after match.
 
 ### AIT-10 — reviewer failure policy
 
-Do not burn model credits merely to crash an Agent. Deterministically simulate selected required roles and a passed set missing one role using `validate_reviewer_completion.py`. The test passes only if the completion gate fails and normal PASS/Lead flow is blocked.
+Use the same V2.1 fast deterministic runner. Do not burn model credits merely to crash an Agent. The actual completion gate receives a required set with one missing reviewer; normal PASS/Lead flow must remain blocked and repo state must match.
 
 ## 14. Product Partner test
 
@@ -283,6 +283,12 @@ For a test/review mission, report in this order:
 Technical evidence can follow only if the user asks or it is necessary to explain a failure.
 
 Never say "no files were modified" unless the deterministic Cleanliness Gate passed.
+
+## 15.1 V2.1 stabilization boundary
+
+V2.1 deliberately changes **harness execution only**. It does not change reviewer prompts, test mission objectives, oracles, or known benchmark answers. This prevents overfitting the team to AIT-01/AIT-04.
+
+If a new harness optimization would alter what a reviewer is asked to conclude, defer it until after the next independent benchmark.
 
 ## 16. Qualification policy before real use
 
