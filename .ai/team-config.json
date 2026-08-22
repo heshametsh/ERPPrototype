@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "teamVersion": "3.4",
-  "operatingProfile": "local-first-hybrid-router-ai-fallback-measured-ps51-safe",
+  "teamVersion": "3.4.1",
+  "operatingProfile": "local-first-hybrid-router-reviewer-smoke-measured-ps51-safe",
   "maxConcurrentReviewers": 3,
   "maxReviewWaves": 2,
   "maxInitialContextFilesPerReviewer": 8,

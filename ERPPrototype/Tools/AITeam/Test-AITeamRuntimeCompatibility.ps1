@@ -93,12 +93,13 @@ try {
     # V3.3 local-first file/config checks (no Codex model call).
 $configPath = Join-Path $RepoRoot '.ai\team-config.json'
 $config = Get-Content -LiteralPath $configPath -Raw -Encoding UTF8 | ConvertFrom-Json
-if ([string]$config.teamVersion -ne '3.4') { throw "Expected AI Team 3.4, found $($config.teamVersion)." }
+if ([string]$config.teamVersion -ne '3.4.1') { throw "Expected AI Team 3.4, found $($config.teamVersion)." }
 foreach ($rel in @(
     'ERPPrototype\Tools\AITeam\AITeamCli.ps1',
     'ERPPrototype\Tools\AITeam\AITeamCodex.psm1',
     'ERPPrototype\Tools\AITeam\run_ai_test.ps1',
     'ERPPrototype\Tools\AITeam\run_router_smoke.ps1',
+    'ERPPrototype\Tools\AITeam\run_reviewer_smoke.ps1',
     'ERPPrototype\Tools\AITeam\AITeamLocalRouter.psm1',
     'ERPPrototype\Tools\AITeam\Setup-AITeamLocalCommand.ps1',
     'ERPPrototype\Tools\AITeam\Setup-AITeamCodexCli.ps1',
@@ -123,6 +124,16 @@ if (@($routerSmokeParseErrors).Count -gt 0) {
 }
 $cliText = Get-Content -LiteralPath (Join-Path $RepoRoot 'ERPPrototype\Tools\AITeam\AITeamCli.ps1') -Raw -Encoding UTF8
 if ($cliText -notmatch "'smoke-router'") { throw 'AI Team CLI does not expose smoke-router.' }
+
+# V3.4.1: parse the single-reviewer smoke runner and prove CLI wiring locally.
+$reviewerSmokePath = Join-Path $RepoRoot 'ERPPrototype\Tools\AITeam\run_reviewer_smoke.ps1'
+$reviewerSmokeTokens = $null
+$reviewerSmokeParseErrors = $null
+[System.Management.Automation.Language.Parser]::ParseFile($reviewerSmokePath, [ref]$reviewerSmokeTokens, [ref]$reviewerSmokeParseErrors) | Out-Null
+if (@($reviewerSmokeParseErrors).Count -gt 0) {
+    throw "Reviewer smoke runner parse failed: $(@($reviewerSmokeParseErrors | ForEach-Object { $_.Message }) -join ' | ')"
+}
+if ($cliText -notmatch "'smoke-reviewer'") { throw 'AI Team CLI does not expose smoke-reviewer.' }
 
 # V3.4 local-first hybrid router: the qualification suite must route locally
 # without invoking Codex. Hidden oracles are used only here, after each local
@@ -237,6 +248,7 @@ Write-Host 'AI TEAM RUNTIME COMPATIBILITY: PASS'
     Write-Host '- Codex installer wrapper (PowerShell 5.1 parse): PASS'
     Write-Host '- Native STDERR capture (PowerShell 5.1): PASS'
     Write-Host '- Router-only smoke runner parse/CLI wiring: PASS'
+    Write-Host '- Single-reviewer smoke runner parse/CLI wiring: PASS'
     Write-Host '- Local router rules: PASS'
     Write-Host "- Local router qualification: PASS ($localQualificationCount model missions, 0 Codex calls)"
     Write-Host '- Local router ambiguity fallback canary: PASS'

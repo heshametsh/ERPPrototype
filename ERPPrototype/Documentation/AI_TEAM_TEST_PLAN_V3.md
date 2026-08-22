@@ -168,3 +168,6 @@ This paid-router smoke was useful to prove transport and revealed the router-cos
 ## V3.4 routing economy gate
 
 Before another full model-backed qualification mission, run `erp-ai-team smoke-router AIT-02`. In V3.4 this command is a pure local-router smoke: expected route is `change-mapper + revo + regression`, AI fallback must be false, reviewers/Lead must remain zero, and Codex attempts/tokens must remain zero. The Windows compatibility test also evaluates every non-deterministic V3 qualification mission against the hidden routing oracle after local routing and fails before any model launch if the local router regresses.
+
+## V3.4.1 single-reviewer smoke gate
+Before the first full multi-reviewer model mission, run one selected reviewer only (for AIT-02, `revo`) with `erp-ai-team smoke-reviewer AIT-02 revo`. This validates reviewer execution, structured output, Finding Gate, evidence anchors, cleanliness, timing, and direct token telemetry while deliberately skipping sibling reviewers and Lead. It is a qualification smoke, not a substitute for the full mission.
