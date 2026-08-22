@@ -11,6 +11,7 @@ $ErrorActionPreference = 'Stop'
 $RepoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..\..'))
 Import-Module (Join-Path $PSScriptRoot 'AITeamRun.psm1') -Force
 Import-Module (Join-Path $PSScriptRoot 'AITeamCodex.psm1') -Force
+Import-Module (Join-Path $PSScriptRoot 'AITeamLocalRouter.psm1') -Force
 $StateRoot = Get-AITeamStateRoot
 
 function Show-Latest {
@@ -67,6 +68,11 @@ switch ($Command) {
         $config = Get-Content -LiteralPath (Join-Path $RepoRoot '.ai\team-config.json') -Raw -Encoding UTF8 | ConvertFrom-Json
         Write-Host "- Team: $($config.teamVersion) / $($config.operatingProfile)"
         Write-Host "- state: $StateRoot"
+        $rulesPath = Join-Path $RepoRoot ([string]$config.routing.rulesPath)
+        $localRouterCheck = Test-AITeamLocalRouterRules -RulesPath $rulesPath
+        Write-Host "- Local router rules: $(if ($localRouterCheck.pass) { 'PASS' } else { 'FAIL' })"
+        Write-Host "- Routing strategy: $([string]$config.routing.strategy)"
+        if (-not $localRouterCheck.pass) { foreach ($e in @($localRouterCheck.errors)) { Write-Host "  - $e" } }
         $schemaErrors = New-Object System.Collections.Generic.List[string]
         foreach ($schemaKey in @('routingPlan','reviewer','lead','product')) {
             $schemaRel = [string]$config.schemas.PSObject.Properties[$schemaKey].Value

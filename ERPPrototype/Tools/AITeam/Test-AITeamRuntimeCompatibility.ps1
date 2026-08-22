@@ -14,6 +14,8 @@ else {
 
 Import-Module (Join-Path $PSScriptRoot 'AITeamRun.psm1') -Force
 Import-Module (Join-Path $PSScriptRoot 'AITeamCodex.psm1') -Force
+Import-Module (Join-Path $PSScriptRoot 'AITeamGates.psm1') -Force
+Import-Module (Join-Path $PSScriptRoot 'AITeamLocalRouter.psm1') -Force
 
 $originalCulture = [System.Threading.Thread]::CurrentThread.CurrentCulture
 $originalUICulture = [System.Threading.Thread]::CurrentThread.CurrentUICulture
@@ -32,6 +34,10 @@ try {
         if ([System.IO.Path]::IsPathRooted($p)) {
             throw "Compatibility smoke: manifest path must be repository-relative: $p"
         }
+    }
+    $manifestPaths = @($manifest.files | ForEach-Object { [string]$_.path })
+    foreach ($requiredHarnessEvidence in @('.ai/routing-rules.json','ERPPrototype/Tools/AITeam/AITeamLocalRouter.psm1')) {
+        if ($manifestPaths -notcontains $requiredHarnessEvidence) { throw "Compatibility smoke: harness manifest is missing $requiredHarnessEvidence" }
     }
 
     # Reproduce the real failure class deliberately: finalize after JSON round-trip under a non-US culture.
@@ -87,16 +93,18 @@ try {
     # V3.3 local-first file/config checks (no Codex model call).
 $configPath = Join-Path $RepoRoot '.ai\team-config.json'
 $config = Get-Content -LiteralPath $configPath -Raw -Encoding UTF8 | ConvertFrom-Json
-if ([string]$config.teamVersion -ne '3.3.6') { throw "Expected AI Team 3.3.6, found $($config.teamVersion)." }
+if ([string]$config.teamVersion -ne '3.4') { throw "Expected AI Team 3.4, found $($config.teamVersion)." }
 foreach ($rel in @(
     'ERPPrototype\Tools\AITeam\AITeamCli.ps1',
     'ERPPrototype\Tools\AITeam\AITeamCodex.psm1',
     'ERPPrototype\Tools\AITeam\run_ai_test.ps1',
     'ERPPrototype\Tools\AITeam\run_router_smoke.ps1',
+    'ERPPrototype\Tools\AITeam\AITeamLocalRouter.psm1',
     'ERPPrototype\Tools\AITeam\Setup-AITeamLocalCommand.ps1',
     'ERPPrototype\Tools\AITeam\Setup-AITeamCodexCli.ps1',
     '.ai\prompts\mission-router.md',
-    '.ai\schemas\routing-plan.schema.json'
+    '.ai\schemas\routing-plan.schema.json',
+    '.ai\routing-rules.json'
 )) {
     if (-not (Test-Path -LiteralPath (Join-Path $RepoRoot $rel) -PathType Leaf)) { throw "V3.3 required file missing: $rel" }
 }
@@ -115,6 +123,43 @@ if (@($routerSmokeParseErrors).Count -gt 0) {
 }
 $cliText = Get-Content -LiteralPath (Join-Path $RepoRoot 'ERPPrototype\Tools\AITeam\AITeamCli.ps1') -Raw -Encoding UTF8
 if ($cliText -notmatch "'smoke-router'") { throw 'AI Team CLI does not expose smoke-router.' }
+
+# V3.4 local-first hybrid router: the qualification suite must route locally
+# without invoking Codex. Hidden oracles are used only here, after each local
+# route has already been produced, to test the router rather than seed it.
+$localRouterText = Get-Content -LiteralPath (Join-Path $RepoRoot 'ERPPrototype\Tools\AITeam\AITeamLocalRouter.psm1') -Raw -Encoding UTF8
+if ($localRouterText -match 'Invoke-AITeamCodex|Get-AITeamCodex|oracles-v3|Test-AITeamRoutingOracle') {
+    throw 'Local router must not depend on Codex or qualification oracles.'
+}
+$rulesPath = Join-Path $RepoRoot ([string]$config.routing.rulesPath)
+$localRulesCheck = Test-AITeamLocalRouterRules -RulesPath $rulesPath
+if (-not $localRulesCheck.pass) { throw "Local router rules check failed: $(@($localRulesCheck.errors) -join ' | ')" }
+$suiteForRouting = Get-Content -LiteralPath (Join-Path $RepoRoot ([string]$config.qualification.suite)) -Raw -Encoding UTF8 | ConvertFrom-Json
+$oracleForRouting = Join-Path $RepoRoot ([string]$config.qualification.oracles)
+$localQualificationMissions = @($suiteForRouting.missions | Where-Object { [string]$_.mode -ne 'deterministic' })
+$localQualificationCount = 0
+foreach ($m in $localQualificationMissions) {
+    $probePacket = [pscustomobject][ordered]@{
+        schemaVersion=1; runId='compat-local-router'; missionId=[string]$m.id; mission=[string]$m.name; mode=[string]$m.mode;
+        commitSha='0000000000000000000000000000000000000000'; workspaceFingerprint=('0000000000000000000000000000000000000000000000000000000000000000'); objective=[string]$m.objective;
+        requiredBehaviors=@(); decisionRefs=@($m.requiredDecisionRefs); exclusions=@(); webPolicy=[string]$m.webPolicy
+    }
+    $localProbe = Get-AITeamLocalRoute -MissionPacket $probePacket -Config $config -RulesPath $rulesPath
+    if ([bool]$localProbe.needsAiFallback) { throw "Qualification mission $($m.id) unexpectedly requires AI router fallback." }
+    $probeSelected = @($localProbe.routingPlan.selectedRoles | ForEach-Object { [string]$_ })
+    $probeScore = Test-AITeamRoutingOracle -OraclePath $oracleForRouting -TestId ([string]$m.id) -Selected $probeSelected
+    if (-not $probeScore.pass) { throw "Local router qualification mismatch for $($m.id): $(@($probeScore.errors) -join ' | ') selected=$($probeSelected -join ',')" }
+    $localQualificationCount++
+}
+if ($localQualificationCount -ne $localQualificationMissions.Count) { throw "Expected $($localQualificationMissions.Count) model qualification missions, routed $localQualificationCount." }
+
+$ambiguousPacket = [pscustomobject][ordered]@{
+    schemaVersion=1; runId='compat-ambiguous-router'; missionId='AMBIG'; mission='New ERP review'; mode='review';
+    commitSha='0000000000000000000000000000000000000000'; workspaceFingerprint='0000000000000000000000000000000000000000000000000000000000000000';
+    objective='Review a newly proposed ERP concern and decide what specialist evidence is needed.'; requiredBehaviors=@(); decisionRefs=@(); exclusions=@(); webPolicy='forbidden'
+}
+$ambiguousRoute = Get-AITeamLocalRoute -MissionPacket $ambiguousPacket -Config $config -RulesPath $rulesPath
+if (-not [bool]$ambiguousRoute.needsAiFallback) { throw 'Local router ambiguity canary failed: unclear mission should recommend AI fallback.' }
 
 # V3.3.5: Windows PowerShell 5.1 treats an empty collection passed to a
 # Mandatory parameter as a binding failure unless AllowEmptyCollection is
@@ -192,6 +237,9 @@ Write-Host 'AI TEAM RUNTIME COMPATIBILITY: PASS'
     Write-Host '- Codex installer wrapper (PowerShell 5.1 parse): PASS'
     Write-Host '- Native STDERR capture (PowerShell 5.1): PASS'
     Write-Host '- Router-only smoke runner parse/CLI wiring: PASS'
+    Write-Host '- Local router rules: PASS'
+    Write-Host "- Local router qualification: PASS ($localQualificationCount model missions, 0 Codex calls)"
+    Write-Host '- Local router ambiguity fallback canary: PASS'
     Write-Host '- PowerShell 5.1 empty schema-error binding: PASS'
 Write-Host '- Structured-output schema preflight: PASS (router/reviewer/lead/product)'
     Write-Host '- Structured-output negative canary (const without type): PASS'

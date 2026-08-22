@@ -9,6 +9,7 @@ $ErrorActionPreference = 'Stop'
 Import-Module (Join-Path $PSScriptRoot 'AITeamGates.psm1') -Force
 Import-Module (Join-Path $PSScriptRoot 'AITeamRun.psm1') -Force
 Import-Module (Join-Path $PSScriptRoot 'AITeamCodex.psm1') -Force
+Import-Module (Join-Path $PSScriptRoot 'AITeamLocalRouter.psm1') -Force
 
 if (-not $RepoRoot) { $RepoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..\..')) }
 else { $RepoRoot = [System.IO.Path]::GetFullPath($RepoRoot) }
@@ -39,6 +40,14 @@ function New-AgentPromptFile {
     return $Path
 }
 
+function Assert-AITeamCodexReady {
+    $status = Get-AITeamCodexLoginStatus
+    if (-not $status.installed -or -not $status.loggedIn) {
+        throw 'Codex CLI is required for this model step but is not installed/logged in. Run: erp-ai-team setup-codex'
+    }
+    return $status
+}
+
 $config = Get-Content -LiteralPath (Join-Path $RepoRoot '.ai\team-config.json') -Raw -Encoding UTF8 | ConvertFrom-Json
 $suitePath = Join-Path $RepoRoot ([string]$config.qualification.suite)
 $oraclePath = Join-Path $RepoRoot ([string]$config.qualification.oracles)
@@ -53,19 +62,6 @@ $runDir = [string]$run.runDirectory
 $phaseMs = [ordered]@{}
 $usageTotal = @{ inputTokens=[int64]0; cachedInputTokens=[int64]0; outputTokens=[int64]0; reasoningTokens=[int64]0; modelAttempts=0; modelCalls=0; apiRejectedBeforeGeneration=0 }
 $runCompleted = $false
-
-$login = Get-AITeamCodexLoginStatus
-if (-not $login.installed -or -not $login.loggedIn) {
-    $blockedUsage = [pscustomobject][ordered]@{ status='no-model-used'; estimated=$false; modelAttempts=0; modelCalls=0; apiRejectedBeforeGeneration=0; inputTokens=[int64]0; cachedInputTokens=[int64]0; outputTokens=[int64]0; reasoningTokens=[int64]0; weeklyAllowancePercent=$null; note='Blocked before model launch because Codex CLI is not installed/logged in.' }
-    Add-AITeamTrace -RunDir $runDir -Event 'MODEL_PREFLIGHT_BLOCKED' -Phase 'codex-preflight' -Status 'BLOCKED' -Detail ([string]$login.detail) | Out-Null
-    Write-AITeamJsonFile -Value $login -Path (Join-Path $runDir 'codex-preflight.json')
-    Complete-AITeamRun -RunDir $runDir -Result 'BLOCKED' -Summary 'Codex CLI is not installed/logged in. Run erp-ai-team setup-codex once.' -UsageTelemetry $blockedUsage | Out-Null
-    Write-Host 'AI TEAM MODEL MISSION: BLOCKED BEFORE MODEL USE'
-    Write-Host '- Codex CLI is not installed/logged in.'
-    Write-Host '- Run once: erp-ai-team setup-codex'
-    Write-Host "- evidence: $runDir"
-    exit 3
-}
 
 try {
     $sw = [System.Diagnostics.Stopwatch]::StartNew()
@@ -104,16 +100,33 @@ try {
 
     $selected = @()
     $routingDetail = $null
-    if ([string]$mission.mode -eq 'product') {
-        $selected = @('product-erp-partner')
-        $routingDetail = [pscustomobject][ordered]@{ schemaVersion=1; missionId=$TestId; selectedRoles=$selected; excludedRoles=@(); reasoningSummary='Product-mode mission routes directly to the single Product Partner; no engineering reviewers.' }
-        Write-AITeamJsonFile -Value $routingDetail -Path (Join-Path $runDir 'routing.json')
+    $routingSource = 'local-rules'
+    $localRoute = $null
+
+    $rulesPath = Join-Path $RepoRoot ([string]$config.routing.rulesPath)
+    $localRulesCheck = Test-AITeamLocalRouterRules -RulesPath $rulesPath
+    Write-AITeamJsonFile -Value $localRulesCheck -Path (Join-Path $runDir 'local-router-rules-gate.json')
+    if (-not $localRulesCheck.pass) { throw "Local router rules failed validation: $(@($localRulesCheck.errors) -join ' | ')" }
+
+    $sw = [System.Diagnostics.Stopwatch]::StartNew()
+    Add-AITeamTrace -RunDir $runDir -Event 'LOCAL_ROUTER_START' -Phase 'routing' -Role 'local-router' -Status 'RUNNING' -Detail 'Local rules run before any model call.' | Out-Null
+    $localRoute = Get-AITeamLocalRoute -MissionPacket $packet -Config $config -RulesPath $rulesPath
+    $sw.Stop(); $phaseMs.localRouter = [int64]$sw.ElapsedMilliseconds
+    Write-AITeamJsonFile -Value $localRoute -Path (Join-Path $runDir 'local-routing-debug.json')
+    Add-AITeamTrace -RunDir $runDir -Event 'LOCAL_ROUTER_END' -Phase 'routing' -Role 'local-router' -Status $(if ($localRoute.needsAiFallback) { 'GAP' } else { 'PASS' }) -Detail "selected=$(@($localRoute.routingPlan.selectedRoles) -join ','); fallback=$($localRoute.needsAiFallback); ms=$($phaseMs.localRouter)" | Out-Null
+
+    if (-not [bool]$localRoute.needsAiFallback) {
+        $routingDetail = $localRoute.routingPlan
+        $routingSource = 'local-rules'
     }
-    else {
-        Add-AITeamTrace -RunDir $runDir -Event 'ROUTER_START' -Phase 'routing' -Role 'mission-router' -Status 'RUNNING' | Out-Null
+    elseif ([bool]$config.routing.aiFallbackEnabled) {
+        Assert-AITeamCodexReady | Out-Null
+        $routingSource = 'ai-fallback'
+        Add-AITeamTrace -RunDir $runDir -Event 'ROUTER_FALLBACK_START' -Phase 'routing' -Role 'mission-router' -Status 'RUNNING' -Detail 'Local route was ambiguous; invoking one AI router fallback.' | Out-Null
         $routerPrompt = @"
-You are the ERP AI Team Mission Router.
+You are the ERP AI Team Mission Router fallback.
 Read $([string]$config.prompts.missionRouter) and obey it exactly.
+The deterministic local router could not make a decisive choice. Independently route this mission from the mission packet only.
 Do not inspect repository files, do not solve the mission, do not read oracles, and do not spawn subagents.
 
 Mission packet:
@@ -131,32 +144,37 @@ Return only the routing JSON.
         if ($null -ne $routerResult.PSObject.Properties['schemaPreflightPass'] -and -not [bool]$routerResult.schemaPreflightPass) {
             throw "Mission Router schema preflight blocked before Codex: $(@($routerResult.schemaPreflightErrors) -join ' | ')"
         }
-        if ($routerResult.exitCode -ne 0 -or -not (Test-Path -LiteralPath $routerOutput -PathType Leaf)) { throw 'Mission Router Codex call failed.' }
+        if ($routerResult.exitCode -ne 0 -or -not (Test-Path -LiteralPath $routerOutput -PathType Leaf)) { throw 'Mission Router Codex fallback failed.' }
         $routingDetail = Get-Content -LiteralPath $routerOutput -Raw -Encoding UTF8 | ConvertFrom-Json
-        if ([int]$routingDetail.schemaVersion -ne 1) { throw 'Router returned the wrong schemaVersion.' }
-        if ([string]$routingDetail.missionId -ne $TestId) { throw 'Router returned the wrong missionId.' }
-        $selected = @($routingDetail.selectedRoles | ForEach-Object { [string]$_ })
-        $excluded = @($routingDetail.excludedRoles | ForEach-Object { [string]$_ })
-        if (@($selected | Select-Object -Unique).Count -ne $selected.Count) { throw 'Router returned duplicate selectedRoles.' }
-        if (@($excluded | Select-Object -Unique).Count -ne $excluded.Count) { throw 'Router returned duplicate excludedRoles.' }
-        $overlap = @($selected | Where-Object { $excluded -contains $_ })
-        if ($overlap.Count -gt 0) { throw "Router returned roles in both selectedRoles and excludedRoles: $($overlap -join ', ')" }
-        if ($selected.Count -gt [int]$config.maxConcurrentReviewers) { throw 'Router exceeded maxConcurrentReviewers.' }
-        foreach ($role in $selected) {
-            if ($null -eq $config.roles.PSObject.Properties[$role]) { throw "Router selected unknown role: $role" }
-            $roleConfig = $config.roles.PSObject.Properties[$role].Value
-            if ([string]$roleConfig.class -ne 'engineering') { throw "Router selected non-engineering role in review mission: $role" }
-        }
-        foreach ($role in $excluded) {
-            if ($null -eq $config.roles.PSObject.Properties[$role]) { throw "Router excluded unknown role: $role" }
-            $roleConfig = $config.roles.PSObject.Properties[$role].Value
-            if ([string]$roleConfig.class -ne 'engineering') { throw "Router excluded non-engineering role in review mission: $role" }
-        }
-        Write-AITeamJsonFile -Value $routingDetail -Path (Join-Path $runDir 'routing.json')
-        Add-AITeamTrace -RunDir $runDir -Event 'ROUTER_END' -Phase 'routing' -Role 'mission-router' -Status 'PASS' -Detail "selected=$($selected -join ',') ms=$($routerResult.elapsedMilliseconds)" | Out-Null
+        Add-AITeamTrace -RunDir $runDir -Event 'ROUTER_FALLBACK_END' -Phase 'routing' -Role 'mission-router' -Status 'PASS' -Detail "ms=$($routerResult.elapsedMilliseconds)" | Out-Null
+    }
+    else {
+        throw 'Local router was ambiguous and AI fallback is disabled.'
     }
 
+    if ([int]$routingDetail.schemaVersion -ne 1) { throw 'Router returned the wrong schemaVersion.' }
+    if ([string]$routingDetail.missionId -ne $TestId) { throw 'Router returned the wrong missionId.' }
+    $selected = @($routingDetail.selectedRoles | ForEach-Object { [string]$_ })
+    $excluded = @($routingDetail.excludedRoles | ForEach-Object { [string]$_ })
+    if (@($selected | Select-Object -Unique).Count -ne $selected.Count) { throw 'Router returned duplicate selectedRoles.' }
+    if (@($excluded | Select-Object -Unique).Count -ne $excluded.Count) { throw 'Router returned duplicate excludedRoles.' }
+    $overlap = @($selected | Where-Object { $excluded -contains $_ })
+    if ($overlap.Count -gt 0) { throw "Router returned roles in both selectedRoles and excludedRoles: $($overlap -join ', ')" }
+    if ($selected.Count -gt [int]$config.maxConcurrentReviewers) { throw 'Router exceeded maxConcurrentReviewers.' }
+    foreach ($role in $selected) {
+        if ($null -eq $config.roles.PSObject.Properties[$role]) { throw "Router selected unknown role: $role" }
+        $roleConfig = $config.roles.PSObject.Properties[$role].Value
+        if ([string]$mission.mode -eq 'review' -and [string]$roleConfig.class -ne 'engineering') { throw "Router selected non-engineering role in review mission: $role" }
+        if ([string]$mission.mode -eq 'product' -and $role -ne 'product-erp-partner') { throw "Product mission selected unexpected role: $role" }
+    }
+    foreach ($role in $excluded) {
+        if ($null -eq $config.roles.PSObject.Properties[$role]) { throw "Router excluded unknown role: $role" }
+    }
+    Write-AITeamJsonFile -Value $routingDetail -Path (Join-Path $runDir 'routing.json')
+    Add-AITeamTrace -RunDir $runDir -Event 'ROUTING_FINAL' -Phase 'routing' -Role $routingSource -Status 'PASS' -Detail "source=$routingSource selected=$($selected -join ',')" | Out-Null
+
     if ([string]$mission.mode -eq 'product') {
+        Assert-AITeamCodexReady | Out-Null
         Add-AITeamTrace -RunDir $runDir -Event 'REVIEWER_START' -Phase 'product' -Role 'product-erp-partner' -Status 'RUNNING' | Out-Null
         $productPrompt = @"
 You are the Product & ERP Partner for ERP Prototype.
@@ -178,6 +196,7 @@ Return only JSON matching .ai/schemas/product-report.schema.json.
         Add-AITeamTrace -RunDir $runDir -Event 'REVIEWER_END' -Phase 'product' -Role 'product-erp-partner' -Status 'PASS' -Detail "ms=$($pr.elapsedMilliseconds)" | Out-Null
     }
     else {
+        if ($selected.Count -gt 0) { Assert-AITeamCodexReady | Out-Null }
         $jobs = @()
         $jobMeta = @{}
         foreach ($role in $selected) {
@@ -313,6 +332,8 @@ Return only JSON matching .ai/schemas/lead-report.schema.json.
         teamVersion = [string]$run.teamVersion
         result = $resultValue
         selectedReviewers = $selected
+        routingSource = $routingSource
+        localRouterFallbackRecommended = [bool]$localRoute.needsAiFallback
         routingOracleMatch = [bool]$routingScore.pass
         cleanlinessPass = [bool]$clean.pass
         semanticOracleEvaluation = 'manual-after-run'
@@ -326,6 +347,7 @@ Return only JSON matching .ai/schemas/lead-report.schema.json.
 
     Write-Host ''
     Write-Host "AI TEAM MODEL TEST ${TestId}: $resultValue"
+    Write-Host "- routing source: $routingSource"
     Write-Host "- reviewers: $($selected -join ', ')"
     Write-Host "- Codex attempts: $($usageObj.modelAttempts)"
     Write-Host "- completed model calls: $($usageObj.modelCalls)"

@@ -149,7 +149,7 @@ AIT-02 exposed a zero-token API rejection because the router response schema use
 
 Qualification rule: if `erp-ai-team doctor` or `Test-AITeamRuntimeCompatibility.ps1` reports a Structured-output schema failure, do not run a model-backed mission until it is corrected.
 
-## V3.3.6 — Router-only paid smoke before full AIT-02
+## V3.3.6 — Historical paid router smoke (superseded by V3.4)
 
 Before the first full model-backed engineering benchmark, use `erp-ai-team smoke-router AIT-02`.
 
@@ -163,4 +163,8 @@ The smoke is intentionally narrower than `erp-ai-team test AIT-02`:
 - it records direct token/event/timing telemetry and rechecks repository cleanliness;
 - a transport/schema failure is FAIL, while a structurally valid router result that misses the hidden routing oracle is PASS_WITH_GAPS so transport cost can be separated from routing quality.
 
-Do not run the full AIT-02 until this smoke has proved the real Codex transport and structured-output path.
+This paid-router smoke was useful to prove transport and revealed the router-cost problem. V3.4 supersedes it: normal routing is local, and the AI router is fallback-only.
+
+## V3.4 routing economy gate
+
+Before another full model-backed qualification mission, run `erp-ai-team smoke-router AIT-02`. In V3.4 this command is a pure local-router smoke: expected route is `change-mapper + revo + regression`, AI fallback must be false, reviewers/Lead must remain zero, and Codex attempts/tokens must remain zero. The Windows compatibility test also evaluates every non-deterministic V3 qualification mission against the hidden routing oracle after local routing and fails before any model launch if the local router regresses.

@@ -1,0 +1,316 @@
+{
+  "schemaVersion": 1,
+  "minimumScore": 60,
+  "decisiveScore": 100,
+  "ambiguityMargin": 15,
+  "trivialNoReviewPatterns": [
+    "\\bonly\\s+the\\s+colou?r\\b",
+    "\\bcolor\\s+only\\b",
+    "\\bnon[- ]functional\\s+error\\s+icon\\b",
+    "\\bcosmetic\\s+only\\b",
+    "\\bno\\s+behavio[u]?r\\s*/?\\s*layout\\s+change\\b",
+    "\\bno\\s+behavio[u]?r\\s+change\\b.*\\bno\\s+layout\\s+change\\b",
+    "تغيير\\s+لون\\s+فقط",
+    "بدون\\s+تغيير\\s+(?:في\\s+)?(?:السلوك|المنطق|التخطيط|اللاي.?اوت)"
+  ],
+  "roles": [
+    {
+      "role": "change-mapper",
+      "tiePriority": 10,
+      "signals": [
+        {
+          "pattern": "current[- ]code\\s+cause|find\\s+(?:the\\s+)?current[- ]code\\s+cause|find\\s+.*\\bcause\\b",
+          "score": 110,
+          "reason": "mission asks for a current-code cause"
+        },
+        {
+          "pattern": "\\bcurrent\\s+ownership\\b|\\breconstruct\\s+current\\b|\\bownership\\b",
+          "score": 100,
+          "reason": "mission asks who currently owns the path"
+        },
+        {
+          "pattern": "\\bimplementation\\s+gap\\b",
+          "score": 90,
+          "reason": "mission asks for the current implementation gap"
+        },
+        {
+          "pattern": "\\bwhat\\s+must\\s+be\\s+proven\\b",
+          "score": 90,
+          "reason": "mission needs current dependency/boundary mapping before change"
+        },
+        {
+          "pattern": "\\bcurrent\\b.{0,40}\\bbehavio[u]?r\\b|\\bcurrently\\s+enforced\\b|\\bcurrent\\b.{0,40}\\bpath\\b|\\bcurrent\\b.{0,40}\\bcosts?\\b",
+          "score": 75,
+          "reason": "mission asks for current implementation facts"
+        },
+        {
+          "pattern": "\\bshared[- ]path\\b",
+          "score": 70,
+          "reason": "mission explicitly mentions a shared path"
+        },
+        {
+          "pattern": "سبب.{0,25}الكود\\s+الحالي|المسار\\s+الحالي|الملكية|سبب\\s+المشكلة|الكود\\s+الحالي",
+          "score": 100,
+          "reason": "Arabic mission asks for current-code ownership/cause"
+        }
+      ]
+    },
+    {
+      "role": "behavior-legacy",
+      "tiePriority": 40,
+      "signals": [
+        {
+          "pattern": "\\btabulator\\b",
+          "score": 160,
+          "reason": "Tabulator is explicitly part of the mission"
+        },
+        {
+          "pattern": "\\blegacy\\b",
+          "score": 150,
+          "reason": "legacy behavior is explicitly part of the mission"
+        },
+        {
+          "pattern": "\\bold\\s+tabulator\\b|\\blegacy[- ]only\\b|\\bold\\s+implementation\\b",
+          "score": 160,
+          "reason": "old implementation is explicitly requested as comparison evidence"
+        },
+        {
+          "pattern": "تابوليتر|السلوك\\s+القديم|التنفيذ\\s+القديم",
+          "score": 160,
+          "reason": "Arabic mission explicitly asks about legacy implementation"
+        }
+      ]
+    },
+    {
+      "role": "revo",
+      "tiePriority": 30,
+      "signals": [
+        {
+          "pattern": "\\brevo(?:grid)?\\b",
+          "score": 130,
+          "reason": "Revo/RevoGrid mechanics are explicit"
+        },
+        {
+          "pattern": "\\bmulti[- ]cell\\b|\\bcells?\\b|\\brange\\b|\\bselection\\b",
+          "score": 100,
+          "reason": "grid range/cell selection mechanics are explicit"
+        },
+        {
+          "pattern": "\\bdelete\\b|\\bpaste\\b|\\bclipboard\\b|\\bundo\\b|\\bredo\\b",
+          "score": 75,
+          "reason": "native grid edit mechanics are explicit"
+        },
+        {
+          "pattern": "\\bgrid\\b|\\bsheet\\b",
+          "score": 40,
+          "reason": "generic grid/sheet mention alone is weak; stronger Revo mechanics signals are preferred"
+        },
+        {
+          "pattern": "ريفو|ريفوجريد|خلايا|خلية|تحديد|حذف|لصق|تراجع|إعادة",
+          "score": 100,
+          "reason": "Arabic mission explicitly concerns grid/Revo mechanics"
+        }
+      ]
+    },
+    {
+      "role": "architecture",
+      "tiePriority": 20,
+      "signals": [
+        {
+          "pattern": "\\barchitecture\\b",
+          "score": 140,
+          "reason": "architecture is explicit"
+        },
+        {
+          "pattern": "\\bownership\\b|\\bsource\\s+of\\s+truth\\b|\\bboundar(?:y|ies)\\b|\\bduplication\\b",
+          "score": 105,
+          "reason": "ownership/boundary risk is explicit"
+        },
+        {
+          "pattern": "\\bimplementation\\s+gap\\b",
+          "score": 90,
+          "reason": "implementation gap may reflect split ownership or missing boundary"
+        },
+        {
+          "pattern": "\\breal\\s+database\\s+save\\b|\\bpersistence\\s+boundary\\b",
+          "score": 90,
+          "reason": "persistence boundary needs architecture review"
+        },
+        {
+          "pattern": "\\bcurrently\\s+enforced\\b|\\bhow\\b.{0,40}\\benforced\\b",
+          "score": 65,
+          "reason": "current enforcement ownership needs architecture review"
+        },
+        {
+          "pattern": "\\bhistorical\\s+note\\b|\\bstale\\s+historical\\b|\\bold\\s+file\\s+owns\\b",
+          "score": 90,
+          "reason": "historical ownership claim needs independent architecture verification"
+        },
+        {
+          "pattern": "معمار|الملكية|مصدر\\s+الحقيقة|حدود\\s+المسؤولية",
+          "score": 110,
+          "reason": "Arabic mission explicitly concerns architecture/ownership"
+        }
+      ]
+    },
+    {
+      "role": "regression",
+      "tiePriority": 25,
+      "signals": [
+        {
+          "pattern": "\\bregression\\b",
+          "score": 160,
+          "reason": "regression surface is explicit"
+        },
+        {
+          "pattern": "\\bknown[- ]bug\\b|\\bbug\\b|\\bdoes\\s+not\\b|\\bdoesn\\x27t\\b|\\bmultiple\\b.{0,45}\\bsingle\\b|\\bclear\\b",
+          "score": 110,
+          "reason": "employee-visible broken behavior requires regression coverage"
+        },
+        {
+          "pattern": "\\bemployee\\s+selects?\\b|\\bemployee[- ]visible\\b",
+          "score": 70,
+          "reason": "employee-visible behavior needs regression scenarios"
+        },
+        {
+          "pattern": "\\bimplementation\\s+gap\\b",
+          "score": 75,
+          "reason": "implementation gap can break approved behavior"
+        },
+        {
+          "pattern": "\\bapproved\\s+validation\\s+decisions?\\b|\\bbehavio[u]?r\\b.{0,35}\\bdecision",
+          "score": 90,
+          "reason": "approved behavior needs regression proof"
+        },
+        {
+          "pattern": "انحدار|ريجريشن|مشكلة|لا\\s+يعمل|لا\\s+تمسح|أكثر\\s+من\\s+خلية",
+          "score": 110,
+          "reason": "Arabic mission describes broken employee-visible behavior"
+        }
+      ]
+    },
+    {
+      "role": "data-integrity-security",
+      "tiePriority": 35,
+      "signals": [
+        {
+          "pattern": "\\breal\\s+database\\s+save\\b|\\bdatabase\\s+save\\b",
+          "score": 160,
+          "reason": "real persistence is explicit"
+        },
+        {
+          "pattern": "\\bpersistence\\b",
+          "score": 130,
+          "reason": "persistence authority/data integrity is explicit"
+        },
+        {
+          "pattern": "\\browversion\\b|\\bconcurrenc(?:y|ies)\\b",
+          "score": 150,
+          "reason": "concurrency control is explicit"
+        },
+        {
+          "pattern": "\\bpermissions?\\b|\\bsecurity\\b|\\bdata\\s+integrity\\b",
+          "score": 150,
+          "reason": "security/data-integrity risk is explicit"
+        },
+        {
+          "pattern": "\\bserver\\s+validation\\b",
+          "score": 120,
+          "reason": "server validation authority is explicit"
+        },
+        {
+          "pattern": "حفظ.{0,25}قاعدة\\s+البيانات|التزامن|الصلاحيات|أمان|سلامة\\s+البيانات",
+          "score": 150,
+          "reason": "Arabic mission explicitly concerns persistence/security"
+        }
+      ]
+    },
+    {
+      "role": "performance-reliability",
+      "tiePriority": 15,
+      "signals": [
+        {
+          "pattern": "\\bperformance\\b",
+          "score": 160,
+          "reason": "performance is explicit"
+        },
+        {
+          "pattern": "\\b10,?000\\b|\\blarge[- ]grid\\b|\\blarge\\s+grid\\b",
+          "score": 150,
+          "reason": "large-grid scale is explicit"
+        },
+        {
+          "pattern": "\\bmeasurable\\s+costs?\\b|\\bmeasure\\b.{0,35}\\boptimization\\b|\\boptimization\\b|\\blatency\\b|\\bslow\\b|\\breconnect\\b|\\bscroll\\b",
+          "score": 120,
+          "reason": "measurement/performance/reliability concern is explicit"
+        },
+        {
+          "pattern": "أداء|بطيء|سرعة|قياس|إعادة\\s+الاتصال|سكرول|تمرير",
+          "score": 140,
+          "reason": "Arabic mission explicitly concerns performance/reliability"
+        }
+      ]
+    }
+  ],
+  "synergies": [
+    {
+      "whenRoles": [
+        "performance-reliability"
+      ],
+      "boostRole": "architecture",
+      "score": 200,
+      "reason": "performance work crosses client/server/DB ownership boundaries"
+    },
+    {
+      "whenRoles": [
+        "performance-reliability"
+      ],
+      "boostRole": "change-mapper",
+      "score": 200,
+      "reason": "performance review first needs the current execution path mapped"
+    },
+    {
+      "whenRoles": [
+        "data-integrity-security"
+      ],
+      "boostRole": "architecture",
+      "score": 100,
+      "reason": "persistence/security authority depends on architecture boundaries"
+    },
+    {
+      "whenRoles": [
+        "data-integrity-security"
+      ],
+      "boostRole": "change-mapper",
+      "score": 80,
+      "reason": "persistence review needs current save/validation ownership mapped"
+    },
+    {
+      "whenRoles": [
+        "behavior-legacy",
+        "revo"
+      ],
+      "boostRole": "architecture",
+      "score": 140,
+      "reason": "legacy-vs-current comparison needs explicit current ownership separation"
+    },
+    {
+      "whenRoles": [
+        "behavior-legacy",
+        "revo"
+      ],
+      "boostRole": "change-mapper",
+      "score": 90,
+      "reason": "legacy comparison must independently map current code first"
+    },
+    {
+      "whenRoles": [
+        "regression",
+        "revo"
+      ],
+      "boostRole": "change-mapper",
+      "score": 70,
+      "reason": "grid regression needs current shared-path ownership mapped"
+    }
+  ]
+}

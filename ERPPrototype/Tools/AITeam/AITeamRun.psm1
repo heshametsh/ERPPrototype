@@ -112,6 +112,7 @@ function Get-AITeamHarnessManifest {
         '.agents\skills\erp-ai-team\SKILL.md',
         'AGENTS.md',
         '.ai\team-config.json',
+        '.ai\routing-rules.json',
         '.ai\test-missions\test-suite-v3.yaml',
         '.ai\test-missions\oracles-v3.yaml'
     )) { $relativeFiles.Add($rel) }

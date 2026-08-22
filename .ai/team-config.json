@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "teamVersion": "3.3.6",
-  "operatingProfile": "local-first-measured-codex-on-demand-router-smoke-schema-preflight-ps51-safe",
+  "teamVersion": "3.4",
+  "operatingProfile": "local-first-hybrid-router-ai-fallback-measured-ps51-safe",
   "maxConcurrentReviewers": 3,
   "maxReviewWaves": 2,
   "maxInitialContextFilesPerReviewer": 8,
@@ -109,5 +109,12 @@
     "captureJsonEvents": true,
     "captureDirectTokenUsage": true,
     "ordinaryExecOnly": true
+  },
+  "routing": {
+    "strategy": "local-first-ai-fallback",
+    "rulesPath": ".ai/routing-rules.json",
+    "aiFallbackEnabled": true,
+    "qualificationRequiresLocalRouting": true,
+    "note": "Local rules decide clear missions at zero model cost. AI router is fallback only for ambiguous missions."
   }
 }

@@ -171,17 +171,16 @@ If a known implemented layer is missed, the Mapper is not trusted for routing ye
 
 ## 5. Mission Router / Orchestrator
 
-The Orchestrator selects the **smallest useful** specialist set after seeing current-code evidence.
-It does not run every specialist every time.
+V3.4 routes **locally first** from the Mission Packet. The deterministic router chooses the smallest useful specialist set from explicit mission/risk signals without reading project code, prior reports, hidden qualification oracles, or calling a model. If the local result is ambiguous, one AI Mission Router fallback may be used. Current-code truth is then established by the selected reviewers themselves.
 
 Examples:
-- text/color-only change -> Implementer + targeted verification;
-- Work Orders grid mechanics -> RevoGrid + Change Risk/QA, plus Architecture when shared ownership changes;
-- Validation foundation -> Behavior/Legacy + RevoGrid + Architecture + Change Risk/QA + Data Integrity when Save rules are involved;
-- persistence/security -> Architecture + Data Integrity/Security + Change Risk/QA;
-- large-grid/reconnect/offline -> Performance/Reliability plus relevant architecture/data specialists.
+- text/color-only change with explicitly no behavior/layout impact -> zero specialist model reviews;
+- Work Orders cell/range/Delete/Paste mechanics -> RevoGrid + Change Mapper + Regression when the shared path is part of the request;
+- explicit Tabulator/legacy comparison -> Behavior/Legacy plus current ownership/mapping specialists;
+- persistence/security -> Change Mapper + Architecture + Data Integrity/Security;
+- large-grid/reconnect/performance -> Performance/Reliability + Change Mapper + Architecture.
 
-Token budget grows with uncertainty/risk/evidence conflict, not a fixed allowance per Agent.
+Token budget grows with uncertainty/risk/evidence conflict, not a fixed allowance per Agent. Routing itself should normally cost zero model tokens.
 
 If reviewers conflict, open a small challenge review on the disputed fact only instead of rerunning the whole project review.
 
@@ -358,3 +357,9 @@ This changes the control direction from `Codex -> discover whether AI is needed`
 Model-backed orchestration now has a schema gate before Codex launch. The strict project schemas remain the contract, but every schema sent through `codex exec --output-schema` must also satisfy the supported Structured Outputs subset. Known incompatibilities are blocked locally with zero model attempts. This prevents malformed response schemas from consuming orchestration time or being misreported as completed model usage.
 
 Direct usage telemetry now separates `modelAttempts`, completed `modelCalls`, and `apiRejectedBeforeGeneration`; token counts continue to come only from Codex `turn.completed` JSON events.
+
+## V3.4 local-first hybrid routing
+
+Routing is now deterministic first. `AITeamLocalRouter.psm1` reads only the mission packet, team config and `.ai/routing-rules.json`; it does not read repository code, prior reports, qualification oracles or Codex output. Clear missions are routed locally at zero model cost. Only an ambiguous route may invoke the AI Mission Router as a single fallback call.
+
+The local router uses explicit role signals and risk combinations. Legacy review requires explicit Tabulator/legacy relevance. Performance and persistence missions deliberately reserve reviewer capacity for cross-layer mapping/architecture rather than filling the team with every technically plausible specialist. Qualification oracles are evaluated only after the route is produced.
