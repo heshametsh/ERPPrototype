@@ -1,6 +1,6 @@
 param(
     [Parameter(Position=0,Mandatory=$true)]
-    [ValidateSet('test','latest','history','doctor','setup-codex','allowance','usage')]
+    [ValidateSet('test','smoke-router','latest','history','doctor','setup-codex','allowance','usage')]
     [string]$Command,
     [Parameter(Position=1)][string]$Arg1,
     [Parameter(Position=2)][string]$Arg2
@@ -29,6 +29,15 @@ switch ($Command) {
         if ([string]::IsNullOrWhiteSpace($Arg1)) { throw 'Usage: erp-ai-team test AIT-04' }
         $dispatch = Join-Path $PSScriptRoot 'AITeamDispatch.ps1'
         & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $dispatch -TestId $Arg1 -RepoRoot $RepoRoot
+        $code = $LASTEXITCODE
+        Write-Host ''
+        Show-Latest
+        exit $code
+    }
+    'smoke-router' {
+        if ([string]::IsNullOrWhiteSpace($Arg1)) { throw 'Usage: erp-ai-team smoke-router AIT-02' }
+        $smoke = Join-Path $PSScriptRoot 'run_router_smoke.ps1'
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $smoke -TestId $Arg1 -RepoRoot $RepoRoot
         $code = $LASTEXITCODE
         Write-Host ''
         Show-Latest

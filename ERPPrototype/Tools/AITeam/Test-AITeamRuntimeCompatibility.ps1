@@ -87,11 +87,12 @@ try {
     # V3.3 local-first file/config checks (no Codex model call).
 $configPath = Join-Path $RepoRoot '.ai\team-config.json'
 $config = Get-Content -LiteralPath $configPath -Raw -Encoding UTF8 | ConvertFrom-Json
-if ([string]$config.teamVersion -ne '3.3.5') { throw "Expected AI Team 3.3.5, found $($config.teamVersion)." }
+if ([string]$config.teamVersion -ne '3.3.6') { throw "Expected AI Team 3.3.6, found $($config.teamVersion)." }
 foreach ($rel in @(
     'ERPPrototype\Tools\AITeam\AITeamCli.ps1',
     'ERPPrototype\Tools\AITeam\AITeamCodex.psm1',
     'ERPPrototype\Tools\AITeam\run_ai_test.ps1',
+    'ERPPrototype\Tools\AITeam\run_router_smoke.ps1',
     'ERPPrototype\Tools\AITeam\Setup-AITeamLocalCommand.ps1',
     'ERPPrototype\Tools\AITeam\Setup-AITeamCodexCli.ps1',
     '.ai\prompts\mission-router.md',
@@ -101,6 +102,19 @@ foreach ($rel in @(
 }
 $routingSchema = Get-Content -LiteralPath (Join-Path $RepoRoot '.ai\schemas\routing-plan.schema.json') -Raw -Encoding UTF8 | ConvertFrom-Json
 if ($null -eq $routingSchema) { throw 'Routing schema could not be parsed.' }
+
+# V3.3.6: parse the dedicated router-only smoke runner locally. This proves
+# the low-cost qualification entry point itself is syntactically valid without
+# launching Codex or consuming model allowance.
+$routerSmokePath = Join-Path $RepoRoot 'ERPPrototype\Tools\AITeam\run_router_smoke.ps1'
+$routerSmokeTokens = $null
+$routerSmokeParseErrors = $null
+[System.Management.Automation.Language.Parser]::ParseFile($routerSmokePath, [ref]$routerSmokeTokens, [ref]$routerSmokeParseErrors) | Out-Null
+if (@($routerSmokeParseErrors).Count -gt 0) {
+    throw "Router-only smoke runner parse failed: $(@($routerSmokeParseErrors | ForEach-Object { $_.Message }) -join ' | ')"
+}
+$cliText = Get-Content -LiteralPath (Join-Path $RepoRoot 'ERPPrototype\Tools\AITeam\AITeamCli.ps1') -Raw -Encoding UTF8
+if ($cliText -notmatch "'smoke-router'") { throw 'AI Team CLI does not expose smoke-router.' }
 
 # V3.3.5: Windows PowerShell 5.1 treats an empty collection passed to a
 # Mandatory parameter as a binding failure unless AllowEmptyCollection is
@@ -177,6 +191,7 @@ Write-Host 'AI TEAM RUNTIME COMPATIBILITY: PASS'
     Write-Host '- Metrics/trace/latest/index closure: PASS'
     Write-Host '- Codex installer wrapper (PowerShell 5.1 parse): PASS'
     Write-Host '- Native STDERR capture (PowerShell 5.1): PASS'
+    Write-Host '- Router-only smoke runner parse/CLI wiring: PASS'
     Write-Host '- PowerShell 5.1 empty schema-error binding: PASS'
 Write-Host '- Structured-output schema preflight: PASS (router/reviewer/lead/product)'
     Write-Host '- Structured-output negative canary (const without type): PASS'

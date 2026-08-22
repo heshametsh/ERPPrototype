@@ -148,3 +148,19 @@ AIT-02 exposed a zero-token API rejection because the router response schema use
 - Usage telemetry distinguishes a Codex process attempt from a completed model turn and from an API rejection before generation.
 
 Qualification rule: if `erp-ai-team doctor` or `Test-AITeamRuntimeCompatibility.ps1` reports a Structured-output schema failure, do not run a model-backed mission until it is corrected.
+
+## V3.3.6 — Router-only paid smoke before full AIT-02
+
+Before the first full model-backed engineering benchmark, use `erp-ai-team smoke-router AIT-02`.
+
+The smoke is intentionally narrower than `erp-ai-team test AIT-02`:
+
+- it performs deterministic suite/mission/cleanliness preflight first;
+- it permits exactly one Mission Router Codex attempt;
+- it launches zero reviewers and never launches Lead;
+- it validates the router Structured Output and local role constraints;
+- only after the router returns does the harness evaluate the hidden routing oracle;
+- it records direct token/event/timing telemetry and rechecks repository cleanliness;
+- a transport/schema failure is FAIL, while a structurally valid router result that misses the hidden routing oracle is PASS_WITH_GAPS so transport cost can be separated from routing quality.
+
+Do not run the full AIT-02 until this smoke has proved the real Codex transport and structured-output path.
