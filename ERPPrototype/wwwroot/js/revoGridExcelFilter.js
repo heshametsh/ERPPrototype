@@ -584,6 +584,61 @@ function syncCheckbox(checkbox, values, selected) {
     checkbox.indeterminate = count > 0 && count < values.length;
 }
 
+function normalizeSearchQuery(value) {
+    return String(value ?? "").trim().toLocaleLowerCase();
+}
+
+function dateTokenMatchesSearch(value, query) {
+    const parsed = parseDateToken(value);
+    if (!parsed) {
+        return displayToken(value).toLocaleLowerCase().includes(query);
+    }
+
+    return String(value).toLocaleLowerCase().includes(query) ||
+        String(parsed.year).includes(query) ||
+        String(parsed.month).includes(query) ||
+        String(parsed.day).includes(query) ||
+        String(parsed.day).padStart(2, "0").includes(query) ||
+        MONTH_NAMES[parsed.month].toLocaleLowerCase().includes(query);
+}
+
+function collectSearchMatches(candidates, kind, rawQuery) {
+    const query = normalizeSearchQuery(rawQuery);
+    if (!query) {
+        return candidates;
+    }
+
+    return candidates.filter(value => kind === "date"
+        ? dateTokenMatchesSearch(value, query)
+        : displayToken(value).toLocaleLowerCase().includes(query));
+}
+
+function syncPopupSelectionUi(ui, visibleValues, selected) {
+    syncCheckbox(ui.selectAll, visibleValues, selected);
+    ui.apply.disabled = selected.size === 0;
+}
+
+function replaceSelectionFromSearch(selected, candidates, kind, rawQuery) {
+    if (!normalizeSearchQuery(rawQuery)) {
+        return false;
+    }
+
+    selected.clear();
+    collectSearchMatches(candidates, kind, rawQuery)
+        .forEach(value => selected.add(value));
+    return true;
+}
+
+function setVisibleSelection(selected, visibleValues, checked) {
+    for (const value of visibleValues) {
+        if (checked) {
+            selected.add(value);
+        } else {
+            selected.delete(value);
+        }
+    }
+}
+
 function positionPopup(popup, anchor) {
     const rect = anchor.getBoundingClientRect();
     const margin = 8;
@@ -726,11 +781,7 @@ function createBasePopup(title, kind) {
 }
 
 function renderValueList(ui, candidates, selected) {
-    const query = ui.search.value.trim().toLocaleLowerCase();
-    const visible = query
-        ? candidates.filter(value =>
-            displayToken(value).toLocaleLowerCase().includes(query))
-        : candidates;
+    const visible = collectSearchMatches(candidates, "values", ui.search.value);
 
     const createRow = (value, index = null) => {
         const option = createCheckboxLabel(
@@ -748,7 +799,7 @@ function renderValueList(ui, candidates, selected) {
             } else {
                 selected.delete(value);
             }
-            syncCheckbox(ui.selectAll, candidates, selected);
+            syncPopupSelectionUi(ui, visible, selected);
         });
         return option.label;
     };
@@ -801,8 +852,9 @@ function renderValueList(ui, candidates, selected) {
 }
 
 function renderDateTree(ui, candidates, selected, expandedYears, expandedMonths) {
-    const query = ui.search.value.trim().toLocaleLowerCase();
-    const { groups, unparsed } = buildDateGroups(candidates);
+    const query = normalizeSearchQuery(ui.search.value);
+    const visible = collectSearchMatches(candidates, "date", query);
+    const { groups, unparsed } = buildDateGroups(visible);
     const fragment = document.createDocumentFragment();
     let rendered = 0;
 
@@ -813,13 +865,6 @@ function renderDateTree(ui, candidates, selected, expandedYears, expandedMonths)
         const yearValues = [];
         for (const items of months.values()) {
             yearValues.push(...allValuesForMonth(items));
-        }
-
-        const yearMatches = !query ||
-            String(year).includes(query) ||
-            yearValues.some(value => value.toLocaleLowerCase().includes(query));
-        if (!yearMatches) {
-            continue;
         }
 
         const yearDetails = document.createElement("details");
@@ -847,7 +892,6 @@ function renderDateTree(ui, candidates, selected, expandedYears, expandedMonths)
                     selected.delete(value);
                 }
             }
-            syncCheckbox(ui.selectAll, candidates, selected);
             renderDateTree(ui, candidates, selected, expandedYears, expandedMonths);
         });
         const yearText = document.createElement("span");
@@ -858,13 +902,6 @@ function renderDateTree(ui, candidates, selected, expandedYears, expandedMonths)
         for (const month of Array.from(months.keys()).sort((a, b) => a - b)) {
             const items = months.get(month).slice().sort((a, b) => a.day - b.day);
             const monthValues = allValuesForMonth(items);
-            const monthMatches = !query ||
-                MONTH_NAMES[month].toLocaleLowerCase().includes(query) ||
-                String(month).includes(query) ||
-                monthValues.some(value => value.toLocaleLowerCase().includes(query));
-            if (!monthMatches) {
-                continue;
-            }
 
             const monthKey = `${year}-${month}`;
             const monthDetails = document.createElement("details");
@@ -892,7 +929,6 @@ function renderDateTree(ui, candidates, selected, expandedYears, expandedMonths)
                         selected.delete(value);
                     }
                 }
-                syncCheckbox(ui.selectAll, candidates, selected);
                 renderDateTree(ui, candidates, selected, expandedYears, expandedMonths);
             });
             const monthText = document.createElement("span");
@@ -901,13 +937,6 @@ function renderDateTree(ui, candidates, selected, expandedYears, expandedMonths)
             monthDetails.appendChild(monthSummary);
 
             for (const item of items) {
-                if (query && !item.value.toLocaleLowerCase().includes(query) &&
-                    !String(item.day).includes(query) &&
-                    !MONTH_NAMES[month].toLocaleLowerCase().includes(query) &&
-                    !String(year).includes(query)) {
-                    continue;
-                }
-
                 const dayOption = createCheckboxLabel(
                     String(item.day).padStart(2, "0"),
                     `${POPUP_CLASS}__option ${POPUP_CLASS}__date-day`
@@ -920,7 +949,7 @@ function renderDateTree(ui, candidates, selected, expandedYears, expandedMonths)
                     } else {
                         selected.delete(item.value);
                     }
-                    syncCheckbox(ui.selectAll, candidates, selected);
+                    syncPopupSelectionUi(ui, visible, selected);
                     syncCheckbox(monthCheckbox, monthValues, selected);
                     syncCheckbox(yearCheckbox, yearValues, selected);
                 });
@@ -934,24 +963,22 @@ function renderDateTree(ui, candidates, selected, expandedYears, expandedMonths)
         fragment.appendChild(yearDetails);
     }
 
-    if (unparsed.length > 0 && !query) {
-        for (const value of unparsed) {
-            const option = createCheckboxLabel(
-                displayToken(value),
-                `${POPUP_CLASS}__option`
-            );
-            option.input.checked = selected.has(value);
-            option.input.addEventListener("change", () => {
-                if (option.input.checked) {
-                    selected.add(value);
-                } else {
-                    selected.delete(value);
-                }
-                syncCheckbox(ui.selectAll, candidates, selected);
-            });
-            fragment.appendChild(option.label);
-            rendered += 1;
-        }
+    for (const value of unparsed) {
+        const option = createCheckboxLabel(
+            displayToken(value),
+            `${POPUP_CLASS}__option`
+        );
+        option.input.checked = selected.has(value);
+        option.input.addEventListener("change", () => {
+            if (option.input.checked) {
+                selected.add(value);
+            } else {
+                selected.delete(value);
+            }
+            syncPopupSelectionUi(ui, visible, selected);
+        });
+        fragment.appendChild(option.label);
+        rendered += 1;
     }
 
     if (rendered === 0) {
@@ -961,6 +988,7 @@ function renderDateTree(ui, candidates, selected, expandedYears, expandedMonths)
         fragment.appendChild(empty);
     }
 
+    syncPopupSelectionUi(ui, visible, selected);
     ui.body.replaceChildren(fragment);
 }
 
@@ -1225,7 +1253,12 @@ export function createRevoGridExcelFilter(options) {
         };
 
         const render = () => {
-            syncCheckbox(ui.selectAll, candidates, pending);
+            const visible = collectSearchMatches(
+                candidates,
+                definition.kind,
+                ui.search.value
+            );
+            syncPopupSelectionUi(ui, visible, pending);
             if (definition.kind === "date") {
                 renderDateTree(
                     ui,
@@ -1239,12 +1272,28 @@ export function createRevoGridExcelFilter(options) {
             }
         };
 
-        ui.search.addEventListener("input", render);
+        ui.search.addEventListener("input", () => {
+            // Excel-like ERP behavior: search is a pending selection shortcut,
+            // not a live grid filter. While text is present, the matched popup
+            // options become the pending selection automatically. The actual
+            // RevoGrid filter is still applied only when the employee presses
+            // Apply, preserving the approved snapshot behavior.
+            replaceSelectionFromSearch(
+                pending,
+                candidates,
+                definition.kind,
+                ui.search.value
+            );
+            ui.body.scrollTop = 0;
+            render();
+        });
         ui.selectAll.addEventListener("change", () => {
-            pending.clear();
-            if (ui.selectAll.checked) {
-                candidates.forEach(value => pending.add(value));
-            }
+            const visible = collectSearchMatches(
+                candidates,
+                definition.kind,
+                ui.search.value
+            );
+            setVisibleSelection(pending, visible, ui.selectAll.checked);
             render();
         });
 
@@ -1436,5 +1485,8 @@ export const revoGridExcelFilterInternals = Object.freeze({
     normalizeFilterViewDelta,
     hasFilterViewDelta,
     parseDateToken,
-    buildNativeFilterItems
+    buildNativeFilterItems,
+    collectSearchMatches,
+    replaceSelectionFromSearch,
+    setVisibleSelection
 });

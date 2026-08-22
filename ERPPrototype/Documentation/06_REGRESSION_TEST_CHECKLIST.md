@@ -744,11 +744,14 @@ Include:
 
 #### Gate 5B-3 — Excel-like Filter over native Revo FilterPlugin
 
-- [ ] `/grid-shootout/revogrid-excel-filter-state-lab.html` reports **PASS 9 / FAIL 0**.
+- [ ] `/grid-shootout/revogrid-excel-filter-state-lab.html` reports **PASS 14 / FAIL 0**.
 - [ ] `/work-orders-revogrid-gate5b3` loads the same real employee/year dataset as Gate 5B-2.
 - [ ] Filter buttons exist only on Work Order Number, Work Type, Assignment Date, Basket, and custom Text/Date/Number columns.
 - [ ] Work Order Value, Partial Amount, Remaining Amount, and custom Money expose native Sort only and no Filter button.
 - [ ] Work Order Number / Work Type / Basket open an Excel-like checkbox list with Search, Select All, Clear Filter, and Apply.
+- [ ] Typing a non-empty Search term automatically makes the matching visible options the pending selection; the grid itself does not change until Apply is pressed. Example: typing `401` then Apply filters directly to `401` without manually clearing Select All first.
+- [ ] While Search is active, Select All changes only the currently searched/visible option rows. Clearing the Search text keeps the current pending checkbox selection instead of silently resetting it.
+- [ ] If Search finds no option, Apply is disabled so a no-match search cannot accidentally clear the filter and show the whole sheet.
 - [ ] Work Order Number remains responsive with a large unique-value set; the popup virtualizes option rows rather than rendering all values at once.
 - [ ] Assignment Date opens `Year → Month → Day`; selecting a year/month/day filters the sheet correctly through Revo's native filter engine.
 - [ ] Custom Date uses the same date hierarchy; custom Text/Number use the checkbox-value picker.

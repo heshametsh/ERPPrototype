@@ -22,13 +22,16 @@
         import {
             collectFilterCandidates,
             revoGridExcelFilterInternals
-        } from "/js/revoGridExcelFilter.js?v=20260821-gate5b3-excel-filter-1";
+        } from "/js/revoGridExcelFilter.js?v=20260822-gate5b5-search-selection-1";
 
         const {
             normalizeFilterState,
             statesEqual,
             parseDateToken,
             buildNativeFilterItems,
+            collectSearchMatches,
+            replaceSelectionFromSearch,
+            setVisibleSelection,
             BLANK_TOKEN
         } = revoGridExcelFilterInternals;
 
@@ -90,6 +93,46 @@
                 items.type.length === 1 &&
                 items.basket.length === 1;
         });
+
+        test("Value Search finds only matching popup options", () =>
+            JSON.stringify(collectSearchMatches(["401", "402", "801"], "values", "401")) ===
+            JSON.stringify(["401"]));
+
+        test("Typing Search replaces pending selection with the matches", () => {
+            const pending = new Set(["401", "402", "801"]);
+            const changed = replaceSelectionFromSearch(
+                pending,
+                ["401", "402", "801"],
+                "values",
+                "401"
+            );
+            return changed && JSON.stringify([...pending]) === JSON.stringify(["401"]);
+        });
+
+        test("Clearing Search preserves the current pending selection", () => {
+            const pending = new Set(["401"]);
+            const changed = replaceSelectionFromSearch(
+                pending,
+                ["401", "402", "801"],
+                "values",
+                ""
+            );
+            return !changed && JSON.stringify([...pending]) === JSON.stringify(["401"]);
+        });
+
+        test("Select All only changes currently searched visible options", () => {
+            const pending = new Set(["801"]);
+            setVisibleSelection(pending, ["401", "402"], true);
+            setVisibleSelection(pending, ["401"], false);
+            return pending.has("801") && !pending.has("401") && pending.has("402");
+        });
+
+        test("Date Search can match the displayed month name", () =>
+            JSON.stringify(collectSearchMatches(
+                ["01/01/2026", "14/02/2026", "02/03/2026"],
+                "date",
+                "February"
+            )) === JSON.stringify(["14/02/2026"]));
 
         const list = document.getElementById("results");
         let passed = 0;

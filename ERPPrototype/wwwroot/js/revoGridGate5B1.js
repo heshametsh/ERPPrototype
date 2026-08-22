@@ -1,8 +1,8 @@
-import * as nativeGate5A from "./revoGridNativeGate5A.js?v=20260821-gate5b5-filter-refresh-1";
+import * as nativeGate5A from "./revoGridNativeGate5A.js?v=20260822-gate5b5-search-selection-1";
 import { createRevoGridChangeBridge } from "./revoGridChangeBridge.js?v=20260821-gate5b5-row-structure-2";
 import { createRevoGridHistoryCoordinator } from "./revoGridHistoryCoordinator.js?v=20260821-minimal-reveal-1";
 import { createRevoGridHistoryFocus } from "./revoGridHistoryFocus.js?v=20260821-gate5b4-keyboard-sort-1";
-import { createRevoGridExcelFilter } from "./revoGridExcelFilter.js?v=20260821-gate5b5-filter-refresh-1";
+import { createRevoGridExcelFilter } from "./revoGridExcelFilter.js?v=20260822-gate5b5-search-selection-1";
 import { createRevoGridSort } from "./revoGridSort.js?v=20260821-gate5b5-row-structure-2";
 import { createRevoGridColumnSelection } from "./revoGridColumnSelection.js?v=20260821-gate5b4-keyboard-sort-1";
 import { createRevoGridSelectionLifecycle } from "./revoGridSelectionLifecycle.js?v=20260821-gate5b4-keyboard-sort-1";

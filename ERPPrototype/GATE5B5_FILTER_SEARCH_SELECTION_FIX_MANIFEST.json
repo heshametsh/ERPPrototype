@@ -1,0 +1,40 @@
+{
+  "name": "Gate 5B-5 Excel-like Filter Search Selection Fix",
+  "date": "2026-08-22",
+  "baseline_commit": "32cb183",
+  "scope": "ERP filter popup only; RevoGrid source is not modified",
+  "behavior": [
+    "Typing a non-empty Search term automatically replaces the pending checkbox selection with the matching popup options.",
+    "The grid is not filtered while typing; RevoGrid Community applies the filter only when Apply is pressed.",
+    "Select All while Search is active affects only currently searched/visible options.",
+    "Clearing Search text preserves the current pending checkbox selection.",
+    "Apply is disabled when the pending selection is empty so a no-match Search cannot accidentally show the whole sheet.",
+    "Date Search uses the same selection rule and can match date text, year, month number/name, or day."
+  ],
+  "architecture": {
+    "community": "RevoGrid Community 4.25.2 remains the native filtering engine through FilterPlugin/multiFilterItems.",
+    "pro_reference": "RevoGrid Pro selection filter documents select-all-visible and supports disabling live quick-search row filtering with quickSearchFiltering=false.",
+    "excel_reference": "Excel AutoFilter supports typing search criteria then applying the filter without first manually clearing Select All."
+  },
+  "changed_files": [
+    "wwwroot/js/revoGridExcelFilter.js",
+    "wwwroot/js/revoGridGate5B1.js",
+    "wwwroot/js/revoGridNativeGate5A.js",
+    "wwwroot/grid-shootout/revogrid-excel-filter-state-lab.html",
+    "Documentation/06_REGRESSION_TEST_CHECKLIST.md",
+    "Documentation/08_DECISIONS_LOG.md"
+  ],
+  "validation": {
+    "javascript_syntax": "PASS",
+    "pure_filter_search_tests": "PASS 5 / FAIL 0",
+    "dotnet_build": "Not run in artifact container because dotnet is unavailable; user will build in Codespaces.",
+    "manual_runtime_required": true
+  },
+  "manual_test": [
+    "Open Work Type filter, type 401, press Apply without changing Select All manually; only 401 rows should remain.",
+    "Undo once should restore the previous filter state; Redo should reapply it.",
+    "Search 40, uncheck 402, press Apply; only the still-checked matching values should remain.",
+    "Search a value that does not exist; Apply should be disabled.",
+    "Clear the Search text after searching 401; 401 should remain the pending checked selection until changed manually or Clear Filter is used."
+  ]
+}
