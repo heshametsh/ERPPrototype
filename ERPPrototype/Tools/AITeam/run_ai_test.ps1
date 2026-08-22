@@ -19,7 +19,18 @@ function Add-Usage {
     foreach ($k in @('inputTokens','cachedInputTokens','outputTokens','reasoningTokens')) {
         if ($null -ne $Usage.PSObject.Properties[$k]) { $Total[$k] = [int64]$Total[$k] + [int64]$Usage.$k }
     }
-    $Total.modelCalls = [int]$Total.modelCalls + 1
+    if ($null -ne $Usage.PSObject.Properties['modelAttempted'] -and [bool]$Usage.modelAttempted) {
+        $Total.modelAttempts = [int]$Total.modelAttempts + 1
+    }
+    if ($null -ne $Usage.PSObject.Properties['completedModelCalls']) {
+        $Total.modelCalls = [int]$Total.modelCalls + [int]$Usage.completedModelCalls
+    }
+    elseif ($null -ne $Usage.PSObject.Properties['turnCompletedCount']) {
+        $Total.modelCalls = [int]$Total.modelCalls + [int]$Usage.turnCompletedCount
+    }
+    if ($null -ne $Usage.PSObject.Properties['apiRejectedBeforeGeneration']) {
+        $Total.apiRejectedBeforeGeneration = [int]$Total.apiRejectedBeforeGeneration + [int]$Usage.apiRejectedBeforeGeneration
+    }
 }
 
 function New-AgentPromptFile {
@@ -40,12 +51,12 @@ if ([string]$mission.mode -eq 'deterministic') { throw "$TestId is deterministic
 $run = New-AITeamRun -RepoRoot $RepoRoot -MissionId $TestId -MissionName ([string]$mission.name) -Mode ([string]$mission.mode) -StateRoot $StateRoot
 $runDir = [string]$run.runDirectory
 $phaseMs = [ordered]@{}
-$usageTotal = @{ inputTokens=[int64]0; cachedInputTokens=[int64]0; outputTokens=[int64]0; reasoningTokens=[int64]0; modelCalls=0 }
+$usageTotal = @{ inputTokens=[int64]0; cachedInputTokens=[int64]0; outputTokens=[int64]0; reasoningTokens=[int64]0; modelAttempts=0; modelCalls=0; apiRejectedBeforeGeneration=0 }
 $runCompleted = $false
 
 $login = Get-AITeamCodexLoginStatus
 if (-not $login.installed -or -not $login.loggedIn) {
-    $blockedUsage = [pscustomobject][ordered]@{ status='no-model-used'; estimated=$false; modelCalls=0; inputTokens=[int64]0; cachedInputTokens=[int64]0; outputTokens=[int64]0; reasoningTokens=[int64]0; weeklyAllowancePercent=$null; note='Blocked before model launch because Codex CLI is not installed/logged in.' }
+    $blockedUsage = [pscustomobject][ordered]@{ status='no-model-used'; estimated=$false; modelAttempts=0; modelCalls=0; apiRejectedBeforeGeneration=0; inputTokens=[int64]0; cachedInputTokens=[int64]0; outputTokens=[int64]0; reasoningTokens=[int64]0; weeklyAllowancePercent=$null; note='Blocked before model launch because Codex CLI is not installed/logged in.' }
     Add-AITeamTrace -RunDir $runDir -Event 'MODEL_PREFLIGHT_BLOCKED' -Phase 'codex-preflight' -Status 'BLOCKED' -Detail ([string]$login.detail) | Out-Null
     Write-AITeamJsonFile -Value $login -Path (Join-Path $runDir 'codex-preflight.json')
     Complete-AITeamRun -RunDir $runDir -Result 'BLOCKED' -Summary 'Codex CLI is not installed/logged in. Run erp-ai-team setup-codex once.' -UsageTelemetry $blockedUsage | Out-Null
@@ -117,15 +128,29 @@ Return only the routing JSON.
         $routerResult = Invoke-AITeamCodexExec -RepoRoot $RepoRoot -PromptPath $routerPromptPath -SchemaPath (Join-Path $RepoRoot ([string]$config.schemas.routingPlan)) -OutputPath $routerOutput -EventsPath $routerEvents -StderrPath $routerErr -ReasoningEffort ([string]$config.codex.routerReasoningEffort) -Model ([string]$config.codex.model) -WebAllowed $false
         Add-Usage -Total $usageTotal -Usage $routerResult.usage
         Write-AITeamJsonFile -Value $routerResult -Path (Join-Path $runDir 'router-execution.json')
+        if ($null -ne $routerResult.PSObject.Properties['schemaPreflightPass'] -and -not [bool]$routerResult.schemaPreflightPass) {
+            throw "Mission Router schema preflight blocked before Codex: $(@($routerResult.schemaPreflightErrors) -join ' | ')"
+        }
         if ($routerResult.exitCode -ne 0 -or -not (Test-Path -LiteralPath $routerOutput -PathType Leaf)) { throw 'Mission Router Codex call failed.' }
         $routingDetail = Get-Content -LiteralPath $routerOutput -Raw -Encoding UTF8 | ConvertFrom-Json
+        if ([int]$routingDetail.schemaVersion -ne 1) { throw 'Router returned the wrong schemaVersion.' }
         if ([string]$routingDetail.missionId -ne $TestId) { throw 'Router returned the wrong missionId.' }
         $selected = @($routingDetail.selectedRoles | ForEach-Object { [string]$_ })
+        $excluded = @($routingDetail.excludedRoles | ForEach-Object { [string]$_ })
+        if (@($selected | Select-Object -Unique).Count -ne $selected.Count) { throw 'Router returned duplicate selectedRoles.' }
+        if (@($excluded | Select-Object -Unique).Count -ne $excluded.Count) { throw 'Router returned duplicate excludedRoles.' }
+        $overlap = @($selected | Where-Object { $excluded -contains $_ })
+        if ($overlap.Count -gt 0) { throw "Router returned roles in both selectedRoles and excludedRoles: $($overlap -join ', ')" }
         if ($selected.Count -gt [int]$config.maxConcurrentReviewers) { throw 'Router exceeded maxConcurrentReviewers.' }
         foreach ($role in $selected) {
             if ($null -eq $config.roles.PSObject.Properties[$role]) { throw "Router selected unknown role: $role" }
             $roleConfig = $config.roles.PSObject.Properties[$role].Value
             if ([string]$roleConfig.class -ne 'engineering') { throw "Router selected non-engineering role in review mission: $role" }
+        }
+        foreach ($role in $excluded) {
+            if ($null -eq $config.roles.PSObject.Properties[$role]) { throw "Router excluded unknown role: $role" }
+            $roleConfig = $config.roles.PSObject.Properties[$role].Value
+            if ([string]$roleConfig.class -ne 'engineering') { throw "Router excluded non-engineering role in review mission: $role" }
         }
         Write-AITeamJsonFile -Value $routingDetail -Path (Join-Path $runDir 'routing.json')
         Add-AITeamTrace -RunDir $runDir -Event 'ROUTER_END' -Phase 'routing' -Role 'mission-router' -Status 'PASS' -Detail "selected=$($selected -join ',') ms=$($routerResult.elapsedMilliseconds)" | Out-Null
@@ -145,6 +170,7 @@ Return only JSON matching .ai/schemas/product-report.schema.json.
         $pr = Invoke-AITeamCodexExec -RepoRoot $RepoRoot -PromptPath $pp -SchemaPath (Join-Path $RepoRoot ([string]$config.schemas.product)) -OutputPath $raw -EventsPath $events -StderrPath $err -ReasoningEffort ([string]$config.codex.productReasoningEffort) -Model ([string]$config.codex.model) -WebAllowed ([string]$mission.webPolicy -ne 'forbidden')
         Add-Usage -Total $usageTotal -Usage $pr.usage
         Write-AITeamJsonFile -Value $pr -Path (Join-Path $runDir 'product-execution.json')
+        if ($null -ne $pr.PSObject.Properties['schemaPreflightPass'] -and -not [bool]$pr.schemaPreflightPass) { throw "Product schema preflight blocked before Codex: $(@($pr.schemaPreflightErrors) -join ' | ')" }
         if ($pr.exitCode -ne 0) { throw 'Product Partner Codex call failed.' }
         $pg = Test-AITeamProductReport -ReportPath $raw -RepoRoot $RepoRoot -ExpectedSha ([string]$run.commitSha) -ExpectedMission ([string]$mission.name)
         Write-AITeamJsonFile -Value $pg -Path (Join-Path $runDir 'product-gate.json')
@@ -197,6 +223,10 @@ Return only JSON matching .ai/schemas/reviewer-findings.schema.json.
             }
             Add-Usage -Total $usageTotal -Usage $res.usage
             Write-AITeamJsonFile -Value $res -Path (Join-Path $runDir "$role-execution.json")
+            if ($null -ne $res.PSObject.Properties['schemaPreflightPass'] -and -not [bool]$res.schemaPreflightPass) {
+                Add-AITeamTrace -RunDir $runDir -Event 'REVIEWER_END' -Phase 'reviewers' -Role $role -Status 'FAIL' -Detail "Schema preflight blocked before Codex: $(@($res.schemaPreflightErrors) -join ' | ')" | Out-Null
+                continue
+            }
             if ([int]$res.exitCode -ne 0 -or -not (Test-Path -LiteralPath ([string]$meta.raw) -PathType Leaf)) {
                 Add-AITeamTrace -RunDir $runDir -Event 'REVIEWER_END' -Phase 'reviewers' -Role $role -Status 'FAIL' -Detail "Codex exit=$($res.exitCode)" | Out-Null
                 continue
@@ -238,6 +268,7 @@ Return only JSON matching .ai/schemas/lead-report.schema.json.
             $lr = Invoke-AITeamCodexExec -RepoRoot $RepoRoot -PromptPath $lp -SchemaPath (Join-Path $RepoRoot ([string]$config.schemas.lead)) -OutputPath $leadRaw -EventsPath $leadEvents -StderrPath $leadErr -ReasoningEffort ([string]$config.codex.leadReasoningEffort) -Model ([string]$config.codex.model) -WebAllowed $false
             Add-Usage -Total $usageTotal -Usage $lr.usage
             Write-AITeamJsonFile -Value $lr -Path (Join-Path $runDir 'lead-execution.json')
+            if ($null -ne $lr.PSObject.Properties['schemaPreflightPass'] -and -not [bool]$lr.schemaPreflightPass) { throw "Lead schema preflight blocked before Codex: $(@($lr.schemaPreflightErrors) -join ' | ')" }
             if ($lr.exitCode -ne 0) { throw 'Lead Codex call failed.' }
             $lg = Test-AITeamLeadReport -ReportPath $leadRaw -RepoRoot $RepoRoot -ExpectedSha ([string]$run.commitSha) -ExpectedMission ([string]$mission.name)
             Write-AITeamJsonFile -Value $lg -Path (Join-Path $runDir 'lead-gate.json')
@@ -261,7 +292,9 @@ Return only JSON matching .ai/schemas/lead-report.schema.json.
     $usageObj = [pscustomobject][ordered]@{
         status = 'direct-codex-cli-json-events'
         estimated = $false
+        modelAttempts = [int]$usageTotal.modelAttempts
         modelCalls = [int]$usageTotal.modelCalls
+        apiRejectedBeforeGeneration = [int]$usageTotal.apiRejectedBeforeGeneration
         inputTokens = [int64]$usageTotal.inputTokens
         cachedInputTokens = [int64]$usageTotal.cachedInputTokens
         outputTokens = [int64]$usageTotal.outputTokens
@@ -288,13 +321,15 @@ Return only JSON matching .ai/schemas/lead-report.schema.json.
         traceFile = (Join-Path $runDir 'trace.jsonl')
     }
     Write-AITeamJsonFile -Value $result -Path (Join-Path $runDir 'result.json')
-    $final = Complete-AITeamRun -RunDir $runDir -Result $resultValue -Summary "routing=$($routingScore.pass); cleanliness=$($clean.pass); modelCalls=$($usageObj.modelCalls)" -PhaseMilliseconds $phaseMs -UsageTelemetry $usageObj
+    $final = Complete-AITeamRun -RunDir $runDir -Result $resultValue -Summary "routing=$($routingScore.pass); cleanliness=$($clean.pass); attempts=$($usageObj.modelAttempts); completedCalls=$($usageObj.modelCalls)" -PhaseMilliseconds $phaseMs -UsageTelemetry $usageObj
     $runCompleted = $true
 
     Write-Host ''
     Write-Host "AI TEAM MODEL TEST ${TestId}: $resultValue"
     Write-Host "- reviewers: $($selected -join ', ')"
-    Write-Host "- direct model calls: $($usageObj.modelCalls)"
+    Write-Host "- Codex attempts: $($usageObj.modelAttempts)"
+    Write-Host "- completed model calls: $($usageObj.modelCalls)"
+    Write-Host "- pre-generation API rejects: $($usageObj.apiRejectedBeforeGeneration)"
     Write-Host "- tokens: input=$($usageObj.inputTokens) cached=$($usageObj.cachedInputTokens) output=$($usageObj.outputTokens)"
     Write-Host "- elapsed ms: $($final.elapsedMilliseconds)"
     Write-Host "- evidence: $runDir"
@@ -306,7 +341,7 @@ catch {
     try {
         Add-AITeamTrace -RunDir $runDir -Event 'RUN_ERROR' -Phase 'orchestration' -Status 'FAIL' -Detail $err | Out-Null
         $usageObj = [pscustomobject][ordered]@{
-            status='direct-codex-cli-json-events'; estimated=$false; modelCalls=[int]$usageTotal.modelCalls;
+            status='direct-codex-cli-json-events'; estimated=$false; modelAttempts=[int]$usageTotal.modelAttempts; modelCalls=[int]$usageTotal.modelCalls; apiRejectedBeforeGeneration=[int]$usageTotal.apiRejectedBeforeGeneration;
             inputTokens=[int64]$usageTotal.inputTokens; cachedInputTokens=[int64]$usageTotal.cachedInputTokens;
             outputTokens=[int64]$usageTotal.outputTokens; reasoningTokens=[int64]$usageTotal.reasoningTokens;
             weeklyAllowancePercent=$null; note='Partial usage captured before failure.'

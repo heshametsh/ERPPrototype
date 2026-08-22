@@ -139,6 +139,136 @@ function Get-AITeamCodexUsageFromEvents {
     return [pscustomobject]$totals
 }
 
+
+function Test-AITeamCodexOutputSchemaNode {
+    param(
+        [Parameter(Mandatory)]$Node,
+        [Parameter(Mandatory)][string]$Path,
+        [Parameter(Mandatory)][AllowEmptyCollection()][System.Collections.Generic.List[string]]$Errors,
+        [bool]$IsRoot = $false
+    )
+
+    if ($null -eq $Node) {
+        $Errors.Add("$Path is null.")
+        return
+    }
+
+    $properties = $Node.PSObject.Properties
+    if ($null -ne $properties['$ref']) {
+        # References are supported. The referenced definition is validated separately.
+        return
+    }
+
+    foreach ($keyword in @('oneOf','allOf','not','dependentRequired','dependentSchemas','if','then','else','uniqueItems','patternProperties')) {
+        if ($null -ne $properties[$keyword]) {
+            $Errors.Add("$Path uses unsupported Structured Outputs keyword '$keyword'.")
+        }
+    }
+
+    $types = @()
+    if ($null -ne $properties['type']) {
+        $types = @($Node.type | ForEach-Object { [string]$_ })
+        foreach ($t in $types) {
+            if (@('string','number','boolean','integer','object','array','null') -notcontains $t) {
+                $Errors.Add("$Path has unsupported type '$t'.")
+            }
+        }
+    }
+
+    if ($null -ne $properties['const'] -and $types.Count -eq 0) {
+        $Errors.Add("$Path uses const without an explicit type.")
+    }
+    if ($null -ne $properties['enum'] -and $types.Count -eq 0) {
+        $Errors.Add("$Path uses enum without an explicit type.")
+    }
+
+    if ($null -ne $properties['format']) {
+        $format = [string]$Node.format
+        if (@('date-time','time','date','duration','email','hostname','ipv4','ipv6','uuid') -notcontains $format) {
+            $Errors.Add("$Path uses unsupported Structured Outputs format '$format'.")
+        }
+    }
+
+    if ($IsRoot) {
+        if ($types.Count -ne 1 -or $types[0] -ne 'object') {
+            $Errors.Add('Root Structured Outputs schema must have type object.')
+        }
+        if ($null -ne $properties['anyOf']) {
+            $Errors.Add('Root Structured Outputs schema must not use anyOf.')
+        }
+    }
+
+    $isObject = ($types -contains 'object') -or ($null -ne $properties['properties'])
+    if ($isObject) {
+        if ($null -eq $properties['additionalProperties'] -or [bool]$Node.additionalProperties -ne $false) {
+            $Errors.Add("$Path object must set additionalProperties=false.")
+        }
+        if ($null -eq $properties['properties']) {
+            $Errors.Add("$Path object must declare properties.")
+        }
+        else {
+            $propertyNames = @($Node.properties.PSObject.Properties | ForEach-Object { [string]$_.Name })
+            $requiredNames = @()
+            if ($null -ne $properties['required']) {
+                $requiredNames = @($Node.required | ForEach-Object { [string]$_ })
+            }
+            foreach ($name in $propertyNames) {
+                if ($requiredNames -notcontains $name) {
+                    $Errors.Add("$Path property '$name' is not listed in required.")
+                }
+                $child = $Node.properties.PSObject.Properties[$name].Value
+                Test-AITeamCodexOutputSchemaNode -Node $child -Path "$Path.properties.$name" -Errors $Errors
+            }
+            foreach ($name in $requiredNames) {
+                if ($propertyNames -notcontains $name) {
+                    $Errors.Add("$Path required entry '$name' has no matching property.")
+                }
+            }
+        }
+    }
+
+    if ($null -ne $properties['items']) {
+        Test-AITeamCodexOutputSchemaNode -Node $Node.items -Path "$Path.items" -Errors $Errors
+    }
+    if ($null -ne $properties['anyOf']) {
+        $i = 0
+        foreach ($child in @($Node.anyOf)) {
+            Test-AITeamCodexOutputSchemaNode -Node $child -Path "$Path.anyOf[$i]" -Errors $Errors
+            $i++
+        }
+    }
+    if ($null -ne $properties['$defs']) {
+        foreach ($definition in @($Node.'$defs'.PSObject.Properties)) {
+            Test-AITeamCodexOutputSchemaNode -Node $definition.Value -Path "$Path.`$defs.$($definition.Name)" -Errors $Errors
+        }
+    }
+}
+
+function Test-AITeamCodexOutputSchema {
+    param([Parameter(Mandatory)][string]$SchemaPath)
+
+    $errors = New-Object System.Collections.Generic.List[string]
+    if (-not (Test-Path -LiteralPath $SchemaPath -PathType Leaf)) {
+        $errors.Add("Schema file not found: $SchemaPath")
+        return [pscustomobject][ordered]@{ pass=$false; schemaPath=$SchemaPath; errors=@($errors) }
+    }
+
+    try {
+        $schema = Get-Content -LiteralPath $SchemaPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    }
+    catch {
+        $errors.Add("Schema JSON parse failed: $($_.Exception.Message)")
+        return [pscustomobject][ordered]@{ pass=$false; schemaPath=$SchemaPath; errors=@($errors) }
+    }
+
+    Test-AITeamCodexOutputSchemaNode -Node $schema -Path '$' -Errors $errors -IsRoot $true
+    return [pscustomobject][ordered]@{
+        pass = ($errors.Count -eq 0)
+        schemaPath = [System.IO.Path]::GetFullPath($SchemaPath)
+        errors = @($errors)
+    }
+}
+
 function Invoke-AITeamCodexExec {
     param(
         [Parameter(Mandatory)][string]$RepoRoot,
@@ -152,10 +282,34 @@ function Invoke-AITeamCodexExec {
         [bool]$WebAllowed = $false
     )
 
-    $codex = Get-AITeamCodexCommand
-    if (-not $codex) { throw 'Codex CLI is required for this model mission. Run: erp-ai-team setup-codex' }
     if (-not (Test-Path -LiteralPath $PromptPath -PathType Leaf)) { throw "Prompt file not found: $PromptPath" }
     if (-not (Test-Path -LiteralPath $SchemaPath -PathType Leaf)) { throw "Schema file not found: $SchemaPath" }
+
+    # Reject known-incompatible Structured Outputs schemas locally before Codex is
+    # launched. This is deliberately deterministic so schema mistakes consume no
+    # model allowance and leave a precise evidence trail.
+    $schemaPreflight = Test-AITeamCodexOutputSchema -SchemaPath $SchemaPath
+    if (-not $schemaPreflight.pass) {
+        $message = 'CODEX_SCHEMA_PREFLIGHT_BLOCKED: ' + (@($schemaPreflight.errors) -join ' | ')
+        $message | Set-Content -LiteralPath $StderrPath -Encoding UTF8
+        return [pscustomobject][ordered]@{
+            exitCode = 65
+            elapsedMilliseconds = [int64]0
+            outputPath = $OutputPath
+            eventsPath = $EventsPath
+            stderrPath = $StderrPath
+            schemaPreflightPass = $false
+            schemaPreflightErrors = @($schemaPreflight.errors)
+            modelAttempted = $false
+            usage = [pscustomobject][ordered]@{
+                inputTokens=[int64]0; cachedInputTokens=[int64]0; outputTokens=[int64]0; reasoningTokens=[int64]0;
+                turnCompletedCount=0; modelAttempted=$false; completedModelCalls=0; apiRejectedBeforeGeneration=0
+            }
+        }
+    }
+
+    $codex = Get-AITeamCodexCommand
+    if (-not $codex) { throw 'Codex CLI is required for this model mission. Run: erp-ai-team setup-codex' }
 
     $prompt = Get-Content -LiteralPath $PromptPath -Raw -Encoding UTF8
     $args = @(
@@ -192,6 +346,12 @@ function Invoke-AITeamCodexExec {
         $sw.Stop()
     }
     $usage = Get-AITeamCodexUsageFromEvents -EventsPath $EventsPath
+    $completedCalls = [int]$usage.turnCompletedCount
+    $apiRejected = 0
+    if ($code -ne 0 -and $completedCalls -eq 0) { $apiRejected = 1 }
+    $usage | Add-Member -NotePropertyName modelAttempted -NotePropertyValue $true -Force
+    $usage | Add-Member -NotePropertyName completedModelCalls -NotePropertyValue $completedCalls -Force
+    $usage | Add-Member -NotePropertyName apiRejectedBeforeGeneration -NotePropertyValue $apiRejected -Force
 
     return [pscustomobject][ordered]@{
         exitCode = $code
@@ -199,8 +359,11 @@ function Invoke-AITeamCodexExec {
         outputPath = $OutputPath
         eventsPath = $EventsPath
         stderrPath = $StderrPath
+        schemaPreflightPass = $true
+        schemaPreflightErrors = @()
+        modelAttempted = $true
         usage = $usage
     }
 }
 
-Export-ModuleMember -Function Get-AITeamCodexKnownPaths, Get-AITeamCodexCommand, Invoke-AITeamNativeCapture, Get-AITeamCodexLoginStatus, Get-AITeamCodexUsageFromEvents, Invoke-AITeamCodexExec
+Export-ModuleMember -Function Get-AITeamCodexKnownPaths, Get-AITeamCodexCommand, Invoke-AITeamNativeCapture, Get-AITeamCodexLoginStatus, Get-AITeamCodexUsageFromEvents, Test-AITeamCodexOutputSchema, Invoke-AITeamCodexExec

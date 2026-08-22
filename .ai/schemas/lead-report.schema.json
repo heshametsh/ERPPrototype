@@ -18,6 +18,7 @@
   ],
   "properties": {
     "schemaVersion": {
+      "type": "integer",
       "const": 3
     },
     "mission": {
@@ -120,7 +121,7 @@
       "type": "boolean"
     },
     "decision": {
-      "oneOf": [
+      "anyOf": [
         {
           "type": "null"
         },

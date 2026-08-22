@@ -352,3 +352,9 @@ Normal AI-Team execution now begins outside the Codex desktop conversation:
 9. The same run directory retains routing, model events, model usage, gates, Lead/product output, cleanliness, trace, metrics, and final result.
 
 This changes the control direction from `Codex -> discover whether AI is needed` to `deterministic harness -> invoke Codex only when AI is needed`.
+
+## V3.3.4 refinement — deterministic Structured Outputs compatibility gate
+
+Model-backed orchestration now has a schema gate before Codex launch. The strict project schemas remain the contract, but every schema sent through `codex exec --output-schema` must also satisfy the supported Structured Outputs subset. Known incompatibilities are blocked locally with zero model attempts. This prevents malformed response schemas from consuming orchestration time or being misreported as completed model usage.
+
+Direct usage telemetry now separates `modelAttempts`, completed `modelCalls`, and `apiRejectedBeforeGeneration`; token counts continue to come only from Codex `turn.completed` JSON events.

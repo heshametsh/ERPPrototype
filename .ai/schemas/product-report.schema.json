@@ -16,9 +16,11 @@
   ],
   "properties": {
     "schemaVersion": {
+      "type": "integer",
       "const": 1
     },
     "agentRole": {
+      "type": "string",
       "const": "product-erp-partner"
     },
     "mission": {
@@ -128,8 +130,7 @@
             "type": "array",
             "maxItems": 4,
             "items": {
-              "type": "string",
-              "format": "uri"
+              "type": "string"
             }
           }
         }

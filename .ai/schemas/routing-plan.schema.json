@@ -2,14 +2,26 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "missionId", "selectedRoles", "excludedRoles", "reasoningSummary"],
+  "required": [
+    "schemaVersion",
+    "missionId",
+    "selectedRoles",
+    "excludedRoles",
+    "reasoningSummary"
+  ],
   "properties": {
-    "schemaVersion": { "const": 1 },
-    "missionId": { "type": "string", "minLength": 1, "maxLength": 80 },
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1
+    },
+    "missionId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80
+    },
     "selectedRoles": {
       "type": "array",
       "maxItems": 3,
-      "uniqueItems": true,
       "items": {
         "type": "string",
         "enum": [
@@ -26,7 +38,6 @@
     "excludedRoles": {
       "type": "array",
       "maxItems": 7,
-      "uniqueItems": true,
       "items": {
         "type": "string",
         "enum": [
@@ -40,6 +51,10 @@
         ]
       }
     },
-    "reasoningSummary": { "type": "string", "minLength": 1, "maxLength": 1200 }
+    "reasoningSummary": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1200
+    }
   }
 }

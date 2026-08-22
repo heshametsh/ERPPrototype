@@ -450,6 +450,9 @@ function Complete-AITeamRun {
             [pscustomobject][ordered]@{
                 status = 'no-model-usage-recorded'
                 estimated = $false
+                modelAttempts = 0
+                modelCalls = 0
+                apiRejectedBeforeGeneration = 0
                 inputTokens = [int64]0
                 cachedInputTokens = [int64]0
                 outputTokens = [int64]0
@@ -504,6 +507,9 @@ function Complete-AITeamRun {
         result = $Result
         elapsedMilliseconds = $elapsed
         reviewerCount = [int]$metrics.reviewerCount
+        modelAttempts = $(if ($null -ne $metrics.usageTelemetry.PSObject.Properties['modelAttempts']) { [int]$metrics.usageTelemetry.modelAttempts } else { [int]0 })
+        modelCalls = $(if ($null -ne $metrics.usageTelemetry.PSObject.Properties['modelCalls']) { [int]$metrics.usageTelemetry.modelCalls } else { [int]0 })
+        apiRejectedBeforeGeneration = $(if ($null -ne $metrics.usageTelemetry.PSObject.Properties['apiRejectedBeforeGeneration']) { [int]$metrics.usageTelemetry.apiRejectedBeforeGeneration } else { [int]0 })
         inputTokens = $(if ($null -ne $metrics.usageTelemetry.PSObject.Properties['inputTokens']) { [int64]$metrics.usageTelemetry.inputTokens } else { [int64]0 })
         cachedInputTokens = $(if ($null -ne $metrics.usageTelemetry.PSObject.Properties['cachedInputTokens']) { [int64]$metrics.usageTelemetry.cachedInputTokens } else { [int64]0 })
         outputTokens = $(if ($null -ne $metrics.usageTelemetry.PSObject.Properties['outputTokens']) { [int64]$metrics.usageTelemetry.outputTokens } else { [int64]0 })
@@ -543,6 +549,7 @@ function Complete-AITeamRun {
         "Metrics: $(Join-Path $RunDir 'metrics.json')",
         "Artifacts: $($metrics.artifactCount) files / $($metrics.artifactBytes) bytes",
         "Reviewers measured: $($metrics.reviewerCount)",
+        "Codex execution: attempts=$(if ($null -ne $metrics.usageTelemetry.PSObject.Properties['modelAttempts']) { $metrics.usageTelemetry.modelAttempts } else { 0 }) completed=$(if ($null -ne $metrics.usageTelemetry.PSObject.Properties['modelCalls']) { $metrics.usageTelemetry.modelCalls } else { 0 }) preGenerationRejects=$(if ($null -ne $metrics.usageTelemetry.PSObject.Properties['apiRejectedBeforeGeneration']) { $metrics.usageTelemetry.apiRejectedBeforeGeneration } else { 0 })",
         "Direct Codex tokens: input=$($metrics.usageTelemetry.inputTokens) cached=$($metrics.usageTelemetry.cachedInputTokens) output=$($metrics.usageTelemetry.outputTokens)",
         "Observability warnings: $(@($traceSummary.warnings).Count)"
     )

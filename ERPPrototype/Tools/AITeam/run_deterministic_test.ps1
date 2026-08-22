@@ -164,7 +164,9 @@ try {
     $noModelUsage = [pscustomobject][ordered]@{
         status = 'no-model-used'
         estimated = $false
+        modelAttempts = 0
         modelCalls = 0
+        apiRejectedBeforeGeneration = 0
         inputTokens = [int64]0
         cachedInputTokens = [int64]0
         outputTokens = [int64]0

@@ -136,3 +136,15 @@ The AI is no longer paid to discover that AI was unnecessary.
 4. Before the first model benchmark, install/login Codex CLI once with `erp-ai-team setup-codex`.
 5. Record the visible weekly remaining percentage manually, run AIT-02 once, then record the percentage again.
 6. Inspect `model-usage.json`, per-role event logs, reviewer durations, routing, and the visible allowance delta before deciding whether the team is economical enough for normal project work.
+
+## V3.3.4 — Structured-output preflight before model allowance
+
+AIT-02 exposed a zero-token API rejection because the router response schema used a `const` without an explicit `type`. V3.3.4 makes schema compatibility a deterministic prerequisite:
+
+- Router, reviewer, Lead, and Product response schemas are validated locally before any Codex process is launched.
+- The exact `const-without-type` failure class is kept as a negative compatibility canary.
+- Unsupported Structured Outputs constructs used by the harness are rejected locally (`oneOf`, `uniqueItems`, unsupported formats, missing `additionalProperties:false`, or object properties missing from `required`).
+- Local business/gate validation remains authoritative for constraints intentionally removed from the model schema, such as routing uniqueness and Product http/https URL checks.
+- Usage telemetry distinguishes a Codex process attempt from a completed model turn and from an API rejection before generation.
+
+Qualification rule: if `erp-ai-team doctor` or `Test-AITeamRuntimeCompatibility.ps1` reports a Structured-output schema failure, do not run a model-backed mission until it is corrected.

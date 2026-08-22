@@ -58,6 +58,16 @@ switch ($Command) {
         $config = Get-Content -LiteralPath (Join-Path $RepoRoot '.ai\team-config.json') -Raw -Encoding UTF8 | ConvertFrom-Json
         Write-Host "- Team: $($config.teamVersion) / $($config.operatingProfile)"
         Write-Host "- state: $StateRoot"
+        $schemaErrors = New-Object System.Collections.Generic.List[string]
+        foreach ($schemaKey in @('routingPlan','reviewer','lead','product')) {
+            $schemaRel = [string]$config.schemas.PSObject.Properties[$schemaKey].Value
+            $schemaCheck = Test-AITeamCodexOutputSchema -SchemaPath (Join-Path $RepoRoot $schemaRel)
+            if (-not $schemaCheck.pass) {
+                foreach ($e in @($schemaCheck.errors)) { $schemaErrors.Add("${schemaKey}: $e") }
+            }
+        }
+        Write-Host "- Structured output schemas: $(if ($schemaErrors.Count -eq 0) { 'PASS' } else { 'FAIL' })"
+        if ($schemaErrors.Count -gt 0) { foreach ($e in $schemaErrors) { Write-Host "  - $e" } }
         $status = Get-AITeamCodexLoginStatus
         Write-Host "- Codex installed: $($status.installed)"
         Write-Host "- Codex logged in: $($status.loggedIn)"
@@ -91,7 +101,8 @@ switch ($Command) {
     'usage' {
         $index = Join-Path $StateRoot 'runs-index.jsonl'
         if (-not (Test-Path -LiteralPath $index -PathType Leaf)) { Write-Host 'No run history yet.'; break }
-        $totalIn=[int64]0; $totalCached=[int64]0; $totalOut=[int64]0; $runs=0
+        $totalIn=[int64]0; $totalCached=[int64]0; $totalOut=[int64]0
+        $attempts=0; $completedCalls=0; $preGenerationRejects=0; $runsWithTokens=0; $legacyUsageRecords=0
         foreach ($line in @(Get-Content -LiteralPath $index -Encoding UTF8)) {
             if ([string]::IsNullOrWhiteSpace($line)) { continue }
             try { $row = $line | ConvertFrom-Json } catch { continue }
@@ -99,19 +110,33 @@ switch ($Command) {
             if (-not (Test-Path -LiteralPath $metricsPath -PathType Leaf)) { continue }
             try { $m = Get-Content -LiteralPath $metricsPath -Raw -Encoding UTF8 | ConvertFrom-Json } catch { continue }
             if ($null -eq $m.usageTelemetry) { continue }
-            $modelCalls = 0
-            if ($null -ne $m.usageTelemetry.PSObject.Properties['modelCalls']) { $modelCalls = [int]$m.usageTelemetry.modelCalls }
-            if ($modelCalls -le 0) { continue }
-            if ($null -ne $m.usageTelemetry.PSObject.Properties['inputTokens']) { $totalIn += [int64]$m.usageTelemetry.inputTokens }
-            if ($null -ne $m.usageTelemetry.PSObject.Properties['cachedInputTokens']) { $totalCached += [int64]$m.usageTelemetry.cachedInputTokens }
-            if ($null -ne $m.usageTelemetry.PSObject.Properties['outputTokens']) { $totalOut += [int64]$m.usageTelemetry.outputTokens }
-            $runs++
+            $u = $m.usageTelemetry
+            $in=[int64]0; $cached=[int64]0; $out=[int64]0
+            if ($null -ne $u.PSObject.Properties['inputTokens']) { $in = [int64]$u.inputTokens; $totalIn += $in }
+            if ($null -ne $u.PSObject.Properties['cachedInputTokens']) { $cached = [int64]$u.cachedInputTokens; $totalCached += $cached }
+            if ($null -ne $u.PSObject.Properties['outputTokens']) { $out = [int64]$u.outputTokens; $totalOut += $out }
+            if (($in + $cached + $out) -gt 0) { $runsWithTokens++ }
+
+            if ($null -ne $u.PSObject.Properties['modelAttempts']) {
+                $attempts += [int]$u.modelAttempts
+                if ($null -ne $u.PSObject.Properties['modelCalls']) { $completedCalls += [int]$u.modelCalls }
+                if ($null -ne $u.PSObject.Properties['apiRejectedBeforeGeneration']) { $preGenerationRejects += [int]$u.apiRejectedBeforeGeneration }
+            }
+            elseif ($null -ne $u.PSObject.Properties['modelCalls'] -and [int]$u.modelCalls -gt 0) {
+                # Historical V3.3.3 records counted an attempted CLI invocation as a
+                # model call even when the API rejected the schema before generation.
+                $legacyUsageRecords++
+            }
         }
         Write-Host 'DIRECT CODEX TOKEN TELEMETRY'
-        Write-Host "- measured model-backed runs: $runs"
+        Write-Host "- Codex attempts (V3.3.4+): $attempts"
+        Write-Host "- completed model calls (V3.3.4+): $completedCalls"
+        Write-Host "- pre-generation API rejects (V3.3.4+): $preGenerationRejects"
+        Write-Host "- runs with measured tokens: $runsWithTokens"
         Write-Host "- input tokens: $totalIn"
         Write-Host "- cached input tokens: $totalCached"
         Write-Host "- output tokens: $totalOut"
+        if ($legacyUsageRecords -gt 0) { Write-Host "- legacy pre-V3.3.4 usage records with old call semantics: $legacyUsageRecords" }
         Write-Host '- weekly allowance percentage is not inferred; record UI snapshots with: erp-ai-team allowance 79'
         break
     }
