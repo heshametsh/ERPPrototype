@@ -1,0 +1,58 @@
+name: Project Brain V1
+
+on:
+  pull_request:
+    paths:
+      - "AGENTS.md"
+      - "ERPPrototype/Documentation/08_DECISIONS_LOG.md"
+      - "ERPPrototype/Documentation/AI_AGENT_WORKFLOW_V3.md"
+      - "ERPPrototype/Documentation/brain/**"
+      - "ERPPrototype/Tools/ProjectBrain/**"
+      - "ERPPrototype/Data/**"
+      - "ERPPrototype/Migrations/**"
+      - "ERPPrototype/Components/**"
+      - "ERPPrototype/wwwroot/js/**"
+      - "ERPPrototype/ERPPrototype.IntegrationTests/**"
+      - "ERPPrototype/ERPPrototype.E2ETests/**"
+      - ".github/workflows/project-brain-check.yml"
+  push:
+    paths:
+      - "AGENTS.md"
+      - "ERPPrototype/Documentation/08_DECISIONS_LOG.md"
+      - "ERPPrototype/Documentation/AI_AGENT_WORKFLOW_V3.md"
+      - "ERPPrototype/Documentation/brain/**"
+      - "ERPPrototype/Tools/ProjectBrain/**"
+      - "ERPPrototype/Data/**"
+      - "ERPPrototype/Migrations/**"
+      - "ERPPrototype/Components/**"
+      - "ERPPrototype/wwwroot/js/**"
+      - "ERPPrototype/ERPPrototype.IntegrationTests/**"
+      - "ERPPrototype/ERPPrototype.E2ETests/**"
+      - ".github/workflows/project-brain-check.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  brain-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout exact commit
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate Project Brain structure
+        run: python ERPPrototype/Tools/ProjectBrain/validate_project_brain.py
+
+      - name: Run PartialAmount Change Mapper canary
+        run: >-
+          python ERPPrototype/Tools/ProjectBrain/change_mapper_v1.py
+          --field PartialAmount
+          --canary
+          --commit "$GITHUB_SHA"

@@ -1,10 +1,10 @@
 # 00 — Documentation Index
 
 **Status:** Current / Approved  
-**Last update:** 2026-08-20
+**Last update:** 2026-08-22
 **Audit baseline:** `00503ab`  
 **Current production runtime baseline retained:** `0f6bd3b`  
-**Latest reviewed Git HEAD:** `dc0b2b0`
+**Latest reviewed Git HEAD:** `04e0f1a`
 
 ## ترتيب الثقة عند التعارض
 
@@ -34,6 +34,8 @@
 | `08_DECISIONS_LOG.md` | سجل القرارات؛ تمت إضافة قرارات ما بعد الـAudit في أعلى الملف |
 | `09_REFACTOR_ROADMAP.md` | التاريخ السابق + ترتيب remediation الحالي في أعلى الملف |
 | `10_RELEASE_READINESS_PLAN.md` | بوابات Staging/Pilot/Production الحالية |
+| `AI_AGENT_WORKFLOW_V3.md` | نظام تشغيل فريق الـAI: Product Partner، Change Map، Specialists، Evidence Gate، Single Implementer |
+| `brain/README.md` | Project Brain V1: حدود الحقيقة، Decision Index، Field Aliases، وقواعد التحقق |
 
 ## وثائق المنتج والهندسة الأساسية
 
@@ -60,5 +62,14 @@
 - **Grid Engine selection completed on 2026-08-20:** RevoGrid Community **4.25.2** is the selected Work Orders replacement target after isolated 100k + ERP behavior gates.
 - `/work-orders` الحقيقي ما زال Tabulator 6.5.0؛ قرار RevoGrid لم يتحول بعد إلى production integration.
 - Univer comparison stopped after a real native mismatch with the approved end-of-sheet Paste rule.
-- **Current task: Gate 5A — isolated Blazor + RevoGrid real-data integration, with no production cutover.**
+- **Current Revo state:** isolated `/work-orders-revogrid-gate5b5` has Edit/Paste/History/Dirty/Filter/Sort/Header Selection/Insert-Delete/Remaining sync; real database Save and production cutover are still not implemented.
+- **Current engineering foundation task:** Project Brain V1 + `PartialAmount` Change Mapper Canary before relying on Agent routing; `DEC-040` Validation behavior is approved but not implemented yet.
 - Grid qualification evidence is retained under `wwwroot/grid-shootout/`, including `REVOGRID_FROZEN_BASELINE_2026-08-20.json`.
+
+## Project Brain V1
+
+- `08_DECISIONS_LOG.md` يظل النص المعياري الكامل للقرارات.
+- `brain/decisions-index.yaml` فهرس Structured فقط؛ الـMigration يبدأ `partial` ولا يعني غياب القرار من الفهرس أن القرار غير موجود.
+- `brain/field-aliases.yaml` يساعد الأدوات على ربط الاسم المنطقي للحقل بين C#/JSON/JavaScript/RevoGrid/DB؛ الكود الحالي يظل الحكم على الواقع المنفذ.
+- `Tools/ProjectBrain/validate_project_brain.py` يتحقق آليًا من الشكل والمراجع.
+- أول Canary معتمد لاختبار الـChange Mapper هو `PartialAmount` على baseline `04e0f1a`.

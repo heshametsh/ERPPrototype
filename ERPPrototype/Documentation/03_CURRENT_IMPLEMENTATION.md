@@ -1,3 +1,34 @@
+# CURRENT IMPLEMENTATION OVERRIDE — 2026-08-22
+
+> هذا القسم هو الوصف الأحدث للواقع الحالي، وينسخ أقسام الـOverride الأقدم عند التعارض. الكود الحالي والاختبارات في نفس الـcommit يظلان الدليل النهائي لما هو منفذ.
+
+**Latest reviewed Git HEAD:** `04e0f1a`  
+**Current reviewed source snapshot:** `ERP_REVO_FULL_REVIEW_04e0f1a.zip`
+
+## Work Orders grid state
+
+- `/work-orders` الحقيقي ما زال Tabulator 6.5.0 ولم يحدث production cutover بعد.
+- RevoGrid Community 4.25.2 يعمل في المسار المعزول `/work-orders-revogrid-gate5b5`.
+- المسار المعزول وصل فعليًا إلى Change Engine + Sheet History/Dirty separation + Paste + Excel-like Filter + dedicated Sort/Header Selection + structural Insert/Delete History + derived Remaining Amount synchronization.
+- `RemainingAmount` مشتق من `WorkOrderValue - PartialAmount` في Revo Gate ويظل server-side `WorkOrderFinancialRules` هو المرجع النهائي عند Save.
+- Gate 5B-5 لا يملك حتى الآن real database Save binding أو `/work-orders` cutover؛ هذا Gap مقصود وموثق في `DEC-038`.
+
+## Open before real Revo Save/cutover
+
+- unified working-sheet Validation foundation وفق `DEC-040` ما زال Planned؛ server validation موجود لكن السلوك الجديد للـclient لم يُنفذ بعد.
+- multi-cell value Clear/Delete في Revo Gate يحتاج إصلاح الـshared range-operation path؛ single-cell clear يعمل.
+- Filter popup search يحتاج استرجاع selection السابقة عند مسح نص البحث بدل الاحتفاظ باختيار نتائج البحث فقط.
+- stable row identity/`RowVersion` must be carried through the Revo Save path before real persistence cutover.
+- local/self-hosted pinned RevoGrid assets + MIT license remain required before production cutover.
+
+## AI engineering foundation
+
+- Project Brain V1 بدأ كـincremental structured index فوق الوثائق الحالية، وليس نظام توثيق بديل.
+- `Documentation/brain/decisions-index.yaml` يبدأ `partial`; غياب قرار منه لا يعني أن القرار غير موجود.
+- أول Change Mapper trust canary هو `PartialAmount` على baseline `04e0f1a`.
+
+---
+
 # CURRENT IMPLEMENTATION OVERRIDE — 2026-08-20
 
 > هذا القسم ينسخ أي وصف أقدم لحالة Grid Engine أو “Current task” عند التعارض. الكود الحالي يظل الحقيقة لما هو منفذ.

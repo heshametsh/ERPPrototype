@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "formatNote": "JSON-compatible YAML is used in V1 so humans and Python stdlib can read the same file without a YAML dependency.",
+  "fields": {
+    "WorkOrderValue": {
+      "aliasesByLayer": {
+        "csharp": ["WorkOrderValue"],
+        "json": ["workOrderValue"],
+        "javascript": ["workOrderValue"],
+        "revogrid": ["workOrderValue"],
+        "database": ["WorkOrderValue"]
+      },
+      "lastVerification": {
+        "status": "verified",
+        "verifiedAtCommit": "04e0f1a"
+      }
+    },
+    "PartialAmount": {
+      "aliasesByLayer": {
+        "csharp": ["PartialAmount"],
+        "json": ["partialAmount"],
+        "javascript": ["partialAmount"],
+        "revogrid": ["partialAmount"],
+        "database": ["PartialAmount"]
+      },
+      "lastVerification": {
+        "status": "verified",
+        "verifiedAtCommit": "04e0f1a"
+      }
+    },
+    "RemainingAmount": {
+      "aliasesByLayer": {
+        "csharp": ["RemainingAmount"],
+        "json": ["remainingAmount"],
+        "javascript": ["remainingAmount"],
+        "revogrid": ["remainingAmount"],
+        "database": []
+      },
+      "lastVerification": {
+        "status": "verified",
+        "verifiedAtCommit": "04e0f1a",
+        "decisionReference": "DEC-039"
+      }
+    }
+  }
+}

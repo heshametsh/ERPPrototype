@@ -1,0 +1,159 @@
+{
+  "schemaVersion": 1,
+  "migrationStatus": "partial",
+  "migrationNote": "V1 intentionally indexes only decisions needed by the first Work Orders/RevoGrid/Validation canary. Absence from this file is not proof that no decision exists; while migrationStatus is partial, fall back to 08_DECISIONS_LOG.md.",
+  "indexedAgainstCommit": "04e0f1a",
+  "decisions": {
+    "DEC-030": {
+      "decisionStatus": "accepted",
+      "recordedAtCommit": null,
+      "indexedAtCommit": "04e0f1a",
+      "decisionScope": {
+        "areas": [
+          "WorkOrders"
+        ],
+        "components": [
+          "GridEngine",
+          "RevoGrid"
+        ],
+        "fields": []
+      },
+      "lastKnownImplementation": {
+        "status": "partial",
+        "context": "RevoGrid selected and isolated gates exist; /work-orders production cutover is not complete",
+        "verifiedAtCommit": "04e0f1a"
+      },
+      "doc": "../08_DECISIONS_LOG.md",
+      "heading": "DEC-030"
+    },
+    "DEC-033": {
+      "decisionStatus": "accepted",
+      "recordedAtCommit": null,
+      "indexedAtCommit": "04e0f1a",
+      "decisionScope": {
+        "areas": [
+          "WorkOrders"
+        ],
+        "components": [
+          "SheetHistory",
+          "DirtyBaseline",
+          "ChangeEngine"
+        ],
+        "fields": []
+      },
+      "lastKnownImplementation": {
+        "status": "implemented",
+        "context": "RevoGrid Gate 5B path",
+        "verifiedAtCommit": "04e0f1a"
+      },
+      "doc": "../08_DECISIONS_LOG.md",
+      "heading": "DEC-033"
+    },
+    "DEC-035": {
+      "decisionStatus": "accepted",
+      "recordedAtCommit": null,
+      "indexedAtCommit": "04e0f1a",
+      "decisionScope": {
+        "areas": [
+          "WorkOrders"
+        ],
+        "components": [
+          "Paste",
+          "SheetHistory",
+          "RevoGrid"
+        ],
+        "fields": []
+      },
+      "lastKnownImplementation": {
+        "status": "implemented",
+        "context": "RevoGrid Gate 5B path",
+        "verifiedAtCommit": "04e0f1a"
+      },
+      "doc": "../08_DECISIONS_LOG.md",
+      "heading": "DEC-035"
+    },
+    "DEC-038": {
+      "decisionStatus": "accepted",
+      "recordedAtCommit": null,
+      "indexedAtCommit": "04e0f1a",
+      "decisionScope": {
+        "areas": [
+          "WorkOrders"
+        ],
+        "components": [
+          "FilterSnapshot",
+          "SortSnapshot",
+          "RowStructure",
+          "SheetHistory",
+          "RevoGrid"
+        ],
+        "fields": []
+      },
+      "lastKnownImplementation": {
+        "status": "implemented",
+        "context": "RevoGrid Gate 5B-5; production Save/cutover explicitly not included",
+        "verifiedAtCommit": "04e0f1a"
+      },
+      "doc": "../08_DECISIONS_LOG.md",
+      "heading": "DEC-038"
+    },
+    "DEC-039": {
+      "decisionStatus": "accepted",
+      "recordedAtCommit": "04e0f1a",
+      "indexedAtCommit": "04e0f1a",
+      "decisionScope": {
+        "areas": [
+          "WorkOrders"
+        ],
+        "components": [
+          "FinancialRules",
+          "DerivedFields",
+          "RevoGrid"
+        ],
+        "fields": [
+          "WorkOrderValue",
+          "PartialAmount",
+          "RemainingAmount"
+        ]
+      },
+      "lastKnownImplementation": {
+        "status": "implemented",
+        "context": "RevoGrid Gate 5B-5 derived Remaining synchronization",
+        "verifiedAtCommit": "04e0f1a"
+      },
+      "doc": "../08_DECISIONS_LOG.md",
+      "heading": "DEC-039"
+    },
+    "DEC-040": {
+      "decisionStatus": "approved",
+      "recordedAtCommit": "04e0f1a",
+      "indexedAtCommit": "04e0f1a",
+      "decisionScope": {
+        "areas": [
+          "WorkOrders"
+        ],
+        "components": [
+          "Validation",
+          "SaveGate",
+          "BulkEdit"
+        ],
+        "fields": [
+          "WorkOrderNumber",
+          "WorkTypeCode",
+          "AssignmentDate",
+          "WorkOrderValue",
+          "PartialAmount",
+          "RemainingAmount",
+          "CustomColumns"
+        ]
+      },
+      "lastKnownImplementation": {
+        "status": "planned",
+        "context": "Unified RevoGrid working-sheet validation foundation; server validation already exists but the approved soft client behavior is not yet implemented",
+        "verifiedAtCommit": null
+      },
+      "doc": "../08_DECISIONS_LOG.md",
+      "heading": "DEC-040"
+    }
+  }
+}

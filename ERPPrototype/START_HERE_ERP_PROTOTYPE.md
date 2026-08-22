@@ -1,3 +1,26 @@
+# CURRENT HANDOFF — 2026-08-22
+
+> **هذا هو ملخص البدء الأحدث.** أي Handoff أقدم أسفل الملف يبقى تاريخيًا عند التعارض.
+
+**Latest reviewed Git HEAD:** `04e0f1a`  
+**Current `/work-orders` engine:** Tabulator 6.5.0 — ما زال live/fallback.  
+**Current Revo target:** RevoGrid Community 4.25.2 on `/work-orders-revogrid-gate5b5`.  
+**Revo state:** Edit/Paste/History/Dirty/Filter/Sort/Header Selection/Insert-Delete/Remaining sync موجودة في المسار المعزول؛ real database Save/cutover غير منفذ بعد.  
+**Approved next product behavior:** `DEC-040` soft working-sheet Validation؛ التنفيذ لم يبدأ بعد.  
+**Current engineering foundation task:** Project Brain V1 + `PartialAmount` Change Mapper Canary قبل الاعتماد على Agent routing.
+
+## اقرأ أولًا الآن
+
+1. `Documentation/00_DOCUMENTATION_INDEX.md`
+2. `Documentation/03_CURRENT_IMPLEMENTATION.md`
+3. `Documentation/08_DECISIONS_LOG.md`
+4. `Documentation/AI_AGENT_WORKFLOW_V3.md`
+5. `Documentation/brain/README.md`
+6. `Documentation/05_WORK_ORDERS_GRID_BEHAVIOUR.md` عند أي Work Orders behavior change
+7. `Documentation/06_REGRESSION_TEST_CHECKLIST.md` قبل إغلاق أي تغيير
+
+---
+
 # CURRENT HANDOFF — 2026-08-20
 
 > **هذا القسم هو الحالة الحالية المعتمدة.** أي خطة أقدم أسفل الملف تُعامل كتاريخ إذا تعارضت مع هذا القسم أو مع `Documentation/12_ENGINEERING_AUDIT_REPORT.md`.

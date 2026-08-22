@@ -482,8 +482,21 @@
 ## DEC-039 — Remaining Amount stays an ERP-derived field across Revo data actions
 
 - **Date:** 2026-08-22
-- **Status:** Pending manual acceptance
+- **Status:** Accepted
 - **Decision:** `Remaining Amount` remains derived from `Work Order Value - Partial Amount`; it is not independently editable or persisted.
 - **Revo behavior:** accepted Cell Edit/Paste updates recalculate the affected row immediately. Undo/Redo replay recalculates the same derived value after the underlying financial input is restored. The grid source is not replaced; existing row objects are updated and the Revo `rgRow` viewport is refreshed.
 - **History/Dirty rule:** only the employee-edited financial input enters data History/Dirty. `Remaining Amount` is a consequence of that action, not a second user action, and therefore never adds a separate Undo step or Save delta.
 - **Architecture rule:** the money calculation is kept in ERP browser rules rather than Revo FormulaPlugin. Revo Community remains the renderer/edit host; server-side `WorkOrderFinancialRules` remains authoritative at Save.
+
+
+## DEC-040 — Soft working-sheet validation keeps invalid values visible and blocks Save
+
+- **Date:** 2026-08-22
+- **Status:** Approved product behavior; implementation planned.
+- **Decision:** invalid values entered manually or through bulk/range operations may remain visible in the working sheet and are marked invalid. The employee may continue working, but Save is blocked until all validation errors are corrected.
+- **Consistency rule:** manual Edit and Paste/range operations follow the same soft-validation product behavior; the implementation must not create separate contradictory validation semantics per input method.
+- **Bulk History rule:** one bulk operation remains one Sheet History action even when it contains one or more invalid cells.
+- **Financial rule:** if `PartialAmount > WorkOrderValue` or another invalid financial state makes `RemainingAmount` misleading, `RemainingAmount` is blank/uncomputed until the financial inputs are corrected.
+- **Required-data rule:** a row may be temporarily incomplete while the employee is preparing it, but Save remains the final gate for required fields.
+- **Authority rule:** browser validation provides working feedback only. Server/database validation remains authoritative and must still reject invalid persisted data.
+- **Implementation state:** the unified RevoGrid client validation foundation is not implemented yet at baseline `04e0f1a`; existing server financial validation is evidence for persistence rules, not proof that this client behavior already exists.
