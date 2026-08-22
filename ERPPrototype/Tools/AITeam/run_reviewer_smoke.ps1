@@ -33,7 +33,7 @@ if ($null -eq $config.roles.PSObject.Properties[$Role]) { throw "Unknown reviewe
 $roleConfig = $config.roles.PSObject.Properties[$Role].Value
 if ([string]$roleConfig.class -ne 'engineering') { throw "Reviewer smoke requires an engineering reviewer role; got $Role." }
 
-$run = New-AITeamRun -RepoRoot $RepoRoot -MissionId "$TestId-RSMK-$Role" -MissionName "Reviewer smoke: $TestId / $Role" -Mode 'reviewer-smoke' -StateRoot $StateRoot
+$run = New-AITeamRun -RepoRoot $RepoRoot -MissionId "$TestId-RSMK-$Role" -MissionName "Reviewer smoke: $TestId / $Role" -Mode ([string]$mission.mode) -StateRoot $StateRoot
 $runDir = [string]$run.runDirectory
 $phaseMs = [ordered]@{}
 $runCompleted = $false

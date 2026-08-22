@@ -93,7 +93,7 @@ try {
     # V3.3 local-first file/config checks (no Codex model call).
 $configPath = Join-Path $RepoRoot '.ai\team-config.json'
 $config = Get-Content -LiteralPath $configPath -Raw -Encoding UTF8 | ConvertFrom-Json
-if ([string]$config.teamVersion -ne '3.4.1') { throw "Expected AI Team 3.4, found $($config.teamVersion)." }
+if ([string]$config.teamVersion -ne '3.4.3') { throw "Expected AI Team 3.4.3, found $($config.teamVersion)." }
 foreach ($rel in @(
     'ERPPrototype\Tools\AITeam\AITeamCli.ps1',
     'ERPPrototype\Tools\AITeam\AITeamCodex.psm1',
@@ -134,6 +134,27 @@ if (@($reviewerSmokeParseErrors).Count -gt 0) {
     throw "Reviewer smoke runner parse failed: $(@($reviewerSmokeParseErrors | ForEach-Object { $_.Message }) -join ' | ')"
 }
 if ($cliText -notmatch "'smoke-reviewer'") { throw 'AI Team CLI does not expose smoke-reviewer.' }
+
+
+# V3.4.3: execution subtypes (for example reviewer-smoke) are not mission
+# modes. Keep the canonical run-mode contract explicit here instead of parsing
+# the ValidateSet declaration with a regex. Under Set-StrictMode, the old regex
+# accidentally expanded `$Mode` while constructing the pattern on PowerShell
+# 5.1, so the compatibility test failed before any Codex call.
+$allowedRunModes = @('review','product','deterministic')
+$runnerFiles = Get-ChildItem -LiteralPath (Join-Path $RepoRoot 'ERPPrototype\Tools\AITeam') -Filter 'run_*.ps1' -File
+foreach ($runnerFile in $runnerFiles) {
+    $runnerText = Get-Content -LiteralPath $runnerFile.FullName -Raw -Encoding UTF8
+    foreach ($m in [regex]::Matches($runnerText, "-Mode\s+'(?<mode>[^']+)'")) {
+        $literalMode = [string]$m.Groups['mode'].Value
+        if ($allowedRunModes -notcontains $literalMode) {
+            throw "Runner $($runnerFile.Name) hard-codes unsupported New-AITeamRun mode '$literalMode'. Allowed: $($allowedRunModes -join ', ')."
+        }
+    }
+}
+if ((Get-Content -LiteralPath $reviewerSmokePath -Raw -Encoding UTF8) -match "-Mode\s+'reviewer-smoke'") {
+    throw 'Reviewer smoke must preserve the underlying mission mode when creating its run.'
+}
 
 # V3.4 local-first hybrid router: the qualification suite must route locally
 # without invoking Codex. Hidden oracles are used only here, after each local
@@ -249,6 +270,7 @@ Write-Host 'AI TEAM RUNTIME COMPATIBILITY: PASS'
     Write-Host '- Native STDERR capture (PowerShell 5.1): PASS'
     Write-Host '- Router-only smoke runner parse/CLI wiring: PASS'
     Write-Host '- Single-reviewer smoke runner parse/CLI wiring: PASS'
+    Write-Host '- Runner mode contract (review/product/deterministic): PASS'
     Write-Host '- Local router rules: PASS'
     Write-Host "- Local router qualification: PASS ($localQualificationCount model missions, 0 Codex calls)"
     Write-Host '- Local router ambiguity fallback canary: PASS'
