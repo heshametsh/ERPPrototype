@@ -35,3 +35,10 @@ Filter refresh verification added 2026-08-21:
 - Re-Apply the unchanged 401 filter hides the non-matching inserted row.
 - Undo restores that pre-Apply snapshot without undoing the Insert.
 - Redo refreshes the filter result again.
+
+
+Multi-row verification added 2026-08-22:
+- Open Insert Rows..., enter 3, and insert Below through the real dialog.
+- One Undo removes all 3 inserted rows; one Redo restores all 3.
+- Select 3 visible rows, right-click inside that selection, and Delete Selected Rows.
+- One Delete removes all 3 selected row identities; one Undo restores all 3.

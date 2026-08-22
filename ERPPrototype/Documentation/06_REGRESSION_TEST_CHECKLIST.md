@@ -783,15 +783,18 @@ Include:
 
 #### Gate 5B-5 — Insert/Delete Rows + structural Dirty/History
 
-- [ ] `/grid-shootout/revogrid-row-structure-state-lab.html` reports **PASS 12 / FAIL 0**.
+- [ ] `/grid-shootout/revogrid-row-structure-state-lab.html` reports **PASS 15 / FAIL 0**.
 - [ ] `/work-orders-revogrid-gate5b5` loads the same real employee/year dataset as Gate 5B-4.
 - [ ] Right-click a selected row and Insert Above/Below: exactly one blank row appears in the requested visible position and row count increases by one.
+- [ ] `Insert Rows...` accepts an explicit positive whole-number count (for example 20), then inserts that many rows Above or Below the target. The count is independent of the current selection size.
+- [ ] A multi-row Insert is exactly one Sheet History action: one Undo removes the whole batch and one Redo restores the same ClientKeys/DisplayOrders together.
 - [ ] The new row gets a unique temporary `ClientKey`; loaded rows keep their existing session ClientKeys. Database `Id` is still not required before Save.
 - [ ] Normal Insert allocates `DisplayOrder` between the target row's real source neighbors. Repeated insertion into a depleted local gap redistributes only the necessary neighborhood.
 - [ ] With Filter active, Insert remains visible under/above the target until the employee explicitly applies/changes Filter again. Editing the new row does not make it disappear automatically.
 - [ ] With Sort active, Insert remains in the requested visible position while the employee edits it. Edit/Paste/Undo do not auto-resort the sheet; explicit Sort interaction recalculates ordering.
 - [ ] Opening Filter after edits/insert reads the current values. Values no longer present in the current data are not kept as stale picker candidates.
 - [ ] Delete Selected Rows removes exactly the selected visible row identities, including under Filter/Sort; hidden rows are never deleted implicitly.
+- [ ] Select several visible rows, then right-click inside that selection: `Delete Selected Rows` deletes the whole selected range as one action. Right-clicking a row outside the selection deletes only that right-clicked row.
 - [ ] One Insert adds exactly one Sheet History entry and structural Dirty. Ctrl+Z removes that unsaved row and returns the structural delta to Baseline; Ctrl+Y restores the same ClientKey/DisplayOrder row.
 - [ ] One multi-row Delete adds exactly one Sheet History entry. Undo restores the same rows to their prior source/proxy/visible positions; Redo removes the same identities again.
 - [ ] Dirty blocks year switching after Insert/Delete. Undo back to Clean allows the year switch and old History is cleared as already approved.

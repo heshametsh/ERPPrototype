@@ -6,7 +6,7 @@ import { createRevoGridExcelFilter } from "./revoGridExcelFilter.js?v=20260821-g
 import { createRevoGridSort } from "./revoGridSort.js?v=20260821-gate5b5-row-structure-2";
 import { createRevoGridColumnSelection } from "./revoGridColumnSelection.js?v=20260821-gate5b4-keyboard-sort-1";
 import { createRevoGridSelectionLifecycle } from "./revoGridSelectionLifecycle.js?v=20260821-gate5b4-keyboard-sort-1";
-import { createRevoGridRowStructure } from "./revoGridRowStructure.js?v=20260821-gate5b5-row-structure-2";
+import { createRevoGridRowStructure } from "./revoGridRowStructure.js?v=20260822-gate5b5-multirow-1";
 
 const bindings = new Map();
 

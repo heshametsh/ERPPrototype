@@ -213,7 +213,7 @@ public partial class WorkOrdersRevoGridNativeGate5A
         try
         {
             var gridModulePath = EnableChangeEngine
-                ? "./js/revoGridGate5B1.js?v=20260821-gate5b5-filter-refresh-1"
+                ? "./js/revoGridGate5B1.js?v=20260822-gate5b5-multirow-1"
                 : "./js/revoGridNativeGate5A.js?v=20260821-gate5b5-filter-refresh-1";
 
             GridModule ??=

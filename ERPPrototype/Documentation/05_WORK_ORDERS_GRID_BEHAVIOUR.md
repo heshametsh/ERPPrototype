@@ -62,8 +62,9 @@ Insertion is Excel-like:
 
 - Select any cell in a row.
 - Insert above or below from the top button or right-click menu.
-- A multi-row range determines the insertion boundary.
-- Multiple rows can be inserted.
+- The row targeted by the Insert command determines the insertion boundary.
+- `Insert 1 Row Above/Below` inserts one row only.
+- `Insert Rows...` asks for an explicit row count; selection size never determines how many rows are inserted.
 - Deleting rows requires confirmation.
 - Unsaved new rows have temporary negative Ids/client keys.
 - Saved rows receive database Ids.

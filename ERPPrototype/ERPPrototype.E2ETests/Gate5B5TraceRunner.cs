@@ -89,9 +89,49 @@ internal static class Gate5B5TraceRunner
 
             await WaitForRenderedCellAsync(page, 0);
             await InstallEventRecorderAsync(page);
+            page.Dialog += AcceptDialog;
 
             await CaptureStepAsync(page, steps, timelinePath, "01-baseline");
             var baselineCount = await GetSourceCountAsync(page);
+
+            // Real UI: Insert Rows... asks for an explicit count. All inserted
+            // rows must be one Sheet History action.
+            await OpenRowMenuAsync(page, visibleRowIndex: 2);
+            await OpenInsertRowsDialogAsync(page);
+            await SubmitInsertRowsDialogAsync(page, count: 3, position: "below");
+            await WaitForSourceCountAsync(page, baselineCount + 3);
+            await PauseForTraceAsync(page);
+            await CaptureStepAsync(page, steps, timelinePath, "02-insert-3-rows-dialog");
+
+            await page.Locator("#revogrid-gate5b1-undo").ClickAsync();
+            await WaitForSourceCountAsync(page, baselineCount);
+            await PauseForTraceAsync(page);
+            await CaptureStepAsync(page, steps, timelinePath, "03-undo-insert-3-one-step");
+
+            await page.Locator("#revogrid-gate5b1-redo").ClickAsync();
+            await WaitForSourceCountAsync(page, baselineCount + 3);
+            await PauseForTraceAsync(page);
+            await CaptureStepAsync(page, steps, timelinePath, "04-redo-insert-3-one-step");
+
+            await page.Locator("#revogrid-gate5b1-undo").ClickAsync();
+            await WaitForSourceCountAsync(page, baselineCount);
+            await PauseForTraceAsync(page);
+            await CaptureStepAsync(page, steps, timelinePath, "05-clean-after-batch-insert-undo");
+
+            // Select three real visible rows, then right-click inside that range
+            // without left-clicking again. The context menu must preserve the
+            // original multi-row range and delete all three in one action.
+            await SelectVisibleRowRangeAsync(page, startVisibleRowIndex: 2, endVisibleRowIndex: 4);
+            await OpenRowMenuOnCurrentSelectionAsync(page, visibleRowIndex: 3);
+            await ClickVisibleRowMenuButtonAsync(page, "Delete Selected Rows");
+            await WaitForSourceCountAsync(page, baselineCount - 3);
+            await PauseForTraceAsync(page);
+            await CaptureStepAsync(page, steps, timelinePath, "06-delete-3-selected-rows");
+
+            await page.Locator("#revogrid-gate5b1-undo").ClickAsync();
+            await WaitForSourceCountAsync(page, baselineCount);
+            await PauseForTraceAsync(page);
+            await CaptureStepAsync(page, steps, timelinePath, "07-undo-delete-3-one-step");
 
             // Real UI: right-click a rendered cell and insert below it.
             await OpenRowMenuAsync(page, visibleRowIndex: 2);
@@ -120,7 +160,6 @@ internal static class Gate5B5TraceRunner
                     "The inserted temporary row is not visible after Redo.");
             }
 
-            page.Dialog += AcceptDialog;
             await OpenRowMenuAsync(page, tempVisibleIndex);
             await ClickVisibleRowMenuButtonAsync(page, "Delete Selected Rows");
             await WaitForSourceCountAsync(page, baselineCount);
@@ -365,7 +404,7 @@ internal static class Gate5B5TraceRunner
                 const store = await grid.getSourceStore('rgRow');
                 const focused = await grid.getFocused();
                 const selectedRange = await grid.getSelectedRange();
-                const module = await import('/js/revoGridGate5B1.js?v=20260821-gate5b5-filter-refresh-1');
+                const module = await import('/js/revoGridGate5B1.js?v=20260822-gate5b5-multirow-1');
                 const diagnostics = await module.getDiagnostics(hostId);
 
                 const row = item => ({
@@ -421,6 +460,7 @@ internal static class Gate5B5TraceRunner
                         undoText: document.getElementById('revogrid-gate5b1-undo-count')?.textContent ?? null,
                         redoText: document.getElementById('revogrid-gate5b1-redo-count')?.textContent ?? null,
                         rowMenuOpen: Boolean(document.querySelector('.erp-revo-row-menu:not([hidden])')),
+                        insertRowsDialogOpen: Boolean(document.querySelector('.erp-revo-insert-rows-dialog:not([hidden])')),
                         filterPopupOpen: Boolean(document.querySelector('.erp-revo-excel-filter')),
                         filterButtons,
                         sortButtons
@@ -578,6 +618,76 @@ internal static class Gate5B5TraceRunner
         await menu.Locator($"button:has-text(\"{text}\")").ClickAsync();
     }
 
+    private static async Task SelectVisibleRowRangeAsync(
+        IPage page,
+        int startVisibleRowIndex,
+        int endVisibleRowIndex)
+    {
+        await ClickVisibleCellAsync(page, startVisibleRowIndex);
+        await WaitForRenderedCellAsync(page, endVisibleRowIndex);
+
+        await page.Keyboard.DownAsync("Shift");
+        try
+        {
+            await DataCell(page, endVisibleRowIndex).ClickAsync();
+        }
+        finally
+        {
+            await page.Keyboard.UpAsync("Shift");
+        }
+
+        await PauseForTraceAsync(page, 200);
+    }
+
+    private static async Task OpenRowMenuOnCurrentSelectionAsync(
+        IPage page,
+        int visibleRowIndex)
+    {
+        await WaitForRenderedCellAsync(page, visibleRowIndex);
+        await DataCell(page, visibleRowIndex).ClickAsync(
+            new LocatorClickOptions { Button = MouseButton.Right });
+
+        await page.Locator(".erp-revo-row-menu:not([hidden])").WaitForAsync(
+            new LocatorWaitForOptions
+            {
+                State = WaitForSelectorState.Visible,
+                Timeout = 10_000
+            });
+    }
+
+    private static async Task OpenInsertRowsDialogAsync(IPage page)
+    {
+        await ClickVisibleRowMenuButtonAsync(page, "Insert Rows...");
+        await page.Locator(".erp-revo-insert-rows-dialog:not([hidden])").WaitForAsync(
+            new LocatorWaitForOptions
+            {
+                State = WaitForSelectorState.Visible,
+                Timeout = 10_000
+            });
+    }
+
+    private static async Task SubmitInsertRowsDialogAsync(
+        IPage page,
+        int count,
+        string position)
+    {
+        var dialog = page.Locator(".erp-revo-insert-rows-dialog:not([hidden])");
+        var input = dialog.Locator("input[type=\"number\"]");
+        await input.FillAsync(count.ToString());
+
+        var buttonText = string.Equals(position, "above", StringComparison.OrdinalIgnoreCase)
+            ? "Insert Above"
+            : "Insert Below";
+        await dialog.Locator($"button:has-text(\"{buttonText}\")").ClickAsync();
+
+        await dialog.WaitForAsync(
+            new LocatorWaitForOptions
+            {
+                State = WaitForSelectorState.Hidden,
+                Timeout = 10_000
+            });
+    }
+
     private static async Task ApplySingleWorkTypeFilterAsync(IPage page, string value)
     {
         await page.Locator(
@@ -675,7 +785,11 @@ internal static class Gate5B5TraceRunner
             "Each recorded step was performed against the real Gate 5B-5 page through browser UI.",
             "",
             "Important review target:",
-            "- Step 11 inserts a blank row while Work Type = 401 is active and keeps it visible.",
+            "- Step 02 uses the real Insert Rows... dialog to add 3 rows in one command.",
+            "- Step 03 Undo removes all 3 rows in one History action; Step 04 Redo restores all 3.",
+            "- Step 06 right-clicks inside a 3-row selection and Delete must remove all 3 selected rows.",
+            "- Step 07 Undo restores all 3 deleted rows in one History action.",
+            "- Later filtered Insert keeps a blank row visible until the employee reapplies the filter.",
             "- Step 12 presses Apply again without changing the filter selection; the blank row must disappear.",
             "- Step 13 Undo restores the exact pre-Apply working snapshot without undoing the Insert.",
             "- Step 14 Redo hides the non-matching inserted row again.",

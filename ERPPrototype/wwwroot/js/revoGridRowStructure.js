@@ -1,6 +1,7 @@
 const HISTORY_ADAPTER_KEY = "work-orders-row-structure";
 const MENU_STYLE_ID = "erp-revogrid-row-structure-style";
 const MENU_CLASS = "erp-revo-row-menu";
+const INSERT_DIALOG_CLASS = "erp-revo-insert-rows-dialog";
 const DISPLAY_ORDER_STEP = 1_000_000_000;
 const FILTER_TRIMMED_TYPE = "filter";
 
@@ -156,6 +157,110 @@ export function planDisplayOrderInsertion(rows, insertIndex, step = DISPLAY_ORDE
     throw new Error("Unable to allocate DisplayOrder for the new row.");
 }
 
+
+export function planDisplayOrderBatchInsertion(
+    rows,
+    insertIndex,
+    requestedCount,
+    step = DISPLAY_ORDER_STEP
+) {
+    const source = Array.isArray(rows) ? rows : [];
+    const index = Math.max(0, Math.min(source.length, Number(insertIndex) || 0));
+    const count = Number(requestedCount);
+
+    if (!Number.isInteger(count) || count < 1) {
+        throw new Error("Insert row count must be a positive integer.");
+    }
+
+    const previous = index > 0 ? displayOrderOf(source[index - 1]) : 0;
+    const next = index < source.length ? displayOrderOf(source[index]) : null;
+
+    if (next === null) {
+        return {
+            newOrders: Array.from(
+                { length: count },
+                (_, offset) => previous + step * (offset + 1)
+            ),
+            adjustments: []
+        };
+    }
+
+    const directInterval = Math.floor((next - previous) / (count + 1));
+    if (directInterval >= 1) {
+        return {
+            newOrders: Array.from(
+                { length: count },
+                (_, offset) => previous + directInterval * (offset + 1)
+            ),
+            adjustments: []
+        };
+    }
+
+    const orderByKey = new Map(
+        source.map(row => [rowKey(row), displayOrderOf(row)])
+    );
+
+    for (let radius = 1; radius <= source.length + 1; radius *= 2) {
+        const left = Math.max(0, index - radius);
+        const right = Math.min(source.length, index + radius);
+        const leftBoundary = left > 0 ? displayOrderOf(source[left - 1]) : 0;
+        const rightBoundary = right < source.length
+            ? displayOrderOf(source[right])
+            : null;
+        const existingCount = right - left;
+        const slots = existingCount + count;
+
+        let interval;
+        if (rightBoundary === null) {
+            interval = step;
+        } else {
+            const available = rightBoundary - leftBoundary;
+            interval = Math.floor(available / (slots + 1));
+            if (interval < 1) {
+                if (left === 0 && right === source.length) {
+                    interval = step;
+                } else {
+                    continue;
+                }
+            }
+        }
+
+        const sequence = [];
+        for (let i = left; i < index; i += 1) {
+            sequence.push({ kind: "existing", key: rowKey(source[i]) });
+        }
+        for (let i = 0; i < count; i += 1) {
+            sequence.push({ kind: "new", newIndex: i });
+        }
+        for (let i = index; i < right; i += 1) {
+            sequence.push({ kind: "existing", key: rowKey(source[i]) });
+        }
+
+        const newOrders = new Array(count);
+        const adjustments = [];
+        sequence.forEach((item, offset) => {
+            const order = leftBoundary + interval * (offset + 1);
+            if (item.kind === "new") {
+                newOrders[item.newIndex] = order;
+                return;
+            }
+
+            const before = orderByKey.get(item.key);
+            if (before !== order) {
+                adjustments.push({
+                    clientKey: item.key,
+                    before,
+                    after: order
+                });
+            }
+        });
+
+        return { newOrders, adjustments };
+    }
+
+    throw new Error("Unable to allocate DisplayOrder values for the new rows.");
+}
+
 function injectStyles() {
     if (document.getElementById(MENU_STYLE_ID)) {
         return;
@@ -193,6 +298,74 @@ function injectStyles() {
         .${MENU_CLASS} button:hover { background: #eef7fc; color: #0b5f95; }
         .${MENU_CLASS} button[data-danger="true"] { color: #a52a2a; }
         .${MENU_CLASS}__separator { height: 1px; margin: 5px 3px; background: #dce5eb; }
+        .${INSERT_DIALOG_CLASS} {
+            position: fixed;
+            inset: 0;
+            z-index: 5100;
+            display: grid;
+            place-items: center;
+            background: rgba(15, 42, 70, .18);
+            font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+        }
+        .${INSERT_DIALOG_CLASS}[hidden] { display: none; }
+        .${INSERT_DIALOG_CLASS}__card {
+            width: min(360px, calc(100vw - 32px));
+            padding: 16px;
+            border: 1px solid #b9c8d4;
+            border-radius: 10px;
+            background: #fff;
+            box-shadow: 0 18px 42px rgba(15, 42, 70, .22);
+        }
+        .${INSERT_DIALOG_CLASS}__title {
+            margin: 0 0 12px;
+            color: #173047;
+            font-size: 1rem;
+            font-weight: 700;
+        }
+        .${INSERT_DIALOG_CLASS} label {
+            display: block;
+            margin-bottom: 6px;
+            color: #40596d;
+            font-size: .84rem;
+            font-weight: 650;
+        }
+        .${INSERT_DIALOG_CLASS} input {
+            box-sizing: border-box;
+            width: 100%;
+            padding: 8px 10px;
+            border: 1px solid #aebfcb;
+            border-radius: 7px;
+            font: inherit;
+        }
+        .${INSERT_DIALOG_CLASS}__error {
+            min-height: 18px;
+            margin-top: 6px;
+            color: #a52a2a;
+            font-size: .78rem;
+        }
+        .${INSERT_DIALOG_CLASS}__actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            justify-content: flex-end;
+            margin-top: 10px;
+        }
+        .${INSERT_DIALOG_CLASS}__actions button {
+            padding: 8px 12px;
+            border: 1px solid #b9c8d4;
+            border-radius: 7px;
+            background: #fff;
+            color: #173047;
+            font: inherit;
+            font-size: .84rem;
+            font-weight: 650;
+            cursor: pointer;
+        }
+        .${INSERT_DIALOG_CLASS}__actions button[data-primary="true"] {
+            border-color: #0b78b5;
+            background: #0b78b5;
+            color: #fff;
+        }
     `;
     document.head.appendChild(style);
 }
@@ -252,24 +425,43 @@ function keysFromPhysical(source, indexes) {
     return result;
 }
 
-export function composeViewAfterInsert(view, targetKey, newKey, position) {
-    const offset = position === "above" ? 0 : 1;
-    const sourceIndex = Math.max(0, view.sourceKeys.indexOf(targetKey) + offset);
+export function composeViewAfterInsertMany(view, targetKey, newKeys, position) {
+    const keys = Array.isArray(newKeys) ? newKeys : [];
+    if (keys.length === 0) {
+        throw new Error("At least one inserted row key is required.");
+    }
+
+    const targetSourceIndex = view.sourceKeys.indexOf(targetKey);
     const proxyBase = view.proxyKeys.indexOf(targetKey);
     const visibleBase = view.visibleKeys.indexOf(targetKey);
-
-    if (sourceIndex < 0 || proxyBase < 0 || visibleBase < 0) {
+    if (targetSourceIndex < 0 || proxyBase < 0 || visibleBase < 0) {
         throw new Error("Insert target is not present in the current Revo view.");
     }
 
+    const offset = position === "above" ? 0 : 1;
+    const sourceIndex = targetSourceIndex + offset;
+    const proxyIndex = proxyBase + offset;
+    const visibleIndex = visibleBase + offset;
+
+    const sourceKeys = [...view.sourceKeys];
+    sourceKeys.splice(sourceIndex, 0, ...keys);
+    const proxyKeys = [...view.proxyKeys];
+    proxyKeys.splice(proxyIndex, 0, ...keys);
+    const visibleKeys = [...view.visibleKeys];
+    visibleKeys.splice(visibleIndex, 0, ...keys);
+
     return {
-        sourceKeys: insertAt(view.sourceKeys, sourceIndex, newKey),
-        proxyKeys: insertAt(view.proxyKeys, proxyBase + offset, newKey),
-        visibleKeys: insertAt(view.visibleKeys, visibleBase + offset, newKey),
+        sourceKeys,
+        proxyKeys,
+        visibleKeys,
         sourceIndex,
-        proxyIndex: proxyBase + offset,
-        visibleIndex: visibleBase + offset
+        proxyIndex,
+        visibleIndex
     };
+}
+
+export function composeViewAfterInsert(view, targetKey, newKey, position) {
+    return composeViewAfterInsertMany(view, targetKey, [newKey], position);
 }
 
 export function composeViewAfterDelete(view, removedKeys) {
@@ -304,15 +496,44 @@ export function createRevoGridRowStructure(options) {
     let busy = false;
     let rowCount = Array.isArray(options?.rows) ? options.rows.length : 0;
     let menuContext = null;
+    let insertDialogContext = null;
+    let pendingRightClickContext = null;
     const removers = [];
 
     const menu = document.createElement("div");
     menu.className = MENU_CLASS;
     menu.hidden = true;
 
+    const insertDialog = document.createElement("div");
+    insertDialog.className = INSERT_DIALOG_CLASS;
+    insertDialog.hidden = true;
+    insertDialog.innerHTML = `
+        <div class="${INSERT_DIALOG_CLASS}__card" role="dialog" aria-modal="true" aria-labelledby="erp-revo-insert-rows-title">
+            <h3 class="${INSERT_DIALOG_CLASS}__title" id="erp-revo-insert-rows-title">Insert Rows</h3>
+            <label for="erp-revo-insert-rows-count">Number of rows</label>
+            <input id="erp-revo-insert-rows-count" type="number" min="1" step="1" value="1" inputmode="numeric" />
+            <div class="${INSERT_DIALOG_CLASS}__error" aria-live="polite"></div>
+            <div class="${INSERT_DIALOG_CLASS}__actions">
+                <button type="button" data-action="cancel">Cancel</button>
+                <button type="button" data-action="above" data-primary="true">Insert Above</button>
+                <button type="button" data-action="below" data-primary="true">Insert Below</button>
+            </div>
+        </div>
+    `;
+    const insertCountInput = insertDialog.querySelector("input");
+    const insertDialogError = insertDialog.querySelector(`.${INSERT_DIALOG_CLASS}__error`);
+
     const hideMenu = () => {
         menu.hidden = true;
         menuContext = null;
+    };
+
+    const hideInsertDialog = () => {
+        insertDialog.hidden = true;
+        insertDialogContext = null;
+        if (insertDialogError) {
+            insertDialogError.textContent = "";
+        }
     };
 
     const addListener = (target, type, handler, listenerOptions) => {
@@ -385,18 +606,21 @@ export function createRevoGridRowStructure(options) {
         excelFilter?.replaceRows?.(nextRows);
     }
 
-    function rowTransitionsForInsert(row, adjustments, direction) {
+    function rowTransitionsForInsert(rows, adjustments, direction) {
+        const insertedRows = Array.isArray(rows) ? rows : [rows];
         const transitions = adjustments.map(item => ({
             clientKey: item.clientKey,
             before: { exists: true, displayOrder: direction === "forward" ? item.before : item.after },
             after: { exists: true, displayOrder: direction === "forward" ? item.after : item.before }
         }));
 
-        transitions.push({
-            clientKey: rowKey(row),
-            before: direction === "forward" ? rowState(row, false) : rowState(row, true),
-            after: direction === "forward" ? rowState(row, true) : rowState(row, false)
-        });
+        for (const row of insertedRows) {
+            transitions.push({
+                clientKey: rowKey(row),
+                before: direction === "forward" ? rowState(row, false) : rowState(row, true),
+                after: direction === "forward" ? rowState(row, true) : rowState(row, false)
+            });
+        }
         return transitions;
     }
 
@@ -410,58 +634,76 @@ export function createRevoGridRowStructure(options) {
 
     async function applyInsertPayload(payload, direction) {
         const view = await captureView();
-        const row = cloneValue(payload.row);
-        const key = rowKey(row);
+        const rows = Array.isArray(payload?.rows)
+            ? payload.rows.map(cloneValue)
+            : payload?.row
+                ? [cloneValue(payload.row)]
+                : [];
+        if (rows.length === 0) {
+            throw new Error("Inserted row payload is empty.");
+        }
+
+        const keys = rows.map(rowKey);
         const targetKey = requireText(payload.targetKey, "targetKey");
+        const adjustments = Array.isArray(payload?.adjustments)
+            ? payload.adjustments
+            : [];
 
         if (direction === "undo") {
-            const currentSource = view.source;
-            const removed = currentSource.find(item => rowKey(item) === key);
-            if (!removed) {
-                throw new Error(`Inserted row '${key}' is not present for Undo.`);
+            const currentKeys = new Set(view.sourceKeys);
+            for (const key of keys) {
+                if (!currentKeys.has(key)) {
+                    throw new Error(`Inserted row '${key}' is not present for Undo.`);
+                }
             }
 
-            const nextRows = currentSource
-                .filter(item => rowKey(item) !== key)
+            const removedSet = new Set(keys);
+            const nextRows = view.source
+                .filter(item => !removedSet.has(rowKey(item)))
                 .map(item => {
-                    const adjustment = payload.adjustments.find(
+                    const adjustment = adjustments.find(
                         candidate => candidate.clientKey === rowKey(item)
                     );
                     return adjustment
                         ? { ...item, displayOrder: adjustment.before }
                         : item;
                 });
-            const nextView = composeViewAfterDelete(view, [key]);
+            const nextView = composeViewAfterDelete(view, keys);
             await applyView(nextRows, nextView.proxyKeys, nextView.visibleKeys);
             changeBridge.applyRowChanges(
-                rowTransitionsForInsert(row, payload.adjustments, "reverse")
+                rowTransitionsForInsert(rows, adjustments, "reverse")
             );
             await grid.clearFocus();
             return;
         }
 
-        if (view.sourceKeys.includes(key)) {
-            throw new Error(`Inserted row '${key}' already exists for Redo.`);
+        const currentKeys = new Set(view.sourceKeys);
+        for (const key of keys) {
+            if (currentKeys.has(key)) {
+                throw new Error(`Inserted row '${key}' already exists for Redo.`);
+            }
         }
 
-        const nextView = composeViewAfterInsert(
+        const nextView = composeViewAfterInsertMany(
             view,
             targetKey,
-            key,
+            keys,
             payload.position
         );
-        let nextRows = insertAt(view.source, nextView.sourceIndex, row);
-        nextRows = nextRows.map(item => {
-            const adjustment = payload.adjustments.find(
+        const adjustedRows = view.source.map(item => {
+            const adjustment = adjustments.find(
                 candidate => candidate.clientKey === rowKey(item)
             );
             return adjustment
                 ? { ...item, displayOrder: adjustment.after }
                 : item;
         });
+        const nextRows = [...adjustedRows];
+        nextRows.splice(nextView.sourceIndex, 0, ...rows);
+
         await applyView(nextRows, nextView.proxyKeys, nextView.visibleKeys);
         changeBridge.applyRowChanges(
-            rowTransitionsForInsert(row, payload.adjustments, "forward")
+            rowTransitionsForInsert(rows, adjustments, "forward")
         );
         await grid.clearFocus();
     }
@@ -538,15 +780,36 @@ export function createRevoGridRowStructure(options) {
         }
     );
 
-    async function resolveMenuContext() {
+    function visibleRowIndexFromPointerEvent(event) {
+        const path = typeof event?.composedPath === "function"
+            ? event.composedPath()
+            : [];
+        for (const node of path) {
+            const raw = node?.dataset?.rgrow ?? node?.dataset?.rgRow;
+            if (raw !== undefined) {
+                const index = Number(raw);
+                if (Number.isInteger(index) && index >= 0) {
+                    return index;
+                }
+            }
+        }
+        return null;
+    }
+
+    async function resolveMenuContext(clickedVisibleIndex = null) {
         const visible = await grid.getVisibleSource("rgRow");
         const focused = await grid.getFocused();
         const range = await grid.getSelectedRange();
 
         const focusedKey = String(focused?.model?.clientKey ?? "").trim();
-        let targetKey = focusedKey || null;
+        const clickedRow = Number.isInteger(clickedVisibleIndex)
+            ? visible[clickedVisibleIndex]
+            : null;
+        const clickedKey = clickedRow ? rowKey(clickedRow) : null;
 
+        let targetKey = clickedKey || focusedKey || null;
         const selectedKeys = [];
+
         if (range && Number.isInteger(range.y) && Number.isInteger(range.y1)) {
             const start = Math.max(0, Math.min(range.y, range.y1));
             const end = Math.min(visible.length - 1, Math.max(range.y, range.y1));
@@ -558,27 +821,63 @@ export function createRevoGridRowStructure(options) {
             }
         }
 
-        if (targetKey && selectedKeys.length > 0 && !selectedKeys.includes(targetKey)) {
+        const uniqueSelected = [...new Set(selectedKeys)];
+
+        // Spreadsheet-style context: right-click inside the current range keeps
+        // the whole range. Right-click outside it targets only the clicked row.
+        if (clickedKey) {
+            if (uniqueSelected.length > 0 && uniqueSelected.includes(clickedKey)) {
+                return {
+                    targetKey: clickedKey,
+                    selectedKeys: uniqueSelected,
+                    preserveRange: {
+                        x: range.x,
+                        y: range.y,
+                        x1: range.x1,
+                        y1: range.y1,
+                        colType: range.colType ?? "rgCol",
+                        rowType: range.rowType ?? "rgRow"
+                    }
+                };
+            }
+            return {
+                targetKey: clickedKey,
+                selectedKeys: [clickedKey]
+            };
+        }
+
+        if (targetKey && uniqueSelected.length > 0 && !uniqueSelected.includes(targetKey)) {
             return { targetKey, selectedKeys: [targetKey] };
         }
-        if (!targetKey && selectedKeys.length > 0) {
-            targetKey = selectedKeys[0];
+        if (!targetKey && uniqueSelected.length > 0) {
+            targetKey = uniqueSelected[0];
         }
 
         return {
             targetKey,
-            selectedKeys: [...new Set(selectedKeys.length ? selectedKeys : targetKey ? [targetKey] : [])]
+            selectedKeys: uniqueSelected.length
+                ? uniqueSelected
+                : targetKey
+                    ? [targetKey]
+                    : []
         };
     }
 
-    async function insertRelative(position) {
-        if (busy || !menuContext?.targetKey) {
+    async function insertRelative(position, requestedCount = 1, explicitContext = null) {
+        const count = Number(requestedCount);
+        const context = explicitContext ?? menuContext;
+
+        if (busy || !context?.targetKey) {
             return false;
         }
-        const context = menuContext;
+        if (!Number.isInteger(count) || count < 1) {
+            throw new Error("Insert row count must be a positive integer.");
+        }
+
         busy = true;
         notifyState();
         hideMenu();
+        hideInsertDialog();
 
         try {
             const view = await captureView();
@@ -589,10 +888,19 @@ export function createRevoGridRowStructure(options) {
             }
 
             const insertIndex = targetIndex + (position === "above" ? 0 : 1);
-            const plan = planDisplayOrderInsertion(view.source, insertIndex);
-            const row = createBlankRow(plan.newOrder);
-            const key = rowKey(row);
-            const nextView = composeViewAfterInsert(view, targetKey, key, position);
+            const plan = planDisplayOrderBatchInsertion(
+                view.source,
+                insertIndex,
+                count
+            );
+            const rows = plan.newOrders.map(order => createBlankRow(order));
+            const keys = rows.map(rowKey);
+            const nextView = composeViewAfterInsertMany(
+                view,
+                targetKey,
+                keys,
+                position
+            );
 
             const adjustedRows = view.source.map(item => {
                 const adjustment = plan.adjustments.find(
@@ -602,24 +910,31 @@ export function createRevoGridRowStructure(options) {
                     ? { ...item, displayOrder: adjustment.after }
                     : item;
             });
-            const nextRows = insertAt(adjustedRows, nextView.sourceIndex, row);
+            const nextRows = [...adjustedRows];
+            nextRows.splice(nextView.sourceIndex, 0, ...rows);
 
             await applyView(nextRows, nextView.proxyKeys, nextView.visibleKeys);
             changeBridge.applyRowChanges(
-                rowTransitionsForInsert(row, plan.adjustments, "forward")
+                rowTransitionsForInsert(rows, plan.adjustments, "forward")
             );
+
+            const label = count === 1
+                ? position === "above"
+                    ? "Insert Row Above"
+                    : "Insert Row Below"
+                : `Insert ${count} Rows ${position === "above" ? "Above" : "Below"}`;
 
             try {
                 historyCoordinator.record({
                     adapterKey: HISTORY_ADAPTER_KEY,
-                    kind: "row-insert",
-                    label: position === "above" ? "Insert Row Above" : "Insert Row Below",
+                    kind: count === 1 ? "row-insert" : "row-insert-batch",
+                    label,
                     focusTarget: null,
                     payload: {
                         action: "insert",
                         position,
                         targetKey,
-                        row: cloneValue(row),
+                        rows: cloneValue(rows),
                         adjustments: cloneValue(plan.adjustments)
                     }
                 });
@@ -628,7 +943,7 @@ export function createRevoGridRowStructure(options) {
                     action: "insert",
                     position,
                     targetKey,
-                    row,
+                    rows,
                     adjustments: plan.adjustments
                 }, "undo");
                 throw error;
@@ -715,9 +1030,56 @@ export function createRevoGridRowStructure(options) {
         }
     }
 
+    function openInsertRowsDialog() {
+        if (busy || !menuContext?.targetKey) {
+            return;
+        }
+        insertDialogContext = {
+            targetKey: menuContext.targetKey,
+            selectedKeys: [...menuContext.selectedKeys]
+        };
+        hideMenu();
+        if (insertCountInput) {
+            insertCountInput.value = "1";
+        }
+        if (insertDialogError) {
+            insertDialogError.textContent = "";
+        }
+        insertDialog.hidden = false;
+        queueMicrotask(() => {
+            insertCountInput?.focus();
+            insertCountInput?.select();
+        });
+    }
+
+    async function submitInsertRows(position) {
+        const raw = String(insertCountInput?.value ?? "").trim();
+        const count = Number(raw);
+        if (!Number.isInteger(count) || count < 1) {
+            if (insertDialogError) {
+                insertDialogError.textContent = "Enter a whole number greater than zero.";
+            }
+            insertCountInput?.focus();
+            return;
+        }
+
+        const context = insertDialogContext;
+        try {
+            await insertRelative(position, count, context);
+        } catch (error) {
+            if (insertDialogError) {
+                insertDialogError.textContent = error?.message || "Unable to insert rows.";
+            }
+            insertDialog.hidden = false;
+            insertDialogContext = context;
+            throw error;
+        }
+    }
+
     menu.append(
         createMenuButton("Insert 1 Row Above", () => void insertRelative("above")),
-        createMenuButton("Insert 1 Row Below", () => void insertRelative("below"))
+        createMenuButton("Insert 1 Row Below", () => void insertRelative("below")),
+        createMenuButton("Insert Rows...", openInsertRowsDialog)
     );
     const separator = document.createElement("div");
     separator.className = `${MENU_CLASS}__separator`;
@@ -725,34 +1087,93 @@ export function createRevoGridRowStructure(options) {
     menu.append(
         createMenuButton("Delete Selected Rows", () => void deleteSelection(), true)
     );
-    document.body.appendChild(menu);
+    document.body.append(menu);
+    document.body.appendChild(insertDialog);
+
+    insertDialog.querySelector('[data-action="cancel"]')?.addEventListener(
+        "click",
+        hideInsertDialog
+    );
+    insertDialog.querySelector('[data-action="above"]')?.addEventListener(
+        "click",
+        () => void submitInsertRows("above")
+    );
+    insertDialog.querySelector('[data-action="below"]')?.addEventListener(
+        "click",
+        () => void submitInsertRows("below")
+    );
+    insertDialog.addEventListener("keydown", event => {
+        if (event.key === "Escape") {
+            event.preventDefault();
+            hideInsertDialog();
+        }
+    });
+
+    const onGridPointerDown = event => {
+        if (event.button !== 2) {
+            pendingRightClickContext = null;
+            return;
+        }
+
+        const clickedVisibleIndex = visibleRowIndexFromPointerEvent(event);
+        // pointerdown precedes Revo's mousedown focus handling. Capture the
+        // current range here so a right-click inside a multi-row selection does
+        // not collapse the delete context to one row.
+        pendingRightClickContext = resolveMenuContext(clickedVisibleIndex)
+            .catch(() => null);
+    };
 
     const onContextMenu = event => {
         event.preventDefault();
         const x = event.clientX;
         const y = event.clientY;
-        void resolveMenuContext().then(context => {
-            if (destroyed || !context.targetKey) {
-                hideMenu();
-                return;
-            }
-            menuContext = context;
-            positionMenu(menu, x, y);
-        });
+        const clickedVisibleIndex = visibleRowIndexFromPointerEvent(event);
+        const captured = pendingRightClickContext;
+        pendingRightClickContext = null;
+
+        void Promise.resolve(captured)
+            .then(context => context ?? resolveMenuContext(clickedVisibleIndex))
+            .then(async context => {
+                if (destroyed || !context?.targetKey) {
+                    hideMenu();
+                    return;
+                }
+
+                menuContext = context;
+                if (context.preserveRange && typeof grid.setCellsFocus === "function") {
+                    await grid.setCellsFocus(
+                        {
+                            x: context.preserveRange.x,
+                            y: context.preserveRange.y
+                        },
+                        {
+                            x: context.preserveRange.x1,
+                            y: context.preserveRange.y1
+                        },
+                        context.preserveRange.colType,
+                        context.preserveRange.rowType
+                    );
+                }
+                positionMenu(menu, x, y);
+            });
     };
 
     const onDocumentPointerDown = event => {
-        if (menu.hidden) {
-            return;
-        }
         const path = typeof event.composedPath === "function"
             ? event.composedPath()
             : [];
-        if (!path.includes(menu)) {
+
+        if (!menu.hidden && !path.includes(menu)) {
             hideMenu();
+        }
+        if (!insertDialog.hidden && !path.includes(insertDialog)) {
+            // The dialog owns its backdrop, so clicks on the backdrop itself do
+            // not silently choose a row action.
+            return;
         }
     };
 
+    addListener(grid, "pointerdown", onGridPointerDown, true);
     addListener(grid, "contextmenu", onContextMenu);
     addListener(grid, "viewportscroll", hideMenu);
     addListener(document, "pointerdown", onDocumentPointerDown, true);
@@ -760,6 +1181,8 @@ export function createRevoGridRowStructure(options) {
 
     async function resetDataset(nextRows, nextDatasetKey) {
         hideMenu();
+        hideInsertDialog();
+        pendingRightClickContext = null;
         datasetKey = requireText(nextDatasetKey, "datasetKey");
         rowCount = Array.isArray(nextRows) ? nextRows.length : 0;
         busy = false;
@@ -771,7 +1194,8 @@ export function createRevoGridRowStructure(options) {
             datasetKey,
             structureBusy: busy,
             rowCount,
-            menuOpen: !menu.hidden
+            menuOpen: !menu.hidden,
+            insertDialogOpen: !insertDialog.hidden
         };
     }
 
@@ -780,6 +1204,8 @@ export function createRevoGridRowStructure(options) {
             return;
         }
         hideMenu();
+        hideInsertDialog();
+        pendingRightClickContext = null;
         for (const remove of removers.splice(0)) {
             try {
                 remove();
@@ -791,6 +1217,7 @@ export function createRevoGridRowStructure(options) {
         } catch {
         }
         menu.remove();
+        insertDialog.remove();
         destroyed = true;
     }
 
@@ -804,5 +1231,6 @@ export function createRevoGridRowStructure(options) {
 export const revoGridRowStructureInternals = Object.freeze({
     HISTORY_ADAPTER_KEY,
     DISPLAY_ORDER_STEP,
-    FILTER_TRIMMED_TYPE
+    FILTER_TRIMMED_TYPE,
+    INSERT_DIALOG_CLASS
 });
