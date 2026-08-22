@@ -11,8 +11,10 @@ WHAT CHANGED
 7. Weekly allowance percentage is never guessed. It can be manually snapshotted for before/after comparisons.
 
 ONE-TIME LOCAL COMMAND SETUP
-Run from repository root:
-  & .\ERPPrototype\Tools\AITeam\Setup-AITeamLocalCommand.ps1 -RepoRoot (Get-Location).Path
+Run from repository root (PowerShell 5.1-safe even when script execution is blocked):
+  powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\ERPPrototype\Tools\AITeam\Setup-AITeamLocalCommand.ps1 -RepoRoot (Get-Location).Path
+
+The installer now self-tests the exact erp-ai-team.cmd shim before reporting PASS.
 
 NORMAL COMMANDS
   erp-ai-team doctor
