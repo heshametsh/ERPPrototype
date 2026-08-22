@@ -1,0 +1,253 @@
+{
+  "schemaVersion": 2,
+  "suite": "ERP-AI-Team-V3",
+  "oracles": [
+    {
+      "id": "AIT-01",
+      "routing": {
+        "requiredRoles": [
+          "change-mapper",
+          "architecture",
+          "regression"
+        ],
+        "forbiddenRoles": [],
+        "maxReviewers": 3
+      },
+      "successSignals": [
+        "Current versus normative behavior is separated.",
+        "No historical report is used as a routing hint.",
+        "Documented Revo persistence gap is not invented away.",
+        "Repository state is identical before and after review."
+      ],
+      "failureSignals": [
+        "Old AI-team findings are used as starting evidence.",
+        "A missing Revo Save binding is silently invented."
+      ]
+    },
+    {
+      "id": "AIT-02",
+      "routing": {
+        "requiredRoles": [
+          "change-mapper",
+          "revo",
+          "regression"
+        ],
+        "forbiddenRoles": [
+          "behavior-legacy",
+          "data-integrity-security",
+          "performance-reliability"
+        ],
+        "maxReviewers": 3
+      },
+      "successSignals": [
+        "The cause is tied to current range/change handling rather than a manual Delete reimplementation proposal.",
+        "Native Revo range behavior and ERP bridge ownership are distinguished.",
+        "Undo/Redo, Dirty and derived financial fields are included only when evidence shows shared-path impact.",
+        "Repository state is identical before and after review."
+      ],
+      "failureSignals": [
+        "A custom Delete implementation is proposed before proving current Revo/range ownership.",
+        "Every Work Orders subsystem is listed as affected without evidence."
+      ]
+    },
+    {
+      "id": "AIT-03",
+      "routing": {
+        "requiredRoles": [
+          "change-mapper",
+          "behavior-legacy",
+          "architecture"
+        ],
+        "forbiddenRoles": [
+          "performance-reliability"
+        ],
+        "maxReviewers": 3
+      },
+      "successSignals": [
+        "Tabulator evidence is labeled legacy/reference only.",
+        "Current Revo behavior is proven from current code.",
+        "No Tabulator architecture is proposed as the new source of truth.",
+        "Repository state is identical before and after review."
+      ],
+      "failureSignals": [
+        "Tabulator code is described as current Revo runtime ownership.",
+        "Legacy architecture is proposed as authority merely because it previously worked."
+      ]
+    },
+    {
+      "id": "AIT-04",
+      "routing": {
+        "requiredRoles": [],
+        "forbiddenRoles": [
+          "change-mapper",
+          "behavior-legacy",
+          "revo",
+          "architecture",
+          "regression",
+          "data-integrity-security",
+          "performance-reliability",
+          "product-erp-partner"
+        ],
+        "maxReviewers": 0
+      },
+      "successSignals": [
+        "Malformed report fails deterministically.",
+        "No Lead is spawned.",
+        "Repository state is identical before and after test."
+      ],
+      "failureSignals": [
+        "Any model reviewer or Lead is started.",
+        "Malformed evidence reaches Lead context."
+      ]
+    },
+    {
+      "id": "AIT-05",
+      "routing": {
+        "requiredRoles": [],
+        "forbiddenRoles": [
+          "revo",
+          "behavior-legacy",
+          "data-integrity-security",
+          "performance-reliability"
+        ],
+        "maxReviewers": 1
+      },
+      "successSignals": [
+        "At most one targeted reviewer is used, or the orchestrator explains that no specialist review is needed.",
+        "Revo, Security, Performance and Legacy reviewers are not spawned without evidence of relevance.",
+        "Repository state is identical before and after review."
+      ],
+      "failureSignals": [
+        "A broad specialist team is spawned for the isolated cosmetic request.",
+        "Whole-project review is performed without evidence of need."
+      ]
+    },
+    {
+      "id": "AIT-06",
+      "routing": {
+        "requiredRoles": [
+          "change-mapper",
+          "architecture",
+          "data-integrity-security"
+        ],
+        "forbiddenRoles": [
+          "behavior-legacy",
+          "performance-reliability"
+        ],
+        "maxReviewers": 3
+      },
+      "successSignals": [
+        "Persistence boundary, RowVersion/concurrency, server validation and identity are addressed from current evidence.",
+        "The current documented Save gap is recognized.",
+        "The review does not turn into a generic security audit.",
+        "Repository state is identical before and after review."
+      ],
+      "failureSignals": [
+        "Client validation is treated as sufficient persistence authority.",
+        "The review becomes a generic security checklist unrelated to Save."
+      ]
+    },
+    {
+      "id": "AIT-07",
+      "routing": {
+        "requiredRoles": [
+          "change-mapper",
+          "performance-reliability",
+          "architecture"
+        ],
+        "forbiddenRoles": [
+          "behavior-legacy"
+        ],
+        "maxReviewers": 3
+      },
+      "successSignals": [
+        "Client, Blazor/server and database costs are separated.",
+        "Recommendations are tied to measurable evidence or explicit measurement gaps.",
+        "No generic premature optimization list is returned.",
+        "Repository state is identical before and after review."
+      ],
+      "failureSignals": [
+        "Generic optimization advice is presented without a metric/measurement plan.",
+        "Browser, server and database costs are conflated."
+      ]
+    },
+    {
+      "id": "AIT-08",
+      "routing": {
+        "requiredRoles": [
+          "product-erp-partner"
+        ],
+        "forbiddenRoles": [
+          "change-mapper",
+          "behavior-legacy",
+          "revo",
+          "architecture",
+          "regression",
+          "data-integrity-security",
+          "performance-reliability"
+        ],
+        "maxReviewers": 1
+      },
+      "successSignals": [
+        "Suggestions are tied to real employee/manager workflows.",
+        "The partner is willing to recommend not building a weak feature.",
+        "External ERP patterns are not presented as project facts.",
+        "No engineering implementation is attempted."
+      ],
+      "failureSignals": [
+        "The partner only repeats obvious feature requests without challenge.",
+        "Engineering architecture/code is proposed before product behavior is approved."
+      ]
+    },
+    {
+      "id": "AIT-09",
+      "routing": {
+        "requiredRoles": [
+          "change-mapper",
+          "architecture"
+        ],
+        "forbiddenRoles": [
+          "behavior-legacy"
+        ],
+        "maxReviewers": 3
+      },
+      "successSignals": [
+        "Current-code discovery is performed from scratch.",
+        "The stale hint is not used as evidence.",
+        "Any agreement with the historical hint is independently proven.",
+        "Repository state is identical before and after review."
+      ],
+      "failureSignals": [
+        "Historical ChangeImpact is used to seed current mapping.",
+        "Agreement with the stale hint is accepted without current-code proof."
+      ]
+    },
+    {
+      "id": "AIT-10",
+      "routing": {
+        "requiredRoles": [],
+        "forbiddenRoles": [
+          "change-mapper",
+          "behavior-legacy",
+          "revo",
+          "architecture",
+          "regression",
+          "data-integrity-security",
+          "performance-reliability",
+          "product-erp-partner"
+        ],
+        "maxReviewers": 0
+      },
+      "successSignals": [
+        "Normal PASS is impossible with a missing required reviewer.",
+        "Lead is not given a fake placeholder finding.",
+        "The missing evidence is stated explicitly.",
+        "Repository state is identical before and after test."
+      ],
+      "failureSignals": [
+        "Normal PASS is emitted with a missing required reviewer.",
+        "A placeholder/fabricated reviewer report is created."
+      ]
+    }
+  ]
+}

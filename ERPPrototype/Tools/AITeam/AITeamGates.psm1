@@ -76,6 +76,7 @@ function Get-AITeamRepoState {
         repoRoot = $root
         head = $head
         branch = $branch
+        isClean = [string]::IsNullOrWhiteSpace($status)
         fingerprint = $fingerprint
         statusSha256 = $payload.statusSha256
         trackedDiffSha256 = $payload.trackedDiffSha256
@@ -126,12 +127,53 @@ function Compare-AITeamRepoState {
     }
 }
 
+function Test-AITeamEvidenceLocation {
+    param(
+        [Parameter(Mandatory)][string]$RepoRoot,
+        [Parameter(Mandatory)][string]$Location
+    )
+
+    if ($Location -notmatch '^(?<file>.+):(?<line>[1-9][0-9]*)$') {
+        return [pscustomobject][ordered]@{ pass=$false; error='evidence location must be file:line'; file=$null; line=$null }
+    }
+
+    $root = [System.IO.Path]::GetFullPath($RepoRoot)
+    $rootPrefix = $root.TrimEnd([System.IO.Path]::DirectorySeparatorChar, [System.IO.Path]::AltDirectorySeparatorChar) + [System.IO.Path]::DirectorySeparatorChar
+    $rel = $Matches.file
+    $lineNo = [int]$Matches.line
+    $full = [System.IO.Path]::GetFullPath((Join-Path $root $rel))
+
+    if (-not $full.StartsWith($rootPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+        return [pscustomobject][ordered]@{ pass=$false; error="evidence escapes repo: $rel"; file=$rel; line=$lineNo }
+    }
+    if (-not (Test-Path -LiteralPath $full -PathType Leaf)) {
+        return [pscustomobject][ordered]@{ pass=$false; error="evidence file missing: $rel"; file=$rel; line=$lineNo }
+    }
+
+    try { $lines = [System.IO.File]::ReadAllLines($full) }
+    catch { return [pscustomobject][ordered]@{ pass=$false; error="cannot read evidence file: $rel"; file=$rel; line=$lineNo } }
+
+    if ($lineNo -gt $lines.Length) {
+        return [pscustomobject][ordered]@{ pass=$false; error="evidence line $lineNo > $($lines.Length): $rel"; file=$rel; line=$lineNo }
+    }
+
+    $lineText = [string]$lines[$lineNo - 1]
+    return [pscustomobject][ordered]@{
+        pass = $true
+        error = $null
+        file = $rel
+        line = $lineNo
+        lineSha256 = Get-AITeamSha256Text -Text $lineText
+    }
+}
+
 function Test-AITeamFindingReport {
     param(
         [Parameter(Mandatory)][string]$ReportPath,
         [Parameter(Mandatory)][string]$RepoRoot,
         [Parameter(Mandatory)][string]$ExpectedSha,
-        [Parameter(Mandatory)][string]$ExpectedMission
+        [Parameter(Mandatory)][string]$ExpectedMission,
+        [string]$ExpectedRole
     )
 
     $errors = New-Object System.Collections.Generic.List[string]
@@ -140,28 +182,54 @@ function Test-AITeamFindingReport {
     }
     catch {
         $errors.Add("cannot parse report JSON: $($_.Exception.Message)")
-        return [pscustomobject][ordered]@{ pass=$false; errors=@($errors); agentRole=$null; findingCount=0; leadView=$null }
+        return [pscustomobject][ordered]@{ pass=$false; errors=@($errors); agentRole=$null; findingCount=0; leadView=$null; evidenceDigests=@() }
     }
 
-    $required = @('schemaVersion','agentRole','mission','commitSha','summary','findings','confidenceTelemetry')
+    $required = @('schemaVersion','agentRole','mission','commitSha','summary','coverage','findings','confidenceTelemetry')
     $props = @($data.PSObject.Properties.Name)
     foreach ($key in $required) {
         if ($props -notcontains $key) { $errors.Add("missing required field $key") }
     }
 
-    if ($props -contains 'schemaVersion' -and [int]$data.schemaVersion -ne 1) {
-        $errors.Add('wrong schemaVersion')
+    if ($props -contains 'schemaVersion' -and [int]$data.schemaVersion -ne 2) {
+        $errors.Add('wrong schemaVersion; expected 2')
     }
     if ($props -contains 'mission' -and [string]$data.mission -ne $ExpectedMission) {
         $errors.Add("mission '$($data.mission)' does not match expected '$ExpectedMission'")
     }
     if ($props -contains 'commitSha') {
         $got = [string]$data.commitSha
-        if (-not (Test-AITeamCommitSha -Value $got)) {
-            $errors.Add("commitSha '$got' is invalid")
+        if ($got -notmatch '^[0-9a-fA-F]{40}$') {
+            $errors.Add("commitSha '$got' must be the full 40-character Git SHA")
         }
-        elseif (-not ($got.ToLowerInvariant().StartsWith($ExpectedSha.ToLowerInvariant()) -or $ExpectedSha.ToLowerInvariant().StartsWith($got.ToLowerInvariant()))) {
+        elseif ($got.ToLowerInvariant() -ne $ExpectedSha.ToLowerInvariant()) {
             $errors.Add("commitSha '$got' does not match expected '$ExpectedSha'")
+        }
+    }
+    if (-not [string]::IsNullOrWhiteSpace($ExpectedRole) -and $props -contains 'agentRole') {
+        if ([string]$data.agentRole -ne $ExpectedRole) {
+            $errors.Add("agentRole '$($data.agentRole)' does not match expected '$ExpectedRole'")
+        }
+    }
+    if ($props -contains 'summary' -and [string]::IsNullOrWhiteSpace([string]$data.summary)) {
+        $errors.Add('summary must be non-empty')
+    }
+
+    if ($props -contains 'coverage') {
+        $coverageProps = @($data.coverage.PSObject.Properties.Name)
+        foreach ($key in @('inspectedAreas','evidenceAnchors','excludedAsIrrelevant','unresolved')) {
+            if ($coverageProps -notcontains $key) { $errors.Add("coverage.$key is required") }
+        }
+        if ($coverageProps -contains 'inspectedAreas' -and @($data.coverage.inspectedAreas).Count -eq 0) {
+            $errors.Add('coverage.inspectedAreas must contain at least one item')
+        }
+        if ($coverageProps -contains 'evidenceAnchors') {
+            $anchors = @($data.coverage.evidenceAnchors)
+            if ($anchors.Count -eq 0) { $errors.Add('coverage.evidenceAnchors must contain at least one item') }
+            foreach ($anchor in $anchors) {
+                $checkedAnchor = Test-AITeamEvidenceLocation -RepoRoot $RepoRoot -Location ([string]$anchor)
+                if (-not $checkedAnchor.pass) { $errors.Add("coverage anchor $($checkedAnchor.error)") }
+            }
         }
     }
 
@@ -169,21 +237,26 @@ function Test-AITeamFindingReport {
     if ($props -contains 'findings') { $findings = @($data.findings) }
     if ($findings.Count -gt 5) { $errors.Add('findings must contain at most 5 items') }
 
-    $root = [System.IO.Path]::GetFullPath($RepoRoot)
-    $rootPrefix = $root.TrimEnd([System.IO.Path]::DirectorySeparatorChar, [System.IO.Path]::AltDirectorySeparatorChar) + [System.IO.Path]::DirectorySeparatorChar
-
+    $ids = @{}
+    $evidenceDigests = @()
     for ($i=0; $i -lt $findings.Count; $i++) {
         $f = $findings[$i]
         $fProps = @($f.PSObject.Properties.Name)
-        foreach ($key in @('id','claim','evidence','impact','verification')) {
+        foreach ($key in @('id','claim','evidence','impact','verification','challenge')) {
             if ($fProps -notcontains $key) {
                 $errors.Add("finding $($i+1) missing/non-empty $key")
                 continue
             }
-            $value = $f.$key
-            if ($null -eq $value -or ([string]$value -eq '' -and $key -ne 'evidence')) {
+            if ($key -ne 'evidence' -and [string]::IsNullOrWhiteSpace([string]$f.$key)) {
                 $errors.Add("finding $($i+1) missing/non-empty $key")
             }
+        }
+
+        if ($fProps -contains 'id') {
+            $id = [string]$f.id
+            if ($id -notmatch '^[A-Z][A-Z0-9-]*-[0-9]{2}$') { $errors.Add("finding $($i+1) invalid id '$id'") }
+            elseif ($ids.ContainsKey($id)) { $errors.Add("duplicate finding id '$id'") }
+            else { $ids[$id] = $true }
         }
 
         if ($fProps -notcontains 'evidence') { continue }
@@ -192,32 +265,26 @@ function Test-AITeamFindingReport {
             $errors.Add("finding $($i+1) missing/non-empty evidence")
             continue
         }
+
         foreach ($e in $evidence) {
-            $location = [string]$e.location
-            if ($location -notmatch '^(?<file>.+):(?<line>[1-9][0-9]*)$') {
-                $errors.Add("finding $($i+1) evidence location must be file:line")
+            $eProps = @($e.PSObject.Properties.Name)
+            if ($eProps -notcontains 'location' -or [string]::IsNullOrWhiteSpace([string]$e.location)) {
+                $errors.Add("finding $($i+1) evidence missing location")
                 continue
             }
-            $rel = $Matches.file
-            $lineNo = [int]$Matches.line
-            $full = [System.IO.Path]::GetFullPath((Join-Path $root $rel))
-            if (-not $full.StartsWith($rootPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
-                $errors.Add("finding $($i+1) evidence escapes repo: $rel")
-                continue
+            if ($eProps -notcontains 'detail' -or [string]::IsNullOrWhiteSpace([string]$e.detail)) {
+                $errors.Add("finding $($i+1) evidence missing detail")
             }
-            if (-not (Test-Path -LiteralPath $full -PathType Leaf)) {
-                $errors.Add("finding $($i+1) evidence file missing: $rel")
-                continue
+            $checked = Test-AITeamEvidenceLocation -RepoRoot $RepoRoot -Location ([string]$e.location)
+            if (-not $checked.pass) {
+                $errors.Add("finding $($i+1) $($checked.error)")
             }
-            try {
-                $lineCount = [System.IO.File]::ReadAllLines($full).Length
-            }
-            catch {
-                $errors.Add("finding $($i+1) cannot read evidence file: $rel")
-                continue
-            }
-            if ($lineNo -gt $lineCount) {
-                $errors.Add("finding $($i+1) evidence line $lineNo > ${lineCount}: $rel")
+            else {
+                $evidenceDigests += [pscustomobject][ordered]@{
+                    findingId = if ($fProps -contains 'id') { [string]$f.id } else { "finding-$($i+1)" }
+                    location = [string]$e.location
+                    lineSha256 = [string]$checked.lineSha256
+                }
             }
         }
     }
@@ -233,6 +300,7 @@ function Test-AITeamFindingReport {
         agentRole = if ($props -contains 'agentRole') { [string]$data.agentRole } else { $null }
         findingCount = $findings.Count
         leadView = [pscustomobject]$lead
+        evidenceDigests = $evidenceDigests
     }
 }
 
@@ -258,6 +326,7 @@ function Test-AITeamSuite {
         [Parameter(Mandatory)][string]$SuitePath,
         [Parameter(Mandatory)][string]$OraclePath
     )
+
     $errors = New-Object System.Collections.Generic.List[string]
     try { $suite = Get-Content -LiteralPath $SuitePath -Raw -Encoding UTF8 | ConvertFrom-Json }
     catch { $errors.Add("cannot parse suite: $($_.Exception.Message)"); $suite = $null }
@@ -265,8 +334,9 @@ function Test-AITeamSuite {
     catch { $errors.Add("cannot parse oracles: $($_.Exception.Message)"); $oracle = $null }
 
     $missionIds = @{}
+    $suiteVersion = if ($null -ne $suite) { [int]$suite.schemaVersion } else { 0 }
     if ($null -ne $suite) {
-        if ([int]$suite.schemaVersion -ne 1) { $errors.Add('suite schemaVersion must be 1') }
+        if (@(1,2) -notcontains $suiteVersion) { $errors.Add('suite schemaVersion must be 1 or 2') }
         $missions = @($suite.missions)
         if ($missions.Count -eq 0) { $errors.Add('missions must be a non-empty array') }
         foreach ($m in $missions) {
@@ -281,20 +351,41 @@ function Test-AITeamSuite {
             }
             if (@('review','product','deterministic') -notcontains [string]$m.mode) { $errors.Add("$id unsupported mode $($m.mode)") }
             $names = @($m.PSObject.Properties.Name)
-            if ($names -contains 'routingHint' -or $names -contains 'successSignals') { $errors.Add("$id leaks evaluation oracle into mission file") }
+            if ($names -contains 'routingHint' -or $names -contains 'successSignals' -or $names -contains 'failureSignals') {
+                $errors.Add("$id leaks evaluation oracle into mission file")
+            }
+            if ($suiteVersion -eq 2 -and $names -contains 'webPolicy') {
+                if (@('forbidden','allowed-if-needed','required') -notcontains [string]$m.webPolicy) {
+                    $errors.Add("$id unsupported webPolicy $($m.webPolicy)")
+                }
+            }
         }
     }
 
     $oracleIds = @{}
+    $oracleVersion = if ($null -ne $oracle) { [int]$oracle.schemaVersion } else { 0 }
     if ($null -ne $oracle) {
-        if ([int]$oracle.schemaVersion -ne 1) { $errors.Add('oracle schemaVersion must be 1') }
+        if (@(1,2) -notcontains $oracleVersion) { $errors.Add('oracle schemaVersion must be 1 or 2') }
         foreach ($o in @($oracle.oracles)) {
             $id = [string]$o.id
             if ($oracleIds.ContainsKey($id)) { $errors.Add("duplicate oracle id $id") }
             $oracleIds[$id] = $true
             if (-not $missionIds.ContainsKey($id)) { $errors.Add("oracle $id has no mission") }
             $names = @($o.PSObject.Properties.Name)
-            if ($names -notcontains 'routingExpectation' -or $names -notcontains 'successSignals') { $errors.Add("oracle $id missing expectations") }
+            if ($oracleVersion -eq 1) {
+                if ($names -notcontains 'routingExpectation' -or $names -notcontains 'successSignals') { $errors.Add("oracle $id missing expectations") }
+            }
+            else {
+                if ($names -notcontains 'routing' -or $names -notcontains 'successSignals' -or $names -notcontains 'failureSignals') {
+                    $errors.Add("oracle $id missing V3 routing/success/failure expectations")
+                }
+                else {
+                    $routingNames = @($o.routing.PSObject.Properties.Name)
+                    foreach ($key in @('requiredRoles','forbiddenRoles','maxReviewers')) {
+                        if ($routingNames -notcontains $key) { $errors.Add("oracle $id routing.$key missing") }
+                    }
+                }
+            }
         }
     }
 
@@ -306,6 +397,221 @@ function Test-AITeamSuite {
         pass = ($errors.Count -eq 0)
         errors = @($errors)
         missionCount = $missionIds.Count
+        suiteSchemaVersion = $suiteVersion
+        oracleSchemaVersion = $oracleVersion
+    }
+}
+
+function Test-AITeamRoutingOracle {
+    param(
+        [Parameter(Mandatory)][string]$OraclePath,
+        [Parameter(Mandatory)][string]$TestId,
+        [string[]]$Selected = @()
+    )
+
+    $errors = New-Object System.Collections.Generic.List[string]
+    try { $oracle = Get-Content -LiteralPath $OraclePath -Raw -Encoding UTF8 | ConvertFrom-Json }
+    catch {
+        return [pscustomobject][ordered]@{ pass=$false; errors=@("cannot parse oracles: $($_.Exception.Message)"); selected=@($Selected) }
+    }
+
+    $entries = @($oracle.oracles | Where-Object { [string]$_.id -eq $TestId })
+    if ($entries.Count -ne 1) {
+        return [pscustomobject][ordered]@{ pass=$false; errors=@("oracle entry $TestId not found exactly once"); selected=@($Selected) }
+    }
+
+    $entry = $entries[0]
+    $selectedUnique = @($Selected | Select-Object -Unique)
+    if ([int]$oracle.schemaVersion -eq 1) {
+        $expected = @($entry.routingExpectation)
+        $missing = @($expected | Where-Object { $selectedUnique -notcontains $_ })
+        $extra = @($selectedUnique | Where-Object { $expected -notcontains $_ })
+        if ($missing.Count -gt 0) { $errors.Add('missing expected role(s): ' + ($missing -join ', ')) }
+        if ($extra.Count -gt 0) { $errors.Add('unexpected role(s): ' + ($extra -join ', ')) }
+        return [pscustomobject][ordered]@{
+            pass = ($errors.Count -eq 0)
+            errors = @($errors)
+            selected = $selectedUnique
+            required = $expected
+            forbiddenSelected = @()
+            maxReviewers = $expected.Count
+        }
+    }
+
+    $required = @($entry.routing.requiredRoles)
+    $forbidden = @($entry.routing.forbiddenRoles)
+    $maxReviewers = [int]$entry.routing.maxReviewers
+    $missingRequired = @($required | Where-Object { $selectedUnique -notcontains $_ })
+    $forbiddenSelected = @($selectedUnique | Where-Object { $forbidden -contains $_ })
+
+    if ($missingRequired.Count -gt 0) { $errors.Add('missing required role(s): ' + ($missingRequired -join ', ')) }
+    if ($forbiddenSelected.Count -gt 0) { $errors.Add('forbidden role(s) selected: ' + ($forbiddenSelected -join ', ')) }
+    if ($selectedUnique.Count -gt $maxReviewers) { $errors.Add("selected $($selectedUnique.Count) reviewers; max is $maxReviewers") }
+
+    return [pscustomobject][ordered]@{
+        pass = ($errors.Count -eq 0)
+        errors = @($errors)
+        selected = $selectedUnique
+        required = $required
+        missingRequired = $missingRequired
+        forbiddenSelected = $forbiddenSelected
+        maxReviewers = $maxReviewers
+    }
+}
+
+function Test-AITeamMissionPacket {
+    param(
+        [Parameter(Mandatory)][string]$PacketPath,
+        [Parameter(Mandatory)][string]$ExpectedSha
+    )
+
+    $errors = New-Object System.Collections.Generic.List[string]
+    try { $data = Get-Content -LiteralPath $PacketPath -Raw -Encoding UTF8 | ConvertFrom-Json }
+    catch {
+        return [pscustomobject][ordered]@{ pass=$false; errors=@("cannot parse Mission Packet JSON: $($_.Exception.Message)") }
+    }
+
+    $required = @('schemaVersion','runId','missionId','mission','mode','commitSha','workspaceFingerprint','objective','requiredBehaviors','decisionRefs','exclusions','webPolicy')
+    $props = @($data.PSObject.Properties.Name)
+    foreach ($key in $required) { if ($props -notcontains $key) { $errors.Add("missing required field $key") } }
+
+    if ($props -contains 'schemaVersion' -and [int]$data.schemaVersion -ne 1) { $errors.Add('Mission Packet schemaVersion must be 1') }
+    if ($props -contains 'commitSha' -and [string]$data.commitSha -ne $ExpectedSha) { $errors.Add('Mission Packet commitSha does not match expected full SHA') }
+    if ($props -contains 'workspaceFingerprint' -and [string]$data.workspaceFingerprint -notmatch '^[0-9a-fA-F]{64}$') { $errors.Add('Mission Packet workspaceFingerprint must be a 64-character SHA256') }
+    if ($props -contains 'mode' -and @('review','product','deterministic') -notcontains [string]$data.mode) { $errors.Add('Mission Packet mode is invalid') }
+    if ($props -contains 'webPolicy' -and @('forbidden','allowed-if-needed','required') -notcontains [string]$data.webPolicy) { $errors.Add('Mission Packet webPolicy is invalid') }
+    if ($props -contains 'objective' -and [string]::IsNullOrWhiteSpace([string]$data.objective)) { $errors.Add('Mission Packet objective is required') }
+
+    if ($props -contains 'decisionRefs') {
+        foreach ($id in @($data.decisionRefs)) {
+            if ([string]$id -notmatch '^DEC-[0-9]{3}$') { $errors.Add("Mission Packet invalid Decision reference '$id'") }
+        }
+    }
+
+    if ($props -contains 'requiredBehaviors') {
+        $ids = @{}
+        foreach ($rb in @($data.requiredBehaviors)) {
+            if ([string]$rb.id -notmatch '^RB-[0-9]{2}$') { $errors.Add("Mission Packet invalid required behavior id '$($rb.id)'") }
+            elseif ($ids.ContainsKey([string]$rb.id)) { $errors.Add("Mission Packet duplicate required behavior id '$($rb.id)'") }
+            else { $ids[[string]$rb.id] = $true }
+            if ([string]::IsNullOrWhiteSpace([string]$rb.behavior)) { $errors.Add("Mission Packet $($rb.id) behavior is required") }
+            if ($null -ne $rb.sourceDecision -and -not [string]::IsNullOrWhiteSpace([string]$rb.sourceDecision) -and [string]$rb.sourceDecision -notmatch '^DEC-[0-9]{3}$') {
+                $errors.Add("Mission Packet $($rb.id) sourceDecision is invalid")
+            }
+        }
+    }
+
+    return [pscustomobject][ordered]@{
+        pass = ($errors.Count -eq 0)
+        errors = @($errors)
+        missionId = if ($props -contains 'missionId') { [string]$data.missionId } else { $null }
+        requiredBehaviorCount = if ($props -contains 'requiredBehaviors') { @($data.requiredBehaviors).Count } else { 0 }
+    }
+}
+
+function Test-AITeamLeadReport {
+    param(
+        [Parameter(Mandatory)][string]$ReportPath,
+        [Parameter(Mandatory)][string]$RepoRoot,
+        [Parameter(Mandatory)][string]$ExpectedSha,
+        [Parameter(Mandatory)][string]$ExpectedMission
+    )
+
+    $errors = New-Object System.Collections.Generic.List[string]
+    try { $data = Get-Content -LiteralPath $ReportPath -Raw -Encoding UTF8 | ConvertFrom-Json }
+    catch {
+        return [pscustomobject][ordered]@{ pass=$false; errors=@("cannot parse Lead report JSON: $($_.Exception.Message)") }
+    }
+
+    $required = @('schemaVersion','mission','commitSha','verdict','userSummary','agreedFacts','gaps','disagreements','decisionRequired','decision','systemQuality','nextStep')
+    $props = @($data.PSObject.Properties.Name)
+    foreach ($key in $required) { if ($props -notcontains $key) { $errors.Add("missing required field $key") } }
+
+    if ($props -contains 'schemaVersion' -and [int]$data.schemaVersion -ne 3) { $errors.Add('Lead schemaVersion must be 3') }
+    if ($props -contains 'mission' -and [string]$data.mission -ne $ExpectedMission) { $errors.Add('Lead mission does not match expected mission') }
+    if ($props -contains 'commitSha' -and [string]$data.commitSha -ne $ExpectedSha) { $errors.Add('Lead commitSha does not match expected full SHA') }
+    if ($props -contains 'verdict' -and @('PASS','PASS_WITH_GAPS','DEGRADED','FAIL') -notcontains [string]$data.verdict) { $errors.Add('Lead verdict is invalid') }
+    if ($props -contains 'userSummary' -and [string]::IsNullOrWhiteSpace([string]$data.userSummary)) { $errors.Add('Lead userSummary is required') }
+    if ($props -contains 'nextStep' -and [string]::IsNullOrWhiteSpace([string]$data.nextStep)) { $errors.Add('Lead nextStep is required') }
+
+    if ($props -contains 'decisionRequired') {
+        $decisionRequired = [bool]$data.decisionRequired
+        if ($decisionRequired -and $null -eq $data.decision) { $errors.Add('decisionRequired=true requires decision object') }
+        if (-not $decisionRequired -and $null -ne $data.decision) { $errors.Add('decisionRequired=false requires decision=null') }
+    }
+
+    if ($props -contains 'agreedFacts') {
+        foreach ($fact in @($data.agreedFacts)) {
+            if ([string]::IsNullOrWhiteSpace([string]$fact.claim)) { $errors.Add('agreedFacts claim is required') }
+            $sources = @($fact.sources)
+            if ($sources.Count -eq 0) { $errors.Add('agreedFacts sources must be non-empty') }
+            foreach ($source in $sources) {
+                $checked = Test-AITeamEvidenceLocation -RepoRoot $RepoRoot -Location ([string]$source)
+                if (-not $checked.pass) { $errors.Add("Lead agreedFact $($checked.error)") }
+            }
+        }
+    }
+
+    return [pscustomobject][ordered]@{
+        pass = ($errors.Count -eq 0)
+        errors = @($errors)
+        verdict = if ($props -contains 'verdict') { [string]$data.verdict } else { $null }
+        decisionRequired = if ($props -contains 'decisionRequired') { [bool]$data.decisionRequired } else { $null }
+    }
+}
+
+function Test-AITeamProductReport {
+    param(
+        [Parameter(Mandatory)][string]$ReportPath,
+        [Parameter(Mandatory)][string]$RepoRoot,
+        [Parameter(Mandatory)][string]$ExpectedSha,
+        [Parameter(Mandatory)][string]$ExpectedMission
+    )
+
+    $errors = New-Object System.Collections.Generic.List[string]
+    try { $data = Get-Content -LiteralPath $ReportPath -Raw -Encoding UTF8 | ConvertFrom-Json }
+    catch {
+        return [pscustomobject][ordered]@{ pass=$false; errors=@("cannot parse Product report JSON: $($_.Exception.Message)") }
+    }
+
+    $required = @('schemaVersion','agentRole','mission','commitSha','jobToBeDone','projectFacts','opportunities','doNotBuild','questions','recommendedNextDiscussion')
+    $props = @($data.PSObject.Properties.Name)
+    foreach ($key in $required) { if ($props -notcontains $key) { $errors.Add("missing required field $key") } }
+
+    if ($props -contains 'schemaVersion' -and [int]$data.schemaVersion -ne 1) { $errors.Add('Product schemaVersion must be 1') }
+    if ($props -contains 'agentRole' -and [string]$data.agentRole -ne 'product-erp-partner') { $errors.Add('Product agentRole must be product-erp-partner') }
+    if ($props -contains 'mission' -and [string]$data.mission -ne $ExpectedMission) { $errors.Add('Product mission does not match expected mission') }
+    if ($props -contains 'commitSha' -and [string]$data.commitSha -ne $ExpectedSha) { $errors.Add('Product commitSha does not match expected full SHA') }
+
+    $projectFacts = @()
+    if ($props -contains 'projectFacts') { $projectFacts = @($data.projectFacts) }
+    foreach ($fact in $projectFacts) {
+        if ([string]::IsNullOrWhiteSpace([string]$fact.claim)) { $errors.Add('Product projectFact claim is required') }
+        $evidence = @($fact.evidence)
+        if ($evidence.Count -eq 0) { $errors.Add('Product projectFact requires evidence'); continue }
+        foreach ($e in $evidence) {
+            if ([string]::IsNullOrWhiteSpace([string]$e.detail)) { $errors.Add('Product projectFact evidence detail is required') }
+            $checked = Test-AITeamEvidenceLocation -RepoRoot $RepoRoot -Location ([string]$e.location)
+            if (-not $checked.pass) { $errors.Add("Product projectFact $($checked.error)") }
+        }
+    }
+
+    $opportunities = @()
+    if ($props -contains 'opportunities') { $opportunities = @($data.opportunities) }
+    if ($opportunities.Count -gt 4) { $errors.Add('Product opportunities must contain at most 4 items') }
+    foreach ($item in $opportunities) {
+        foreach ($key in @('id','problem','proposal','whyBetter','employeeExample','tradeoff','externalPatternRefs')) {
+            if (@($item.PSObject.Properties.Name) -notcontains $key) { $errors.Add("Product opportunity missing $key") }
+        }
+        foreach ($url in @($item.externalPatternRefs)) {
+            if ([string]$url -notmatch '^https?://') { $errors.Add("Product externalPatternRef is not http/https: $url") }
+        }
+    }
+
+    return [pscustomobject][ordered]@{
+        pass = ($errors.Count -eq 0)
+        errors = @($errors)
+        opportunityCount = $opportunities.Count
     }
 }
 
@@ -406,4 +712,4 @@ function Test-AITeamProjectBrain {
     }
 }
 
-Export-ModuleMember -Function Get-AITeamRepoState, Compare-AITeamRepoState, Test-AITeamFindingReport, Test-AITeamReviewerCompletion, Test-AITeamSuite, Test-AITeamProjectBrain
+Export-ModuleMember -Function Get-AITeamRepoState, Compare-AITeamRepoState, Test-AITeamFindingReport, Test-AITeamReviewerCompletion, Test-AITeamSuite, Test-AITeamRoutingOracle, Test-AITeamMissionPacket, Test-AITeamLeadReport, Test-AITeamProductReport, Test-AITeamProjectBrain

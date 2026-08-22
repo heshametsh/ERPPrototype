@@ -65,6 +65,7 @@ def capture(repo: Path) -> dict:
         "repoRoot": str(repo),
         "head": head,
         "branch": branch,
+        "isClean": len(status_bytes) == 0,
         "fingerprint": fingerprint,
         "statusSha256": fingerprint_payload["statusSha256"],
         "trackedDiffSha256": fingerprint_payload["trackedDiffSha256"],

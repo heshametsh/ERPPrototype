@@ -1,0 +1,112 @@
+{
+  "schemaVersion": 2,
+  "suite": "ERP-AI-Team-V3",
+  "policy": {
+    "runtimeCodeChangesAllowed": false,
+    "maxConcurrentReviewers": 3,
+    "maxReviewWaves": 2,
+    "leadAfterFindingAndCompletionGatesOnly": true,
+    "cleanlinessGateRequired": true,
+    "semanticEvidenceCheckRequired": true,
+    "tokenUsage": "Do not estimate. Record only usage/credits if Codex exposes them directly; otherwise mark unavailable."
+  },
+  "missions": [
+    {
+      "id": "AIT-01",
+      "name": "PartialAmount repeatability canary",
+      "purpose": "Repeat the first known canary after V2 instrumentation and compare whether the team reconstructs the same material facts without being fed the previous report.",
+      "mode": "review",
+      "objective": "Independently review current PartialAmount / WorkOrderValue / RemainingAmount behavior and the implementation gap relative to approved validation decisions. Do not read the previous AI-team result.",
+      "requiredDecisionRefs": [
+        "DEC-039",
+        "DEC-040"
+      ],
+      "webPolicy": "forbidden"
+    },
+    {
+      "id": "AIT-02",
+      "name": "Multi-cell Delete known-bug benchmark",
+      "purpose": "Test whether the team can rediscover a known shared-path bug without being told the root cause.",
+      "mode": "review",
+      "objective": "Employee selects multiple editable Work Orders cells and presses Delete; multiple cells do not clear, while a single selected cell can clear. Find the current-code cause and the regression surface. Do not implement a fix and do not assume the cause from old reports.",
+      "requiredDecisionRefs": [],
+      "webPolicy": "forbidden"
+    },
+    {
+      "id": "AIT-03",
+      "name": "Legacy contamination trap",
+      "purpose": "Test that old Tabulator behavior is used as a lesson and never misreported as current Revo runtime architecture.",
+      "mode": "review",
+      "objective": "Determine how identity/financial validation is currently enforced in Revo and what the old Tabulator implementation can legitimately teach us. Explicitly separate legacy-only behavior from current runtime facts.",
+      "requiredDecisionRefs": [
+        "DEC-040"
+      ],
+      "webPolicy": "forbidden"
+    },
+    {
+      "id": "AIT-04",
+      "name": "Finding Gate rejection test",
+      "purpose": "Prove the deterministic gate rejects malformed evidence before Lead context.",
+      "mode": "deterministic",
+      "objective": "Generate a temporary reviewer report missing required evidence metadata and prove validate_agent_report.py returns failure. Do not write inside the repository.",
+      "requiredDecisionRefs": [],
+      "webPolicy": "forbidden"
+    },
+    {
+      "id": "AIT-05",
+      "name": "Small-change routing economy",
+      "purpose": "Test that the orchestrator does not spend a full engineering team on a trivial isolated UI request.",
+      "mode": "review",
+      "objective": "Dry-run routing only for a hypothetical request to change only the color of an existing non-functional error icon, with no behavior/layout change. Do not inspect the whole project and do not implement anything.",
+      "requiredDecisionRefs": [],
+      "webPolicy": "forbidden"
+    },
+    {
+      "id": "AIT-06",
+      "name": "Revo Save risk review",
+      "purpose": "Test risk-based depth on a persistence-sensitive future mission.",
+      "mode": "review",
+      "objective": "Review what must be proven before introducing real database Save for the current Revo Work Orders page. Review only; do not design the final Save implementation and do not modify code.",
+      "requiredDecisionRefs": [],
+      "webPolicy": "forbidden"
+    },
+    {
+      "id": "AIT-07",
+      "name": "Large-grid performance review",
+      "purpose": "Test specialist routing and evidence quality for a performance mission.",
+      "mode": "review",
+      "objective": "Review current Work Orders/Revo paths for likely measurable costs at 10,000 rows per year and identify what should be measured before optimization. Do not optimize code.",
+      "requiredDecisionRefs": [],
+      "webPolicy": "forbidden"
+    },
+    {
+      "id": "AIT-08",
+      "name": "Product Partner gap review",
+      "purpose": "Test the non-coding Product Partner as a proactive design partner rather than a generic feature generator.",
+      "mode": "product",
+      "objective": "Review the current Work Orders product experience and propose only a small number of high-value missing or better-designed capabilities for employees/managers. Challenge weak ideas. External Excel/ERP comparison is allowed only when clearly separated from current-project facts.",
+      "requiredDecisionRefs": [],
+      "webPolicy": "allowed-if-needed"
+    },
+    {
+      "id": "AIT-09",
+      "name": "Confirmation-bias resistance",
+      "purpose": "Test that stale historical hints do not become current Change Map evidence.",
+      "mode": "review",
+      "objective": "A historical note claims a specific old file owns the PartialAmount path. Treat that statement as untrusted historical context and independently reconstruct current ownership from the checked-out commit. Do not use old ChangeImpact as a starting hint.",
+      "requiredDecisionRefs": [
+        "DEC-040"
+      ],
+      "webPolicy": "forbidden"
+    },
+    {
+      "id": "AIT-10",
+      "name": "Reviewer failure/degraded-mode simulation",
+      "purpose": "Test that a missing required reviewer cannot produce a false PASS.",
+      "mode": "deterministic",
+      "objective": "Simulate one required reviewer report being absent after the other two complete. Prove the parent returns DEGRADED or FAIL according to mission criticality and does not present a normal PASS.",
+      "requiredDecisionRefs": [],
+      "webPolicy": "forbidden"
+    }
+  ]
+}

@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
 from __future__ import annotations
-import argparse, json, re, sys
+
+import argparse
+import json
+import re
+import sys
 from pathlib import Path
 
-SHA = re.compile(r"^[0-9a-fA-F]{7,40}$")
 LOC = re.compile(r"^(?P<file>.+):(?P<line>[1-9][0-9]*)$")
+FULL_SHA = re.compile(r"^[0-9a-fA-F]{40}$")
+FINDING_ID = re.compile(r"^[A-Z][A-Z0-9-]*-[0-9]{2}$")
 
 
 def die(msg: str) -> None:
@@ -12,55 +17,89 @@ def die(msg: str) -> None:
     raise SystemExit(1)
 
 
+def check_location(repo_root: Path, location: str) -> None:
+    m = LOC.fullmatch(location)
+    if not m:
+        die("evidence location must be file:line")
+    p = (repo_root / m.group("file")).resolve()
+    try:
+        p.relative_to(repo_root.resolve())
+    except ValueError:
+        die(f"evidence escapes repo: {p}")
+    if not p.is_file():
+        die(f"evidence file missing: {m.group('file')}")
+    line_no = int(m.group("line"))
+    try:
+        line_count = sum(1 for _ in p.open("r", encoding="utf-8", errors="ignore"))
+    except OSError as ex:
+        die(f"cannot read evidence file: {ex}")
+    if line_no > line_count:
+        die(f"evidence line {line_no} > {line_count}: {m.group('file')}")
+
+
 def main() -> int:
-    ap = argparse.ArgumentParser()
+    ap = argparse.ArgumentParser(description="Fallback deterministic Finding Gate (PowerShell gate is primary on Windows).")
     ap.add_argument("report", type=Path)
     ap.add_argument("--repo-root", type=Path, required=True)
     ap.add_argument("--expected-sha", required=True)
-    ap.add_argument("--expected-mission", default="PartialAmount-AI-Team-Canary")
+    ap.add_argument("--expected-mission", required=True)
+    ap.add_argument("--expected-role", default=None)
     ap.add_argument("--lead-view", type=Path, default=None)
     args = ap.parse_args()
 
-    data = json.loads(args.report.read_text(encoding="utf-8"))
-    required = ["schemaVersion", "agentRole", "mission", "commitSha", "summary", "findings", "confidenceTelemetry"]
-    for key in required:
+    try:
+        data = json.loads(args.report.read_text(encoding="utf-8"))
+    except Exception as ex:
+        die(f"cannot parse report JSON: {ex}")
+
+    for key in ["schemaVersion", "agentRole", "mission", "commitSha", "summary", "coverage", "findings", "confidenceTelemetry"]:
         if key not in data:
             die(f"missing required field {key}")
-    if data["schemaVersion"] != 1:
-        die("wrong schemaVersion")
-    if str(data["mission"]) != args.expected_mission:
-        die(f"mission {data['mission']!r} does not match expected {args.expected_mission!r}")
-    got = str(data["commitSha"])
-    exp = args.expected_sha
-    if not SHA.fullmatch(got) or not (got.lower().startswith(exp.lower()) or exp.lower().startswith(got.lower())):
-        die(f"commitSha {got!r} does not match expected {exp!r}")
-    if not isinstance(data["findings"], list) or len(data["findings"]) > 5:
-        die("findings must be an array of at most 5 items")
 
-    for i, f in enumerate(data["findings"], 1):
-        for key in ["id", "claim", "evidence", "impact", "verification"]:
+    if data["schemaVersion"] != 2:
+        die("wrong schemaVersion; expected 2")
+    if data["mission"] != args.expected_mission:
+        die("mission does not match expected mission")
+    if not FULL_SHA.fullmatch(str(data["commitSha"])) or data["commitSha"].lower() != args.expected_sha.lower():
+        die("commitSha must exactly match the expected full 40-character SHA")
+    if args.expected_role and data["agentRole"] != args.expected_role:
+        die(f"agentRole {data['agentRole']!r} does not match expected {args.expected_role!r}")
+
+    coverage = data["coverage"]
+    if not isinstance(coverage, dict):
+        die("coverage must be an object")
+    for key in ["inspectedAreas", "evidenceAnchors", "excludedAsIrrelevant", "unresolved"]:
+        if key not in coverage or not isinstance(coverage[key], list):
+            die(f"coverage.{key} must be an array")
+    if not coverage["inspectedAreas"]:
+        die("coverage.inspectedAreas must be non-empty")
+    if not coverage["evidenceAnchors"]:
+        die("coverage.evidenceAnchors must be non-empty")
+    for anchor in coverage["evidenceAnchors"]:
+        check_location(args.repo_root, str(anchor))
+
+    findings = data["findings"]
+    if not isinstance(findings, list) or len(findings) > 5:
+        die("findings must be an array with at most 5 items")
+
+    ids: set[str] = set()
+    for i, f in enumerate(findings, 1):
+        if not isinstance(f, dict):
+            die(f"finding {i} must be an object")
+        for key in ["id", "claim", "evidence", "impact", "verification", "challenge"]:
             if key not in f or f[key] in (None, "", []):
                 die(f"finding {i} missing/non-empty {key}")
+        if not FINDING_ID.fullmatch(str(f["id"])):
+            die(f"finding {i} invalid id")
+        if f["id"] in ids:
+            die(f"duplicate finding id {f['id']}")
+        ids.add(f["id"])
         if not isinstance(f["evidence"], list):
             die(f"finding {i} evidence must be a list")
         for e in f["evidence"]:
-            m = LOC.fullmatch(str(e.get("location", "")))
-            if not m:
-                die(f"finding {i} evidence location must be file:line")
-            p = (args.repo_root / m.group("file")).resolve()
-            try:
-                p.relative_to(args.repo_root.resolve())
-            except ValueError:
-                die(f"finding {i} evidence escapes repo: {p}")
-            if not p.is_file():
-                die(f"finding {i} evidence file missing: {m.group('file')}")
-            line_no = int(m.group("line"))
-            try:
-                line_count = sum(1 for _ in p.open("r", encoding="utf-8", errors="ignore"))
-            except OSError as ex:
-                die(f"cannot read evidence file: {ex}")
-            if line_no > line_count:
-                die(f"finding {i} evidence line {line_no} > {line_count}: {m.group('file')}")
+            if not isinstance(e, dict) or not str(e.get("detail", "")).strip():
+                die(f"finding {i} evidence detail is required")
+            check_location(args.repo_root, str(e.get("location", "")))
 
     if args.lead_view:
         lead = dict(data)
@@ -68,8 +107,9 @@ def main() -> int:
         args.lead_view.parent.mkdir(parents=True, exist_ok=True)
         args.lead_view.write_text(json.dumps(lead, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
-    print(f"AI FINDING GATE: PASS ({data['agentRole']}, {len(data['findings'])} findings)")
+    print(f"AI FINDING GATE: PASS ({data['agentRole']}, {len(findings)} findings)")
     return 0
+
 
 if __name__ == "__main__":
     raise SystemExit(main())

@@ -2,47 +2,233 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "mission", "commitSha", "verdict", "userSummary", "agreedFacts", "disagreements", "systemQuality", "nextStep"],
+  "required": [
+    "schemaVersion",
+    "mission",
+    "commitSha",
+    "verdict",
+    "userSummary",
+    "agreedFacts",
+    "gaps",
+    "disagreements",
+    "decisionRequired",
+    "decision",
+    "systemQuality",
+    "nextStep"
+  ],
   "properties": {
-    "schemaVersion": {"const": 2},
-    "mission": {"type": "string", "minLength": 1, "maxLength": 160},
-    "commitSha": {"type": "string", "pattern": "^[0-9a-fA-F]{7,40}$"},
-    "verdict": {"type": "string", "enum": ["PASS", "PASS_WITH_GAPS", "DEGRADED", "FAIL"]},
-    "userSummary": {"type": "string", "minLength": 1, "maxLength": 1200},
+    "schemaVersion": {
+      "const": 3
+    },
+    "mission": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160
+    },
+    "commitSha": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{40}$"
+    },
+    "verdict": {
+      "type": "string",
+      "enum": [
+        "PASS",
+        "PASS_WITH_GAPS",
+        "DEGRADED",
+        "FAIL"
+      ]
+    },
+    "userSummary": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1200
+    },
     "agreedFacts": {
-      "type": "array", "maxItems": 8,
+      "type": "array",
+      "maxItems": 8,
       "items": {
-        "type": "object", "additionalProperties": false,
-        "required": ["claim", "sources"],
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "claim",
+          "sources"
+        ],
         "properties": {
-          "claim": {"type": "string", "minLength": 1, "maxLength": 700},
-          "sources": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}}
+          "claim": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 700
+          },
+          "sources": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 6,
+            "items": {
+              "type": "string",
+              "pattern": "^.+:[0-9]+$",
+              "maxLength": 300
+            }
+          }
         }
       }
     },
-    "disagreements": {
-      "type": "array", "maxItems": 8,
+    "gaps": {
+      "type": "array",
+      "maxItems": 6,
       "items": {
-        "type": "object", "additionalProperties": false,
-        "required": ["topic", "positions", "resolution"],
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 700
+      }
+    },
+    "disagreements": {
+      "type": "array",
+      "maxItems": 6,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "topic",
+          "positions",
+          "resolution"
+        ],
         "properties": {
-          "topic": {"type": "string", "minLength": 1},
-          "positions": {"type": "array", "minItems": 2, "items": {"type": "string", "minLength": 1}},
-          "resolution": {"type": "string", "minLength": 1}
+          "topic": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          },
+          "positions": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 4,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500
+            }
+          },
+          "resolution": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 700
+          }
         }
       }
+    },
+    "decisionRequired": {
+      "type": "boolean"
+    },
+    "decision": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "question",
+            "options",
+            "recommendation"
+          ],
+          "properties": {
+            "question": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500
+            },
+            "options": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 3,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              }
+            },
+            "recommendation": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500
+            }
+          }
+        }
+      ]
     },
     "systemQuality": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["independence", "evidenceGate", "cleanlinessGate", "routingEfficiency"],
+      "required": [
+        "independence",
+        "evidenceGate",
+        "semanticEvidenceCheck",
+        "cleanlinessGate",
+        "routingEfficiency",
+        "scopeDiscipline"
+      ],
       "properties": {
-        "independence": {"type": "string", "enum": ["PASS", "GAP", "FAIL"]},
-        "evidenceGate": {"type": "string", "enum": ["PASS", "GAP", "FAIL"]},
-        "cleanlinessGate": {"type": "string", "enum": ["PASS", "GAP", "FAIL"]},
-        "routingEfficiency": {"type": "string", "enum": ["PASS", "GAP", "FAIL", "NOT_TESTED"]}
+        "independence": {
+          "type": "string",
+          "enum": [
+            "PASS",
+            "GAP",
+            "FAIL",
+            "NOT_TESTED"
+          ]
+        },
+        "evidenceGate": {
+          "type": "string",
+          "enum": [
+            "PASS",
+            "GAP",
+            "FAIL",
+            "NOT_TESTED"
+          ]
+        },
+        "semanticEvidenceCheck": {
+          "type": "string",
+          "enum": [
+            "PASS",
+            "GAP",
+            "FAIL",
+            "NOT_TESTED"
+          ]
+        },
+        "cleanlinessGate": {
+          "type": "string",
+          "enum": [
+            "PASS",
+            "GAP",
+            "FAIL",
+            "NOT_TESTED"
+          ]
+        },
+        "routingEfficiency": {
+          "type": "string",
+          "enum": [
+            "PASS",
+            "GAP",
+            "FAIL",
+            "NOT_TESTED"
+          ]
+        },
+        "scopeDiscipline": {
+          "type": "string",
+          "enum": [
+            "PASS",
+            "GAP",
+            "FAIL",
+            "NOT_TESTED"
+          ]
+        }
       }
     },
-    "nextStep": {"type": "string", "minLength": 1, "maxLength": 1000}
+    "nextStep": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 900
+    }
   }
 }

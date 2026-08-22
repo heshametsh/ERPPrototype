@@ -1,6 +1,6 @@
 param(
     [Parameter(Mandatory=$true)]
-    [ValidateSet('ValidateSuite','ValidateBrain','CaptureRepo','CompareRepo','ValidateReport','ValidateCompletion')]
+    [ValidateSet('ValidateSuite','ValidateBrain','CaptureRepo','CompareRepo','ValidateReport','ValidateCompletion','ScoreRouting','ValidateMission','ValidateLead','ValidateProduct')]
     [string]$Command,
 
     [string]$RepoRoot,
@@ -12,6 +12,9 @@ param(
     [string]$ExpectedSha,
     [string]$ExpectedMission,
     [string]$LeadView,
+    [string]$ExpectedRole,
+    [string]$TestId,
+    [string[]]$Selected = @(),
     [string[]]$Required = @(),
     [string[]]$Passed = @()
 )
@@ -76,8 +79,8 @@ switch ($Command) {
         break
     }
     'ValidateReport' {
-        $result = Test-AITeamFindingReport -ReportPath $Report -RepoRoot $RepoRoot -ExpectedSha $ExpectedSha -ExpectedMission $ExpectedMission
-        if ($Output) { Write-JsonFile -Value ([pscustomobject][ordered]@{ pass=$result.pass; errors=$result.errors; agentRole=$result.agentRole; findingCount=$result.findingCount }) -Path $Output }
+        $result = Test-AITeamFindingReport -ReportPath $Report -RepoRoot $RepoRoot -ExpectedSha $ExpectedSha -ExpectedMission $ExpectedMission -ExpectedRole $ExpectedRole
+        if ($Output) { Write-JsonFile -Value ([pscustomobject][ordered]@{ pass=$result.pass; errors=$result.errors; agentRole=$result.agentRole; findingCount=$result.findingCount; evidenceDigests=$result.evidenceDigests }) -Path $Output }
         if (-not $result.pass) {
             Write-Host 'AI FINDING GATE: FAIL'
             foreach ($e in @($result.errors)) { Write-Host "- $e" }
@@ -95,6 +98,39 @@ switch ($Command) {
             throw 'Reviewer completion gate failed.'
         }
         Write-Host "AI REVIEWER COMPLETION GATE: PASS: $($result.required -join ', ')"
+        break
+    }
+    'ScoreRouting' {
+        if (-not $Oracles -or -not $TestId) { throw 'ScoreRouting requires -Oracles and -TestId.' }
+        $result = Test-AITeamRoutingOracle -OraclePath $Oracles -TestId $TestId -Selected $Selected
+        if ($Output) { Write-JsonFile -Value $result -Path $Output }
+        if (-not $result.pass) {
+            Write-Host 'AI ROUTING ORACLE: FAIL'
+            foreach ($e in @($result.errors)) { Write-Host "- $e" }
+            throw 'Routing oracle failed.'
+        }
+        Write-Host "AI ROUTING ORACLE: PASS ($(@($result.selected).Count) reviewer(s))"
+        break
+    }
+    'ValidateMission' {
+        $result = Test-AITeamMissionPacket -PacketPath $Report -ExpectedSha $ExpectedSha
+        if ($Output) { Write-JsonFile -Value $result -Path $Output }
+        if (-not $result.pass) { Fail-Result -Label 'AI MISSION PACKET GATE' -Result $result }
+        Write-Host "AI MISSION PACKET GATE: PASS ($($result.requiredBehaviorCount) required behavior(s))"
+        break
+    }
+    'ValidateLead' {
+        $result = Test-AITeamLeadReport -ReportPath $Report -RepoRoot $RepoRoot -ExpectedSha $ExpectedSha -ExpectedMission $ExpectedMission
+        if ($Output) { Write-JsonFile -Value $result -Path $Output }
+        if (-not $result.pass) { Fail-Result -Label 'AI LEAD GATE' -Result $result }
+        Write-Host "AI LEAD GATE: PASS ($($result.verdict))"
+        break
+    }
+    'ValidateProduct' {
+        $result = Test-AITeamProductReport -ReportPath $Report -RepoRoot $RepoRoot -ExpectedSha $ExpectedSha -ExpectedMission $ExpectedMission
+        if ($Output) { Write-JsonFile -Value $result -Path $Output }
+        if (-not $result.pass) { Fail-Result -Label 'AI PRODUCT GATE' -Result $result }
+        Write-Host "AI PRODUCT GATE: PASS ($($result.opportunityCount) opportunity/ies)"
         break
     }
 }

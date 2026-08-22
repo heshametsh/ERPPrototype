@@ -12,6 +12,7 @@ import json
 import re
 import subprocess
 import sys
+import time
 from collections import Counter, defaultdict
 from pathlib import Path
 
@@ -95,7 +96,7 @@ def iter_text_files(repo_root: Path):
         yield path
 
 
-def scan_aliases(repo_root: Path, aliases: list[str]) -> list[dict]:
+def scan_aliases_fallback(repo_root: Path, aliases: list[str]) -> list[dict]:
     tokens = sorted(set(aliases), key=len, reverse=True)
     patterns = [(token, re.compile(rf"(?<![A-Za-z0-9_]){re.escape(token)}(?![A-Za-z0-9_])")) for token in tokens]
     hits: list[dict] = []
@@ -117,6 +118,50 @@ def scan_aliases(repo_root: Path, aliases: list[str]) -> list[dict]:
                     "text": line.strip()[:240],
                 })
     return hits
+
+
+def scan_aliases_git(repo_root: Path, aliases: list[str]) -> tuple[list[dict], str]:
+    """Prefer git grep over opening every repository file.
+
+    git grep searches tracked working-tree content quickly. If Git is unavailable or
+    returns an unexpected error, fall back to the original bounded Python scan.
+    """
+    tokens = sorted(set(aliases), key=len, reverse=True)
+    if not tokens:
+        return [], "none"
+
+    cmd = ["git", "-C", str(repo_root), "grep", "-n", "-I", "-w"]
+    for token in tokens:
+        cmd.extend(["-e", token])
+    cmd.extend(["--", "ERPPrototype"])
+
+    cp = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, errors="replace")
+    if cp.returncode not in (0, 1):
+        return scan_aliases_fallback(repo_root, aliases), "python-fallback"
+
+    patterns = [(token, re.compile(rf"(?<![A-Za-z0-9_]){re.escape(token)}(?![A-Za-z0-9_])")) for token in tokens]
+    hits: list[dict] = []
+    for raw in cp.stdout.splitlines():
+        # git grep -n output is repo-relative path:line:text.
+        parts = raw.split(":", 2)
+        if len(parts) != 3:
+            continue
+        rel, line_raw, line = parts
+        try:
+            line_no = int(line_raw)
+        except ValueError:
+            continue
+        matched = [token for token, pattern in patterns if pattern.search(line)]
+        if not matched:
+            continue
+        hits.append({
+            "file": rel.replace("\\", "/"),
+            "line": line_no,
+            "aliases": matched,
+            "zone": classify_zone(rel),
+            "text": line.strip()[:240],
+        })
+    return hits, "git-grep"
 
 
 def has_evidence(hits: list[dict], file_suffix: str, token: str | None = None) -> dict | None:
@@ -301,7 +346,9 @@ def main() -> int:
         print(f"No aliases declared for {args.field}", file=sys.stderr)
         return 2
 
-    hits = scan_aliases(repo_root, aliases)
+    scan_started = time.perf_counter()
+    hits, scan_method = scan_aliases_git(repo_root, aliases)
+    scan_elapsed_ms = round((time.perf_counter() - scan_started) * 1000)
     zones = Counter(hit["zone"] for hit in hits)
     files_by_zone: dict[str, set[str]] = defaultdict(set)
     for hit in hits:
@@ -312,6 +359,8 @@ def main() -> int:
         "schemaVersion": 1,
         "logicalField": args.field,
         "commitSha": commit,
+        "scanMethod": scan_method,
+        "scanMilliseconds": scan_elapsed_ms,
         "aliases": aliases_by_layer,
         "totalHits": len(hits),
         "zoneSummary": {
@@ -346,6 +395,7 @@ def main() -> int:
 
     print(f"CHANGE MAP V1 — {args.field} @ {commit}")
     print(f"- aliases searched: {', '.join(aliases)}")
+    print(f"- scan: {scan_method} / {scan_elapsed_ms} ms")
     print(f"- total evidence hits: {len(hits)}")
     for zone, count in sorted(zones.items()):
         print(f"- {zone}: {len(files_by_zone[zone])} files / {count} hits")

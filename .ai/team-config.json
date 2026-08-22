@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "teamVersion": "3.0",
+  "operatingProfile": "quality-observability",
+  "maxConcurrentReviewers": 3,
+  "maxReviewWaves": 2,
+  "maxInitialContextFilesPerReviewer": 8,
+  "maxMaterialFindingsPerReviewer": 5,
+  "runState": {
+    "root": "%LOCALAPPDATA%\\ERPPrototype\\AI-Team",
+    "runsDirectory": "Runs",
+    "latestFile": "latest.json",
+    "indexFile": "runs-index.jsonl",
+    "traceFile": "trace.jsonl"
+  },
+  "qualification": {
+    "suite": ".ai/test-missions/test-suite-v3.yaml",
+    "oracles": ".ai/test-missions/oracles-v3.yaml",
+    "historicalSuite": ".ai/test-missions/test-suite-v2.yaml",
+    "historicalOracles": ".ai/test-missions/oracles-v2.yaml",
+    "fastDeterministicTests": [
+      "AIT-04",
+      "AIT-10"
+    ],
+    "requireCleanStart": true
+  },
+  "schemas": {
+    "reviewer": ".ai/schemas/reviewer-findings.schema.json",
+    "lead": ".ai/schemas/lead-report.schema.json",
+    "product": ".ai/schemas/product-report.schema.json",
+    "missionPacket": ".ai/schemas/mission-packet.schema.json"
+  },
+  "prompts": {
+    "commonReviewer": ".ai/prompts/_reviewer-common.md",
+    "lead": ".ai/prompts/lead-integrator.md",
+    "product": ".ai/prompts/product-erp-partner.md"
+  },
+  "roles": {
+    "change-mapper": {
+      "prompt": ".ai/prompts/change-mapper-reviewer.md",
+      "class": "engineering"
+    },
+    "behavior-legacy": {
+      "prompt": ".ai/prompts/behavior-legacy-reviewer.md",
+      "class": "engineering"
+    },
+    "revo": {
+      "prompt": ".ai/prompts/revo-reviewer.md",
+      "class": "engineering"
+    },
+    "architecture": {
+      "prompt": ".ai/prompts/architecture-reviewer.md",
+      "class": "engineering"
+    },
+    "regression": {
+      "prompt": ".ai/prompts/regression-reviewer.md",
+      "class": "engineering"
+    },
+    "data-integrity-security": {
+      "prompt": ".ai/prompts/data-integrity-security-reviewer.md",
+      "class": "engineering"
+    },
+    "performance-reliability": {
+      "prompt": ".ai/prompts/performance-reliability-reviewer.md",
+      "class": "engineering"
+    },
+    "product-erp-partner": {
+      "prompt": ".ai/prompts/product-erp-partner.md",
+      "class": "product"
+    }
+  },
+  "reviewPolicy": {
+    "zeroFindingsAllowed": true,
+    "requireDisconfirmingCheckPerFinding": true,
+    "requireCoverageStatement": true,
+    "oldChangeImpactMaySeedNewMap": false,
+    "leadMustSemanticallyVerifyMaterialFacts": true,
+    "confidenceVisibleToLead": false
+  }
+}

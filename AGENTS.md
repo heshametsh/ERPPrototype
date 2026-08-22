@@ -17,6 +17,9 @@ Before substantial work, read only the documents relevant to the task, beginning
 8. `ERPPrototype/Documentation/12_ENGINEERING_AUDIT_REPORT.md` only when synthesis/history is needed
 9. `ERPPrototype/Documentation/AI_AGENT_WORKFLOW_V3.md` when running or designing the AI team workflow
 10. `ERPPrototype/Documentation/brain/README.md` for Project Brain V1 structured routing rules
+11. `.ai/team-config.json` when an AI-team mission is being run; it is the live role/path/tuning registry
+12. `.ai/prompts/_reviewer-common.md` for the shared independent-review contract
+13. `ERPPrototype/Documentation/AI_TEAM_TEST_PLAN_V3.md` for current qualification/tuning policy
 
 Current code, migrations, and tests in the checked-out commit are the primary evidence for what is actually implemented.
 
@@ -29,6 +32,8 @@ Current code, migrations, and tests in the checked-out commit are the primary ev
 - Do not silently change business rules, architecture, persistence, security, permissions, or user-visible behavior.
 - Any material product decision must be presented to the user in business terms before implementation.
 - Explain important outcomes in concise Arabic with a concrete ERP example.
+- AI-team review/test artifacts must be stored outside the repository through the tracked run lifecycle; never make the user search random Temp folders for evidence.
+- AI-team prompts/config are read fresh per mission. Do not require a Codex restart for ordinary prompt/config/harness tuning; only the Skill contract itself may require a refresh.
 
 ## Change workflow
 For a substantial feature or core behavior change:

@@ -1,4 +1,4 @@
-# ERP Prototype — AI Agent Workflow V3.1
+# ERP Prototype — AI Agent Workflow V3.2
 
 **Status:** Approved MVP design under live validation  
 **Scope:** Entire ERP Prototype project  
@@ -30,6 +30,45 @@ Do not build usage analytics only to trigger this Agent in V1.
 ### Engineering track — after desired behavior is clear
 
 `Request -> Current-code Change Map -> Mission Routing -> Independent Specialist Review -> Deterministic Finding Gate -> Lead synthesis -> User decision when needed -> Single Implementer -> Deterministic Verification -> Independent Review -> Project Brain Update`
+
+### V3.2 operational observability
+
+Every non-trivial AI-team mission is also a tracked run outside the repository.
+
+Default state root:
+`%LOCALAPPDATA%\ERPPrototype\AI-Team`
+
+Each run owns a stable evidence directory with:
+- exact commit and harness/prompt hashes;
+- Mission Packet;
+- routing decision;
+- reviewer reports/gates;
+- Lead/Product report gates;
+- repo-before/repo-after cleanliness evidence;
+- `trace.jsonl` for phase/role start-end events;
+- timing/result/summary.
+
+`latest.json` points to the current/latest run and `runs-index.jsonl` keeps historical run metadata. This is operational telemetry, not Project Brain/product truth.
+
+The goal is to optimize the phase that is actually slow instead of guessing from one total Codex duration.
+
+### Stable Skill, live tuning files
+
+`.agents/skills/erp-ai-team/SKILL.md` is the stable orchestration contract.
+`.ai/team-config.json`, role prompts, schemas and harness scripts are read fresh for each mission.
+
+Ordinary role/routing/prompt tuning should not require restarting Codex. A refresh is only potentially needed when the Skill contract itself changes.
+
+### Reviewer quality contract
+
+Independent reviewers share `.ai/prompts/_reviewer-common.md`:
+- start narrow; expand only for a concrete evidence gap;
+- zero findings is acceptable;
+- every material finding must include a disconfirming/challenge check;
+- coverage/unresolved scope is explicit;
+- current `file:line` evidence is required before a current-code fact reaches Lead.
+
+Lead does not merely trust schema-valid evidence metadata. It reopens at least one cited source for each material agreed fact to perform a targeted semantic evidence check.
 
 ## 2. Project Brain — source of reusable knowledge, not an Agent
 
