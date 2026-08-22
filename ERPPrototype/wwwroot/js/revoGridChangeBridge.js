@@ -1,6 +1,11 @@
 import { createRevoGridChangeEngine } from "./revoGridChangeEngine.js";
+import { syncWorkOrderDerivedFinancialFields } from "./workOrderFinancialRules.js?v=20260822-remaining-sync-1";
 
 const DATA_CELL_SET_ADAPTER = "data-cell-set";
+const FINANCIAL_INPUT_FIELDS = new Set([
+    "workOrderValue",
+    "partialAmount"
+]);
 
 function requireText(value, name) {
     const normalized = String(value ?? "").trim();
@@ -163,6 +168,32 @@ export function createRevoGridChangeBridge(options) {
         }
     };
 
+    function syncDerivedFinancialFields(operations) {
+        const affectedClientKeys = new Set();
+
+        for (const operation of Array.isArray(operations) ? operations : []) {
+            if (FINANCIAL_INPUT_FIELDS.has(String(operation?.field ?? ""))) {
+                affectedClientKeys.add(
+                    requireText(operation?.clientKey, "operation.clientKey")
+                );
+            }
+        }
+
+        let changed = false;
+
+        for (const clientKey of affectedClientKeys) {
+            const row = rowByClientKey.get(clientKey);
+            if (!row) {
+                continue;
+            }
+
+            changed =
+                syncWorkOrderDerivedFinancialFields(row) || changed;
+        }
+
+        return changed;
+    }
+
     async function applyDataHistoryEntry(entry, direction) {
         const operations = Array.isArray(entry?.payload?.operations)
             ? entry.payload.operations
@@ -213,6 +244,8 @@ export function createRevoGridChangeBridge(options) {
                 row[transition.field] = transition.after;
             }
 
+            syncDerivedFinancialFields(transitions);
+
             // RevoGrid stays the renderer/state host. Sheet History replay is
             // one controlled data transition; it must not re-enter the user
             // edit capture path as a new action.
@@ -254,6 +287,7 @@ export function createRevoGridChangeBridge(options) {
             }
         }
 
+        syncDerivedFinancialFields(reverse);
         engine.applyExternalChanges(reverse, datasetKey);
         void grid.refresh("rgRow");
         notifyState();
@@ -485,7 +519,16 @@ export function createRevoGridChangeBridge(options) {
                 after: detail.model[field]
             }]);
 
+            const derivedChanged = syncDerivedFinancialFields(
+                result?.changeSet?.operations
+            );
+
             recordFinalizedChange(result);
+
+            if (derivedChanged) {
+                void grid.refresh("rgRow");
+            }
+
             notifyState();
             return;
         }
@@ -517,7 +560,16 @@ export function createRevoGridChangeBridge(options) {
         });
 
         const result = engine.finalizeAfter(capture.captureId, applied);
+        const derivedChanged = syncDerivedFinancialFields(
+            result?.changeSet?.operations
+        );
+
         recordFinalizedChange(result);
+
+        if (derivedChanged) {
+            void grid.refresh("rgRow");
+        }
+
         notifyState();
     };
 

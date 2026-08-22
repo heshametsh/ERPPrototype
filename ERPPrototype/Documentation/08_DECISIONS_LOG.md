@@ -478,3 +478,12 @@
 - **History/Dirty rule:** one Insert is one Sheet History action; one multi-row Delete is one Sheet History action. New/deleted/reordered rows are structural Dirty in Change Engine. Undoing an unsaved Insert or restoring a deleted row returns structural Dirty toward Baseline without clearing unrelated History.
 - **Revo boundary:** Revo Community remains responsible for row rendering, native proxy/trimmed view stores, FilterPlugin, and SortingPlugin. ERP code uses stable row identity to preserve the approved working snapshot during structural changes and does not patch Revo source. Revo Pro's explicit separation of virtual/physical/authored row indexes and built-in row insert/delete commands is used as an architectural reference only.
 - **Production constraint:** Gate 5B-5 is isolated at `/work-orders-revogrid-gate5b5`; no database Save or `/work-orders` cutover is included yet.
+
+## DEC-039 — Remaining Amount stays an ERP-derived field across Revo data actions
+
+- **Date:** 2026-08-22
+- **Status:** Pending manual acceptance
+- **Decision:** `Remaining Amount` remains derived from `Work Order Value - Partial Amount`; it is not independently editable or persisted.
+- **Revo behavior:** accepted Cell Edit/Paste updates recalculate the affected row immediately. Undo/Redo replay recalculates the same derived value after the underlying financial input is restored. The grid source is not replaced; existing row objects are updated and the Revo `rgRow` viewport is refreshed.
+- **History/Dirty rule:** only the employee-edited financial input enters data History/Dirty. `Remaining Amount` is a consequence of that action, not a second user action, and therefore never adds a separate Undo step or Save delta.
+- **Architecture rule:** the money calculation is kept in ERP browser rules rather than Revo FormulaPlugin. Revo Community remains the renderer/edit host; server-side `WorkOrderFinancialRules` remains authoritative at Save.

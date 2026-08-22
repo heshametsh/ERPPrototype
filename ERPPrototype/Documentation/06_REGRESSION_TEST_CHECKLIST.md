@@ -802,3 +802,12 @@ Include:
 - [ ] One multi-row Delete adds exactly one Sheet History entry. Undo restores the same rows to their prior source/proxy/visible positions; Redo removes the same identities again.
 - [ ] Dirty blocks year switching after Insert/Delete. Undo back to Clean allows the year switch and old History is cleared as already approved.
 - [ ] No Revo Community source file is patched and `/work-orders` remains on Tabulator. No browser page error, unexpected console error, failed request, or server 5xx appears during the qualification.
+
+#### Gate 5B-5 — Derived Remaining Amount synchronization
+
+- [ ] Edit `Work Order Value`: `Remaining Amount` updates immediately from `Work Order Value - Partial Amount` without reload.
+- [ ] Edit `Partial Amount`: `Remaining Amount` updates immediately without reload.
+- [ ] Paste Work Order Value/Partial Amount into one or many rows: every affected row recalculates once after the Paste and the Paste remains one Undo action.
+- [ ] Ctrl+Z after a financial Edit/Paste restores the financial input and the matching `Remaining Amount`; Ctrl+Y reapplies both visible results.
+- [ ] `Remaining Amount` remains readonly and does not create its own Dirty cell, History entry, or Save field.
+- [ ] With a Sort active, recalculation updates the value but does not auto-resort the row until the employee explicitly changes/reapplies Sort.
