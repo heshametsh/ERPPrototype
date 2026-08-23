@@ -16,6 +16,7 @@ Import-Module (Join-Path $PSScriptRoot 'AITeamRun.psm1') -Force
 Import-Module (Join-Path $PSScriptRoot 'AITeamCodex.psm1') -Force
 Import-Module (Join-Path $PSScriptRoot 'AITeamGates.psm1') -Force
 Import-Module (Join-Path $PSScriptRoot 'AITeamLocalRouter.psm1') -Force
+Import-Module (Join-Path $PSScriptRoot 'AITeamReviewWorkspace.psm1') -Force
 
 $originalCulture = [System.Threading.Thread]::CurrentThread.CurrentCulture
 $originalUICulture = [System.Threading.Thread]::CurrentThread.CurrentUICulture
@@ -93,7 +94,7 @@ try {
     # V3.3 local-first file/config checks (no Codex model call).
 $configPath = Join-Path $RepoRoot '.ai\team-config.json'
 $config = Get-Content -LiteralPath $configPath -Raw -Encoding UTF8 | ConvertFrom-Json
-if ([string]$config.teamVersion -ne '3.4.3') { throw "Expected AI Team 3.4.3, found $($config.teamVersion)." }
+if ([string]$config.teamVersion -ne '3.5.2') { throw "Expected AI Team 3.5.2, found $($config.teamVersion)." }
 foreach ($rel in @(
     'ERPPrototype\Tools\AITeam\AITeamCli.ps1',
     'ERPPrototype\Tools\AITeam\AITeamCodex.psm1',
@@ -101,6 +102,7 @@ foreach ($rel in @(
     'ERPPrototype\Tools\AITeam\run_router_smoke.ps1',
     'ERPPrototype\Tools\AITeam\run_reviewer_smoke.ps1',
     'ERPPrototype\Tools\AITeam\AITeamLocalRouter.psm1',
+    'ERPPrototype\Tools\AITeam\AITeamReviewWorkspace.psm1',
     'ERPPrototype\Tools\AITeam\Setup-AITeamLocalCommand.ps1',
     'ERPPrototype\Tools\AITeam\Setup-AITeamCodexCli.ps1',
     '.ai\prompts\mission-router.md',
@@ -193,6 +195,153 @@ $ambiguousPacket = [pscustomobject][ordered]@{
 $ambiguousRoute = Get-AITeamLocalRoute -MissionPacket $ambiguousPacket -Config $config -RulesPath $rulesPath
 if (-not [bool]$ambiguousRoute.needsAiFallback) { throw 'Local router ambiguity canary failed: unclear mission should recommend AI fallback.' }
 
+# V3.5.3: Windows PowerShell 5.1 must not abort when Git writes a harmless
+# warning to STDERR while returning exit code 0. Get-AITeamRepoState exercises
+# the public Git-backed gate path against the current working tree, which is
+# commonly dirty while a patch is being qualified.
+try {
+    $gitStateProbe = Get-AITeamRepoState -RepoRoot $RepoRoot
+    if ([string]::IsNullOrWhiteSpace([string]$gitStateProbe.head)) {
+        throw 'repo-state probe returned an empty HEAD'
+    }
+}
+catch {
+    throw "Native Git STDERR compatibility smoke failed: $($_.Exception.Message)"
+}
+
+# V3.5: parse every AI Team PowerShell entry point/module locally. This catches
+# syntax regressions before a model-backed run.
+$allPowerShellFiles = @(
+    Get-ChildItem -LiteralPath (Join-Path $RepoRoot 'ERPPrototype\Tools\AITeam') -File |
+        Where-Object { $_.Extension -in @('.ps1','.psm1') }
+)
+foreach ($psFile in $allPowerShellFiles) {
+    $tokens = $null; $parseErrors = $null
+    [System.Management.Automation.Language.Parser]::ParseFile($psFile.FullName, [ref]$tokens, [ref]$parseErrors) | Out-Null
+    if (@($parseErrors).Count -gt 0) {
+        throw "PowerShell parse failed for $($psFile.Name): $(@($parseErrors | ForEach-Object { $_.Message }) -join ' | ')"
+    }
+}
+
+# V3.5.2 exact regression for the uploaded Revo smoke failure. Exercise the
+# PUBLIC Finding Gate instead of calling the module-private path helper directly.
+# A long diagnostic ending in :9 must be rejected as evidence and must never
+# escape as a GetFullPath/path-length exception.
+$compatSha = (& git -C $RepoRoot rev-parse HEAD).Trim()
+$compatMission = 'Compatibility evidence-path gate canary'
+$validEvidenceReportPath = Join-Path $tempRoot 'valid-evidence-report.json'
+$validEvidenceReport = [pscustomobject][ordered]@{
+    schemaVersion = 2
+    agentRole = 'compat-reviewer'
+    mission = $compatMission
+    commitSha = $compatSha
+    summary = 'Valid evidence-path canary.'
+    coverage = [pscustomobject][ordered]@{
+        inspectedAreas = @('Compatibility gate')
+        evidenceAnchors = @('AGENTS.md:1')
+        excludedAsIrrelevant = @()
+        unresolved = @()
+    }
+    findings = @()
+    confidenceTelemetry = 'high'
+}
+Write-AITeamJsonFile -Value $validEvidenceReport -Path $validEvidenceReportPath
+$validEvidenceGate = Test-AITeamFindingReport -ReportPath $validEvidenceReportPath -RepoRoot $RepoRoot -ExpectedSha $compatSha -ExpectedMission $compatMission -ExpectedRole 'compat-reviewer'
+if (-not $validEvidenceGate.pass) {
+    throw "Safe evidence-path valid canary failed through Finding Gate: $(@($validEvidenceGate.errors) -join ' | ')"
+}
+
+$oversizedEvidence = ('Sandbox diagnostic ' + ('x' * 400) + ':9')
+$badEvidenceReportPath = Join-Path $tempRoot 'oversized-evidence-report.json'
+$badEvidenceReport = [pscustomobject][ordered]@{
+    schemaVersion = 2
+    agentRole = 'compat-reviewer'
+    mission = $compatMission
+    commitSha = $compatSha
+    summary = 'Oversized pseudo-evidence canary.'
+    coverage = [pscustomobject][ordered]@{
+        inspectedAreas = @('Compatibility gate')
+        evidenceAnchors = @('AGENTS.md:1')
+        excludedAsIrrelevant = @()
+        unresolved = @()
+    }
+    findings = @(
+        [pscustomobject][ordered]@{
+            id = 'COMPAT-01'
+            claim = 'Oversized diagnostic text must not be treated as a repository evidence path.'
+            evidence = @([pscustomobject][ordered]@{ location = $oversizedEvidence; detail = 'Synthetic regression canary.' })
+            impact = 'A malformed reviewer evidence string must fail the gate without crashing the harness.'
+            verification = 'Finding Gate returns pass=false and a bounded evidence-path error.'
+            challenge = 'The payload deliberately resembles file:line syntax only at the final colon.'
+        }
+    )
+    confidenceTelemetry = 'high'
+}
+Write-AITeamJsonFile -Value $badEvidenceReport -Path $badEvidenceReportPath
+try {
+    $badEvidenceGate = Test-AITeamFindingReport -ReportPath $badEvidenceReportPath -RepoRoot $RepoRoot -ExpectedSha $compatSha -ExpectedMission $compatMission -ExpectedRole 'compat-reviewer'
+}
+catch {
+    throw "Safe evidence-path rejection threw instead of returning a Finding Gate failure: $($_.Exception.Message)"
+}
+if ($badEvidenceGate.pass) { throw 'Safe evidence-path rejection canary unexpectedly accepted oversized pseudo evidence.' }
+if ((@($badEvidenceGate.errors) -join ' ') -notmatch 'evidence location exceeds 260 characters') {
+    throw "Safe evidence-path rejection returned the wrong failure: $(@($badEvidenceGate.errors) -join ' | ')"
+}
+
+# V3.5 prove disposable exact-commit worktree lifecycle and main-tree isolation.
+$mainBeforeIsolation = Get-AITeamRepoState -RepoRoot $RepoRoot
+$compatHead = (& git -C $RepoRoot rev-parse HEAD).Trim()
+$compatWorkspace = $null
+try {
+    $compatWorkspace = New-AITeamReviewWorkspace -RepoRoot $RepoRoot -CommitSha $compatHead -Role 'compat'
+    if (-not (Test-Path -LiteralPath ([string]$compatWorkspace.path) -PathType Container)) { throw 'Isolated review worktree was not created.' }
+    $workspaceInitial = Get-AITeamReviewWorkspaceState -WorkspaceRoot ([string]$compatWorkspace.path)
+    if (-not $workspaceInitial.clean) { throw 'Fresh isolated review worktree is not clean.' }
+    'compat-dirty-canary' | Set-Content -LiteralPath (Join-Path ([string]$compatWorkspace.path) 'AIT_WORKSPACE_DIRTY_CANARY.tmp') -Encoding ASCII
+    $workspaceDirty = Get-AITeamReviewWorkspaceState -WorkspaceRoot ([string]$compatWorkspace.path)
+    if ($workspaceDirty.clean) { throw 'Review workspace dirty-state canary was not detected.' }
+}
+finally {
+    if ($null -ne $compatWorkspace) {
+        $removed = Remove-AITeamReviewWorkspace -RepoRoot $RepoRoot -WorkspaceRoot ([string]$compatWorkspace.path)
+        if (-not $removed) { throw 'Compatibility review worktree cleanup failed.' }
+    }
+}
+$mainAfterIsolation = Get-AITeamRepoState -RepoRoot $RepoRoot
+$mainIsolation = Compare-AITeamRepoState -Baseline $mainBeforeIsolation -Current $mainAfterIsolation
+if (-not $mainIsolation.pass) { throw "Primary repository changed during review worktree canary: $(@($mainIsolation.differences) -join ' | ')" }
+
+# V3.5 synthetic UTF-16 Codex events: current Windows CLI can emit UTF-16 and
+# uses reasoning_output_tokens. Prove telemetry reads both correctly.
+$utf16Events = Join-Path $tempRoot 'codex-events-utf16.jsonl'
+@'
+{"type":"item.started","item":{"id":"m1","type":"mcp_tool_call","server":"codex","tool":"list_mcp_resources"}}
+{"type":"turn.completed","usage":{"input_tokens":1000,"cached_input_tokens":600,"output_tokens":50,"reasoning_output_tokens":25}}
+'@ | Set-Content -LiteralPath $utf16Events -Encoding Unicode
+$usageProbe = Get-AITeamCodexUsageFromEvents -EventsPath $utf16Events
+if ($usageProbe.inputTokens -ne 1000 -or $usageProbe.cachedInputTokens -ne 600 -or $usageProbe.uncachedInputTokens -ne 400 -or $usageProbe.outputTokens -ne 50 -or $usageProbe.reasoningTokens -ne 25 -or $usageProbe.mcpToolCallCount -ne 1) {
+    throw 'UTF-16 Codex event/reasoning telemetry canary failed.'
+}
+
+# V3.5 budget gate is local and must stop follow-on reviewers after an
+# expensive/broken call. This is intentionally synthetic and launches no Codex.
+$budgetProbeResult = [pscustomobject][ordered]@{
+    promptBytes = 1000; sandboxProcessBlockCount = 0;
+    usage = [pscustomobject][ordered]@{ inputTokens=[int64]130000; cachedInputTokens=[int64]50000; uncachedInputTokens=[int64]80000; mcpToolCallCount=0 }
+}
+$budgetProbe = Test-AITeamCodexBudget -ExecutionResult $budgetProbeResult -MaxInputTokens 120000 -MaxUncachedInputTokens 70000 -MaxPromptBytes 32768 -RequireNoMcpCalls $true -RequireNoSandboxProcessBlocks $true
+if ($budgetProbe.pass -or @($budgetProbe.errors).Count -lt 2) { throw 'Reviewer budget gate canary failed to reject an over-budget synthetic call.' }
+
+# V3.5 static execution-surface guard: engineering model calls must support
+# workspace-write isolation and disable nonessential app/plugin/MCP surfaces.
+$codexModuleText = Get-Content -LiteralPath (Join-Path $RepoRoot 'ERPPrototype\Tools\AITeam\AITeamCodex.psm1') -Raw -Encoding UTF8
+foreach ($requiredText in @('workspace-write','features.plugins=false','features.apps=false','features.connectors=false','features.enable_mcp_apps=false','approval_policy="never"')) {
+    if ($codexModuleText -notmatch [regex]::Escape($requiredText)) { throw "Minimal Codex integration surface wiring missing: $requiredText" }
+}
+$fullRunnerText = Get-Content -LiteralPath (Join-Path $RepoRoot 'ERPPrototype\Tools\AITeam\run_ai_test.ps1') -Raw -Encoding UTF8
+if ($fullRunnerText -match 'Start-Job') { throw 'Qualification reviewers must be sequential/budget-aware, not parallel Start-Job fanout.' }
+
 # V3.3.5: Windows PowerShell 5.1 treats an empty collection passed to a
 # Mandatory parameter as a binding failure unless AllowEmptyCollection is
 # explicitly declared. Exercise the zero-error path directly so this exact
@@ -268,12 +417,20 @@ Write-Host 'AI TEAM RUNTIME COMPATIBILITY: PASS'
     Write-Host '- Metrics/trace/latest/index closure: PASS'
     Write-Host '- Codex installer wrapper (PowerShell 5.1 parse): PASS'
     Write-Host '- Native STDERR capture (PowerShell 5.1): PASS'
+    Write-Host '- Native Git STDERR capture (PowerShell 5.1): PASS'
     Write-Host '- Router-only smoke runner parse/CLI wiring: PASS'
     Write-Host '- Single-reviewer smoke runner parse/CLI wiring: PASS'
     Write-Host '- Runner mode contract (review/product/deterministic): PASS'
     Write-Host '- Local router rules: PASS'
     Write-Host "- Local router qualification: PASS ($localQualificationCount model missions, 0 Codex calls)"
     Write-Host '- Local router ambiguity fallback canary: PASS'
+    Write-Host '- All AI Team PowerShell files parse: PASS'
+    Write-Host '- Safe evidence-path rejection (no GetFullPath crash): PASS'
+    Write-Host '- Isolated review worktree lifecycle: PASS'
+    Write-Host '- Main worktree isolation: PASS'
+    Write-Host '- Minimal Codex integration surface wiring: PASS'
+    Write-Host '- UTF-16 Codex event/reasoning telemetry: PASS'
+    Write-Host '- Reviewer budget gate canary: PASS'
     Write-Host '- PowerShell 5.1 empty schema-error binding: PASS'
 Write-Host '- Structured-output schema preflight: PASS (router/reviewer/lead/product)'
     Write-Host '- Structured-output negative canary (const without type): PASS'

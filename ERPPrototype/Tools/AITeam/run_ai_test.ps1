@@ -10,6 +10,7 @@ Import-Module (Join-Path $PSScriptRoot 'AITeamGates.psm1') -Force
 Import-Module (Join-Path $PSScriptRoot 'AITeamRun.psm1') -Force
 Import-Module (Join-Path $PSScriptRoot 'AITeamCodex.psm1') -Force
 Import-Module (Join-Path $PSScriptRoot 'AITeamLocalRouter.psm1') -Force
+Import-Module (Join-Path $PSScriptRoot 'AITeamReviewWorkspace.psm1') -Force
 
 if (-not $RepoRoot) { $RepoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..\..')) }
 else { $RepoRoot = [System.IO.Path]::GetFullPath($RepoRoot) }
@@ -17,9 +18,12 @@ else { $RepoRoot = [System.IO.Path]::GetFullPath($RepoRoot) }
 function Add-Usage {
     param([hashtable]$Total, $Usage)
     if ($null -eq $Usage) { return }
-    foreach ($k in @('inputTokens','cachedInputTokens','outputTokens','reasoningTokens')) {
+    foreach ($k in @('inputTokens','cachedInputTokens','uncachedInputTokens','outputTokens','reasoningTokens')) {
         if ($null -ne $Usage.PSObject.Properties[$k]) { $Total[$k] = [int64]$Total[$k] + [int64]$Usage.$k }
     }
+    if ($null -ne $Usage.PSObject.Properties['mcpToolCallCount']) { $Total.mcpToolCallCount = [int]$Total.mcpToolCallCount + [int]$Usage.mcpToolCallCount }
+    if ($null -ne $Usage.PSObject.Properties['mcpResourceCallCount']) { $Total.mcpResourceCallCount = [int]$Total.mcpResourceCallCount + [int]$Usage.mcpResourceCallCount }
+    if ($null -ne $Usage.PSObject.Properties['eventBytes']) { $Total.eventBytes = [int64]$Total.eventBytes + [int64]$Usage.eventBytes }
     if ($null -ne $Usage.PSObject.Properties['modelAttempted'] -and [bool]$Usage.modelAttempted) {
         $Total.modelAttempts = [int]$Total.modelAttempts + 1
     }
@@ -60,7 +64,7 @@ if ([string]$mission.mode -eq 'deterministic') { throw "$TestId is deterministic
 $run = New-AITeamRun -RepoRoot $RepoRoot -MissionId $TestId -MissionName ([string]$mission.name) -Mode ([string]$mission.mode) -StateRoot $StateRoot
 $runDir = [string]$run.runDirectory
 $phaseMs = [ordered]@{}
-$usageTotal = @{ inputTokens=[int64]0; cachedInputTokens=[int64]0; outputTokens=[int64]0; reasoningTokens=[int64]0; modelAttempts=0; modelCalls=0; apiRejectedBeforeGeneration=0 }
+$usageTotal = @{ inputTokens=[int64]0; cachedInputTokens=[int64]0; uncachedInputTokens=[int64]0; outputTokens=[int64]0; reasoningTokens=[int64]0; mcpToolCallCount=0; mcpResourceCallCount=0; eventBytes=[int64]0; modelAttempts=0; modelCalls=0; apiRejectedBeforeGeneration=0 }
 $runCompleted = $false
 
 try {
@@ -138,7 +142,7 @@ Return only the routing JSON.
         $routerOutput = Join-Path $runDir 'routing.raw.json'
         $routerEvents = Join-Path $runDir 'router.events.jsonl'
         $routerErr = Join-Path $runDir 'router.stderr.txt'
-        $routerResult = Invoke-AITeamCodexExec -RepoRoot $RepoRoot -PromptPath $routerPromptPath -SchemaPath (Join-Path $RepoRoot ([string]$config.schemas.routingPlan)) -OutputPath $routerOutput -EventsPath $routerEvents -StderrPath $routerErr -ReasoningEffort ([string]$config.codex.routerReasoningEffort) -Model ([string]$config.codex.model) -WebAllowed $false
+        $routerResult = Invoke-AITeamCodexExec -RepoRoot $RepoRoot -PromptPath $routerPromptPath -SchemaPath (Join-Path $RepoRoot ([string]$config.schemas.routingPlan)) -OutputPath $routerOutput -EventsPath $routerEvents -StderrPath $routerErr -ReasoningEffort ([string]$config.codex.routerReasoningEffort) -Model ([string]$config.codex.model) -WebAllowed $false -Sandbox 'read-only' -DisableExternalIntegrations $true -DisableShell $true -MaxPromptBytes 16384
         Add-Usage -Total $usageTotal -Usage $routerResult.usage
         Write-AITeamJsonFile -Value $routerResult -Path (Join-Path $runDir 'router-execution.json')
         if ($null -ne $routerResult.PSObject.Properties['schemaPreflightPass'] -and -not [bool]$routerResult.schemaPreflightPass) {
@@ -175,89 +179,98 @@ Return only the routing JSON.
 
     if ([string]$mission.mode -eq 'product') {
         Assert-AITeamCodexReady | Out-Null
-        Add-AITeamTrace -RunDir $runDir -Event 'REVIEWER_START' -Phase 'product' -Role 'product-erp-partner' -Status 'RUNNING' | Out-Null
-        $productPrompt = @"
+        $productWorkspace = $null
+        try {
+            $productWorkspace = New-AITeamReviewWorkspace -RepoRoot $RepoRoot -CommitSha ([string]$run.commitSha) -Role 'product-erp-partner'
+            Write-AITeamJsonFile -Value $productWorkspace -Path (Join-Path $runDir 'product-workspace.json')
+            Add-AITeamTrace -RunDir $runDir -Event 'REVIEWER_START' -Phase 'product' -Role 'product-erp-partner' -Status 'RUNNING' | Out-Null
+            $productPrompt = @"
 You are the Product & ERP Partner for ERP Prototype.
-Read AGENTS.md and .ai/prompts/product-erp-partner.md. Work read-only. Do not implement anything.
+You are in an isolated disposable workspace at the exact mission commit. Do not modify files.
+Read AGENTS.md and .ai/prompts/product-erp-partner.md. Use local shell/file search for project evidence. Do not use apps, connectors, MCP resources, or subagents.
 Mission packet:
 $packetJson
 Return only JSON matching .ai/schemas/product-report.schema.json.
 "@
-        $pp = New-AgentPromptFile -Path (Join-Path $runDir 'product-prompt.txt') -Text $productPrompt
-        $raw = Join-Path $runDir 'product.raw.json'; $events = Join-Path $runDir 'product.events.jsonl'; $err = Join-Path $runDir 'product.stderr.txt'
-        $pr = Invoke-AITeamCodexExec -RepoRoot $RepoRoot -PromptPath $pp -SchemaPath (Join-Path $RepoRoot ([string]$config.schemas.product)) -OutputPath $raw -EventsPath $events -StderrPath $err -ReasoningEffort ([string]$config.codex.productReasoningEffort) -Model ([string]$config.codex.model) -WebAllowed ([string]$mission.webPolicy -ne 'forbidden')
-        Add-Usage -Total $usageTotal -Usage $pr.usage
-        Write-AITeamJsonFile -Value $pr -Path (Join-Path $runDir 'product-execution.json')
-        if ($null -ne $pr.PSObject.Properties['schemaPreflightPass'] -and -not [bool]$pr.schemaPreflightPass) { throw "Product schema preflight blocked before Codex: $(@($pr.schemaPreflightErrors) -join ' | ')" }
-        if ($pr.exitCode -ne 0) { throw 'Product Partner Codex call failed.' }
-        $pg = Test-AITeamProductReport -ReportPath $raw -RepoRoot $RepoRoot -ExpectedSha ([string]$run.commitSha) -ExpectedMission ([string]$mission.name)
-        Write-AITeamJsonFile -Value $pg -Path (Join-Path $runDir 'product-gate.json')
-        if (-not $pg.pass) { throw 'Product Gate rejected report.' }
-        Add-AITeamTrace -RunDir $runDir -Event 'REVIEWER_END' -Phase 'product' -Role 'product-erp-partner' -Status 'PASS' -Detail "ms=$($pr.elapsedMilliseconds)" | Out-Null
+            $pp = New-AgentPromptFile -Path (Join-Path $runDir 'product-prompt.txt') -Text $productPrompt
+            $raw = Join-Path $runDir 'product.raw.json'; $events = Join-Path $runDir 'product.events.jsonl'; $err = Join-Path $runDir 'product.stderr.txt'
+            $pr = Invoke-AITeamCodexExec -RepoRoot ([string]$productWorkspace.path) -PromptPath $pp -SchemaPath (Join-Path $RepoRoot ([string]$config.schemas.product)) -OutputPath $raw -EventsPath $events -StderrPath $err -ReasoningEffort ([string]$config.codex.productReasoningEffort) -Model ([string]$config.codex.model) -WebAllowed ([string]$mission.webPolicy -ne 'forbidden') -Sandbox 'workspace-write' -DisableExternalIntegrations $true -MaxPromptBytes ([int64]$config.codex.maxProductPromptBytes)
+            Add-Usage -Total $usageTotal -Usage $pr.usage
+            Write-AITeamJsonFile -Value $pr -Path (Join-Path $runDir 'product-execution.json')
+            $productState = Get-AITeamReviewWorkspaceState -WorkspaceRoot ([string]$productWorkspace.path)
+            Write-AITeamJsonFile -Value $productState -Path (Join-Path $runDir 'product-workspace-state.json')
+            if (-not $productState.clean) { throw "Product Partner modified its disposable workspace: $(@($productState.changes) -join ' | ')" }
+            $productBudget = Test-AITeamCodexBudget -ExecutionResult $pr -MaxInputTokens ([int64]$config.codex.productInputTokenHardLimit) -MaxUncachedInputTokens ([int64]$config.codex.productUncachedInputTokenHardLimit) -MaxPromptBytes ([int64]$config.codex.maxProductPromptBytes) -RequireNoMcpCalls $true -RequireNoSandboxProcessBlocks $true
+            Write-AITeamJsonFile -Value $productBudget -Path (Join-Path $runDir 'product-budget-gate.json')
+            if (-not $productBudget.pass) { throw "Product budget/transport gate failed: $(@($productBudget.errors) -join ' | ')" }
+            if ($null -ne $pr.PSObject.Properties['schemaPreflightPass'] -and -not [bool]$pr.schemaPreflightPass) { throw "Product schema preflight blocked before Codex: $(@($pr.schemaPreflightErrors) -join ' | ')" }
+            if ($pr.exitCode -ne 0) { throw 'Product Partner Codex call failed.' }
+            $pg = Test-AITeamProductReport -ReportPath $raw -RepoRoot $RepoRoot -ExpectedSha ([string]$run.commitSha) -ExpectedMission ([string]$mission.name)
+            Write-AITeamJsonFile -Value $pg -Path (Join-Path $runDir 'product-gate.json')
+            if (-not $pg.pass) { throw 'Product Gate rejected report.' }
+            Add-AITeamTrace -RunDir $runDir -Event 'REVIEWER_END' -Phase 'product' -Role 'product-erp-partner' -Status 'PASS' -Detail "ms=$($pr.elapsedMilliseconds)" | Out-Null
+        }
+        finally {
+            if ($null -ne $productWorkspace) { try { Remove-AITeamReviewWorkspace -RepoRoot $RepoRoot -WorkspaceRoot ([string]$productWorkspace.path) | Out-Null } catch { } }
+        }
     }
     else {
         if ($selected.Count -gt 0) { Assert-AITeamCodexReady | Out-Null }
-        $jobs = @()
-        $jobMeta = @{}
+        $passedRoles = @()
+
+        # Qualification is intentionally sequential and budget-aware. A broken or
+        # unexpectedly expensive first reviewer must not fan out into two more paid calls.
         foreach ($role in $selected) {
             $roleConfig = $config.roles.PSObject.Properties[$role].Value
             $rolePrompt = [string]$roleConfig.prompt
-            $promptText = @"
+            $reviewWorkspace = $null
+            try {
+                $reviewWorkspace = New-AITeamReviewWorkspace -RepoRoot $RepoRoot -CommitSha ([string]$run.commitSha) -Role $role
+                Write-AITeamJsonFile -Value $reviewWorkspace -Path (Join-Path $runDir "$role-workspace.json")
+                $promptText = @"
 You are the $role independent reviewer for ERP Prototype.
+You are running inside an isolated disposable workspace at the exact mission commit. The main ERP working tree is not your workspace.
 Read AGENTS.md, .ai/prompts/_reviewer-common.md, and $rolePrompt. Obey those files exactly.
-You are read-only. Do not spawn subagents. Do not read sibling reports, prior AI-team reports, or qualification oracles.
+Work read-only: do not modify files. Use local shell/file-search commands only. Do not use git commands, MCP resources, apps, connectors, browser tools, or subagents.
+If repository access fails, do NOT invent a file:line anchor; leave evidenceAnchors empty and record the access gap in coverage.unresolved.
 
 Mission packet:
 $packetJson
 
 Return only JSON matching .ai/schemas/reviewer-findings.schema.json.
 "@
-            $promptPath = New-AgentPromptFile -Path (Join-Path $runDir "$role-prompt.txt") -Text $promptText
-            $raw = Join-Path $runDir "$role.raw.json"; $events = Join-Path $runDir "$role.events.jsonl"; $err = Join-Path $runDir "$role.stderr.txt"
-            Add-AITeamTrace -RunDir $runDir -Event 'REVIEWER_START' -Phase 'reviewers' -Role $role -Status 'RUNNING' | Out-Null
-            $modulePath = Join-Path $PSScriptRoot 'AITeamCodex.psm1'
-            $schema = Join-Path $RepoRoot ([string]$config.schemas.reviewer)
-            $effort = [string]$config.codex.reviewerReasoningEffort
-            $model = [string]$config.codex.model
-            $webAllowed = ([string]$mission.webPolicy -ne 'forbidden')
-            $job = Start-Job -ScriptBlock {
-                param($ModulePath,$Repo,$Prompt,$Schema,$Output,$Events,$Err,$Effort,$Model,$WebAllowed)
-                Import-Module $ModulePath -Force
-                Invoke-AITeamCodexExec -RepoRoot $Repo -PromptPath $Prompt -SchemaPath $Schema -OutputPath $Output -EventsPath $Events -StderrPath $Err -ReasoningEffort $Effort -Model $Model -WebAllowed ([bool]$WebAllowed)
-            } -ArgumentList $modulePath,$RepoRoot,$promptPath,$schema,$raw,$events,$err,$effort,$model,$webAllowed
-            $jobs += $job
-            $jobMeta[([string]$job.Id)] = [pscustomobject]@{ role=$role; raw=$raw; events=$events; err=$err }
-        }
+                $promptPath = New-AgentPromptFile -Path (Join-Path $runDir "$role-prompt.txt") -Text $promptText
+                $raw = Join-Path $runDir "$role.raw.json"; $events = Join-Path $runDir "$role.events.jsonl"; $err = Join-Path $runDir "$role.stderr.txt"
+                Add-AITeamTrace -RunDir $runDir -Event 'REVIEWER_START' -Phase 'reviewers' -Role $role -Status 'RUNNING' | Out-Null
+                $res = Invoke-AITeamCodexExec -RepoRoot ([string]$reviewWorkspace.path) -PromptPath $promptPath -SchemaPath (Join-Path $RepoRoot ([string]$config.schemas.reviewer)) -OutputPath $raw -EventsPath $events -StderrPath $err -ReasoningEffort ([string]$config.codex.reviewerReasoningEffort) -Model ([string]$config.codex.model) -WebAllowed ([string]$mission.webPolicy -ne 'forbidden') -Sandbox ([string]$config.codex.reviewerSandbox) -DisableExternalIntegrations ([bool]$config.codex.disableExternalIntegrationsForEngineering) -MaxPromptBytes ([int64]$config.codex.maxReviewerPromptBytes)
+                Add-Usage -Total $usageTotal -Usage $res.usage
+                Write-AITeamJsonFile -Value $res -Path (Join-Path $runDir "$role-execution.json")
 
-        if ($jobs.Count -gt 0) { Wait-Job -Job $jobs | Out-Null }
-        $passedRoles = @()
-        foreach ($job in $jobs) {
-            $meta = $jobMeta[([string]$job.Id)]
-            $role = [string]$meta.role
-            $res = @(Receive-Job -Job $job -ErrorAction SilentlyContinue) | Select-Object -Last 1
-            Remove-Job -Job $job -Force | Out-Null
-            if ($null -eq $res) {
-                Add-AITeamTrace -RunDir $runDir -Event 'REVIEWER_END' -Phase 'reviewers' -Role $role -Status 'FAIL' -Detail 'No execution result returned.' | Out-Null
-                continue
-            }
-            Add-Usage -Total $usageTotal -Usage $res.usage
-            Write-AITeamJsonFile -Value $res -Path (Join-Path $runDir "$role-execution.json")
-            if ($null -ne $res.PSObject.Properties['schemaPreflightPass'] -and -not [bool]$res.schemaPreflightPass) {
-                Add-AITeamTrace -RunDir $runDir -Event 'REVIEWER_END' -Phase 'reviewers' -Role $role -Status 'FAIL' -Detail "Schema preflight blocked before Codex: $(@($res.schemaPreflightErrors) -join ' | ')" | Out-Null
-                continue
-            }
-            if ([int]$res.exitCode -ne 0 -or -not (Test-Path -LiteralPath ([string]$meta.raw) -PathType Leaf)) {
-                Add-AITeamTrace -RunDir $runDir -Event 'REVIEWER_END' -Phase 'reviewers' -Role $role -Status 'FAIL' -Detail "Codex exit=$($res.exitCode)" | Out-Null
-                continue
-            }
-            $gate = Test-AITeamFindingReport -ReportPath ([string]$meta.raw) -RepoRoot $RepoRoot -ExpectedSha ([string]$run.commitSha) -ExpectedMission ([string]$mission.name) -ExpectedRole $role
-            Write-AITeamJsonFile -Value ([pscustomobject][ordered]@{ pass=$gate.pass; errors=$gate.errors; agentRole=$gate.agentRole; findingCount=$gate.findingCount; evidenceDigests=$gate.evidenceDigests }) -Path (Join-Path $runDir "finding-gate-$role.json")
-            if ($gate.pass) {
+                $workspaceState = Get-AITeamReviewWorkspaceState -WorkspaceRoot ([string]$reviewWorkspace.path)
+                Write-AITeamJsonFile -Value $workspaceState -Path (Join-Path $runDir "$role-workspace-state.json")
+                if (-not $workspaceState.clean) { throw "Reviewer $role modified its disposable workspace: $(@($workspaceState.changes) -join ' | ')" }
+
+                $budget = Test-AITeamCodexBudget -ExecutionResult $res -MaxInputTokens ([int64]$config.codex.reviewerInputTokenHardLimit) -MaxUncachedInputTokens ([int64]$config.codex.reviewerUncachedInputTokenHardLimit) -MaxPromptBytes ([int64]$config.codex.maxReviewerPromptBytes) -RequireNoMcpCalls ([bool]$config.codex.disableExternalIntegrationsForEngineering) -RequireNoSandboxProcessBlocks $true
+                Write-AITeamJsonFile -Value $budget -Path (Join-Path $runDir "$role-budget-gate.json")
+                if (-not $budget.pass) {
+                    Add-AITeamTrace -RunDir $runDir -Event 'REVIEWER_END' -Phase 'reviewers' -Role $role -Status 'FAIL' -Detail "Budget/transport gate: $(@($budget.errors) -join ' | ')" | Out-Null
+                    throw "Reviewer $role budget/transport gate failed: $(@($budget.errors) -join ' | ')"
+                }
+                if ($null -ne $res.PSObject.Properties['schemaPreflightPass'] -and -not [bool]$res.schemaPreflightPass) { throw "Reviewer $role schema preflight blocked before Codex." }
+                if ([int]$res.exitCode -ne 0 -or -not (Test-Path -LiteralPath $raw -PathType Leaf)) { throw "Reviewer $role Codex call failed with exit code $($res.exitCode)." }
+
+                $gate = Test-AITeamFindingReport -ReportPath $raw -RepoRoot $RepoRoot -ExpectedSha ([string]$run.commitSha) -ExpectedMission ([string]$mission.name) -ExpectedRole $role
+                Write-AITeamJsonFile -Value ([pscustomobject][ordered]@{ pass=$gate.pass; errors=$gate.errors; agentRole=$gate.agentRole; findingCount=$gate.findingCount; evidenceDigests=$gate.evidenceDigests }) -Path (Join-Path $runDir "finding-gate-$role.json")
+                if (-not $gate.pass) {
+                    Add-AITeamTrace -RunDir $runDir -Event 'REVIEWER_END' -Phase 'reviewers' -Role $role -Status 'FAIL' -Detail 'Finding Gate rejected report.' | Out-Null
+                    throw "Finding Gate rejected ${role}: $(@($gate.errors) -join ' | ')"
+                }
                 Write-AITeamJsonFile -Value $gate.leadView -Path (Join-Path $runDir "$role.lead.json")
                 $passedRoles += $role
-                Add-AITeamTrace -RunDir $runDir -Event 'REVIEWER_END' -Phase 'reviewers' -Role $role -Status 'PASS' -Detail "ms=$($res.elapsedMilliseconds); findings=$($gate.findingCount)" | Out-Null
-            } else {
-                Add-AITeamTrace -RunDir $runDir -Event 'REVIEWER_END' -Phase 'reviewers' -Role $role -Status 'FAIL' -Detail 'Finding Gate rejected report.' | Out-Null
+                Add-AITeamTrace -RunDir $runDir -Event 'REVIEWER_END' -Phase 'reviewers' -Role $role -Status 'PASS' -Detail "ms=$($res.elapsedMilliseconds); findings=$($gate.findingCount); input=$($res.usage.inputTokens); uncached=$($res.usage.uncachedInputTokens)" | Out-Null
+            }
+            finally {
+                if ($null -ne $reviewWorkspace) { try { Remove-AITeamReviewWorkspace -RepoRoot $RepoRoot -WorkspaceRoot ([string]$reviewWorkspace.path) | Out-Null } catch { } }
             }
         }
 
@@ -267,12 +280,14 @@ Return only JSON matching .ai/schemas/reviewer-findings.schema.json.
 
         if ($selected.Count -gt 0) {
             $leadViews = @()
-            foreach ($role in $selected) {
-                $leadViews += (Get-Content -LiteralPath (Join-Path $runDir "$role.lead.json") -Raw -Encoding UTF8)
-            }
-            $leadPrompt = @"
+            foreach ($role in $selected) { $leadViews += (Get-Content -LiteralPath (Join-Path $runDir "$role.lead.json") -Raw -Encoding UTF8) }
+            $leadWorkspace = $null
+            try {
+                $leadWorkspace = New-AITeamReviewWorkspace -RepoRoot $RepoRoot -CommitSha ([string]$run.commitSha) -Role 'lead'
+                $leadPrompt = @"
 You are the Lead Integrator for ERP Prototype.
-Read .ai/prompts/lead-integrator.md and obey it exactly. Work read-only. Do not spawn subagents.
+You are in an isolated disposable workspace at the exact mission commit. Do not modify files.
+Read .ai/prompts/lead-integrator.md and obey it exactly. Use local shell/file search only to reopen cited current source when required. Do not use git commands, MCP resources, apps, connectors, web, browser tools, or subagents.
 Mission packet:
 $packetJson
 
@@ -281,19 +296,30 @@ $($leadViews -join "`n--- REVIEWER ---`n")
 
 Return only JSON matching .ai/schemas/lead-report.schema.json.
 "@
-            $lp = New-AgentPromptFile -Path (Join-Path $runDir 'lead-prompt.txt') -Text $leadPrompt
-            $leadRaw=Join-Path $runDir 'lead.raw.json'; $leadEvents=Join-Path $runDir 'lead.events.jsonl'; $leadErr=Join-Path $runDir 'lead.stderr.txt'
-            Add-AITeamTrace -RunDir $runDir -Event 'LEAD_START' -Phase 'lead' -Role 'lead' -Status 'RUNNING' | Out-Null
-            $lr = Invoke-AITeamCodexExec -RepoRoot $RepoRoot -PromptPath $lp -SchemaPath (Join-Path $RepoRoot ([string]$config.schemas.lead)) -OutputPath $leadRaw -EventsPath $leadEvents -StderrPath $leadErr -ReasoningEffort ([string]$config.codex.leadReasoningEffort) -Model ([string]$config.codex.model) -WebAllowed $false
-            Add-Usage -Total $usageTotal -Usage $lr.usage
-            Write-AITeamJsonFile -Value $lr -Path (Join-Path $runDir 'lead-execution.json')
-            if ($null -ne $lr.PSObject.Properties['schemaPreflightPass'] -and -not [bool]$lr.schemaPreflightPass) { throw "Lead schema preflight blocked before Codex: $(@($lr.schemaPreflightErrors) -join ' | ')" }
-            if ($lr.exitCode -ne 0) { throw 'Lead Codex call failed.' }
-            $lg = Test-AITeamLeadReport -ReportPath $leadRaw -RepoRoot $RepoRoot -ExpectedSha ([string]$run.commitSha) -ExpectedMission ([string]$mission.name)
-            Write-AITeamJsonFile -Value $lg -Path (Join-Path $runDir 'lead-gate.json')
-            if (-not $lg.pass) { throw 'Lead Gate rejected report.' }
-            Add-AITeamTrace -RunDir $runDir -Event 'LEAD_END' -Phase 'lead' -Role 'lead' -Status 'PASS' -Detail "ms=$($lr.elapsedMilliseconds); verdict=$($lg.verdict)" | Out-Null
-        } else {
+                $lp = New-AgentPromptFile -Path (Join-Path $runDir 'lead-prompt.txt') -Text $leadPrompt
+                $leadRaw=Join-Path $runDir 'lead.raw.json'; $leadEvents=Join-Path $runDir 'lead.events.jsonl'; $leadErr=Join-Path $runDir 'lead.stderr.txt'
+                Add-AITeamTrace -RunDir $runDir -Event 'LEAD_START' -Phase 'lead' -Role 'lead' -Status 'RUNNING' | Out-Null
+                $lr = Invoke-AITeamCodexExec -RepoRoot ([string]$leadWorkspace.path) -PromptPath $lp -SchemaPath (Join-Path $RepoRoot ([string]$config.schemas.lead)) -OutputPath $leadRaw -EventsPath $leadEvents -StderrPath $leadErr -ReasoningEffort ([string]$config.codex.leadReasoningEffort) -Model ([string]$config.codex.model) -WebAllowed $false -Sandbox 'workspace-write' -DisableExternalIntegrations $true -MaxPromptBytes ([int64]$config.codex.maxLeadPromptBytes)
+                Add-Usage -Total $usageTotal -Usage $lr.usage
+                Write-AITeamJsonFile -Value $lr -Path (Join-Path $runDir 'lead-execution.json')
+                $leadState = Get-AITeamReviewWorkspaceState -WorkspaceRoot ([string]$leadWorkspace.path)
+                Write-AITeamJsonFile -Value $leadState -Path (Join-Path $runDir 'lead-workspace-state.json')
+                if (-not $leadState.clean) { throw "Lead modified its disposable workspace: $(@($leadState.changes) -join ' | ')" }
+                $leadBudget = Test-AITeamCodexBudget -ExecutionResult $lr -MaxInputTokens ([int64]$config.codex.leadInputTokenHardLimit) -MaxUncachedInputTokens ([int64]$config.codex.leadUncachedInputTokenHardLimit) -MaxPromptBytes ([int64]$config.codex.maxLeadPromptBytes) -RequireNoMcpCalls $true -RequireNoSandboxProcessBlocks $true
+                Write-AITeamJsonFile -Value $leadBudget -Path (Join-Path $runDir 'lead-budget-gate.json')
+                if (-not $leadBudget.pass) { throw "Lead budget/transport gate failed: $(@($leadBudget.errors) -join ' | ')" }
+                if ($null -ne $lr.PSObject.Properties['schemaPreflightPass'] -and -not [bool]$lr.schemaPreflightPass) { throw "Lead schema preflight blocked before Codex: $(@($lr.schemaPreflightErrors) -join ' | ')" }
+                if ($lr.exitCode -ne 0) { throw 'Lead Codex call failed.' }
+                $lg = Test-AITeamLeadReport -ReportPath $leadRaw -RepoRoot $RepoRoot -ExpectedSha ([string]$run.commitSha) -ExpectedMission ([string]$mission.name)
+                Write-AITeamJsonFile -Value $lg -Path (Join-Path $runDir 'lead-gate.json')
+                if (-not $lg.pass) { throw 'Lead Gate rejected report.' }
+                Add-AITeamTrace -RunDir $runDir -Event 'LEAD_END' -Phase 'lead' -Role 'lead' -Status 'PASS' -Detail "ms=$($lr.elapsedMilliseconds); verdict=$($lg.verdict)" | Out-Null
+            }
+            finally {
+                if ($null -ne $leadWorkspace) { try { Remove-AITeamReviewWorkspace -RepoRoot $RepoRoot -WorkspaceRoot ([string]$leadWorkspace.path) | Out-Null } catch { } }
+            }
+        }
+        else {
             Write-AITeamJsonFile -Value ([pscustomobject][ordered]@{ started=$false; reason='Router selected no substantive reviewer for this routing-only/trivial mission.' }) -Path (Join-Path $runDir 'lead-state.json')
             Add-AITeamTrace -RunDir $runDir -Event 'LEAD_SKIPPED' -Phase 'lead' -Status 'PASS' -Detail 'No selected reviewer.' | Out-Null
         }
@@ -316,8 +342,12 @@ Return only JSON matching .ai/schemas/lead-report.schema.json.
         apiRejectedBeforeGeneration = [int]$usageTotal.apiRejectedBeforeGeneration
         inputTokens = [int64]$usageTotal.inputTokens
         cachedInputTokens = [int64]$usageTotal.cachedInputTokens
+        uncachedInputTokens = [int64]$usageTotal.uncachedInputTokens
         outputTokens = [int64]$usageTotal.outputTokens
         reasoningTokens = [int64]$usageTotal.reasoningTokens
+        mcpToolCallCount = [int]$usageTotal.mcpToolCallCount
+        mcpResourceCallCount = [int]$usageTotal.mcpResourceCallCount
+        eventBytes = [int64]$usageTotal.eventBytes
         weeklyAllowancePercent = $null
         note = 'Token counts are parsed from Codex CLI turn.completed JSON events. Weekly allowance percentage is not inferred.'
     }
@@ -352,7 +382,9 @@ Return only JSON matching .ai/schemas/lead-report.schema.json.
     Write-Host "- Codex attempts: $($usageObj.modelAttempts)"
     Write-Host "- completed model calls: $($usageObj.modelCalls)"
     Write-Host "- pre-generation API rejects: $($usageObj.apiRejectedBeforeGeneration)"
-    Write-Host "- tokens: input=$($usageObj.inputTokens) cached=$($usageObj.cachedInputTokens) output=$($usageObj.outputTokens)"
+    Write-Host "- tokens: input=$($usageObj.inputTokens) cached=$($usageObj.cachedInputTokens) uncached=$($usageObj.uncachedInputTokens) output=$($usageObj.outputTokens) reasoning=$($usageObj.reasoningTokens)"
+    Write-Host "- MCP/app tool calls: $($usageObj.mcpToolCallCount)"
+    Write-Host "- Codex event bytes: $($usageObj.eventBytes)"
     Write-Host "- elapsed ms: $($final.elapsedMilliseconds)"
     Write-Host "- evidence: $runDir"
     Write-Host "- trace: $(Join-Path $runDir 'trace.jsonl')"
@@ -364,8 +396,8 @@ catch {
         Add-AITeamTrace -RunDir $runDir -Event 'RUN_ERROR' -Phase 'orchestration' -Status 'FAIL' -Detail $err | Out-Null
         $usageObj = [pscustomobject][ordered]@{
             status='direct-codex-cli-json-events'; estimated=$false; modelAttempts=[int]$usageTotal.modelAttempts; modelCalls=[int]$usageTotal.modelCalls; apiRejectedBeforeGeneration=[int]$usageTotal.apiRejectedBeforeGeneration;
-            inputTokens=[int64]$usageTotal.inputTokens; cachedInputTokens=[int64]$usageTotal.cachedInputTokens;
-            outputTokens=[int64]$usageTotal.outputTokens; reasoningTokens=[int64]$usageTotal.reasoningTokens;
+            inputTokens=[int64]$usageTotal.inputTokens; cachedInputTokens=[int64]$usageTotal.cachedInputTokens; uncachedInputTokens=[int64]$usageTotal.uncachedInputTokens;
+            outputTokens=[int64]$usageTotal.outputTokens; reasoningTokens=[int64]$usageTotal.reasoningTokens; mcpToolCallCount=[int]$usageTotal.mcpToolCallCount; mcpResourceCallCount=[int]$usageTotal.mcpResourceCallCount; eventBytes=[int64]$usageTotal.eventBytes;
             weeklyAllowancePercent=$null; note='Partial usage captured before failure.'
         }
         Write-AITeamJsonFile -Value $usageObj -Path (Join-Path $runDir 'model-usage.json')

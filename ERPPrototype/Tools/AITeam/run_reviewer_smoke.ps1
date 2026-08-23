@@ -11,6 +11,7 @@ Import-Module (Join-Path $PSScriptRoot 'AITeamGates.psm1') -Force
 Import-Module (Join-Path $PSScriptRoot 'AITeamRun.psm1') -Force
 Import-Module (Join-Path $PSScriptRoot 'AITeamCodex.psm1') -Force
 Import-Module (Join-Path $PSScriptRoot 'AITeamLocalRouter.psm1') -Force
+Import-Module (Join-Path $PSScriptRoot 'AITeamReviewWorkspace.psm1') -Force
 
 if (-not $RepoRoot) { $RepoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..\..')) }
 else { $RepoRoot = [System.IO.Path]::GetFullPath($RepoRoot) }
@@ -37,10 +38,12 @@ $run = New-AITeamRun -RepoRoot $RepoRoot -MissionId "$TestId-RSMK-$Role" -Missio
 $runDir = [string]$run.runDirectory
 $phaseMs = [ordered]@{}
 $runCompleted = $false
+$reviewWorkspace = $null
 $usageObj = [pscustomobject][ordered]@{
     status='direct-codex-cli-json-events'; estimated=$false; modelAttempts=0; modelCalls=0; apiRejectedBeforeGeneration=0;
-    inputTokens=[int64]0; cachedInputTokens=[int64]0; outputTokens=[int64]0; reasoningTokens=[int64]0;
-    weeklyAllowancePercent=$null; note='Single-reviewer smoke telemetry.'
+    inputTokens=[int64]0; cachedInputTokens=[int64]0; uncachedInputTokens=[int64]0; outputTokens=[int64]0; reasoningTokens=[int64]0;
+    mcpToolCallCount=0; mcpResourceCallCount=0; agentMessageCount=0; eventBytes=[int64]0; sandboxProcessBlockCount=0; promptBytes=[int64]0;
+    weeklyAllowancePercent=$null; note='Single-reviewer smoke telemetry with isolated workspace and budget gate.'
 }
 
 try {
@@ -70,7 +73,6 @@ try {
     Write-AITeamJsonFile -Value $missionGate -Path (Join-Path $runDir 'mission-gate.json')
     if (-not $missionGate.pass) { throw 'Mission Packet Gate failed.' }
 
-    # Prove the requested reviewer belongs to the local route, without any model router call.
     $rulesPath = Join-Path $RepoRoot ([string]$config.routing.rulesPath)
     $rulesCheck = Test-AITeamLocalRouterRules -RulesPath $rulesPath
     if (-not $rulesCheck.pass) { throw "Local router rules failed: $(@($rulesCheck.errors) -join ' | ')" }
@@ -84,14 +86,20 @@ try {
     $login = Get-AITeamCodexLoginStatus
     if (-not $login.installed -or -not $login.loggedIn) { throw 'Codex CLI is not installed/logged in.' }
 
+    $reviewWorkspace = New-AITeamReviewWorkspace -RepoRoot $RepoRoot -CommitSha ([string]$run.commitSha) -Role $Role
+    Write-AITeamJsonFile -Value $reviewWorkspace -Path (Join-Path $runDir 'review-workspace.json')
+    Add-AITeamTrace -RunDir $runDir -Event 'REVIEW_WORKSPACE_READY' -Phase 'reviewer-smoke' -Role $Role -Status 'PASS' -Detail "isolated=$($reviewWorkspace.path)" | Out-Null
+
     $packetJson = $packet | ConvertTo-Json -Depth 20
     $rolePrompt = [string]$roleConfig.prompt
     $promptText = @"
 You are the $Role independent reviewer for ERP Prototype.
 This is a SINGLE-REVIEWER SMOKE RUN. No sibling reviewer and no Lead will run.
+You are running inside an isolated disposable workspace at the exact mission commit. The main ERP working tree is not your workspace.
 Read AGENTS.md, .ai/prompts/_reviewer-common.md, and $rolePrompt. Obey them exactly.
-Work read-only. Do not spawn subagents. Do not read prior AI-team reports, qualification oracles, or sibling outputs.
+Work read-only: do not modify files. Use local shell/file-search commands only. Do not use git commands, MCP resources, apps, connectors, web, browser tools, or subagents.
 Use current repository code as implementation truth. Start narrow and expand only for a concrete evidence gap.
+If repository access fails, do NOT invent a file:line anchor; leave evidenceAnchors empty and explain the access gap in coverage.unresolved.
 
 Your JSON MUST use:
 - agentRole: "$Role"
@@ -110,7 +118,7 @@ Return only JSON matching .ai/schemas/reviewer-findings.schema.json.
 
     $sw = [System.Diagnostics.Stopwatch]::StartNew()
     Add-AITeamTrace -RunDir $runDir -Event 'REVIEWER_START' -Phase 'reviewer-smoke' -Role $Role -Status 'RUNNING' | Out-Null
-    $res = Invoke-AITeamCodexExec -RepoRoot $RepoRoot -PromptPath $promptPath -SchemaPath (Join-Path $RepoRoot ([string]$config.schemas.reviewer)) -OutputPath $raw -EventsPath $events -StderrPath $err -ReasoningEffort ([string]$config.codex.reviewerReasoningEffort) -Model ([string]$config.codex.model) -WebAllowed $false
+    $res = Invoke-AITeamCodexExec -RepoRoot ([string]$reviewWorkspace.path) -PromptPath $promptPath -SchemaPath (Join-Path $RepoRoot ([string]$config.schemas.reviewer)) -OutputPath $raw -EventsPath $events -StderrPath $err -ReasoningEffort ([string]$config.codex.reviewerReasoningEffort) -Model ([string]$config.codex.model) -WebAllowed $false -Sandbox ([string]$config.codex.reviewerSandbox) -DisableExternalIntegrations ([bool]$config.codex.disableExternalIntegrationsForEngineering) -MaxPromptBytes ([int64]$config.codex.maxReviewerPromptBytes)
     $sw.Stop(); $phaseMs.reviewer = [int64]$sw.ElapsedMilliseconds
     Write-AITeamJsonFile -Value $res -Path (Join-Path $runDir "$Role-execution.json")
 
@@ -118,17 +126,24 @@ Return only JSON matching .ai/schemas/reviewer-findings.schema.json.
         $u = $res.usage
         if ($null -ne $u.PSObject.Properties['modelAttempted'] -and [bool]$u.modelAttempted) { $usageObj.modelAttempts = 1 }
         if ($null -ne $u.PSObject.Properties['completedModelCalls']) { $usageObj.modelCalls = [int]$u.completedModelCalls }
-        elseif ($null -ne $u.PSObject.Properties['turnCompletedCount']) { $usageObj.modelCalls = [int]$u.turnCompletedCount }
         if ($null -ne $u.PSObject.Properties['apiRejectedBeforeGeneration']) { $usageObj.apiRejectedBeforeGeneration = [int]$u.apiRejectedBeforeGeneration }
-        foreach ($k in @('inputTokens','cachedInputTokens','outputTokens','reasoningTokens')) {
-            if ($null -ne $u.PSObject.Properties[$k]) { $usageObj.$k = [int64]$u.$k }
+        foreach ($k in @('inputTokens','cachedInputTokens','uncachedInputTokens','outputTokens','reasoningTokens','mcpToolCallCount','mcpResourceCallCount','agentMessageCount','eventBytes')) {
+            if ($null -ne $u.PSObject.Properties[$k]) { $usageObj.$k = $u.$k }
         }
     }
+    if ($null -ne $res.PSObject.Properties['sandboxProcessBlockCount']) { $usageObj.sandboxProcessBlockCount = [int]$res.sandboxProcessBlockCount }
+    if ($null -ne $res.PSObject.Properties['promptBytes']) { $usageObj.promptBytes = [int64]$res.promptBytes }
     Write-AITeamJsonFile -Value $usageObj -Path (Join-Path $runDir 'model-usage.json')
 
-    if ($null -ne $res.PSObject.Properties['schemaPreflightPass'] -and -not [bool]$res.schemaPreflightPass) {
-        throw "Reviewer schema preflight blocked before Codex: $(@($res.schemaPreflightErrors) -join ' | ')"
-    }
+    $workspaceState = Get-AITeamReviewWorkspaceState -WorkspaceRoot ([string]$reviewWorkspace.path)
+    Write-AITeamJsonFile -Value $workspaceState -Path (Join-Path $runDir 'review-workspace-state.json')
+    if (-not $workspaceState.clean) { throw "Reviewer modified the disposable review workspace: $(@($workspaceState.changes) -join ' | ')" }
+
+    $budget = Test-AITeamCodexBudget -ExecutionResult $res -MaxInputTokens ([int64]$config.codex.reviewerInputTokenHardLimit) -MaxUncachedInputTokens ([int64]$config.codex.reviewerUncachedInputTokenHardLimit) -MaxPromptBytes ([int64]$config.codex.maxReviewerPromptBytes) -RequireNoMcpCalls ([bool]$config.codex.disableExternalIntegrationsForEngineering) -RequireNoSandboxProcessBlocks $true
+    Write-AITeamJsonFile -Value $budget -Path (Join-Path $runDir 'reviewer-budget-gate.json')
+
+    if ($null -ne $res.PSObject.Properties['schemaPreflightPass'] -and -not [bool]$res.schemaPreflightPass) { throw "Reviewer schema preflight blocked before Codex: $(@($res.schemaPreflightErrors) -join ' | ')" }
+    if ($null -ne $res.PSObject.Properties['promptPreflightPass'] -and -not [bool]$res.promptPreflightPass) { throw 'Reviewer prompt preflight blocked before Codex.' }
     if ([int]$res.exitCode -ne 0 -or -not (Test-Path -LiteralPath $raw -PathType Leaf)) { throw "Reviewer Codex call failed with exit code $($res.exitCode)." }
 
     $gate = Test-AITeamFindingReport -ReportPath $raw -RepoRoot $RepoRoot -ExpectedSha ([string]$run.commitSha) -ExpectedMission ([string]$mission.name) -ExpectedRole $Role
@@ -137,8 +152,13 @@ Return only JSON matching .ai/schemas/reviewer-findings.schema.json.
         Add-AITeamTrace -RunDir $runDir -Event 'REVIEWER_END' -Phase 'reviewer-smoke' -Role $Role -Status 'FAIL' -Detail 'Finding Gate rejected report.' | Out-Null
         throw "Finding Gate rejected $Role smoke report: $(@($gate.errors) -join ' | ')"
     }
+    if (-not $budget.pass) {
+        Add-AITeamTrace -RunDir $runDir -Event 'REVIEWER_END' -Phase 'reviewer-smoke' -Role $Role -Status 'FAIL' -Detail "Budget Gate: $(@($budget.errors) -join ' | ')" | Out-Null
+        throw "Reviewer budget/transport gate failed: $(@($budget.errors) -join ' | ')"
+    }
+
     Write-AITeamJsonFile -Value $gate.leadView -Path (Join-Path $runDir "$Role.lead.json")
-    Add-AITeamTrace -RunDir $runDir -Event 'REVIEWER_END' -Phase 'reviewer-smoke' -Role $Role -Status 'PASS' -Detail "ms=$($phaseMs.reviewer); findings=$($gate.findingCount)" | Out-Null
+    Add-AITeamTrace -RunDir $runDir -Event 'REVIEWER_END' -Phase 'reviewer-smoke' -Role $Role -Status 'PASS' -Detail "ms=$($phaseMs.reviewer); findings=$($gate.findingCount); input=$($usageObj.inputTokens); uncached=$($usageObj.uncachedInputTokens)" | Out-Null
 
     Write-AITeamJsonFile -Value ([pscustomobject][ordered]@{ started=$false; expected=$false; reason='Single-reviewer smoke deliberately stops before Lead.' }) -Path (Join-Path $runDir 'lead-state.json')
     Add-AITeamTrace -RunDir $runDir -Event 'LEAD_SKIPPED' -Phase 'lead' -Status 'PASS' -Detail 'Reviewer smoke deliberately stops before Lead.' | Out-Null
@@ -147,26 +167,32 @@ Return only JSON matching .ai/schemas/reviewer-findings.schema.json.
     Write-AITeamJsonFile -Value $after -Path (Join-Path $runDir 'repo-after.json')
     $clean = Compare-AITeamRepoState -Baseline $before -Current $after
     Write-AITeamJsonFile -Value $clean -Path (Join-Path $runDir 'cleanliness-result.json')
-    if (-not $clean.pass) { throw 'Cleanliness Gate failed.' }
+    if (-not $clean.pass) { throw 'Main repository Cleanliness Gate failed.' }
 
     $result = [pscustomobject][ordered]@{
         schemaVersion=1; testId=$TestId; smokeRole=$Role; commitSha=[string]$run.commitSha; teamVersion=[string]$run.teamVersion;
         result='PASS'; localFullRoute=$selected; reviewerStartedCount=1; leadStarted=$false; findingCount=[int]$gate.findingCount;
-        cleanlinessPass=$true; usageTelemetry=$usageObj; evidenceDirectory=$runDir; traceFile=(Join-Path $runDir 'trace.jsonl')
+        cleanlinessPass=$true; reviewerWorkspaceClean=$true; budgetPass=$true; usageTelemetry=$usageObj; evidenceDirectory=$runDir; traceFile=(Join-Path $runDir 'trace.jsonl')
     }
     Write-AITeamJsonFile -Value $result -Path (Join-Path $runDir 'result.json')
-    $final = Complete-AITeamRun -RunDir $runDir -Result 'PASS' -Summary "reviewer=$Role; gate=True; leadStarted=False; attempts=$($usageObj.modelAttempts); completedCalls=$($usageObj.modelCalls)" -PhaseMilliseconds $phaseMs -UsageTelemetry $usageObj
+    $final = Complete-AITeamRun -RunDir $runDir -Result 'PASS' -Summary "reviewer=$Role; gate=True; isolated=True; budget=True; attempts=$($usageObj.modelAttempts); completedCalls=$($usageObj.modelCalls)" -PhaseMilliseconds $phaseMs -UsageTelemetry $usageObj
     $runCompleted = $true
 
     Write-Host ''
     Write-Host "AI TEAM REVIEWER SMOKE ${TestId} / ${Role}: PASS"
+    Write-Host '- isolated review workspace: PASS'
     Write-Host '- reviewers started: 1'
     Write-Host '- Lead started: False'
     Write-Host "- Finding Gate: PASS; findings=$($gate.findingCount)"
+    Write-Host '- Budget/transport Gate: PASS'
     Write-Host "- Codex attempts: $($usageObj.modelAttempts)"
     Write-Host "- completed model calls: $($usageObj.modelCalls)"
-    Write-Host "- pre-generation API rejects: $($usageObj.apiRejectedBeforeGeneration)"
-    Write-Host "- tokens: input=$($usageObj.inputTokens) cached=$($usageObj.cachedInputTokens) output=$($usageObj.outputTokens) reasoning=$($usageObj.reasoningTokens)"
+    Write-Host "- tokens: input=$($usageObj.inputTokens) cached=$($usageObj.cachedInputTokens) uncached=$($usageObj.uncachedInputTokens) output=$($usageObj.outputTokens) reasoning=$($usageObj.reasoningTokens)"
+    Write-Host "- MCP/app tool calls: $($usageObj.mcpToolCallCount)"
+    Write-Host "- MCP resource calls: $($usageObj.mcpResourceCallCount)"
+    Write-Host "- Codex event bytes: $($usageObj.eventBytes)"
+    Write-Host "- sandbox process blocks: $($usageObj.sandboxProcessBlockCount)"
+    Write-Host "- prompt bytes: $($usageObj.promptBytes)"
     Write-Host "- reviewer ms: $($phaseMs.reviewer)"
     Write-Host "- total ms: $($final.elapsedMilliseconds)"
     Write-Host "- evidence: $runDir"
@@ -188,4 +214,12 @@ catch {
     Write-Host "- error: $errMessage"
     Write-Host "- evidence: $runDir"
     throw $errMessage
+}
+finally {
+    if ($null -ne $reviewWorkspace -and -not [string]::IsNullOrWhiteSpace([string]$reviewWorkspace.path)) {
+        try {
+            $removed = Remove-AITeamReviewWorkspace -RepoRoot $RepoRoot -WorkspaceRoot ([string]$reviewWorkspace.path)
+            if (-not $removed) { Add-AITeamTrace -RunDir $runDir -Event 'WORKSPACE_CLEANUP' -Phase 'reviewer-smoke' -Role $Role -Status 'WARN' -Detail 'Isolated review workspace cleanup could not be confirmed.' | Out-Null }
+        } catch { }
+    }
 }

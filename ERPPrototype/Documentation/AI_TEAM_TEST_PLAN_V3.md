@@ -171,3 +171,18 @@ Before another full model-backed qualification mission, run `erp-ai-team smoke-r
 
 ## V3.4.1 single-reviewer smoke gate
 Before the first full multi-reviewer model mission, run one selected reviewer only (for AIT-02, `revo`) with `erp-ai-team smoke-reviewer AIT-02 revo`. This validates reviewer execution, structured output, Finding Gate, evidence anchors, cleanliness, timing, and direct token telemetry while deliberately skipping sibling reviewers and Lead. It is a qualification smoke, not a substitute for the full mission.
+
+## V3.5 — isolated single-reviewer requalification
+
+The V3.4.3 Revo smoke is a historical failed transport benchmark, not a reviewer-quality benchmark. Its model turn completed, but every repository read/search process was blocked before creation; it then called an MCP resource listing and accumulated 208,253 input tokens (148,736 cached) before returning an evidence-free report. The harness subsequently crashed while parsing a long pseudo evidence string ending in `:9`.
+
+Before any further paid qualification:
+
+1. Run `Test-AITeamRuntimeCompatibility.ps1` only. It must prove safe evidence rejection, disposable review-worktree lifecycle, unchanged primary worktree, UTF-16/reasoning telemetry, budget gating, minimal integration wiring, and PowerShell syntax with **zero Codex calls**.
+2. Commit/push only after that local compatibility test passes.
+3. Then run exactly one `erp-ai-team smoke-reviewer AIT-02 revo` and stop.
+4. The Revo smoke must show: isolated workspace clean, primary repo clean, no sandbox process blocks, no MCP/app calls, Finding Gate PASS, and direct input/cached/uncached/output/reasoning telemetry.
+5. Treat the first post-V3.5 Revo call as a measurement. Do not claim the token target is solved until measured. If input exceeds 120,000 or uncached input exceeds 70,000, Budget Gate fails and no sibling reviewer/Lead may start.
+6. Only after the Revo transport/evidence/cost smoke passes may AIT-02 proceed to its remaining reviewers and Lead.
+
+The goal is not to make reviewers shallow. The goal is to spend model context on current-code reasoning rather than sandbox failures, plugin discovery, or orchestration overhead.

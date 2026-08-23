@@ -81,6 +81,10 @@ switch ($Command) {
         $localRouterCheck = Test-AITeamLocalRouterRules -RulesPath $rulesPath
         Write-Host "- Local router rules: $(if ($localRouterCheck.pass) { 'PASS' } else { 'FAIL' })"
         Write-Host "- Routing strategy: $([string]$config.routing.strategy)"
+        Write-Host "- Reviewer isolation: disposable exact-commit Git worktree + $([string]$config.codex.reviewerSandbox) sandbox"
+        Write-Host "- Engineering integrations disabled: $([bool]$config.codex.disableExternalIntegrationsForEngineering)"
+        Write-Host "- Reviewer budgets: prompt<=$([int64]$config.codex.maxReviewerPromptBytes) bytes; input<=$([int64]$config.codex.reviewerInputTokenHardLimit); uncached<=$([int64]$config.codex.reviewerUncachedInputTokenHardLimit)"
+        Write-Host "- Qualification reviewer execution: $([string]$config.codex.qualificationReviewerExecution)"
         if (-not $localRouterCheck.pass) { foreach ($e in @($localRouterCheck.errors)) { Write-Host "  - $e" } }
         $schemaErrors = New-Object System.Collections.Generic.List[string]
         foreach ($schemaKey in @('routingPlan','reviewer','lead','product')) {
@@ -125,7 +129,8 @@ switch ($Command) {
     'usage' {
         $index = Join-Path $StateRoot 'runs-index.jsonl'
         if (-not (Test-Path -LiteralPath $index -PathType Leaf)) { Write-Host 'No run history yet.'; break }
-        $totalIn=[int64]0; $totalCached=[int64]0; $totalOut=[int64]0
+        $totalIn=[int64]0; $totalCached=[int64]0; $totalUncached=[int64]0; $totalOut=[int64]0; $totalReasoning=[int64]0
+        $totalMcp=0
         $attempts=0; $completedCalls=0; $preGenerationRejects=0; $runsWithTokens=0; $legacyUsageRecords=0
         foreach ($line in @(Get-Content -LiteralPath $index -Encoding UTF8)) {
             if ([string]::IsNullOrWhiteSpace($line)) { continue }
@@ -135,11 +140,16 @@ switch ($Command) {
             try { $m = Get-Content -LiteralPath $metricsPath -Raw -Encoding UTF8 | ConvertFrom-Json } catch { continue }
             if ($null -eq $m.usageTelemetry) { continue }
             $u = $m.usageTelemetry
-            $in=[int64]0; $cached=[int64]0; $out=[int64]0
+            $in=[int64]0; $cached=[int64]0; $uncached=[int64]0; $out=[int64]0; $reasoning=[int64]0
             if ($null -ne $u.PSObject.Properties['inputTokens']) { $in = [int64]$u.inputTokens; $totalIn += $in }
             if ($null -ne $u.PSObject.Properties['cachedInputTokens']) { $cached = [int64]$u.cachedInputTokens; $totalCached += $cached }
+            if ($null -ne $u.PSObject.Properties['uncachedInputTokens']) { $uncached = [int64]$u.uncachedInputTokens }
+            else { $uncached = [Math]::Max([int64]0, $in - $cached) }
+            $totalUncached += $uncached
             if ($null -ne $u.PSObject.Properties['outputTokens']) { $out = [int64]$u.outputTokens; $totalOut += $out }
-            if (($in + $cached + $out) -gt 0) { $runsWithTokens++ }
+            if ($null -ne $u.PSObject.Properties['reasoningTokens']) { $reasoning = [int64]$u.reasoningTokens; $totalReasoning += $reasoning }
+            if ($null -ne $u.PSObject.Properties['mcpToolCallCount']) { $totalMcp += [int]$u.mcpToolCallCount }
+            if (($in + $out) -gt 0) { $runsWithTokens++ }
 
             if ($null -ne $u.PSObject.Properties['modelAttempts']) {
                 $attempts += [int]$u.modelAttempts
@@ -159,7 +169,10 @@ switch ($Command) {
         Write-Host "- runs with measured tokens: $runsWithTokens"
         Write-Host "- input tokens: $totalIn"
         Write-Host "- cached input tokens: $totalCached"
+        Write-Host "- uncached input tokens: $totalUncached"
         Write-Host "- output tokens: $totalOut"
+        Write-Host "- reasoning tokens: $totalReasoning"
+        Write-Host "- MCP/app tool calls: $totalMcp"
         if ($legacyUsageRecords -gt 0) { Write-Host "- legacy pre-V3.3.4 usage records with old call semantics: $legacyUsageRecords" }
         Write-Host '- weekly allowance percentage is not inferred; record UI snapshots with: erp-ai-team allowance 79'
         break

@@ -7,7 +7,7 @@ import re
 import sys
 from pathlib import Path
 
-LOC = re.compile(r"^(?P<file>.+):(?P<line>[1-9][0-9]*)$")
+LOC = re.compile(r"^(?P<file>[^:\r\n]+):(?P<line>[1-9][0-9]*)$")
 FULL_SHA = re.compile(r"^[0-9a-fA-F]{40}$")
 FINDING_ID = re.compile(r"^[A-Z][A-Z0-9-]*-[0-9]{2}$")
 
@@ -18,23 +18,29 @@ def die(msg: str) -> None:
 
 
 def check_location(repo_root: Path, location: str) -> None:
+    if not location or len(location) > 260:
+        die("evidence location must be a repository-relative file:line and <= 260 characters")
     m = LOC.fullmatch(location)
     if not m:
-        die("evidence location must be file:line")
-    p = (repo_root / m.group("file")).resolve()
+        die("evidence location must be a repository-relative file:line")
+    rel = m.group("file")
+    if len(rel) > 240 or Path(rel).is_absolute() or re.match(r"^[A-Za-z]:", rel):
+        die(f"invalid repository-relative evidence path: {rel}")
     try:
-        p.relative_to(repo_root.resolve())
-    except ValueError:
-        die(f"evidence escapes repo: {p}")
+        root = repo_root.resolve()
+        p = (root / rel).resolve()
+        p.relative_to(root)
+    except (OSError, RuntimeError, ValueError) as ex:
+        die(f"invalid evidence path {rel!r}: {ex}")
     if not p.is_file():
-        die(f"evidence file missing: {m.group('file')}")
+        die(f"evidence file missing: {rel}")
     line_no = int(m.group("line"))
     try:
         line_count = sum(1 for _ in p.open("r", encoding="utf-8", errors="ignore"))
     except OSError as ex:
         die(f"cannot read evidence file: {ex}")
     if line_no > line_count:
-        die(f"evidence line {line_no} > {line_count}: {m.group('file')}")
+        die(f"evidence line {line_no} > {line_count}: {rel}")
 
 
 def main() -> int:

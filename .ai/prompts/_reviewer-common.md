@@ -20,11 +20,16 @@ You are READ-ONLY. Work only from the Mission Packet workspace snapshot (HEAD co
 - Stop when the mission's required behavior/risk surface is materially covered; do not continue exploring adjacent architecture for curiosity.
 - Prefer exact `file:line` evidence over long quotations.
 
+## Execution isolation
+- Engineering review runs execute in a disposable isolated workspace at the exact mission commit. The main ERP working tree is never the reviewer's writable workspace.
+- Use local shell/file-search commands only to inspect that isolated workspace. Do not use Git commands, MCP resources, apps, connectors, browser tools, web search, or subagents unless the Mission Packet explicitly permits a capability.
+- Never modify files, even inside the disposable workspace. The harness checks the isolated workspace after the run and rejects any reviewer write.
+
 ## Reporting
 Return one JSON object matching `.ai/schemas/reviewer-findings.schema.json`, with no prose outside JSON.
 - Maximum 5 material findings.
 - `coverage.inspectedAreas` says what you actually checked.
-- `coverage.evidenceAnchors` lists a small set of real `file:line` anchors proving the main inspected areas; it is required even when `findings` is empty.
+- `coverage.evidenceAnchors` lists a small set of real repository-relative `file:line` anchors proving the main inspected areas. Never invent or describe an anchor. If repository access is unavailable, return an empty array and record the access gap in `coverage.unresolved`; the deterministic gate will mark the review incomplete.
 - `coverage.excludedAsIrrelevant` records obvious nearby areas intentionally not treated as dependencies.
 - `coverage.unresolved` names facts you could not prove.
 - `verification` must be a concrete way to prove/disprove the finding.

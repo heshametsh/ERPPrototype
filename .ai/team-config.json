@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "teamVersion": "3.4.3",
-  "operatingProfile": "local-first-hybrid-router-reviewer-smoke-mode-contract-ps51-safe",
+  "teamVersion": "3.5.3",
+  "operatingProfile": "isolated-reviewers-token-guard-native-git-stderr-ps51-safe",
   "maxConcurrentReviewers": 3,
   "maxReviewWaves": 2,
   "maxInitialContextFilesPerReviewer": 8,
@@ -108,7 +108,20 @@
     "model": "",
     "captureJsonEvents": true,
     "captureDirectTokenUsage": true,
-    "ordinaryExecOnly": true
+    "ordinaryExecOnly": true,
+    "reviewerSandbox": "workspace-write",
+    "disableExternalIntegrationsForEngineering": true,
+    "maxReviewerPromptBytes": 32768,
+    "reviewerInputTokenHardLimit": 120000,
+    "reviewerUncachedInputTokenHardLimit": 70000,
+    "stopQualificationOnReviewerBudgetBreach": true,
+    "qualificationReviewerExecution": "sequential-budget-aware",
+    "maxLeadPromptBytes": 65536,
+    "leadInputTokenHardLimit": 140000,
+    "leadUncachedInputTokenHardLimit": 80000,
+    "maxProductPromptBytes": 32768,
+    "productInputTokenHardLimit": 120000,
+    "productUncachedInputTokenHardLimit": 70000
   },
   "routing": {
     "strategy": "local-first-ai-fallback",

@@ -345,7 +345,7 @@ Normal AI-Team execution now begins outside the Codex desktop conversation:
 3. Deterministic missions run without starting Codex at all.
 4. Model missions require Codex CLI authenticated through ChatGPT. The harness, not a parent chat, invokes model work.
 5. A low-effort router selects the smallest engineering specialist set; product missions route directly to Product Partner.
-6. Independent reviewers run read-only and concurrently up to the configured limit.
+6. Qualification reviewers run independently and sequentially under V3.5 budget guards; normal routing still limits the selected specialist set.
 7. Finding/Completion gates run before Lead. Failed/missing reviewers cannot be replaced with placeholders.
 8. Codex CLI JSON events are saved per call and direct token usage is aggregated. Weekly allowance percentage remains an external UI signal and is never guessed.
 9. The same run directory retains routing, model events, model usage, gates, Lead/product output, cleanliness, trace, metrics, and final result.
@@ -363,3 +363,20 @@ Direct usage telemetry now separates `modelAttempts`, completed `modelCalls`, an
 Routing is now deterministic first. `AITeamLocalRouter.psm1` reads only the mission packet, team config and `.ai/routing-rules.json`; it does not read repository code, prior reports, qualification oracles or Codex output. Clear missions are routed locally at zero model cost. Only an ambiguous route may invoke the AI Mission Router as a single fallback call.
 
 The local router uses explicit role signals and risk combinations. Legacy review requires explicit Tabulator/legacy relevance. Performance and persistence missions deliberately reserve reviewer capacity for cross-layer mapping/architecture rather than filling the team with every technically plausible specialist. Qualification oracles are evaluated only after the route is produced.
+
+## V3.5 reviewer isolation, transport safety, and cost guard
+
+The first real Revo reviewer smoke proved that a model call could complete while the reviewer had **no current-code access**: native Windows `read-only` sandboxing rejected every local read/search process before creation. The reviewer correctly refused to invent a code cause, but an invalid diagnostic string ending in `:9` then reached the evidence-path parser and triggered the Windows path-length exception. The same failed turn also exposed a costly MCP/app resource detour and 208k cumulative input tokens.
+
+V3.5 changes reviewer execution without weakening reviewer independence:
+
+1. Every engineering reviewer/Lead/Product call runs in a **disposable detached Git worktree** at the exact mission commit, under a short state-root path.
+2. Codex receives that disposable workspace with `workspace-write` so native read/search commands can execute on Windows. The model is still instructed not to modify files, and the host checks `git status` after the call; any modification fails the run. The primary ERP worktree is never the model workspace and is fingerprint-checked separately.
+3. Engineering calls disable nonessential Codex plugin/app/connector/MCP surfaces process-locally. Review prompts explicitly prohibit MCP/apps/connectors/subagents and require local current-code evidence.
+4. Qualification reviewers run **sequentially and budget-aware**, not in parallel. One transport or budget failure stops the wave before more reviewer allowance is spent.
+5. Prompt bytes are capped before model launch. Direct token/MCP/sandbox telemetry is checked after each completed call; an over-budget call cannot trigger the next reviewer or Lead.
+6. Evidence locations are strict repository-relative `file:line` values with bounded length. Invalid or oversized evidence returns a normal Finding Gate failure; it must never throw `Path.GetFullPath`.
+7. A reviewer that cannot access the repository may return empty `coverage.evidenceAnchors` plus an unresolved access gap. The model schema permits that honest failure state, while Finding Gate still requires at least one real anchor before a report can PASS.
+8. Codex JSON-event parsing is BOM-aware and records `reasoning_output_tokens`, uncached input, MCP calls, and event bytes.
+
+V3.5 is a transport/cost-control change. It does not authorize runtime ERP edits, does not pre-seed reviewer conclusions, and does not reduce the requirement for current-code evidence.

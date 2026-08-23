@@ -76,12 +76,12 @@
         },
         "evidenceAnchors": {
           "type": "array",
-          "minItems": 1,
+          "minItems": 0,
           "maxItems": 8,
           "items": {
             "type": "string",
-            "pattern": "^.+:[0-9]+$",
-            "maxLength": 300
+            "pattern": "^[^:\\r\\n]+:[1-9][0-9]*$",
+            "maxLength": 260
           }
         }
       }
@@ -124,7 +124,8 @@
               "properties": {
                 "location": {
                   "type": "string",
-                  "pattern": "^.+:[0-9]+$"
+                  "pattern": "^[^:\\r\\n]+:[1-9][0-9]*$",
+                  "maxLength": 260
                 },
                 "detail": {
                   "type": "string",

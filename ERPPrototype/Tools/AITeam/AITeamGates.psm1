@@ -24,12 +24,42 @@ function Invoke-AITeamGit {
         [Parameter(Mandatory)][string]$RepoRoot,
         [Parameter(Mandatory)][string[]]$Arguments
     )
-    $output = & git -C $RepoRoot @Arguments 2>&1
-    $code = $LASTEXITCODE
-    if ($code -ne 0) {
-        throw "git $($Arguments -join ' ') failed: $($output -join [Environment]::NewLine)"
+
+    # Windows PowerShell 5.1 turns native STDERR into ErrorRecord objects.
+    # With ErrorActionPreference=Stop, harmless Git warnings (for example
+    # LF -> CRLF warnings on a dirty working tree) can otherwise abort the
+    # harness even when Git exits 0. Capture both streams under Continue,
+    # return STDOUT only on success, and surface STDERR only on real failure.
+    $previousPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        $items = @(& git -C $RepoRoot @Arguments 2>&1)
+        $code = $LASTEXITCODE
     }
-    return ($output -join "`n")
+    finally {
+        $ErrorActionPreference = $previousPreference
+    }
+
+    $stdout = New-Object System.Collections.Generic.List[string]
+    $stderr = New-Object System.Collections.Generic.List[string]
+    foreach ($item in @($items)) {
+        if ($item -is [System.Management.Automation.ErrorRecord]) {
+            if ($null -ne $item.Exception -and -not [string]::IsNullOrWhiteSpace([string]$item.Exception.Message)) {
+                $stderr.Add([string]$item.Exception.Message)
+            }
+            else { $stderr.Add([string]$item) }
+        }
+        else {
+            $stdout.Add([string]$item)
+        }
+    }
+
+    if ($code -ne 0) {
+        $details = @($stdout) + @($stderr)
+        throw "git $($Arguments -join ' ') failed (exit $code): $($details -join [Environment]::NewLine)"
+    }
+
+    return ([string](@($stdout) -join "`n")).TrimEnd()
 }
 
 function Get-AITeamRepoState {
@@ -133,15 +163,33 @@ function Test-AITeamEvidenceLocation {
         [Parameter(Mandatory)][string]$Location
     )
 
-    if ($Location -notmatch '^(?<file>.+):(?<line>[1-9][0-9]*)$') {
-        return [pscustomobject][ordered]@{ pass=$false; error='evidence location must be file:line'; file=$null; line=$null }
+    if ([string]::IsNullOrWhiteSpace($Location)) {
+        return [pscustomobject][ordered]@{ pass=$false; error='evidence location is empty'; file=$null; line=$null }
+    }
+    if ($Location.Length -gt 260) {
+        return [pscustomobject][ordered]@{ pass=$false; error='evidence location exceeds 260 characters'; file=$null; line=$null }
+    }
+    if ($Location -notmatch '^(?<file>[^:\r\n]+):(?<line>[1-9][0-9]*)$') {
+        return [pscustomobject][ordered]@{ pass=$false; error='evidence location must be a repository-relative file:line'; file=$null; line=$null }
     }
 
-    $root = [System.IO.Path]::GetFullPath($RepoRoot)
-    $rootPrefix = $root.TrimEnd([System.IO.Path]::DirectorySeparatorChar, [System.IO.Path]::AltDirectorySeparatorChar) + [System.IO.Path]::DirectorySeparatorChar
-    $rel = $Matches.file
+    $rel = [string]$Matches.file
     $lineNo = [int]$Matches.line
-    $full = [System.IO.Path]::GetFullPath((Join-Path $root $rel))
+    if ($rel.Length -gt 240) {
+        return [pscustomobject][ordered]@{ pass=$false; error='evidence file path exceeds 240 characters'; file=$rel; line=$lineNo }
+    }
+    if ([System.IO.Path]::IsPathRooted($rel) -or $rel -match '^[A-Za-z]:') {
+        return [pscustomobject][ordered]@{ pass=$false; error="evidence path must be repository-relative: $rel"; file=$rel; line=$lineNo }
+    }
+
+    try {
+        $root = [System.IO.Path]::GetFullPath($RepoRoot)
+        $rootPrefix = $root.TrimEnd([System.IO.Path]::DirectorySeparatorChar, [System.IO.Path]::AltDirectorySeparatorChar) + [System.IO.Path]::DirectorySeparatorChar
+        $full = [System.IO.Path]::GetFullPath((Join-Path $root $rel))
+    }
+    catch {
+        return [pscustomobject][ordered]@{ pass=$false; error="invalid evidence path: $rel"; file=$rel; line=$lineNo }
+    }
 
     if (-not $full.StartsWith($rootPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
         return [pscustomobject][ordered]@{ pass=$false; error="evidence escapes repo: $rel"; file=$rel; line=$lineNo }
