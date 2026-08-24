@@ -6,6 +6,10 @@
 **Current production runtime baseline retained:** `0f6bd3b`  
 **Latest reviewed Git HEAD:** `04e0f1a`
 
+## Native V1 cleanup override — 2026-08-24
+
+The active AI-engineering surface is defined by `AGENTS.md`, this Decisions Log, `.ai/prompts/native-reviewer-v1.md`, and `ERPPrototype/Tools/AITeam/NativeV1/`. Project Brain, V2/V3 qualification, and the old reviewer/harness infrastructure are archived under `ERPPrototype/Documentation/Archive/AI-Team-V3/`; they are retained for history only.
+
 ## ترتيب الثقة عند التعارض
 
 1. **الكود الحالي + Migrations + Tests في نفس الـbaseline** — الحقيقة لما هو منفذ فعليًا.
@@ -34,8 +38,8 @@
 | `08_DECISIONS_LOG.md` | سجل القرارات؛ تمت إضافة قرارات ما بعد الـAudit في أعلى الملف |
 | `09_REFACTOR_ROADMAP.md` | التاريخ السابق + ترتيب remediation الحالي في أعلى الملف |
 | `10_RELEASE_READINESS_PLAN.md` | بوابات Staging/Pilot/Production الحالية |
-| `AI_AGENT_WORKFLOW_V3.md` | نظام تشغيل فريق الـAI: Product Partner، Change Map، Specialists، Evidence Gate، Single Implementer |
-| `brain/README.md` | Project Brain V1: حدود الحقيقة، Decision Index، Field Aliases، وقواعد التحقق |
+| `Archive/AI-Team-V3/ERPPrototype/Documentation/AI_AGENT_WORKFLOW_V3.md` | Historical AI-team workflow; archived and not active |
+| `Archive/AI-Team-V3/` | Historical Project Brain, qualification, reviewer, and harness material; not an active dependency |
 
 ## وثائق المنتج والهندسة الأساسية
 
@@ -63,13 +67,9 @@
 - `/work-orders` الحقيقي ما زال Tabulator 6.5.0؛ قرار RevoGrid لم يتحول بعد إلى production integration.
 - Univer comparison stopped after a real native mismatch with the approved end-of-sheet Paste rule.
 - **Current Revo state:** isolated `/work-orders-revogrid-gate5b5` has Edit/Paste/History/Dirty/Filter/Sort/Header Selection/Insert-Delete/Remaining sync; real database Save and production cutover are still not implemented.
-- **Current engineering foundation task:** Project Brain V1 + `PartialAmount` Change Mapper Canary before relying on Agent routing; `DEC-040` Validation behavior is approved but not implemented yet.
+- **Current engineering foundation task:** Native V1 cleanup is frozen by `DEC-041`; `DEC-040` remains the normative validation decision for the ERP runtime.
 - Grid qualification evidence is retained under `wwwroot/grid-shootout/`, including `REVOGRID_FROZEN_BASELINE_2026-08-20.json`.
 
-## Project Brain V1
+## Archived Project Brain / qualification
 
-- `08_DECISIONS_LOG.md` يظل النص المعياري الكامل للقرارات.
-- `brain/decisions-index.yaml` فهرس Structured فقط؛ الـMigration يبدأ `partial` ولا يعني غياب القرار من الفهرس أن القرار غير موجود.
-- `brain/field-aliases.yaml` يساعد الأدوات على ربط الاسم المنطقي للحقل بين C#/JSON/JavaScript/RevoGrid/DB؛ الكود الحالي يظل الحكم على الواقع المنفذ.
-- `Tools/ProjectBrain/validate_project_brain.py` يتحقق آليًا من الشكل والمراجع.
-- أول Canary معتمد لاختبار الـChange Mapper هو `PartialAmount` على baseline `04e0f1a`.
+The former Project Brain index, aliases, validator, canary, and CI check are preserved under `Documentation/Archive/AI-Team-V3/` and are not used by Native V1.

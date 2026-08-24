@@ -127,7 +127,8 @@ function Get-AITeamCodexUsageFromEvents {
             @('inputTokens','input_tokens'),
             @('cachedInputTokens','cached_input_tokens'),
             @('outputTokens','output_tokens'),
-            @('reasoningTokens','reasoning_tokens')
+            @('reasoningTokens','reasoning_tokens'),
+            @('reasoningTokens','reasoning_output_tokens')
         )) {
             $target = $pair[0]
             $source = $pair[1]
@@ -279,7 +280,9 @@ function Invoke-AITeamCodexExec {
         [Parameter(Mandatory)][string]$StderrPath,
         [ValidateSet('low','medium','high')][string]$ReasoningEffort = 'medium',
         [string]$Model = '',
-        [bool]$WebAllowed = $false
+        [bool]$WebAllowed = $false,
+        [ValidateSet('read-only','workspace-write','danger-full-access')][string]$SandboxMode = 'read-only',
+        [string[]]$SandboxPermissions = @()
     )
 
     if (-not (Test-Path -LiteralPath $PromptPath -PathType Leaf)) { throw "Prompt file not found: $PromptPath" }
@@ -315,7 +318,7 @@ function Invoke-AITeamCodexExec {
     $args = @(
         'exec',
         '--json',
-        '--sandbox','read-only',
+        '--sandbox',$SandboxMode,
         '--ephemeral',
         '--ignore-user-config',
         '-C',$RepoRoot,
@@ -325,6 +328,10 @@ function Invoke-AITeamCodexExec {
     )
     if (-not [string]::IsNullOrWhiteSpace($Model)) {
         $args += @('-m',$Model)
+    }
+    if (@($SandboxPermissions).Count -gt 0) {
+        $permissionsToml = (@($SandboxPermissions | ForEach-Object { '"' + ([string]$_).Replace('"','\\"') + '"' }) -join ',')
+        $args += @('-c',('sandbox_permissions=[{0}]' -f $permissionsToml))
     }
     if (-not $WebAllowed) {
         $args += @('-c','web_search="disabled"')

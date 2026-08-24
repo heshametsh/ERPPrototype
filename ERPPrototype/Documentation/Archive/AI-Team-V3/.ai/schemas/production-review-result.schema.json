@@ -1,0 +1,13 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "reviewId": { "type": "string" }, "attemptId": { "type": "string" }, "candidateSha": { "type": "string" }, "repositoryCwd": { "type": "string" },
+    "disposition": { "type": "string", "enum": ["FINDINGS", "NO_FINDINGS_EVIDENCE_SUFFICIENT", "EVIDENCE_REQUIRED"] },
+    "criterionCoverage": { "type": "array", "items": { "type": "object", "additionalProperties": false, "properties": { "acceptanceCriterion": { "type": "string" }, "classification": { "type": "string", "enum": ["COVERED", "UNRESOLVED"] }, "evidence": { "type": "string" } }, "required": ["acceptanceCriterion", "classification", "evidence"] } },
+    "findings": { "type": "array", "items": { "type": "object", "additionalProperties": false, "properties": { "id": { "type": "string" }, "summary": { "type": "string" }, "impact": { "type": "string" }, "anchors": { "type": "array", "items": { "type": "object", "additionalProperties": false, "properties": { "relativePath": { "type": "string" }, "startLine": { "type": "integer" }, "endLine": { "type": "integer" } }, "required": ["relativePath", "startLine", "endLine"] } } }, "required": ["id", "summary", "impact", "anchors"] } },
+    "evidenceRequired": { "type": "array", "items": { "type": "object", "additionalProperties": false, "properties": { "acceptanceCriterion": { "type": "string" }, "exactEvidence": { "type": "string" }, "supportOrRefute": { "type": "string" } }, "required": ["acceptanceCriterion", "exactEvidence", "supportOrRefute"] } },
+    "evidenceReferences": { "type": "array", "items": { "type": "string" } }
+  },
+  "required": ["reviewId", "attemptId", "candidateSha", "repositoryCwd", "disposition", "criterionCoverage", "findings", "evidenceRequired", "evidenceReferences"]
+}

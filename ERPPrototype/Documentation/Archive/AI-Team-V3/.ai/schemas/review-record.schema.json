@@ -1,0 +1,15 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "identity": { "type": "object", "additionalProperties": false, "properties": { "schemaVersion": {"type":"string"}, "recordRevision": {"type":"integer"}, "reviewId": {"type":"string"}, "missionId": {"type":"string"}, "mode": {"type":"string","enum":["production","benchmark"]}, "repoRoot": {"type":"string"}, "baseSha": {"type":"string"}, "candidateSha": {"type":"string"}, "createdAt": {"type":"string"}, "updatedAt": {"type":"string"} }, "required": ["schemaVersion","recordRevision","reviewId","missionId","mode","repoRoot","baseSha","candidateSha","createdAt","updatedAt"] },
+    "contract": { "type": "object", "additionalProperties": false, "properties": { "contractVersion":{"type":"string"}, "acceptanceCriteria":{"type":"array","items":{"type":"string"}}, "exclusions":{"type":"array","items":{"type":"string"}} }, "required":["contractVersion","acceptanceCriteria","exclusions"] },
+    "risk": { "type": "object", "additionalProperties": false, "properties": { "level":{"type":"string"}, "categories":{"type":"array","items":{"type":"string"}}, "subsystem":{"type":"string"}, "changeType":{"type":"string"}, "technologyTags":{"type":"array","items":{"type":"string"}} }, "required":["level","categories","subsystem","changeType","technologyTags"] },
+    "preflight": { "type": "object", "additionalProperties": false, "properties": { "actualHeadSha":{"type":"string"}, "candidateSha":{"type":"string"}, "candidateMatch":{"type":"boolean"}, "baseAncestorOfCandidate":{"type":"boolean"}, "trackedStatus":{"type":"string"}, "untrackedStatus":{"type":"string"}, "workspaceFingerprint":{"type":"string"}, "candidateDiffDigest":{"type":"string"}, "repoRoot":{"type":"string"}, "baseSha":{"type":"string"} }, "required":["actualHeadSha","candidateSha","candidateMatch","baseAncestorOfCandidate","trackedStatus","untrackedStatus","workspaceFingerprint","candidateDiffDigest","repoRoot","baseSha"] },
+    "policy": { "type": "object", "additionalProperties": false, "properties": { "policyVersion":{"type":"string"}, "reviewerProtocolVersion":{"type":"string"}, "reviewerProtocolHash":{"type":["string","null"]}, "routingDecision":{"type":"string"}, "routingReason":{"type":"string"} }, "required":["policyVersion","reviewerProtocolVersion","reviewerProtocolHash","routingDecision","routingReason"] },
+    "attempts": { "type": "array", "items": { "type":"object" } },
+    "outcome": { "type": ["object","null"] },
+    "laterFeedback": { "type": "array", "items": { "type":"object", "additionalProperties": false, "properties": { "type":{"type":"string","enum":["known_missed_defect","regression","requirement_superseded"]}, "timestamp":{"type":"string"}, "evidence":{"type":"string"}, "affected":{"type":"string"} }, "required":["type","timestamp","evidence","affected"] } }
+  },
+  "required": ["identity","contract","risk","preflight","policy","attempts","outcome","laterFeedback"]
+}

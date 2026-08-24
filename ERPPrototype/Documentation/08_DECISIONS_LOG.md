@@ -1,3 +1,16 @@
+# NATIVE V1 AI-ENGINEERING DECISION OVERRIDE — 2026-08-24
+
+## DEC-041 — Freeze the Native V1 engineering surface
+
+- **Status:** Accepted / Architecture V1 frozen
+- **Decision:** The active AI-engineering surface is limited to `AGENTS.md`, this Decisions Log, one neutral Native reviewer contract, a minimal Git-visible-state fingerprint, a tiny Candidate Receipt writer/storage, and passive Native telemetry only when the Native session actually exposes it.
+- **Archive:** Project Brain/legacy qualification, the revisioned Review Record, the old reviewer-findings schema, routing, Lead, CLI child-reviewer, sandbox/transport, evidence-pack, collector, learning-engine, database, dashboard, and replacement-framework material is historical under `Documentation/Archive/AI-Team-V3/`.
+- **Candidate Receipt:** The learning unit contains `receiptId`, `mission`, `baseSha`, `candidateSha`, `changeType`, `risk`, `mainDecision`, and `reviews[]`; missing telemetry is `null`. Later events are factual `CONFIRMED_FINDING`, `REJECTED_FINDING`, `KNOWN_DEFECT`, and `REQUIREMENT_CHANGED` records.
+- **Rule:** Local code stores supplied observations and fingerprints Git-visible state only. It does not route, select reviewers, classify findings, accept candidates, or make engineering judgments.
+- **Reason:** Architecture V1 is frozen; retaining unused orchestration would preserve complexity and create a second architecture by compatibility.
+
+---
+
 # GRID ENGINE DECISION OVERRIDE — 2026-08-20
 
 > هذا القرار أحدث من قرار “keep Tabulator” في 2026-08-17 ومن `DEC-004` كاتجاه مستقبلي. Tabulator يظل **current runtime only** إلى أن ينجح cutover.

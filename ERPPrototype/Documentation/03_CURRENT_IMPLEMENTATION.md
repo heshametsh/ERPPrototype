@@ -1,3 +1,14 @@
+# CURRENT IMPLEMENTATION OVERRIDE — 2026-08-24
+
+## Native V1 AI-engineering state
+
+- Architecture V1 is frozen.
+- The former Project Brain and V2/V3 AI-team infrastructure is archived under `Documentation/Archive/AI-Team-V3/`.
+- Native V1 has one neutral reviewer contract, a Git-visible-state fingerprint, and a tiny Candidate Receipt writer/storage. It has no router, Lead, child-reviewer, harness, transport, collector, learning engine, database, or dashboard.
+- Native Codex telemetry is not available as a structured local session stream in this repository. Receipt telemetry fields remain `null` unless a Native session supplies an observed value.
+
+---
+
 # CURRENT IMPLEMENTATION OVERRIDE — 2026-08-22
 
 > هذا القسم هو الوصف الأحدث للواقع الحالي، وينسخ أقسام الـOverride الأقدم عند التعارض. الكود الحالي والاختبارات في نفس الـcommit يظلان الدليل النهائي لما هو منفذ.
@@ -21,11 +32,9 @@
 - stable row identity/`RowVersion` must be carried through the Revo Save path before real persistence cutover.
 - local/self-hosted pinned RevoGrid assets + MIT license remain required before production cutover.
 
-## AI engineering foundation
+## Historical AI engineering foundation (archived)
 
-- Project Brain V1 بدأ كـincremental structured index فوق الوثائق الحالية، وليس نظام توثيق بديل.
-- `Documentation/brain/decisions-index.yaml` يبدأ `partial`; غياب قرار منه لا يعني أن القرار غير موجود.
-- أول Change Mapper trust canary هو `PartialAmount` على baseline `04e0f1a`.
+- Project Brain V1 and its `PartialAmount` Change Mapper canary are preserved under `Documentation/Archive/AI-Team-V3/` as historical evidence only.
 
 ---
 
