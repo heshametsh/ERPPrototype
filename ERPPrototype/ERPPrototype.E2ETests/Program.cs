@@ -18,6 +18,16 @@ internal static class Program
                 argument =>
                     string.Equals(
                         argument,
+                        "--revo-gate5b5-financial-diagnostic",
+                        StringComparison.OrdinalIgnoreCase)))
+        {
+            return await FinancialDiagnosticRunner.RunAsync();
+        }
+
+        if (args.Any(
+                argument =>
+                    string.Equals(
+                        argument,
                         "--grid-community",
                         StringComparison.OrdinalIgnoreCase)))
         {

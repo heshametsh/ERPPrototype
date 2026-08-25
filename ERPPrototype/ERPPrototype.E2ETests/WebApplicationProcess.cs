@@ -43,6 +43,8 @@ internal sealed class WebApplicationProcess : IAsyncDisposable
 
         Directory.CreateDirectory(artifactDirectory);
 
+        await CleanupRepositoryProcessesAsync(projectRoot, cancellationToken);
+
         var port = fixedPort ?? ReserveTcpPort();
         if (fixedPort.HasValue)
         {
@@ -239,6 +241,63 @@ internal sealed class WebApplicationProcess : IAsyncDisposable
         finally
         {
             listener.Stop();
+        }
+    }
+
+    private static async Task CleanupRepositoryProcessesAsync(
+        string projectRoot,
+        CancellationToken cancellationToken)
+    {
+        var cleanupScript = Path.Combine(
+            projectRoot,
+            "Tools",
+            "E2E",
+            "RepositoryProcessCleanup.ps1");
+
+        if (!File.Exists(cleanupScript))
+        {
+            throw new FileNotFoundException(
+                "The repository-scoped E2E process cleanup script was not found.",
+                cleanupScript);
+        }
+
+        using var cleanup = new Process
+        {
+            StartInfo = new ProcessStartInfo
+            {
+                FileName = "powershell.exe",
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true
+            }
+        };
+
+        cleanup.StartInfo.ArgumentList.Add("-NoProfile");
+        cleanup.StartInfo.ArgumentList.Add("-NonInteractive");
+        cleanup.StartInfo.ArgumentList.Add("-ExecutionPolicy");
+        cleanup.StartInfo.ArgumentList.Add("Bypass");
+        cleanup.StartInfo.ArgumentList.Add("-File");
+        cleanup.StartInfo.ArgumentList.Add(cleanupScript);
+        cleanup.StartInfo.ArgumentList.Add("-CleanupOnly");
+        cleanup.StartInfo.ArgumentList.Add("-RepositoryRoot");
+        cleanup.StartInfo.ArgumentList.Add(projectRoot);
+
+        if (!cleanup.Start())
+        {
+            throw new InvalidOperationException(
+                "The repository-scoped E2E process cleanup could not be started.");
+        }
+
+        var stdout = await cleanup.StandardOutput.ReadToEndAsync(cancellationToken);
+        var stderr = await cleanup.StandardError.ReadToEndAsync(cancellationToken);
+        await cleanup.WaitForExitAsync(cancellationToken);
+
+        if (cleanup.ExitCode != 0)
+        {
+            throw new InvalidOperationException(
+                $"Repository-scoped E2E process cleanup failed with exit code {cleanup.ExitCode}. " +
+                $"Output: {stdout}\n{stderr}");
         }
     }
 

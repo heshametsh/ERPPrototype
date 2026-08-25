@@ -13,7 +13,21 @@ do not touch the developer database.
 
 Run
 ---
-dotnet run --project ERPPrototype.E2ETests -- --revo-gate5b5-trace
+powershell -NoProfile -ExecutionPolicy Bypass -File .\Tools\E2E\Invoke-RevoGridE2E.ps1
+
+The wrapper performs repository-scoped stale-process cleanup before dotnet
+build/run. It never terminates unrelated dotnet, Visual Studio, IIS Express,
+or other .NET processes. The direct dotnet command remains usable after the
+preflight cleanup, but the wrapper is the supported locked-output-safe path.
+
+Dedicated Remaining Amount diagnostic
+-------------------------------------
+powershell -NoProfile -ExecutionPolicy Bypass -File .\Tools\E2E\Invoke-RevoGridE2E.ps1 -RunnerArguments --revo-gate5b5-financial-diagnostic
+
+This diagnostic uses real RevoGrid cell edits, Undo/Redo, native clipboard
+Paste, and a Remaining Amount readonly attempt. It records source values,
+rendered Remaining text, Revo events, refresh calls, History/Dirty state, and
+browser diagnostics in the run artifact directory.
 
 Evidence
 --------
