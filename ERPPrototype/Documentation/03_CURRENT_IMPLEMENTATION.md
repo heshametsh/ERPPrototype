@@ -6,7 +6,8 @@
 - The former Project Brain and V2/V3 AI-team infrastructure is archived under `Documentation/Archive/AI-Team-V3/`.
 - Native V1 has one neutral reviewer contract, a Git-visible-state fingerprint, and a tiny Native V1 Receipt writer/storage. It has no router, Lead, child-reviewer, harness, transport, collector, learning engine, database, or dashboard.
 - Native Codex telemetry is not available as a structured local session stream in this repository. Receipt telemetry fields remain `null` unless a Native session supplies an observed value.
-- Native V1.1 receipts now record every completed real mission, including diagnostic missions without a Candidate, using factual `participants[]` and `result` fields. Missing telemetry remains `null`; later diagnosis outcome events remain append-only and factual.
+- Native V1.2 receipts record every completed real mission, including diagnostic missions without a Candidate, using factual timing, lifecycle events, concise material Decision Trace entries, `participants[]`, `reviews[]`, and supplied failure context. Missing telemetry remains `null`; no acceptance, push, reviewer transport, risk classification, or diagnosis outcome is inferred locally.
+- Official review-gate evidence is one independent Native subagent review when Main records that review is required. CLI/child/ephemeral/sandbox/archived reviewer transports cannot satisfy the gate, and no second review is launched automatically after sufficient `NO_FINDINGS_EVIDENCE_SUFFICIENT` evidence.
 
 ---
 
@@ -24,6 +25,7 @@
 - المسار المعزول وصل فعليًا إلى Change Engine + Sheet History/Dirty separation + Paste + Excel-like Filter + dedicated Sort/Header Selection + structural Insert/Delete History + derived Remaining Amount synchronization.
 - `RemainingAmount` مشتق من `WorkOrderValue - PartialAmount` في Revo Gate ويظل server-side `WorkOrderFinancialRules` هو المرجع النهائي عند Save.
 - Gate 5B-5 لا يملك حتى الآن real database Save binding أو `/work-orders` cutover؛ هذا Gap مقصود وموثق في `DEC-038`.
+- **Scope rule:** inspect the current runtime/dependency path before including or excluding Tabulator. `/work-orders` remains the current employee runtime until actual RevoGrid cutover; RevoGrid is the isolated target/new architecture and Tabulator is not its design authority.
 
 ## Open before real Revo Save/cutover
 

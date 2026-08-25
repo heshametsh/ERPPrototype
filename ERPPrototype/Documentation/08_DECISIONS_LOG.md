@@ -19,6 +19,16 @@
 - **Rule:** Local code stores supplied observations and fingerprints Git-visible state only. It does not route, select reviewers, classify findings, accept candidates, or make engineering judgments.
 - **Reason:** Architecture V1 is frozen; retaining unused orchestration would preserve complexity and create a second architecture by compatibility.
 
+## DEC-043 — Native V1.2 auditable lifecycle and bounded review workflow
+
+- **Status:** Accepted / Implemented
+- **Decision:** Evolve the same `NativeV1Receipt.psm1` into a backward-readable V1.2 receipt with factual wall-clock timing, concise material `decisionTrace[]`, explicit lifecycle events (`USER_ACCEPTED`, `PUSH_COMPLETED`, `MISSION_COMPLETED`), and optional supplied failure classification context.
+- **Gate rule:** Main supplies whether review or manual acceptance is required. A required review is satisfied only by one valid `native-reviewer-v1` result recorded with `NATIVE_SUBAGENT`; CLI/child/ephemeral/sandbox/archived transports are rejected and cannot satisfy finalization. A sufficient `NO_FINDINGS_EVIDENCE_SUFFICIENT` result does not automatically trigger another reviewer.
+- **Lifecycle rule:** `USER_ACCEPTED` is never inferred. `PUSH_COMPLETED` is recorded only when local Git HEAD factually matches `candidateSha`. `MISSION_COMPLETED` advances the receipt only after all supplied required gates are present and records `completedAt`/`durationSeconds`.
+- **Test rule:** Prefer closest deterministic tests during implementation, targeted tests after behavior stabilizes, and one justified full regression after Candidate/reviewer corrections. Do not weaken tests or create a reviewer/router/transport/harness service to save time.
+- **Compatibility rule:** Existing V1/V1.1 receipts remain readable; existing participant/review telemetry remains nullable and is never fabricated.
+- **Architecture boundary:** No ERP product/runtime, database, service, dashboard, orchestration framework, or archived AI-Team V3 code is changed or revived.
+
 ---
 
 # GRID ENGINE DECISION OVERRIDE — 2026-08-20

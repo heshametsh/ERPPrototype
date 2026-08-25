@@ -13,7 +13,7 @@ Only these AI-engineering pieces are active:
 - this file, including the Native V1 risk gate;
 - `ERPPrototype/Documentation/08_DECISIONS_LOG.md`;
 - `.ai/prompts/native-reviewer-v1.md`, the single neutral reviewer contract;
-- `ERPPrototype/Tools/AITeam/NativeV1/NativeV1Receipt.psm1`, which fingerprints Git-visible state and writes Native V1 Receipts/events;
+- `ERPPrototype/Tools/AITeam/NativeV1/NativeV1Receipt.psm1`, which fingerprints Git-visible state and writes Native V1.2 Receipts/events;
 - `ERPPrototype/Tools/AITeam/NativeV1/Test-NativeV1.ps1`, deterministic local checks for that small capability.
 
 The former Project Brain, V2/V3 qualification material, routing, Lead, CLI reviewer, sandbox/transport, evidence-pack, collector, learning-engine, database, and dashboard infrastructure is historical only under `ERPPrototype/Documentation/Archive/AI-Team-V3/`. It is not an active dependency and must not be revived as a compatibility path.
@@ -42,19 +42,19 @@ For an independent Native reviewer, use only `.ai/prompts/native-reviewer-v1.md`
 
 ## Candidate Receipt contract
 
-Native V1.1 Receipt is the unit of learning for every completed real mission, including diagnostic missions without a Candidate. The writer stores only supplied observations:
+Native V1.2 Receipt is the unit of learning for every completed real mission, including diagnostic missions without a Candidate. The writer stores only supplied observations:
 
-`receiptVersion`, `receiptId`, `missionId`, `mission`, `missionType`, `baseSha`, `finalSha`, `candidateSha`, `changeType`, `risk`, `mainDecision`, `result`, `participants[]`, and `reviews[]`.
+`receiptVersion`, `receiptId`, `missionId`, `mission`, `missionType`, `baseSha`, `finalSha`, `candidateSha`, `changeType`, `risk`, `mainDecision`, `result`, `participants[]`, `reviews[]`, concise `decisionTrace[]`, factual lifecycle timestamps/state, and optional supplied failure classification context.
 
 Each participant records only the supplied role/purpose and available model/session/telemetry facts. Missing native telemetry is `null`; a participant is never added merely because it was available or recommended. Candidate-specific fields remain `null` for diagnostic missions.
 
-Each review may contain `reviewId`, `protocolVersion`, `requestedReviewerModel`, `actualReviewerModel`, `reviewerResult`, `findingCount`, `findingIds`, `tokens`, `cachedTokens`, `toolCalls`, `time`, and `reviewerThread/session`. Missing telemetry is `null`. Later events are factual records only: `CONFIRMED_FINDING`, `REJECTED_FINDING`, `KNOWN_DEFECT`, and `REQUIREMENT_CHANGED`. Later factual diagnosis events may also be `CONFIRMED_DIAGNOSIS` or `REJECTED_DIAGNOSIS`; completion never classifies a diagnosis automatically. Existing V1 receipts remain readable.
+Each review may contain `reviewId`, `protocolVersion`, `reviewerTransport`, `requestedReviewerModel`, `actualReviewerModel`, `reviewerResult`, `findingCount`, `findingIds`, `tokens`, `cachedTokens`, `toolCalls`, `time`, and `reviewerThread/session`. Missing telemetry is `null`. Official review-gate evidence requires the native subagent transport; CLI/child/sandbox/archived transports never satisfy it. Lifecycle events are explicit factual records: `USER_ACCEPTED`, `PUSH_COMPLETED`, and `MISSION_COMPLETED`, alongside the existing finding/diagnosis events. Completion never infers acceptance, push, or diagnosis classification. Existing V1/V1.1 receipts remain readable.
 
 ## Protected Work Orders behavior
 
 Unless an approved task explicitly changes it, preserve Excel-like edit, keyboard navigation, range selection, copy/paste, row insert/delete, filtering, sorting, Undo/Redo, Sheet History, Dirty/Baseline separation, year isolation, ERP-owned Remaining Amount rules, server authority, security, RowVersion/concurrency, and the frozen visual baseline.
 
-RevoGrid Community native behavior comes first for grid mechanics. Add ERP-owned logic only for ERP business rules or behavior RevoGrid does not own. Do not modify RevoGrid source. Old Tabulator code is historical context, not design authority for new RevoGrid work.
+RevoGrid Community native behavior comes first for grid mechanics. Add ERP-owned logic only for ERP business rules or behavior RevoGrid does not own. Do not modify RevoGrid source. Before including or excluding Tabulator, inspect the current runtime and dependency path: `/work-orders` may still use Tabulator until the actual cutover, while Tabulator remains non-authoritative for new RevoGrid design.
 
 ## Stop conditions
 

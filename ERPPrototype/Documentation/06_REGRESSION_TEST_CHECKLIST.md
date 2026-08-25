@@ -2,11 +2,21 @@
 
 > **Current reconciliation 2026-08-20:** `/work-orders` still uses Tabulator 6.5.0, while RevoGrid Community 4.25.2 is the selected replacement target. Preserve the current accepted runtime until RevoGrid passes isolated Blazor real-data, Save/Delta, visual, and full regression gates. Do not treat Lab PASS as production cutover.
 
+> **Scope rule:** before a mission includes or excludes Tabulator, inspect the current `/work-orders` runtime and dependency path. Tabulator remains in scope when that path proves it is active; it is not the design authority for new RevoGrid work.
+
 > تحديث 2026-08-12: استخدم `Tools/Invoke-ERPTests.ps1` للتحقق الحالي. أوامر Phase 8/Phase 9 القديمة الواردة في أقسام تاريخية لم تعد موجودة. آخر تحقق مقبول: Integration `25/25` وSmoke Browser `11/11`.
 
 **Status:** Mandatory after any grid/runtime change
 **Historical foundation checkpoint:** `M5D4R3-Stable-Range-UX` (E6C). **Current accepted checkpoint:** `0f6bd3b` per captured Git log.
 **Rule:** لا ننتقل للخطوة التالية إذا فشل اختبار أساسي.
+
+## Native V1.2 workflow checks
+
+- [ ] Native V1 deterministic checks pass: `ERPPrototype/Tools/AITeam/NativeV1/Test-NativeV1.ps1`.
+- [ ] Mission timing is factual (`startedAt`, `completedAt`, `durationSeconds`); unavailable AI telemetry remains `null`.
+- [ ] Required review evidence uses one Native subagent; excluded CLI/child/ephemeral/sandbox transports cannot satisfy the gate.
+- [ ] Employee-visible workflow changes have explicit `USER_ACCEPTED` before completion; tooling/docs missions do not invent an ERP manual test.
+- [ ] `PUSH_COMPLETED` is recorded only from factual Git evidence, and final completion is explicit `MISSION_COMPLETED`.
 
 ## A. Before Testing
 
