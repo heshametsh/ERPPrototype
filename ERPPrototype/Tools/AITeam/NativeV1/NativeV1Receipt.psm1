@@ -47,6 +47,12 @@ function Get-NativeV1UtcTimestamp {
 function ConvertTo-NativeV1UtcTimestamp {
     param([AllowNull()]$Value)
     if ($null -eq $Value -or [string]::IsNullOrWhiteSpace([string]$Value)) { return $null }
+    if ($Value -is [DateTimeOffset]) {
+        return $Value.ToUniversalTime().ToString('o', [Globalization.CultureInfo]::InvariantCulture)
+    }
+    if ($Value -is [DateTime]) {
+        return ([DateTimeOffset]$Value).ToUniversalTime().ToString('o', [Globalization.CultureInfo]::InvariantCulture)
+    }
     return ([DateTimeOffset]::Parse([string]$Value, [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::RoundtripKind)).ToUniversalTime().ToString('o', [Globalization.CultureInfo]::InvariantCulture)
 }
 
@@ -473,7 +479,8 @@ function Write-NativeV1LifecycleEvent {
             Set-NativeV1Property -InputObject $receipt -Name 'completedAt' -Value $occurredAt
             $startedAt = Get-NativeV1Property -InputObject $receipt -Name 'startedAt'
             if ($null -ne $startedAt) {
-                $duration = ([DateTimeOffset]::Parse($occurredAt) - [DateTimeOffset]::Parse([string]$startedAt)).TotalSeconds
+                $normalizedStartedAt = ConvertTo-NativeV1UtcTimestamp $startedAt
+                $duration = ([DateTimeOffset]::Parse($occurredAt, [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::RoundtripKind) - [DateTimeOffset]::Parse($normalizedStartedAt, [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::RoundtripKind)).TotalSeconds
                 Set-NativeV1Property -InputObject $receipt -Name 'durationSeconds' -Value ([Math]::Max(0, [Math]::Round($duration, 3)))
             }
             Set-NativeV1Property -InputObject $receipt -Name 'lifecycleState' -Value 'COMPLETED'

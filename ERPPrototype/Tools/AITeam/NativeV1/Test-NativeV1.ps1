@@ -87,6 +87,16 @@ try {
         $loaded = Read-NativeV1Receipt -ReceiptId 'diagnosis-receipt' -DataRoot $DataRoot
         if ($loaded.lifecycleState -ne 'COMPLETED' -or [string]::IsNullOrWhiteSpace($loaded.completedAt) -or $null -eq $loaded.durationSeconds -or $loaded.durationSeconds -lt 0) { throw 'Diagnostic mission did not complete with wall-clock timing.' }
     }
+    Assert-Check 'Timing survives a DateTime JSON round-trip without locale-dependent parsing' {
+        $localeReceipt = New-NativeV1MissionReceipt -MissionId 'locale-timing' -Mission 'locale timing' -MissionType 'DIAGNOSTIC' -BaseSha $head -FinalSha $head -Risk 'low' -MainDecision 'timing-check' -Result 'PASS' -Participants @($main) -ReceiptId 'locale-timing-receipt'
+        [void](Write-NativeV1Receipt -Receipt $localeReceipt -DataRoot $DataRoot)
+        $localeLoaded = Read-NativeV1Receipt -ReceiptId 'locale-timing-receipt' -DataRoot $DataRoot
+        $localeLoaded.startedAt = [DateTime]::UtcNow.AddSeconds(-1)
+        [void](Write-NativeV1Receipt -Receipt $localeLoaded -DataRoot $DataRoot -Overwrite)
+        [void](Write-NativeV1LifecycleEvent -EventType 'MISSION_COMPLETED' -ReceiptId 'locale-timing-receipt' -DataRoot $DataRoot)
+        $completed = Read-NativeV1Receipt -ReceiptId 'locale-timing-receipt' -DataRoot $DataRoot
+        if ($null -eq $completed.durationSeconds -or $completed.durationSeconds -lt 0) { throw 'DateTime round-trip timing was locale-dependent.' }
+    }
     Assert-Check 'Optional specialist is recorded without inventing a reviewer' {
         $specialistReceipt = New-NativeV1MissionReceipt -MissionId 'diagnosis-2' -Mission 'specialist-assisted diagnosis' -MissionType 'DIAGNOSTIC' -BaseSha $head -FinalSha $head -Risk 'medium' -MainDecision 'diagnosis-complete' -Result 'PASS' -Participants @($main, $specialist) -ReceiptId 'specialist-receipt'
         [void](Write-NativeV1Receipt -Receipt $specialistReceipt -DataRoot $DataRoot)
