@@ -73,6 +73,17 @@ function renderState(state) {
         state.redoCountElement.textContent = String(current.redoCount);
     }
 
+    if (state.financialErrorElement) {
+        const invalidRows = Number(current.financialInvalidRowCount ?? 0);
+        const invalidCells = Number(current.financialInvalidCellCount ?? 0);
+        state.financialErrorElement.textContent = invalidCells > 0
+            ? `Financial errors ${invalidCells} in ${invalidRows} rows — Save blocked`
+            : "Financial inputs valid";
+        state.financialErrorElement.dataset.invalid = invalidCells > 0
+            ? "true"
+            : "false";
+    }
+
     if (state.rowCountElement && state.rowStructure) {
         state.rowCountElement.textContent = Number(
             state.rowStructure.getState().rowCount ?? 0
@@ -198,6 +209,9 @@ export async function initialize(elementId, rows, customColumns, options) {
         ),
         redoButton: findElement(
             value(options, "redoButtonId", "RedoButtonId", "")
+        ),
+        financialErrorElement: findElement(
+            value(options, "financialErrorElementId", "FinancialErrorElementId", "")
         ),
         rowCountElement: findElement(
             value(options, "rowCountElementId", "RowCountElementId", "")

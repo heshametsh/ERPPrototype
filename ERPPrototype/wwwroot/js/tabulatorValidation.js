@@ -2395,7 +2395,7 @@
             label: "Partial Amount",
             order: 50,
             normalize: function (value) {
-                return this.normalizeAmountValue(value);
+                return this.normalizePartialAmountValue(value);
             },
             validationRules: ["financial-amounts"],
             validators: [
@@ -2413,11 +2413,11 @@
                         };
                     }
 
-                    return parsed.cents > 0
+                    return parsed.cents >= 0
                         ? null
                         : {
-                            code: "positive_amount",
-                            message: "المبلغ الجزئي يجب أن يكون أكبر من صفر عند إدخاله."
+                            code: "negative_amount",
+                            message: "المبلغ الجزئي لا يمكن أن يكون سالبًا."
                         };
                 }
             ]

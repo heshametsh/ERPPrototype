@@ -587,6 +587,37 @@ internal sealed class WorkOrdersPage(IPage page)
             });
     }
 
+    public async Task<bool> HasValidationMarkerAsync(int rowId)
+    {
+        return await page.EvaluateAsync<bool>(
+            """
+            args => {
+                const table =
+                    window.tabulatorTest?.tables?.[args.tableId];
+
+                const row = table?.getRow(args.rowId);
+                const rowElement = row?.getElement?.();
+                const firstCell = rowElement?.querySelector(
+                    '.tabulator-cell');
+                const marker = firstCell
+                    ? window.getComputedStyle(firstCell, '::after')
+                    : null;
+
+                return Boolean(
+                    rowElement?.classList.contains(
+                        'uds-validation-error-row') &&
+                    marker &&
+                    marker.content === '\"!\"'
+                );
+            }
+            """,
+            new
+            {
+                tableId = TableId,
+                rowId
+            });
+    }
+
     public async Task PasteCellValueAsync(
         int rowId,
         string field,

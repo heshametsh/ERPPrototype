@@ -150,23 +150,128 @@ internal static class FinancialDiagnosticRunner
                     [targetClientKey] = 100_000m
                 }));
 
+            await EditCellAsync(page, 0, partialAmountColumn, "0");
+            await AssertFinancialStateAsync(
+                page,
+                targetClientKey,
+                expectedPartial: "",
+                expectedRemaining: "100000",
+                expectInvalid: false);
+
+            await EditCellAsync(page, 0, partialAmountColumn, "-500");
+            await AssertFinancialStateAsync(
+                page,
+                targetClientKey,
+                expectedPartial: "-500",
+                expectedRemaining: null,
+                expectInvalid: true);
+
+            await page.Locator("#revogrid-gate5b1-undo").ClickAsync();
+            await page.WaitForTimeoutAsync(500);
+            await AssertFinancialStateAsync(
+                page,
+                targetClientKey,
+                expectedPartial: "",
+                expectedRemaining: "100000",
+                expectInvalid: false);
+
+            await page.Locator("#revogrid-gate5b1-redo").ClickAsync();
+            await page.WaitForTimeoutAsync(500);
+            await AssertFinancialStateAsync(
+                page,
+                targetClientKey,
+                expectedPartial: "-500",
+                expectedRemaining: null,
+                expectInvalid: true);
+
+            await page.Locator("#revogrid-gate5b1-undo").ClickAsync();
+            await page.WaitForTimeoutAsync(500);
+
+            await EditCellAsync(page, 1, workOrderValueColumn, "0");
+            await AssertFinancialStateAsync(
+                page,
+                secondClientKey,
+                expectedPartial: "",
+                expectedRemaining: null,
+                expectInvalid: true);
+
+            await EditCellAsync(page, 2, workOrderValueColumn, "-1000");
+            await EditCellAsync(page, 2, partialAmountColumn, "20000");
+            await AssertFinancialStateAsync(
+                page,
+                thirdClientKey,
+                expectedPartial: "20000",
+                expectedRemaining: null,
+                expectInvalid: true);
+
+            await EditCellAsync(page, 0, workOrderValueColumn, "100000");
+            await EditCellAsync(page, 1, workOrderValueColumn, "100000");
+            await EditCellAsync(page, 2, workOrderValueColumn, "100000");
+            await EditCellAsync(page, 2, partialAmountColumn, string.Empty);
+
             await PrepareClipboardAsync(
                 page,
                 startVisibleRow: 0,
                 column: partialAmountColumn,
-                "10000\n20000\n30000");
+                "0\n-500\n120000");
             await page.Keyboard.PressAsync("Control+V");
             await page.WaitForTimeoutAsync(750);
+            await AssertFinancialStateAsync(
+                page,
+                targetClientKey,
+                expectedPartial: "",
+                expectedRemaining: "100000",
+                expectInvalid: false);
+            await AssertFinancialStateAsync(
+                page,
+                secondClientKey,
+                expectedPartial: "-500",
+                expectedRemaining: null,
+                expectInvalid: true);
+            await AssertFinancialStateAsync(
+                page,
+                thirdClientKey,
+                expectedPartial: "120000",
+                expectedRemaining: null,
+                expectInvalid: true);
             observations.Add(await CaptureAsync(
                 page,
                 targetClientKey,
                 "paste-partial-three-rows",
                 new Dictionary<string, decimal>
                 {
-                    [targetClientKey] = 90_000m,
-                    [secondClientKey] = 80_000m,
-                    [thirdClientKey] = 70_000m
+                    [targetClientKey] = 100_000m
                 }));
+
+            await page.Locator("#revogrid-gate5b1-undo").ClickAsync();
+            await page.WaitForTimeoutAsync(500);
+            await AssertFinancialStateAsync(
+                page,
+                targetClientKey,
+                expectedPartial: "",
+                expectedRemaining: "100000",
+                expectInvalid: false);
+            await AssertFinancialStateAsync(
+                page,
+                secondClientKey,
+                expectedPartial: "",
+                expectedRemaining: "100000",
+                expectInvalid: false);
+            await AssertFinancialStateAsync(
+                page,
+                thirdClientKey,
+                expectedPartial: "",
+                expectedRemaining: "100000",
+                expectInvalid: false);
+
+            await page.Locator("#revogrid-gate5b1-redo").ClickAsync();
+            await page.WaitForTimeoutAsync(500);
+            await AssertFinancialStateAsync(
+                page,
+                secondClientKey,
+                expectedPartial: "-500",
+                expectedRemaining: null,
+                expectInvalid: true);
 
             observations.Add(await CaptureReadonlyAttemptAsync(
                 page,
@@ -365,6 +470,80 @@ internal static class FinancialDiagnosticRunner
 
         using var document = JsonDocument.Parse(json);
         return document.RootElement.Clone();
+    }
+
+    private static async Task AssertFinancialStateAsync(
+        IPage page,
+        string clientKey,
+        string? expectedPartial,
+        string? expectedRemaining,
+        bool expectInvalid)
+    {
+        var result = await page.EvaluateAsync<JsonElement>(
+            """
+            async args => {
+                const host = document.getElementById('revogrid-native-gate5a-grid');
+                const grid = host?.querySelector('revo-grid');
+                const source = await grid.getSource('rgRow');
+                const visible = await grid.getVisibleSource('rgRow');
+                const row = source.find(item => String(item?.clientKey) === args.clientKey);
+                const columns = Array.isArray(grid.columns) ? grid.columns : [];
+                const module = await import('/js/revoGridGate5B1.js?v=20260822-gate5b5-multirow-1');
+                const diagnostics = await module.getDiagnostics('revogrid-native-gate5a-grid');
+                const actualPartial = row?.partialAmount === null || row?.partialAmount === undefined
+                    ? ''
+                    : String(row.partialAmount);
+                const actualRemaining = row?.remainingAmount === null || row?.remainingAmount === undefined
+                    ? null
+                    : String(row.remainingAmount);
+                const visibleIndex = visible.findIndex(item =>
+                    String(item?.clientKey) === args.clientKey);
+                const financialCells = ['workOrderValue', 'partialAmount']
+                    .map(property => {
+                        const logicalIndex = columns.findIndex(column =>
+                            String(column?.prop ?? '') === property);
+                        const visualColumn = grid.rtl
+                            ? columns.length - 1 - logicalIndex
+                            : logicalIndex;
+                        return visibleIndex < 0 || logicalIndex < 0
+                            ? null
+                            : host.querySelector(
+                                `[data-rgRow="${visibleIndex}"][data-rgCol="${visualColumn}"]`);
+                    });
+                const partialMatches = actualPartial === (args.expectedPartial ?? '');
+                const remainingMatches = actualRemaining === (args.expectedRemaining ?? null);
+                const invalidRows = diagnostics.changeEngine?.financialInvalidRows ?? [];
+                const rowIsInvalid = invalidRows.some(item =>
+                    String(item?.clientKey) === args.clientKey);
+                const invalidMatches = rowIsInvalid === args.expectInvalid;
+                const visualMatches = financialCells.some(cell =>
+                    cell?.getAttribute('data-erp-financial-invalid') === 'true') === args.expectInvalid;
+                return {
+                    ok: Boolean(row) && partialMatches && remainingMatches && invalidMatches && visualMatches,
+                    actualPartial,
+                    actualRemaining,
+                    invalidRows: diagnostics.changeEngine?.financialInvalidRowCount ?? null,
+                    rowIsInvalid,
+                    visualMatches,
+                    expectedPartial: args.expectedPartial ?? '',
+                    expectedRemaining: args.expectedRemaining ?? null,
+                    expectInvalid: args.expectInvalid
+                };
+            }
+            """,
+            new
+            {
+                clientKey,
+                expectedPartial,
+                expectedRemaining,
+                expectInvalid
+            });
+
+        if (!result.GetProperty("ok").GetBoolean())
+        {
+            throw new InvalidOperationException(
+                $"Financial state mismatch for {clientKey}: {result}");
+        }
     }
 
     private static async Task<JsonElement> CaptureReadonlyAttemptAsync(

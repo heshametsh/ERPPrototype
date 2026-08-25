@@ -131,6 +131,16 @@
                 : String(value ?? "").trim();
         },
 
+        normalizePartialAmountValue: function (value) {
+            const parsed = this.parseAmount(value);
+
+            if (parsed.valid && !parsed.empty && parsed.cents === 0) {
+                return "";
+            }
+
+            return this.normalizeAmountValue(value);
+        },
+
         amountFormatter: function (cell) {
             return this.normalizeAmountValue(cell?.getValue?.());
         },
@@ -167,11 +177,17 @@
             const value = this.parseAmount(workOrderValue);
             const partial = this.parseAmount(partialAmount);
 
-            if (!value.valid || value.empty) {
+            if (!value.valid || value.empty || value.cents <= 0) {
                 return "";
             }
 
-            if (!partial.valid) {
+            if (
+                !partial.valid ||
+                (!partial.empty && partial.cents < 0) ||
+                (!partial.empty &&
+                    partial.cents > 0 &&
+                    partial.cents > value.cents)
+            ) {
                 return "";
             }
 

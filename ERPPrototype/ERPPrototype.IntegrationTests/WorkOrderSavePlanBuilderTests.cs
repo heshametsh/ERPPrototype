@@ -155,6 +155,21 @@ internal sealed class WorkOrderSavePlanBuilderTests
                 planned.PartialAmount),
             "Remaining Amount was not calculated from normalized values.");
 
+        TestAssert.Equal(
+            (decimal?)null,
+            WorkOrderFinancialRules.CalculateRemainingAmount(0m, 20_000m),
+            "Remaining Amount must be blank when Work Order Value is zero.");
+
+        TestAssert.Equal(
+            (decimal?)null,
+            WorkOrderFinancialRules.CalculateRemainingAmount(100_000m, -500m),
+            "Remaining Amount must be blank when Partial Amount is negative.");
+
+        TestAssert.Equal(
+            (decimal?)null,
+            WorkOrderFinancialRules.CalculateRemainingAmount(100_000m, 120_000m),
+            "Remaining Amount must be blank when Partial Amount exceeds Work Order Value.");
+
         return Task.CompletedTask;
     }
 
@@ -207,9 +222,55 @@ internal sealed class WorkOrderSavePlanBuilderTests
             changedRecords: Array.Empty<WorkOrderChangeSet>(),
             deletedRecords: []);
 
-        TestAssert.False(
+        TestAssert.True(
             zeroPartialResult.Succeeded,
-            "An entered zero Partial Amount entered database execution.");
+            "A zero Partial Amount should normalize to the optional empty state.");
+
+        TestAssert.Equal(
+            (decimal?)null,
+            zeroPartialResult.Plan!.NewRecords.Single().PartialAmount,
+            "A zero Partial Amount was not normalized to NULL.");
+
+        TestAssert.Equal(
+            (decimal?)125_000m,
+            WorkOrderFinancialRules.CalculateRemainingAmount(
+                zeroPartialResult.Plan.NewRecords.Single().WorkOrderValue,
+                zeroPartialResult.Plan.NewRecords.Single().PartialAmount),
+            "An empty normalized Partial Amount should leave Remaining equal to Work Order Value.");
+
+        var negativePartial = CreateNewRecord(
+            -3024,
+            "810000027",
+            "427",
+            WorkOrderBuskets.InProgress);
+        negativePartial.PartialAmount = -500m;
+
+        var negativePartialResult = builder.Build(
+            2026,
+            addedRecords: [negativePartial],
+            changedRecords: Array.Empty<WorkOrderChangeSet>(),
+            deletedRecords: []);
+
+        TestAssert.False(
+            negativePartialResult.Succeeded,
+            "A negative Partial Amount entered database execution.");
+
+        var negativeValue = CreateNewRecord(
+            -3025,
+            "810000028",
+            "428",
+            WorkOrderBuskets.InProgress);
+        negativeValue.WorkOrderValue = -1_000m;
+
+        var negativeValueResult = builder.Build(
+            2026,
+            addedRecords: [negativeValue],
+            changedRecords: Array.Empty<WorkOrderChangeSet>(),
+            deletedRecords: []);
+
+        TestAssert.False(
+            negativeValueResult.Succeeded,
+            "A negative Work Order Value entered database execution.");
 
         var excessivePartial = CreateNewRecord(
             -3021,

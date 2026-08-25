@@ -25,8 +25,13 @@ public static class WorkOrderFinancialRules
         workOrder.WorkOrderValue =
             NormalizeAmount(workOrder.WorkOrderValue);
 
-        workOrder.PartialAmount =
+        var normalizedPartial =
             NormalizeAmount(workOrder.PartialAmount);
+
+        workOrder.PartialAmount =
+            normalizedPartial == 0m
+                ? null
+                : normalizedPartial;
     }
 
     public static decimal? CalculateRemainingAmount(
@@ -35,12 +40,17 @@ public static class WorkOrderFinancialRules
     {
         var normalizedValue = NormalizeAmount(workOrderValue);
 
-        if (normalizedValue is null)
+        if (normalizedValue is null || normalizedValue <= 0m)
         {
             return null;
         }
 
         var normalizedPartial = NormalizeAmount(partialAmount) ?? 0m;
+
+        if (normalizedPartial < 0m || normalizedPartial > normalizedValue)
+        {
+            return null;
+        }
 
         return NormalizeAmount(
             normalizedValue.Value - normalizedPartial);
@@ -50,33 +60,39 @@ public static class WorkOrderFinancialRules
         WorkOrder workOrder,
         bool requireWorkOrderValue)
     {
-        if (workOrder.WorkOrderValue is null)
+        var normalizedWorkOrderValue =
+            NormalizeAmount(workOrder.WorkOrderValue);
+
+        if (normalizedWorkOrderValue is null)
         {
             return requireWorkOrderValue
                 ? "Work Order Value is required and must be greater than zero."
                 : null;
         }
 
-        if (workOrder.WorkOrderValue <= 0m)
+        if (normalizedWorkOrderValue <= 0m)
         {
             return "Work Order Value must be greater than zero.";
         }
 
-        if (workOrder.PartialAmount is null)
+        var normalizedPartial =
+            NormalizeAmount(workOrder.PartialAmount);
+
+        if (normalizedPartial is null || normalizedPartial == 0m)
         {
             return null;
         }
 
-        if (workOrder.PartialAmount <= 0m)
+        if (normalizedPartial < 0m)
         {
-            return "Partial Amount must be greater than zero when entered.";
+            return "Partial Amount cannot be negative.";
         }
 
-        if (workOrder.PartialAmount > workOrder.WorkOrderValue)
+        if (normalizedPartial > normalizedWorkOrderValue)
         {
             return
                 "Work Order Value cannot be less than the recorded " +
-                $"Partial Amount: {workOrder.PartialAmount.Value.ToString(
+                $"Partial Amount: {normalizedPartial.Value.ToString(
                     "N2",
                     CultureInfo.InvariantCulture)}.";
         }

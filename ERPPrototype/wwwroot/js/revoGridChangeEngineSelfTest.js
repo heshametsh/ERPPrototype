@@ -15,6 +15,10 @@ import {
     createRevoGridHistoryFocus
 } from "./revoGridHistoryFocus.js";
 import { createRevoGridChangeBridge } from "./revoGridChangeBridge.js";
+import {
+    calculateRemainingAmount,
+    validateFinancialInputs
+} from "./workOrderFinancialRules.js";
 
 function assert(condition, message) {
     if (!condition) {
@@ -586,6 +590,92 @@ function makeRangeDetail(rows, data) {
     };
 }
 
+function makeCellDetail(row, field, value) {
+    return {
+        model: row,
+        prop: field,
+        rowIndex: 0,
+        val: value
+    };
+}
+
+function testFinancialRulesRejectInvalidRemaining() {
+    assert(
+        calculateRemainingAmount(100000, null) === 100000,
+        "An empty Partial Amount must leave the full Work Order Value remaining."
+    );
+    assert(
+        calculateRemainingAmount(100000, 20000) === 80000,
+        "A valid Partial Amount must be subtracted from Work Order Value."
+    );
+    assert(
+        calculateRemainingAmount(100000, 0) === 100000,
+        "Partial Amount zero must normalize to the empty calculation state."
+    );
+    assert(
+        calculateRemainingAmount(100000, -500) === null,
+        "A negative Partial Amount must blank Remaining Amount."
+    );
+    assert(
+        calculateRemainingAmount(100000, 120000) === null,
+        "An excessive Partial Amount must blank Remaining Amount."
+    );
+    assert(
+        calculateRemainingAmount(0, 20000) === null,
+        "An invalid Work Order Value must blank Remaining Amount."
+    );
+    assert(
+        validateFinancialInputs(0, 20000).length >= 2,
+        "The cross-field invalid state must mark the financial inputs."
+    );
+}
+
+async function testPartialZeroIsOneUndoableNormalizedEdit() {
+    const rows = [{
+        clientKey: "financial:1",
+        workOrderValue: 100000,
+        partialAmount: 20000,
+        remainingAmount: 80000
+    }];
+    const grid = new BridgeMockGrid(rows);
+    const coordinator = createRevoGridHistoryCoordinator({ grid, datasetKey: "2026" });
+    const bridge = createRevoGridChangeBridge({
+        grid,
+        rows,
+        datasetKey: "2026",
+        historyCoordinator: coordinator,
+        allowPaste: true
+    });
+
+    const before = dispatchGridEvent(
+        grid,
+        "beforeedit",
+        makeCellDetail(rows[0], "partialAmount", "0")
+    );
+    assert(!before.defaultPrevented, "Manual financial edit was blocked.");
+    rows[0].partialAmount = "0";
+    dispatchGridEvent(
+        grid,
+        "afteredit",
+        makeCellDetail(rows[0], "partialAmount", "0")
+    );
+
+    assert(rows[0].partialAmount === null, "Partial zero was not normalized to empty.");
+    assert(rows[0].remainingAmount === 100000, "Remaining did not recalculate after zero normalization.");
+    assert(coordinator.getState().undoCount === 1, "Zero normalization must create one logical History action.");
+
+    await coordinator.undo();
+    assert(rows[0].partialAmount === 20000, "Undo did not restore the prior Partial Amount.");
+    assert(rows[0].remainingAmount === 80000, "Undo did not restore the prior Remaining Amount.");
+
+    await coordinator.redo();
+    assert(rows[0].partialAmount === null, "Redo did not restore normalized empty Partial Amount.");
+    assert(rows[0].remainingAmount === 100000, "Redo did not restore derived Remaining Amount.");
+
+    bridge.destroy();
+    coordinator.destroy();
+}
+
 function applyRevoPaste(grid, rows, data) {
     const detail = makeRangeDetail(rows, data);
     const pasteEvent = dispatchGridEvent(grid, "clipboardrangepaste", detail);
@@ -767,6 +857,8 @@ async function testCanceledClipboardPasteDoesNotLeaveEngineBusy() {
 }
 
 const TESTS = [
+    ["Financial rules keep invalid Remaining blank", testFinancialRulesRejectInvalidRemaining],
+    ["Partial zero normalization has one Undo/Redo transaction", testPartialZeroIsOneUndoableNormalizedEdit],
     ["Change Engine owns Dirty, not History", testChangeEngineOwnsDirtyNotHistory],
     ["Return to Baseline prunes Dirty tracker", testReturnToBaselinePrunesDirtyTracker],
     ["Multi-cell change stays one Change Set", testMultiCellProducesOneChangeSet],

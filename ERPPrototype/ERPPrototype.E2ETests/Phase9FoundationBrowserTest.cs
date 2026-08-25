@@ -20,7 +20,7 @@ internal sealed class Phase9FoundationBrowserTest(
             var baseCount = suite switch
             {
                 E2ETestSuite.Smoke => 11,
-                E2ETestSuite.Full => 46,
+                E2ETestSuite.Full => 50,
                 E2ETestSuite.Stress => 53,
                 _ => throw new ArgumentOutOfRangeException(nameof(suite))
             };
@@ -937,6 +937,138 @@ internal sealed class Phase9FoundationBrowserTest(
 
                 checks.Pass(
                     "Saved financial amounts persist and recalculate after reload");
+
+                await workOrdersPage.SetCellValueAsync(
+                    seed.CurrentYearMiddleRowId,
+                    "partialAmount",
+                    string.Empty);
+                await workOrdersPage.WaitForCellValueAsync(
+                    seed.CurrentYearMiddleRowId,
+                    "remainingAmount",
+                    "1,250,000.57");
+
+                await workOrdersPage.SetCellValueAsync(
+                    seed.CurrentYearMiddleRowId,
+                    "partialAmount",
+                    "0",
+                    expectedValue: string.Empty);
+                await workOrdersPage.WaitForCellValueAsync(
+                    seed.CurrentYearMiddleRowId,
+                    "remainingAmount",
+                    "1,250,000.57");
+
+                await workOrdersPage.UndoAsync();
+                await workOrdersPage.WaitForCellValueAsync(
+                    seed.CurrentYearMiddleRowId,
+                    "partialAmount",
+                    "250,000.26");
+                await workOrdersPage.WaitForCellValueAsync(
+                    seed.CurrentYearMiddleRowId,
+                    "remainingAmount",
+                    "1,000,000.31");
+
+                checks.Pass(
+                    "Partial zero from an already empty cell creates no extra history transaction");
+
+                await workOrdersPage.RedoAsync();
+                await workOrdersPage.WaitForCellValueAsync(
+                    seed.CurrentYearMiddleRowId,
+                    "partialAmount",
+                    string.Empty);
+                await workOrdersPage.SetCellValueAsync(
+                    seed.CurrentYearMiddleRowId,
+                    "partialAmount",
+                    "250000.26",
+                    expectedValue: "250,000.26");
+                await workOrdersPage.WaitForDirtyRowCountAsync(0);
+
+                await workOrdersPage.SetCellValueAsync(
+                    seed.CurrentYearMiddleRowId,
+                    "workOrderValue",
+                    "0");
+                await workOrdersPage.WaitForCellValueAsync(
+                    seed.CurrentYearMiddleRowId,
+                    "remainingAmount",
+                    string.Empty);
+                await workOrdersPage.SaveAndWaitForFailureAsync(
+                    "لا يمكن الحفظ");
+                E2ETestAssert.Equal(
+                    "0",
+                    await workOrdersPage.GetCellValueAsync(
+                        seed.CurrentYearMiddleRowId,
+                        "workOrderValue"),
+                    "Invalid Work Order Value was not kept visible after Save was blocked.");
+                E2ETestAssert.True(
+                    await workOrdersPage.HasValidationMarkerAsync(
+                        seed.CurrentYearMiddleRowId),
+                    "Invalid Work Order Value did not show the visible validation marker.");
+                checks.Pass(
+                    "Invalid Work Order Value stays visible, blanks Remaining, and blocks Save");
+
+                await workOrdersPage.UndoAsync();
+                await workOrdersPage.WaitForCellValueAsync(
+                    seed.CurrentYearMiddleRowId,
+                    "workOrderValue",
+                    "1,250,000.57");
+
+                await workOrdersPage.SetCellValueAsync(
+                    seed.CurrentYearMiddleRowId,
+                    "workOrderValue",
+                    "not-a-number");
+                await workOrdersPage.WaitForCellValueAsync(
+                    seed.CurrentYearMiddleRowId,
+                    "remainingAmount",
+                    string.Empty);
+                await workOrdersPage.SaveAndWaitForFailureAsync(
+                    "لا يمكن الحفظ");
+                E2ETestAssert.Equal(
+                    "not-a-number",
+                    await workOrdersPage.GetCellValueAsync(
+                        seed.CurrentYearMiddleRowId,
+                        "workOrderValue"),
+                    "Malformed Work Order Value was not kept visible after Save was blocked.");
+                E2ETestAssert.True(
+                    await workOrdersPage.HasValidationMarkerAsync(
+                        seed.CurrentYearMiddleRowId),
+                    "Malformed Work Order Value did not show the visible validation marker.");
+                checks.Pass(
+                    "Malformed Work Order Value stays visible, blanks Remaining, and blocks Save");
+
+                await workOrdersPage.UndoAsync();
+                await workOrdersPage.WaitForCellValueAsync(
+                    seed.CurrentYearMiddleRowId,
+                    "workOrderValue",
+                    "1,250,000.57");
+
+                await workOrdersPage.SetCellValueAsync(
+                    seed.CurrentYearMiddleRowId,
+                    "partialAmount",
+                    "not-a-number");
+                await workOrdersPage.WaitForCellValueAsync(
+                    seed.CurrentYearMiddleRowId,
+                    "remainingAmount",
+                    string.Empty);
+                await workOrdersPage.SaveAndWaitForFailureAsync(
+                    "لا يمكن الحفظ");
+                E2ETestAssert.Equal(
+                    "not-a-number",
+                    await workOrdersPage.GetCellValueAsync(
+                        seed.CurrentYearMiddleRowId,
+                        "partialAmount"),
+                    "Malformed Partial Amount was not kept visible after Save was blocked.");
+                E2ETestAssert.True(
+                    await workOrdersPage.HasValidationMarkerAsync(
+                        seed.CurrentYearMiddleRowId),
+                    "Malformed Partial Amount did not show the visible validation marker.");
+                checks.Pass(
+                    "Malformed Partial Amount stays visible, blanks Remaining, and blocks Save");
+
+                await workOrdersPage.UndoAsync();
+                await workOrdersPage.WaitForCellValueAsync(
+                    seed.CurrentYearMiddleRowId,
+                    "partialAmount",
+                    "250,000.26");
+                await workOrdersPage.WaitForDirtyRowCountAsync(0);
 
                 await workOrdersPage.SelectContiguousRowsAsync(
                     seed.CurrentYearMiddleRowId,

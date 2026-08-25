@@ -17,6 +17,7 @@ public partial class WorkOrdersRevoGridNativeGate5A
     private const string RedoCountElementId = "revogrid-gate5b1-redo-count";
     private const string UndoButtonId = "revogrid-gate5b1-undo";
     private const string RedoButtonId = "revogrid-gate5b1-redo";
+    private const string FinancialErrorElementId = "revogrid-gate5b-financial-errors";
     private const string RowCountElementId = "revogrid-gate5b-row-count";
 
     [Parameter]
@@ -240,7 +241,8 @@ public partial class WorkOrdersRevoGridNativeGate5A
                     UndoCountElementId,
                     RedoCountElementId,
                     UndoButtonId,
-                    RedoButtonId
+                    RedoButtonId,
+                    FinancialErrorElementId
                 });
 
             GridInitialized = true;

@@ -1,5 +1,9 @@
 import { createRevoGridChangeEngine } from "./revoGridChangeEngine.js";
-import { syncWorkOrderDerivedFinancialFields } from "./workOrderFinancialRules.js?v=20260822-remaining-sync-1";
+import {
+    normalizeFinancialInput,
+    syncWorkOrderDerivedFinancialFields,
+    validateFinancialInputs
+} from "./workOrderFinancialRules.js?v=20260825-financial-rules-1";
 
 const DATA_CELL_SET_ADAPTER = "data-cell-set";
 const FINANCIAL_INPUT_FIELDS = new Set([
@@ -159,6 +163,8 @@ export function createRevoGridChangeBridge(options) {
     let destroyed = false;
     let activeCapture = null;
     let pendingPasteIntent = null;
+    const financialErrorsByClientKey = new Map();
+    let financialVisualRefreshToken = 0;
 
     const engine = createRevoGridChangeEngine({ datasetKey });
 
@@ -167,6 +173,99 @@ export function createRevoGridChangeBridge(options) {
             options.onStateChange(getState());
         }
     };
+
+    function refreshFinancialValidation(clientKeys) {
+        const keys = clientKeys
+            ? new Set(Array.from(clientKeys).map(key => String(key)))
+            : new Set(rowByClientKey.keys());
+
+        for (const clientKey of keys) {
+            const row = rowByClientKey.get(clientKey);
+            if (!row) {
+                financialErrorsByClientKey.delete(clientKey);
+                continue;
+            }
+
+            const errors = validateFinancialInputs(
+                row.workOrderValue,
+                row.partialAmount
+            );
+
+            if (errors.length === 0) {
+                financialErrorsByClientKey.delete(clientKey);
+            } else {
+                financialErrorsByClientKey.set(clientKey, errors);
+            }
+        }
+    }
+
+    async function refreshFinancialVisuals() {
+        const token = ++financialVisualRefreshToken;
+        const root = grid;
+
+        for (const cell of root.querySelectorAll?.("[data-erp-financial-invalid]") ?? []) {
+            cell.removeAttribute("data-erp-financial-invalid");
+            cell.removeAttribute("aria-invalid");
+            cell.removeAttribute("title");
+            cell.style.removeProperty("background-color");
+            cell.style.removeProperty("box-shadow");
+        }
+
+        if (financialErrorsByClientKey.size === 0) {
+            return;
+        }
+
+        let visibleRows;
+        try {
+            visibleRows = await grid.getVisibleSource("rgRow");
+        } catch {
+            return;
+        }
+
+        if (token !== financialVisualRefreshToken) {
+            return;
+        }
+
+        const columns = Array.isArray(grid.columns)
+            ? grid.columns
+            : await grid.getColumns?.() ?? [];
+        const logicalColumnByField = new Map(
+            columns.map((column, index) => [String(column?.prop ?? ""), index])
+        );
+
+        for (let rowIndex = 0; rowIndex < (visibleRows?.length ?? 0); rowIndex++) {
+            const row = visibleRows[rowIndex];
+            const errors = financialErrorsByClientKey.get(String(row?.clientKey));
+            if (!errors) {
+                continue;
+            }
+
+            for (const error of errors) {
+                const logicalColumn = logicalColumnByField.get(error.field);
+                if (logicalColumn === undefined) {
+                    continue;
+                }
+
+                const visualColumn = grid.rtl
+                    ? columns.length - 1 - logicalColumn
+                    : logicalColumn;
+                const selector =
+                    `[data-rgRow="${rowIndex}"][data-rgCol="${visualColumn}"]`;
+
+                for (const cell of root.querySelectorAll?.(selector) ?? []) {
+                    cell.setAttribute("data-erp-financial-invalid", "true");
+                    cell.setAttribute("aria-invalid", "true");
+                    cell.title = error.message;
+                    cell.style.backgroundColor = "#fff1f0";
+                    cell.style.boxShadow = "inset 0 0 0 2px #d92d20";
+                }
+            }
+        }
+    }
+
+    function scheduleFinancialVisualRefresh() {
+        void refreshFinancialVisuals();
+    }
 
     function syncDerivedFinancialFields(operations) {
         const affectedClientKeys = new Set();
@@ -191,8 +290,17 @@ export function createRevoGridChangeBridge(options) {
                 syncWorkOrderDerivedFinancialFields(row) || changed;
         }
 
+        refreshFinancialValidation(affectedClientKeys);
+        scheduleFinancialVisualRefresh();
+
         return changed;
     }
+
+    for (const row of rowByClientKey.values()) {
+        normalizeFinancialInput(row, "partialAmount");
+    }
+    refreshFinancialValidation();
+    scheduleFinancialVisualRefresh();
 
     async function applyDataHistoryEntry(entry, direction) {
         const operations = Array.isArray(entry?.payload?.operations)
@@ -251,6 +359,7 @@ export function createRevoGridChangeBridge(options) {
             // edit capture path as a new action.
             await grid.refresh("rgRow");
             engine.applyExternalChanges(transitions, datasetKey);
+            scheduleFinancialVisualRefresh();
             notifyState();
         } catch (error) {
             for (const backup of backups) {
@@ -513,6 +622,8 @@ export function createRevoGridChangeBridge(options) {
             const capture = activeCapture;
             activeCapture = null;
 
+            normalizeFinancialInput(detail.model, field);
+
             const result = engine.finalizeAfter(capture.captureId, [{
                 clientKey,
                 field,
@@ -543,6 +654,13 @@ export function createRevoGridChangeBridge(options) {
 
         const capture = activeCapture;
         activeCapture = null;
+
+        for (const target of capture.targets) {
+            const row = rowByClientKey.get(target.clientKey);
+            if (row) {
+                normalizeFinancialInput(row, target.field);
+            }
+        }
 
         const applied = capture.targets.map(target => {
             const row = rowByClientKey.get(target.clientKey);
@@ -577,6 +695,7 @@ export function createRevoGridChangeBridge(options) {
     grid.addEventListener("clipboardrangepaste", clipboardRangePaste);
     grid.addEventListener("beforerangeedit", beforeRangeEdit);
     grid.addEventListener("afteredit", afterEdit);
+    grid.addEventListener("viewportscroll", scheduleFinancialVisualRefresh);
 
     function setEditLocked(locked) {
         editLocked = Boolean(locked);
@@ -597,17 +716,30 @@ export function createRevoGridChangeBridge(options) {
         engine.resetDataset(normalizedDatasetKey);
         datasetKey = normalizedDatasetKey;
         rowByClientKey = nextIndex;
+        for (const row of rowByClientKey.values()) {
+            normalizeFinancialInput(row, "partialAmount");
+        }
+        financialErrorsByClientKey.clear();
+        refreshFinancialValidation();
         editLocked = false;
+        scheduleFinancialVisualRefresh();
         notifyState();
     }
 
     function replaceRowIndex(rows) {
         rowByClientKey = buildRowIndex(rows);
+        for (const row of rowByClientKey.values()) {
+            normalizeFinancialInput(row, "partialAmount");
+        }
+        refreshFinancialValidation();
+        scheduleFinancialVisualRefresh();
         notifyState();
     }
 
     function applyRowChanges(changes) {
         const state = engine.applyExternalRowChanges(changes, datasetKey);
+        refreshFinancialValidation();
+        scheduleFinancialVisualRefresh();
         notifyState();
         return state;
     }
@@ -617,13 +749,27 @@ export function createRevoGridChangeBridge(options) {
     }
 
     function getState() {
+        const financialInvalidRows = Array.from(
+            financialErrorsByClientKey.entries()
+        ).map(([clientKey, errors]) => ({
+            clientKey,
+            fields: errors.map(error => error.field),
+            messages: errors.map(error => error.message)
+        }));
+
         return {
             ...engine.getState(),
             editLocked,
             pasteEnabled: allowPaste,
             activeDataCapture: Boolean(activeCapture || pendingPasteIntent),
             activeCellCapture: activeCapture?.type === "cell-edit",
-            activePasteCapture: activeCapture?.type === "paste" || Boolean(pendingPasteIntent)
+            activePasteCapture: activeCapture?.type === "paste" || Boolean(pendingPasteIntent),
+            financialInvalidRowCount: financialInvalidRows.length,
+            financialInvalidCellCount: financialInvalidRows.reduce(
+                (count, row) => count + row.fields.length,
+                0
+            ),
+            financialInvalidRows
         };
     }
 
@@ -647,6 +793,7 @@ export function createRevoGridChangeBridge(options) {
         grid.removeEventListener("clipboardrangepaste", clipboardRangePaste);
         grid.removeEventListener("beforerangeedit", beforeRangeEdit);
         grid.removeEventListener("afteredit", afterEdit);
+        grid.removeEventListener("viewportscroll", scheduleFinancialVisualRefresh);
         unregisterDataHistoryAdapter();
         rowByClientKey.clear();
         destroyed = true;
