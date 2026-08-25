@@ -23,6 +23,7 @@ function Normalize-PathText {
 function Test-CommandLineContainsRepositoryRoot {
     param(
         [Parameter(Mandatory = $true)]
+        [AllowEmptyString()]
         [string]$CommandLine,
         [Parameter(Mandatory = $true)]
         [string]$Root
