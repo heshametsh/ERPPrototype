@@ -68,15 +68,37 @@ internal static class FinancialDiagnosticRunner
                 });
 
             await InstallRecorderAsync(page);
-            var source = await GetSourceAsync(page);
-            var targetClientKey = source[0].GetProperty("clientKey").GetString()!;
+            var sourcePayload = await GetSourcePayloadAsync(page);
+            if (!TryExtractSourceRows(
+                    sourcePayload,
+                    out var source,
+                    out var sourceEvidenceFailure))
+            {
+                failure = true;
+                await WriteEvidenceFailureAsync(
+                    observationsPath,
+                    browser,
+                    sourcePayload,
+                    sourceEvidenceFailure);
+                return 1;
+            }
+
+            var targetClientKey = GetClientKey(source[0]);
+            var secondClientKey = GetClientKey(source[1]);
+            var thirdClientKey = GetClientKey(source[2]);
+            var workOrderValueColumn =
+                await GetVisualColumnIndexAsync(page, "workOrderValue");
+            var partialAmountColumn =
+                await GetVisualColumnIndexAsync(page, "partialAmount");
+            var remainingAmountColumn =
+                await GetVisualColumnIndexAsync(page, "remainingAmount");
 
             // Establish the concrete 100,000-value fixture through real cell edits.
-            await EditCellAsync(page, 0, 3, "100000");
-            await EditCellAsync(page, 1, 3, "100000");
-            await EditCellAsync(page, 2, 3, "100000");
+            await EditCellAsync(page, 0, workOrderValueColumn, "100000");
+            await EditCellAsync(page, 1, workOrderValueColumn, "100000");
+            await EditCellAsync(page, 2, workOrderValueColumn, "100000");
 
-            await EditCellAsync(page, 0, 4, "20000");
+            await EditCellAsync(page, 0, partialAmountColumn, "20000");
             observations.Add(await CaptureAsync(
                 page,
                 targetClientKey,
@@ -86,7 +108,7 @@ internal static class FinancialDiagnosticRunner
                     [targetClientKey] = 80_000m
                 }));
 
-            await EditCellAsync(page, 0, 4, "30000");
+            await EditCellAsync(page, 0, partialAmountColumn, "30000");
             observations.Add(await CaptureAsync(
                 page,
                 targetClientKey,
@@ -118,7 +140,7 @@ internal static class FinancialDiagnosticRunner
                     [targetClientKey] = 70_000m
                 }));
 
-            await EditCellAsync(page, 0, 4, string.Empty);
+            await EditCellAsync(page, 0, partialAmountColumn, string.Empty);
             observations.Add(await CaptureAsync(
                 page,
                 targetClientKey,
@@ -131,7 +153,7 @@ internal static class FinancialDiagnosticRunner
             await PrepareClipboardAsync(
                 page,
                 startVisibleRow: 0,
-                column: 4,
+                column: partialAmountColumn,
                 "10000\n20000\n30000");
             await page.Keyboard.PressAsync("Control+V");
             await page.WaitForTimeoutAsync(750);
@@ -142,11 +164,14 @@ internal static class FinancialDiagnosticRunner
                 new Dictionary<string, decimal>
                 {
                     [targetClientKey] = 90_000m,
-                    [source[1].GetProperty("clientKey").GetString()!] = 80_000m,
-                    [source[2].GetProperty("clientKey").GetString()!] = 70_000m
+                    [secondClientKey] = 80_000m,
+                    [thirdClientKey] = 70_000m
                 }));
 
-            observations.Add(await CaptureReadonlyAttemptAsync(page, targetClientKey));
+            observations.Add(await CaptureReadonlyAttemptAsync(
+                page,
+                targetClientKey,
+                remainingAmountColumn));
 
             var report = new
             {
@@ -266,14 +291,20 @@ internal static class FinancialDiagnosticRunner
                 const grid = host?.querySelector('revo-grid');
                 const source = await grid.getSource('rgRow');
                 const visible = await grid.getVisibleSource('rgRow');
-                const module = await import('/js/revoGridGate5B1.js?v=20260822-remaining-sync-1');
+                const module = await import('/js/revoGridGate5B1.js?v=20260822-gate5b5-multirow-1');
                 const expected = args.expectedRemaining || {};
+                const columns = Array.isArray(grid.columns) ? grid.columns : [];
+                const remainingLogicalIndex = columns.findIndex(column =>
+                    String(column?.prop ?? '') === 'remainingAmount');
+                const remainingColumn = grid.rtl
+                    ? columns.length - 1 - remainingLogicalIndex
+                    : remainingLogicalIndex;
                 const rows = Object.entries(expected).map(([clientKey, remainingAmount]) => {
                     const row = source.find(item => String(item?.clientKey) === clientKey);
                     const visibleIndex = visible.findIndex(item => String(item?.clientKey) === clientKey);
                     const cell = visibleIndex < 0
                         ? null
-                        : host.querySelector(`[data-rgRow="${visibleIndex}"][data-rgCol="5"]`);
+                        : host.querySelector(`[data-rgRow="${visibleIndex}"][data-rgCol="${remainingColumn}"]`);
                     return {
                         clientKey,
                         source: row ? {
@@ -294,6 +325,14 @@ internal static class FinancialDiagnosticRunner
                 return JSON.stringify({
                     label: args.label,
                     at: new Date().toISOString(),
+                    columns: columns.map((column, logicalIndex) => ({
+                        logicalIndex,
+                        prop: column?.prop ?? null,
+                        visualIndex: grid.rtl
+                            ? columns.length - 1 - logicalIndex
+                            : logicalIndex
+                    })),
+                    rtl: Boolean(grid.rtl),
                     rows,
                     aftereditEvents: events.filter(event => event.name === 'afteredit'),
                     relevantEvents: events.slice(-30),
@@ -330,9 +369,10 @@ internal static class FinancialDiagnosticRunner
 
     private static async Task<JsonElement> CaptureReadonlyAttemptAsync(
         IPage page,
-        string targetClientKey)
+        string targetClientKey,
+        int remainingAmountColumn)
     {
-        var cell = DataCell(page, 0, 5);
+        var cell = DataCell(page, 0, remainingAmountColumn);
         await cell.DblClickAsync();
         await page.WaitForTimeoutAsync(300);
         var editorCount = await page.Locator($"#{HostId} input").CountAsync();
@@ -382,10 +422,29 @@ internal static class FinancialDiagnosticRunner
             """,
             new { startVisibleRow, column, text });
 
-        await page.WaitForFunctionAsync(
-            "() => document.activeElement?.tagName?.toLowerCase() === 'revo-grid'",
-            null,
-            new PageWaitForFunctionOptions { Timeout = 5_000 });
+        await page.WaitForTimeoutAsync(100);
+    }
+
+    private static async Task<int> GetVisualColumnIndexAsync(
+        IPage page,
+        string property)
+    {
+        return await page.EvaluateAsync<int>(
+            """
+            property => {
+                const grid = document.querySelector('#revogrid-native-gate5a-grid revo-grid');
+                const columns = Array.isArray(grid?.columns) ? grid.columns : [];
+                const logicalIndex = columns.findIndex(column =>
+                    String(column?.prop ?? '') === property);
+                if (logicalIndex < 0) {
+                    throw new Error(`Column '${property}' was not found.`);
+                }
+                return grid.rtl
+                    ? columns.length - 1 - logicalIndex
+                    : logicalIndex;
+            }
+            """,
+            property);
     }
 
     private static async Task EditCellAsync(
@@ -422,15 +481,138 @@ internal static class FinancialDiagnosticRunner
             $"[data-rgRow=\"{visibleRow}\"][data-rgCol=\"{column}\"]");
     }
 
-    private static async Task<JsonElement[]> GetSourceAsync(IPage page)
+    private static async Task<JsonElement> GetSourcePayloadAsync(IPage page)
     {
-        return await page.EvaluateAsync<JsonElement[]>(
+        var raw = await page.EvaluateAsync<string>(
             """
             async () => {
                 const grid = document.querySelector('#revogrid-native-gate5a-grid revo-grid');
-                return await grid.getSource('rgRow');
+                const source = await grid.getSource('rgRow');
+                return JSON.stringify(source ?? null);
             }
             """);
+
+        using var document = JsonDocument.Parse(raw ?? "null");
+        return document.RootElement.Clone();
+    }
+
+    private static bool TryExtractSourceRows(
+        JsonElement payload,
+        out JsonElement[] rows,
+        out string failure)
+    {
+        rows = Array.Empty<JsonElement>();
+        failure = string.Empty;
+
+        JsonElement candidate = payload;
+        if (candidate.ValueKind == JsonValueKind.Object)
+        {
+            if (!TryGetPropertyIgnoreCase(candidate, "rows", out candidate)
+                && !TryGetPropertyIgnoreCase(candidate, "source", out candidate))
+            {
+                failure = $"Source payload was an object without rows/source. ValueKind={payload.ValueKind}.";
+                return false;
+            }
+        }
+
+        if (candidate.ValueKind != JsonValueKind.Array)
+        {
+            failure = $"Source payload was not an array. ValueKind={candidate.ValueKind}.";
+            return false;
+        }
+
+        rows = candidate.EnumerateArray().ToArray();
+        if (rows.Length < 3)
+        {
+            failure = $"Source payload contained {rows.Length} rows; at least 3 are required for the diagnostic.";
+            return false;
+        }
+
+        for (var index = 0; index < 3; index++)
+        {
+            if (rows[index].ValueKind != JsonValueKind.Object
+                || string.IsNullOrWhiteSpace(GetClientKey(rows[index])))
+            {
+                failure =
+                    $"Source row {index} was missing an object/clientKey. " +
+                    $"ValueKind={rows[index].ValueKind}.";
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static string GetClientKey(JsonElement row)
+    {
+        if (!TryGetPropertyIgnoreCase(row, "clientKey", out var value))
+        {
+            return string.Empty;
+        }
+
+        return value.ValueKind switch
+        {
+            JsonValueKind.String => value.GetString() ?? string.Empty,
+            JsonValueKind.Number => value.ToString(),
+            _ => string.Empty
+        };
+    }
+
+    private static bool TryGetPropertyIgnoreCase(
+        JsonElement element,
+        string propertyName,
+        out JsonElement value)
+    {
+        if (element.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var property in element.EnumerateObject())
+            {
+                if (string.Equals(
+                        property.Name,
+                        propertyName,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    value = property.Value;
+                    return true;
+                }
+            }
+        }
+
+        value = default;
+        return false;
+    }
+
+    private static async Task WriteEvidenceFailureAsync(
+        string observationsPath,
+        E2EBrowserSession browser,
+        JsonElement sourcePayload,
+        string failure)
+    {
+        var browserDiagnostics = await ReadBrowserDiagnosticsAsync(browser.Diagnostics);
+        await File.WriteAllTextAsync(
+            observationsPath,
+            JsonSerializer.Serialize(
+                new
+                {
+                    generatedAtUtc = DateTime.UtcNow,
+                    failureKind = "DIAGNOSTIC_EVIDENCE_MISSING",
+                    failure,
+                    rawSourcePayload = sourcePayload.GetRawText(),
+                    browserDiagnostics
+                },
+                new JsonSerializerOptions { WriteIndented = true }));
+
+        try
+        {
+            await browser.CaptureFailureAsync("remaining-amount-financial-diagnostic");
+        }
+        catch (Exception captureException)
+        {
+            Console.Error.WriteLine(
+                $"Could not capture diagnostic evidence failure: {captureException.Message}");
+        }
+
+        Console.Error.WriteLine($"Financial diagnostic evidence failure: {failure}");
     }
 
     private static string FindProjectRoot()
