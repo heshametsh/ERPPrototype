@@ -93,6 +93,37 @@ function Test-RepositoryProcessMatch {
     return $false
 }
 
+function Get-EffectiveExcludedProcessIds {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object[]]$Snapshot,
+        [int[]]$InitialExcludedProcessId = @()
+    )
+
+    $byId = @{}
+    foreach ($item in $Snapshot) {
+        $byId[[int]$item.ProcessId] = $item
+    }
+
+    $excluded = [System.Collections.Generic.HashSet[int]]::new()
+    foreach ($initialId in $InitialExcludedProcessId) {
+        $currentId = [int]$initialId
+        while ($currentId -gt 0 -and $excluded.Add($currentId)) {
+            if (-not $byId.ContainsKey($currentId)) {
+                break
+            }
+
+            $parentId = 0
+            if ($null -ne $byId[$currentId].ParentProcessId) {
+                $parentId = [int]$byId[$currentId].ParentProcessId
+            }
+            $currentId = $parentId
+        }
+    }
+
+    return @($excluded)
+}
+
 function Get-ProcessSnapshot {
     try {
         return @(Get-CimInstance Win32_Process |
@@ -125,8 +156,11 @@ function Invoke-RepositoryProcessCleanup {
     )
 
     $snapshot = @(Get-ProcessSnapshot)
+    $effectiveExcludedProcessId = Get-EffectiveExcludedProcessIds `
+        -Snapshot $snapshot `
+        -InitialExcludedProcessId $ExcludeProcessId
     $matches = @($snapshot | Where-Object {
-        Test-RepositoryProcessMatch $_ $Root $ExcludeProcessId
+        Test-RepositoryProcessMatch $_ $Root $effectiveExcludedProcessId
     })
     if ($matches.Count -eq 0) {
         Write-Host 'E2E process cleanup: no repository-owned ERPPrototype processes found.'
@@ -135,7 +169,7 @@ function Invoke-RepositoryProcessCleanup {
 
     foreach ($match in ($matches | Sort-Object ProcessId -Descending)) {
         $processId = [int]$match.ProcessId
-        if ($processId -eq $PID -or $ExcludeProcessId -contains $processId) {
+        if ($processId -eq $PID -or $effectiveExcludedProcessId -contains $processId) {
             continue
         }
 
@@ -189,7 +223,21 @@ function Invoke-SelfTest {
         throw 'Process-selection self-test failed: unrelated descendant was selected.'
     }
 
-    Write-Host "E2E process-selection self-test: PASS ($($cases.Count + 1) cases; no real process was terminated)."
+    $callerGraph = @(
+        [pscustomobject]@{ ProcessId = 3001; ParentProcessId = 3002; Name = 'dotnet.exe'; ExecutablePath = 'C:\Program Files\dotnet\dotnet.exe'; CommandLine = 'dotnet C:\src\ERPPrototype\ERPPrototype.E2ETests.dll' }
+        [pscustomobject]@{ ProcessId = 3002; ParentProcessId = 0; Name = 'dotnet.exe'; ExecutablePath = 'C:\Program Files\dotnet\dotnet.exe'; CommandLine = 'dotnet run --project C:\src\ERPPrototype\ERPPrototype.E2ETests\ERPPrototype.E2ETests.csproj' }
+    )
+    $callerExclusions = Get-EffectiveExcludedProcessIds `
+        -Snapshot $callerGraph `
+        -InitialExcludedProcessId @(3001)
+    $callerMatches = @($callerGraph | Where-Object {
+        Test-RepositoryProcessMatch $_ $root $callerExclusions
+    })
+    if ($callerMatches.Count -ne 0) {
+        throw 'Process-selection self-test failed: the E2E caller or its dotnet ancestor was selected.'
+    }
+
+    Write-Host "E2E process-selection self-test: PASS ($($cases.Count + 2) cases; no real process was terminated)."
 }
 
 if ($SelfTest) {
