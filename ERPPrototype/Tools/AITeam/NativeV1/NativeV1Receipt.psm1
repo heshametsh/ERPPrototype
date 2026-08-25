@@ -1,7 +1,8 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-$script:NativeV1ReceiptVersion = 'candidate-receipt-v1'
+$script:NativeV1ReceiptVersion = '1.1'
+$script:NativeV1ReviewProtocolVersion = 'candidate-receipt-v1'
 
 function Get-NativeV1DataRoot {
     param([string]$DataRoot)
@@ -87,7 +88,7 @@ function New-NativeV1Review {
     $findingIds = Get-NativeV1Property -InputObject $Review -Name 'findingIds'
     return [ordered]@{
         reviewId = Get-NativeV1Property -InputObject $Review -Name 'reviewId'
-        protocolVersion = Get-NativeV1Property -InputObject $Review -Name 'protocolVersion' -Default $script:NativeV1ReceiptVersion
+        protocolVersion = Get-NativeV1Property -InputObject $Review -Name 'protocolVersion' -Default $script:NativeV1ReviewProtocolVersion
         requestedReviewerModel = Get-NativeV1Property -InputObject $Review -Name 'requestedReviewerModel'
         actualReviewerModel = Get-NativeV1Property -InputObject $Review -Name 'actualReviewerModel'
         reviewerResult = Get-NativeV1Property -InputObject $Review -Name 'reviewerResult'
@@ -101,6 +102,76 @@ function New-NativeV1Review {
     }
 }
 
+function New-NativeV1Participant {
+    param([AllowNull()]$Participant)
+    $role = [string](Get-NativeV1Property -InputObject $Participant -Name 'role')
+    if ($role -notin @('MAIN', 'REVIEWER', 'SPECIALIST')) {
+        throw 'Participant role must be MAIN, REVIEWER, or SPECIALIST.'
+    }
+
+    return [ordered]@{
+        role = $role
+        purpose = Get-NativeV1Property -InputObject $Participant -Name 'purpose'
+        requestedModel = Get-NativeV1Property -InputObject $Participant -Name 'requestedModel'
+        actualModel = Get-NativeV1Property -InputObject $Participant -Name 'actualModel'
+        sessionOrThread = Get-NativeV1Property -InputObject $Participant -Name 'sessionOrThread'
+        tokens = Get-NativeV1Property -InputObject $Participant -Name 'tokens'
+        cachedTokens = Get-NativeV1Property -InputObject $Participant -Name 'cachedTokens'
+        toolCalls = Get-NativeV1Property -InputObject $Participant -Name 'toolCalls'
+        elapsedTime = Get-NativeV1Property -InputObject $Participant -Name 'elapsedTime'
+    }
+}
+
+function New-NativeV1MissionReceipt {
+    param(
+        [Parameter(Mandatory)][string]$MissionId,
+        [Parameter(Mandatory)][string]$Mission,
+        [Parameter(Mandatory)][string]$MissionType,
+        [Parameter(Mandatory)][string]$BaseSha,
+        [Parameter(Mandatory)][string]$FinalSha,
+        [Parameter(Mandatory)][string]$Risk,
+        [Parameter(Mandatory)][string]$MainDecision,
+        [Parameter(Mandatory)][string]$Result,
+        [AllowNull()][string]$CandidateSha = $null,
+        [AllowNull()][string]$ChangeType = $null,
+        [AllowNull()][object[]]$Participants = @(),
+        [AllowNull()][object[]]$Reviews = @(),
+        [string]$ReceiptId = ([Guid]::NewGuid().ToString())
+    )
+    if ($ReceiptId -notmatch '^[A-Za-z0-9._-]+$') { throw 'ReceiptId contains unsupported path characters.' }
+    if ([string]::IsNullOrWhiteSpace($MissionId)) { throw 'MissionId is required.' }
+
+    $normalizedParticipants = @()
+    foreach ($participant in @($Participants)) {
+        $normalizedParticipants += ,(New-NativeV1Participant -Participant $participant)
+    }
+
+    $normalizedReviews = @()
+    foreach ($review in @($Reviews)) {
+        $normalizedReviews += ,(New-NativeV1Review -Review $review)
+    }
+
+    $normalizedCandidateSha = if ([string]::IsNullOrWhiteSpace($CandidateSha)) { $null } else { $CandidateSha }
+    $normalizedChangeType = if ([string]::IsNullOrWhiteSpace($ChangeType)) { $null } else { $ChangeType }
+
+    return [ordered]@{
+        receiptVersion = $script:NativeV1ReceiptVersion
+        receiptId = $ReceiptId
+        missionId = $MissionId
+        mission = $Mission
+        missionType = $MissionType
+        baseSha = $BaseSha
+        finalSha = $FinalSha
+        candidateSha = $normalizedCandidateSha
+        changeType = $normalizedChangeType
+        risk = $Risk
+        mainDecision = $MainDecision
+        result = $Result
+        participants = @($normalizedParticipants)
+        reviews = @($normalizedReviews)
+    }
+}
+
 function New-NativeV1CandidateReceipt {
     param(
         [Parameter(Mandatory)][string]$Mission,
@@ -110,23 +181,26 @@ function New-NativeV1CandidateReceipt {
         [Parameter(Mandatory)][string]$Risk,
         [Parameter(Mandatory)][string]$MainDecision,
         [AllowNull()][object[]]$Reviews = @(),
+        [AllowNull()][object[]]$Participants = @(),
+        [string]$MissionId = '',
+        [string]$Result = 'CANDIDATE_CREATED',
         [string]$ReceiptId = ([Guid]::NewGuid().ToString())
     )
-    if ($ReceiptId -notmatch '^[A-Za-z0-9._-]+$') { throw 'ReceiptId contains unsupported path characters.' }
-    $normalizedReviews = @()
-    foreach ($review in @($Reviews)) {
-        $normalizedReviews += ,(New-NativeV1Review -Review $review)
-    }
-    return [ordered]@{
-        receiptId = $ReceiptId
-        mission = $Mission
-        baseSha = $BaseSha
-        candidateSha = $CandidateSha
-        changeType = $ChangeType
-        risk = $Risk
-        mainDecision = $MainDecision
-        reviews = @($normalizedReviews)
-    }
+    if ([string]::IsNullOrWhiteSpace($MissionId)) { $MissionId = $ReceiptId }
+    return New-NativeV1MissionReceipt `
+        -MissionId $MissionId `
+        -Mission $Mission `
+        -MissionType 'IMPLEMENTATION' `
+        -BaseSha $BaseSha `
+        -FinalSha $CandidateSha `
+        -Risk $Risk `
+        -MainDecision $MainDecision `
+        -Result $Result `
+        -CandidateSha $CandidateSha `
+        -ChangeType $ChangeType `
+        -Participants $Participants `
+        -Reviews $Reviews `
+        -ReceiptId $ReceiptId
 }
 
 function Get-NativeV1ReceiptPath {
@@ -153,7 +227,7 @@ function Write-NativeV1JsonAtomic {
     return $Path
 }
 
-function Write-NativeV1CandidateReceipt {
+function Write-NativeV1Receipt {
     param(
         [Parameter(Mandatory)]$Receipt,
         [string]$DataRoot,
@@ -162,20 +236,49 @@ function Write-NativeV1CandidateReceipt {
     foreach ($name in @('receiptId','mission','baseSha','candidateSha','changeType','risk','mainDecision','reviews')) {
         if (-not (Test-NativeV1Property -InputObject $Receipt -Name $name)) { throw "Candidate Receipt is missing '$name'." }
     }
+    $version = Get-NativeV1Property -InputObject $Receipt -Name 'receiptVersion'
+    if ($null -ne $version -and [string]$version -eq '1.1') {
+        foreach ($name in @('missionId','missionType','finalSha','result','participants')) {
+            if (-not (Test-NativeV1Property -InputObject $Receipt -Name $name)) { throw "Native V1.1 Receipt is missing '$name'." }
+        }
+    }
     $path = Get-NativeV1ReceiptPath -ReceiptId ([string]$Receipt.receiptId) -DataRoot $DataRoot
     return Write-NativeV1JsonAtomic -Value $Receipt -Path $path -Overwrite:$Overwrite
 }
 
+function Write-NativeV1CandidateReceipt {
+    param(
+        [Parameter(Mandatory)]$Receipt,
+        [string]$DataRoot,
+        [switch]$Overwrite
+    )
+    return Write-NativeV1Receipt -Receipt $Receipt -DataRoot $DataRoot -Overwrite:$Overwrite
+}
+
+function Read-NativeV1Receipt {
+    param(
+        [Parameter(Mandatory)][string]$ReceiptId,
+        [string]$DataRoot
+    )
+    $path = Get-NativeV1ReceiptPath -ReceiptId $ReceiptId -DataRoot $DataRoot
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "Receipt not found: $ReceiptId" }
+    return Get-Content -LiteralPath $path -Raw -Encoding UTF8 | ConvertFrom-Json
+}
+
 function Write-NativeV1LearningEvent {
     param(
-        [Parameter(Mandatory)][ValidateSet('CONFIRMED_FINDING','REJECTED_FINDING','KNOWN_DEFECT','REQUIREMENT_CHANGED')][string]$EventType,
+        [Parameter(Mandatory)][ValidateSet('CONFIRMED_FINDING','REJECTED_FINDING','KNOWN_DEFECT','REQUIREMENT_CHANGED','CONFIRMED_DIAGNOSIS','REJECTED_DIAGNOSIS')][string]$EventType,
         [Parameter(Mandatory)][string]$ReceiptId,
         [string]$ReviewId,
         [string]$FindingId,
+        [string]$DiagnosisId,
         [string]$DataRoot
     )
     if ($EventType -in @('CONFIRMED_FINDING','REJECTED_FINDING') -and ([string]::IsNullOrWhiteSpace($ReviewId) -or [string]::IsNullOrWhiteSpace($FindingId))) {
         throw "$EventType requires ReviewId and FindingId."
+    }
+    if ($EventType -in @('CONFIRMED_DIAGNOSIS','REJECTED_DIAGNOSIS') -and [string]::IsNullOrWhiteSpace($DiagnosisId)) {
+        throw "$EventType requires DiagnosisId."
     }
     $root = Get-NativeV1DataRoot $DataRoot
     $path = Join-Path $root 'events.jsonl'
@@ -185,10 +288,11 @@ function Write-NativeV1LearningEvent {
         receiptId = $ReceiptId
         reviewId = if ([string]::IsNullOrWhiteSpace($ReviewId)) { $null } else { $ReviewId }
         findingId = if ([string]::IsNullOrWhiteSpace($FindingId)) { $null } else { $FindingId }
+        diagnosisId = if ([string]::IsNullOrWhiteSpace($DiagnosisId)) { $null } else { $DiagnosisId }
         occurredAt = [DateTime]::UtcNow.ToString('o', [Globalization.CultureInfo]::InvariantCulture)
     }
     ($event | ConvertTo-Json -Compress) | Add-Content -LiteralPath $path -Encoding UTF8
     return $path
 }
 
-Export-ModuleMember -Function Get-NativeV1DataRoot, Get-NativeV1GitVisibleStateFingerprint, New-NativeV1Review, New-NativeV1CandidateReceipt, Get-NativeV1ReceiptPath, Write-NativeV1CandidateReceipt, Write-NativeV1LearningEvent
+Export-ModuleMember -Function Get-NativeV1DataRoot, Get-NativeV1GitVisibleStateFingerprint, New-NativeV1Review, New-NativeV1Participant, New-NativeV1MissionReceipt, New-NativeV1CandidateReceipt, Get-NativeV1ReceiptPath, Write-NativeV1Receipt, Write-NativeV1CandidateReceipt, Read-NativeV1Receipt, Write-NativeV1LearningEvent

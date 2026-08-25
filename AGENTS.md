@@ -13,7 +13,7 @@ Only these AI-engineering pieces are active:
 - this file, including the Native V1 risk gate;
 - `ERPPrototype/Documentation/08_DECISIONS_LOG.md`;
 - `.ai/prompts/native-reviewer-v1.md`, the single neutral reviewer contract;
-- `ERPPrototype/Tools/AITeam/NativeV1/NativeV1Receipt.psm1`, which fingerprints Git-visible state and writes Candidate Receipts/events;
+- `ERPPrototype/Tools/AITeam/NativeV1/NativeV1Receipt.psm1`, which fingerprints Git-visible state and writes Native V1 Receipts/events;
 - `ERPPrototype/Tools/AITeam/NativeV1/Test-NativeV1.ps1`, deterministic local checks for that small capability.
 
 The former Project Brain, V2/V3 qualification material, routing, Lead, CLI reviewer, sandbox/transport, evidence-pack, collector, learning-engine, database, and dashboard infrastructure is historical only under `ERPPrototype/Documentation/Archive/AI-Team-V3/`. It is not an active dependency and must not be revived as a compatibility path.
@@ -42,11 +42,13 @@ For an independent Native reviewer, use only `.ai/prompts/native-reviewer-v1.md`
 
 ## Candidate Receipt contract
 
-Candidate Receipt is the unit of learning. The writer stores only supplied observations:
+Native V1.1 Receipt is the unit of learning for every completed real mission, including diagnostic missions without a Candidate. The writer stores only supplied observations:
 
-`receiptId`, `mission`, `baseSha`, `candidateSha`, `changeType`, `risk`, `mainDecision`, `reviews[]`.
+`receiptVersion`, `receiptId`, `missionId`, `mission`, `missionType`, `baseSha`, `finalSha`, `candidateSha`, `changeType`, `risk`, `mainDecision`, `result`, `participants[]`, and `reviews[]`.
 
-Each review may contain `reviewId`, `protocolVersion`, `requestedReviewerModel`, `actualReviewerModel`, `reviewerResult`, `findingCount`, `findingIds`, `tokens`, `cachedTokens`, `toolCalls`, `time`, and `reviewerThread/session`. Missing telemetry is `null`. Later events are factual records only: `CONFIRMED_FINDING`, `REJECTED_FINDING`, `KNOWN_DEFECT`, and `REQUIREMENT_CHANGED`.
+Each participant records only the supplied role/purpose and available model/session/telemetry facts. Missing native telemetry is `null`; a participant is never added merely because it was available or recommended. Candidate-specific fields remain `null` for diagnostic missions.
+
+Each review may contain `reviewId`, `protocolVersion`, `requestedReviewerModel`, `actualReviewerModel`, `reviewerResult`, `findingCount`, `findingIds`, `tokens`, `cachedTokens`, `toolCalls`, `time`, and `reviewerThread/session`. Missing telemetry is `null`. Later events are factual records only: `CONFIRMED_FINDING`, `REJECTED_FINDING`, `KNOWN_DEFECT`, and `REQUIREMENT_CHANGED`. Later factual diagnosis events may also be `CONFIRMED_DIAGNOSIS` or `REJECTED_DIAGNOSIS`; completion never classifies a diagnosis automatically. Existing V1 receipts remain readable.
 
 ## Protected Work Orders behavior
 

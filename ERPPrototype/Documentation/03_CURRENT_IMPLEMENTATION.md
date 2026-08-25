@@ -4,8 +4,9 @@
 
 - Architecture V1 is frozen.
 - The former Project Brain and V2/V3 AI-team infrastructure is archived under `Documentation/Archive/AI-Team-V3/`.
-- Native V1 has one neutral reviewer contract, a Git-visible-state fingerprint, and a tiny Candidate Receipt writer/storage. It has no router, Lead, child-reviewer, harness, transport, collector, learning engine, database, or dashboard.
+- Native V1 has one neutral reviewer contract, a Git-visible-state fingerprint, and a tiny Native V1 Receipt writer/storage. It has no router, Lead, child-reviewer, harness, transport, collector, learning engine, database, or dashboard.
 - Native Codex telemetry is not available as a structured local session stream in this repository. Receipt telemetry fields remain `null` unless a Native session supplies an observed value.
+- Native V1.1 receipts now record every completed real mission, including diagnostic missions without a Candidate, using factual `participants[]` and `result` fields. Missing telemetry remains `null`; later diagnosis outcome events remain append-only and factual.
 
 ---
 

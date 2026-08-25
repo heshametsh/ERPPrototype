@@ -1,5 +1,15 @@
 # NATIVE V1 AI-ENGINEERING DECISION OVERRIDE — 2026-08-24
 
+## DEC-042 — Native V1.1 records every completed real mission
+
+- **Status:** Accepted / Implemented
+- **Decision:** Every completed real Native mission writes one lightweight receipt, whether it produces a Candidate or is diagnostic/read-only. The receipt adds `receiptVersion: "1.1"`, mission identity/type, final state, result, and the exact supplied `participants[]`; Candidate fields remain nullable when no Candidate exists.
+- **Participation rule:** `participants[]` contains only roles that actually participated: `MAIN`, `REVIEWER`, or optional `SPECIALIST`. No reviewer or specialist is inferred from availability or recommendation.
+- **Telemetry rule:** Requested/actual model, session/thread, tokens, cached tokens, tool calls, and elapsed time are stored only when supplied by the Native session; unavailable values remain `null`.
+- **Compatibility rule:** Existing V1 Candidate receipts remain readable, and the existing `reviews[]` semantics remain unchanged.
+- **Outcome rule:** `CONFIRMED_DIAGNOSIS` and `REJECTED_DIAGNOSIS` are append-only factual events. Receipt completion never classifies a diagnosis automatically.
+- **Architecture boundary:** This is a compatible evolution of `NativeV1Receipt.psm1`; it adds no router, reviewer transport, collector, database, dashboard, learning engine, or automatic learning.
+
 ## DEC-041 — Freeze the Native V1 engineering surface
 
 - **Status:** Accepted / Architecture V1 frozen
