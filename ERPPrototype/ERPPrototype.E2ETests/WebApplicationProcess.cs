@@ -282,6 +282,8 @@ internal sealed class WebApplicationProcess : IAsyncDisposable
         cleanup.StartInfo.ArgumentList.Add("-CleanupOnly");
         cleanup.StartInfo.ArgumentList.Add("-RepositoryRoot");
         cleanup.StartInfo.ArgumentList.Add(projectRoot);
+        cleanup.StartInfo.ArgumentList.Add("-ExcludeProcessId");
+        cleanup.StartInfo.ArgumentList.Add(Environment.ProcessId.ToString());
 
         if (!cleanup.Start())
         {

@@ -4,7 +4,7 @@ param(
     [switch]$SelfTest,
     [Parameter(Mandatory = $true)]
     [string]$RepositoryRoot,
-    [int[]]$RelevantPort = @(5265, 5270)
+    [int[]]$ExcludeProcessId = @()
 )
 
 Set-StrictMode -Version Latest
@@ -20,13 +20,49 @@ function Normalize-PathText {
     return $Value.Replace('/', '\').TrimEnd('\')
 }
 
+function Test-CommandLineContainsRepositoryRoot {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$CommandLine,
+        [Parameter(Mandatory = $true)]
+        [string]$Root
+    )
+
+    $start = 0
+    while (($index = $CommandLine.IndexOf($Root, $start, [System.StringComparison]::OrdinalIgnoreCase)) -ge 0) {
+        $before =
+            $index -eq 0 -or
+            $CommandLine[$index - 1] -eq ' ' -or
+            $CommandLine[$index - 1] -eq '"'
+        $end = $index + $Root.Length
+        $after =
+            $end -eq $CommandLine.Length -or
+            $CommandLine[$end] -eq '\' -or
+            $CommandLine[$end] -eq ' ' -or
+            $CommandLine[$end] -eq '"'
+
+        if ($before -and $after) {
+            return $true
+        }
+
+        $start = $end
+    }
+
+    return $false
+}
+
 function Test-RepositoryProcessMatch {
     param(
         [Parameter(Mandatory = $true)]
         [pscustomobject]$ProcessInfo,
         [Parameter(Mandatory = $true)]
-        [string]$Root
+        [string]$Root,
+        [int[]]$ExcludedProcessId = @()
     )
+
+    if ($ExcludedProcessId -contains [int]$ProcessInfo.ProcessId) {
+        return $false
+    }
 
     $rootText = (Normalize-PathText $Root).ToLowerInvariant()
     $name = ([string]$ProcessInfo.Name).ToLowerInvariant()
@@ -34,7 +70,7 @@ function Test-RepositoryProcessMatch {
     $commandLine = ([string]$ProcessInfo.CommandLine).Replace('/', '\').ToLowerInvariant()
     $hasRepositoryEvidence =
         (($executablePath -like "$rootText\*") -or
-         ($commandLine.Contains($rootText)))
+         (Test-CommandLineContainsRepositoryRoot -CommandLine $commandLine -Root $rootText))
 
     if (-not $hasRepositoryEvidence) {
         return $false
@@ -82,42 +118,6 @@ function Get-ProcessSnapshot {
     }
 }
 
-function Get-DescendantProcessIds {
-    param(
-        [Parameter(Mandatory = $true)]
-        [object[]]$Snapshot,
-        [Parameter(Mandatory = $true)]
-        [int]$RootProcessId
-    )
-
-    $children = @{}
-    foreach ($item in $Snapshot) {
-        $parentId = 0
-        if ($null -ne $item.ParentProcessId) {
-            $parentId = [int]$item.ParentProcessId
-        }
-        if (-not $children.ContainsKey($parentId)) {
-            $children[$parentId] = [System.Collections.Generic.List[int]]::new()
-        }
-        $children[$parentId].Add([int]$item.ProcessId)
-    }
-
-    $result = [System.Collections.Generic.List[int]]::new()
-    $pending = [System.Collections.Generic.Queue[int]]::new()
-    $pending.Enqueue($RootProcessId)
-    while ($pending.Count -gt 0) {
-        $current = $pending.Dequeue()
-        if ($children.ContainsKey($current)) {
-            foreach ($child in $children[$current]) {
-                $result.Add($child)
-                $pending.Enqueue($child)
-            }
-        }
-    }
-
-    return @($result)
-}
-
 function Invoke-RepositoryProcessCleanup {
     param(
         [Parameter(Mandatory = $true)]
@@ -125,43 +125,30 @@ function Invoke-RepositoryProcessCleanup {
     )
 
     $snapshot = @(Get-ProcessSnapshot)
-    $matches = @($snapshot | Where-Object { Test-RepositoryProcessMatch $_ $Root })
+    $matches = @($snapshot | Where-Object {
+        Test-RepositoryProcessMatch $_ $Root $ExcludeProcessId
+    })
     if ($matches.Count -eq 0) {
         Write-Host 'E2E process cleanup: no repository-owned ERPPrototype processes found.'
         return
     }
 
-    $matchIds = [System.Collections.Generic.HashSet[int]]::new()
-    foreach ($match in $matches) {
-        [void]$matchIds.Add([int]$match.ProcessId)
-    }
+    foreach ($match in ($matches | Sort-Object ProcessId -Descending)) {
+        $processId = [int]$match.ProcessId
+        if ($processId -eq $PID -or $ExcludeProcessId -contains $processId) {
+            continue
+        }
 
-    $roots = @($matches | Where-Object {
-        -not $matchIds.Contains([int]$_.ParentProcessId)
-    })
-
-    foreach ($rootProcess in $roots) {
-        $treeIds = @(
-            @([int]$rootProcess.ProcessId) +
-            @(Get-DescendantProcessIds -Snapshot $snapshot -RootProcessId ([int]$rootProcess.ProcessId))
-        ) | Sort-Object -Unique -Descending
-
-        foreach ($processId in $treeIds) {
-            if ($processId -eq $PID -or $processId -eq $Host.InstanceId) {
-                continue
-            }
-
-            try {
-                $target = Get-Process -Id $processId -ErrorAction Stop
-                Stop-Process -Id $target.Id -Force -ErrorAction Stop
-                Write-Host "E2E process cleanup: stopped PID $processId ($($target.ProcessName))."
-            }
-            catch [System.Management.Automation.ItemNotFoundException] {
-                # Idempotent: it exited between snapshot and cleanup.
-            }
-            catch {
-                Write-Warning "Could not stop selected repository PID ${processId}: $($_.Exception.Message)"
-            }
+        try {
+            $target = Get-Process -Id $processId -ErrorAction Stop
+            Stop-Process -Id $target.Id -Force -ErrorAction Stop
+            Write-Host "E2E process cleanup: stopped selected PID $processId ($($target.ProcessName))."
+        }
+        catch [System.Management.Automation.ItemNotFoundException] {
+            # Idempotent: it exited between snapshot and cleanup.
+        }
+        catch {
+            Write-Warning "Could not stop selected repository PID ${processId}: $($_.Exception.Message)"
         }
     }
 }
@@ -169,21 +156,40 @@ function Invoke-RepositoryProcessCleanup {
 function Invoke-SelfTest {
     $root = 'C:\src\ERPPrototype'
     $cases = @(
-        [pscustomobject]@{ Name = 'ERPPrototype.exe'; ExecutablePath = 'C:\src\ERPPrototype\ERPPrototype\bin\Debug\net10.0\ERPPrototype.exe'; CommandLine = ''; Expected = $true }
-        [pscustomobject]@{ Name = 'dotnet.exe'; ExecutablePath = 'C:\Program Files\dotnet\dotnet.exe'; CommandLine = 'dotnet C:\src\ERPPrototype\ERPPrototype\bin\Debug\net10.0\ERPPrototype.dll'; Expected = $true }
-        [pscustomobject]@{ Name = 'dotnet.exe'; ExecutablePath = 'C:\Program Files\dotnet\dotnet.exe'; CommandLine = 'dotnet C:\other\ERPPrototype\ERPPrototype.dll'; Expected = $false }
-        [pscustomobject]@{ Name = 'iisexpress.exe'; ExecutablePath = 'C:\src\ERPPrototype\iisexpress.exe'; CommandLine = ''; Expected = $false }
-        [pscustomobject]@{ Name = 'dotnet.exe'; ExecutablePath = 'C:\Program Files\dotnet\dotnet.exe'; CommandLine = 'dotnet --urls http://localhost:5265'; Expected = $false }
+        [pscustomobject]@{ ProcessId = 1001; Name = 'ERPPrototype.exe'; ExecutablePath = 'C:\src\ERPPrototype\ERPPrototype\bin\Debug\net10.0\ERPPrototype.exe'; CommandLine = ''; Expected = $true }
+        [pscustomobject]@{ ProcessId = 1002; Name = 'dotnet.exe'; ExecutablePath = 'C:\Program Files\dotnet\dotnet.exe'; CommandLine = 'dotnet C:\src\ERPPrototype\ERPPrototype\bin\Debug\net10.0\ERPPrototype.dll'; Expected = $true }
+        [pscustomobject]@{ ProcessId = 1003; Name = 'dotnet.exe'; ExecutablePath = 'C:\Program Files\dotnet\dotnet.exe'; CommandLine = 'dotnet C:\other\ERPPrototype\ERPPrototype.dll'; Expected = $false }
+        [pscustomobject]@{ ProcessId = 1004; Name = 'dotnet.exe'; ExecutablePath = 'C:\Program Files\dotnet\dotnet.exe'; CommandLine = 'dotnet C:\src\ERPPrototypeFork\ERPPrototype.dll'; Expected = $false }
+        [pscustomobject]@{ ProcessId = 1005; Name = 'iisexpress.exe'; ExecutablePath = 'C:\src\ERPPrototype\iisexpress.exe'; CommandLine = ''; Expected = $false }
+        [pscustomobject]@{ ProcessId = 1006; Name = 'dotnet.exe'; ExecutablePath = 'C:\Program Files\dotnet\dotnet.exe'; CommandLine = 'dotnet --urls http://localhost:5265'; Expected = $false }
+        [pscustomobject]@{ ProcessId = 1007; Name = 'dotnet.exe'; ExecutablePath = 'C:\Program Files\dotnet\dotnet.exe'; CommandLine = 'dotnet C:\src\ERPPrototype\ERPPrototype.E2ETests.dll'; Expected = $false; Excluded = $true }
     )
 
     foreach ($case in $cases) {
-        $actual = Test-RepositoryProcessMatch $case $root
+        $excluded = if ($case.PSObject.Properties['Excluded'] -and $case.Excluded) {
+            @(1007)
+        }
+        else {
+            @()
+        }
+        $actual = Test-RepositoryProcessMatch $case $root $excluded
         if ($actual -ne $case.Expected) {
             throw "Process-selection self-test failed for $($case.Name): expected $($case.Expected), got $actual."
         }
     }
 
-    Write-Host "E2E process-selection self-test: PASS ($($cases.Count) cases; no real process was terminated)."
+    $syntheticSnapshot = @(
+        [pscustomobject]@{ ProcessId = 2001; ParentProcessId = 0; Name = 'dotnet.exe'; ExecutablePath = 'C:\Program Files\dotnet\dotnet.exe'; CommandLine = 'dotnet C:\src\ERPPrototype\ERPPrototype.dll' }
+        [pscustomobject]@{ ProcessId = 2002; ParentProcessId = 2001; Name = 'unrelated.exe'; ExecutablePath = 'C:\other\unrelated.exe'; CommandLine = 'unrelated.exe' }
+    )
+    $syntheticMatches = @($syntheticSnapshot | Where-Object {
+        Test-RepositoryProcessMatch $_ $root
+    })
+    if ($syntheticMatches.Count -ne 1 -or $syntheticMatches[0].ProcessId -ne 2001) {
+        throw 'Process-selection self-test failed: unrelated descendant was selected.'
+    }
+
+    Write-Host "E2E process-selection self-test: PASS ($($cases.Count + 1) cases; no real process was terminated)."
 }
 
 if ($SelfTest) {
