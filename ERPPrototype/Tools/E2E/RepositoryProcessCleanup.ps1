@@ -96,6 +96,7 @@ function Test-RepositoryProcessMatch {
 function Get-EffectiveExcludedProcessIds {
     param(
         [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
         [object[]]$Snapshot,
         [int[]]$InitialExcludedProcessId = @()
     )
