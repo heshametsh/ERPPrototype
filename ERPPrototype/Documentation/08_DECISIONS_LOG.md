@@ -533,3 +533,16 @@
 - **Required-data rule:** a row may be temporarily incomplete while the employee is preparing it, but Save remains the final gate for required fields.
 - **Authority rule:** browser validation provides working feedback only. Server/database validation remains authoritative and must still reject invalid persisted data.
 - **Implementation state:** the unified RevoGrid client validation foundation is not implemented yet at baseline `04e0f1a`; existing server financial validation is evidence for persistence rules, not proof that this client behavior already exists.
+
+
+## DEC-045 — RevoGrid Range Clear uses the native range payload and real-browser acceptance
+
+- **Date:** 2026-08-26
+- **Status:** Accepted
+- **Employee-visible rule:** selecting multiple editable cells and pressing `Delete` or `Backspace` clears the writable cells as one user action. Readonly/derived fields such as `Remaining Amount` are never directly cleared.
+- **History rule:** one Range Clear is one Sheet History transaction; Undo restores the whole range once and Redo reapplies it once.
+- **Financial rule:** clearing `Work Order Value` or `Partial Amount` triggers the existing ERP financial derivation; `Remaining Amount` remains derived and does not become a separate Dirty/History cell.
+- **Revo boundary:** native RevoGrid produces the final writable-cell range payload. ERP qualifies an in-place all-blank range mutation as `range-clear`, captures the before state in `beforerangeedit`, then finalizes from the applied row state in `afteredit`. Paste keeps its explicit clipboard identity and unrelated range mutation/Autofill remains blocked.
+- **Acceptance rule:** important Grid behavior is not accepted from an isolated/self-test alone. The matching Playwright real-browser journey must exercise the employee-facing page and assert the visible/data/History result. On failure it preserves screenshot, browser trace, console/network diagnostics, loaded module URLs, and range-event evidence.
+- **Evidence:** Change Engine self-tests PASS 39/39 and the 2026-08-26 Gate 5B-5 real Chromium journey passed Delete, Backspace, one-step Undo/Redo, financial Remaining synchronization, readonly protection, and the existing structural/filter/sort journey without console, request, or HTTP 5xx errors.
+- **Scope:** this qualifies the isolated Revo Gate 5B-5 behavior only. It does not cut over `/work-orders` and does not add database Save.

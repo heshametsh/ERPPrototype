@@ -244,3 +244,14 @@ Example: pasting a custom Text column into 4,952 rows changes 4,952 values, but 
 - Hide/Unhide changes update Tabulator locally, participate in Undo/Redo, and are sent to SQL Server only by the normal Save action.
 - Visibility is stored with the existing department column layout (`DepartmentId + FieldKey`) and therefore applies to every year of that department without affecting another department.
 - The selection summary renders totals only for amount columns that are currently visible. Fixed yearly summaries remain independent of column visibility.
+
+
+## 20. RevoGrid Gate 5B-5 Range Clear Contract
+
+- This contract applies to the isolated Revo route `/work-orders-revogrid-gate5b5`; `/work-orders` remains on the current production grid until cutover qualification.
+- A multi-cell `Delete` or `Backspace` clears only writable cells in the selected range.
+- `Remaining Amount` stays readonly and derived; selecting it together with editable financial cells does not directly blank it.
+- One Range Clear creates one Sheet History action. Undo/Redo restores/reapplies the complete operation once.
+- Range Clear participates in Change Engine Dirty tracking using the actual affected editable cells only.
+- Paste retains its explicit clipboard intent. Other unqualified range mutation/Autofill stays blocked.
+- Qualification requires both the Change Engine self-test and the real Playwright browser journey. A browser failure must preserve diagnostic evidence rather than being reduced to a generic FAIL.

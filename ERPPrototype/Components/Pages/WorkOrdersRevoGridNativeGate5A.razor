@@ -125,7 +125,7 @@
         <footer class="native-gate5a__note">
             @if (EnableRowStructure)
             {
-                <span>Gate 5B-5 يضيف Insert/Delete من قائمة الكليك اليمين. الصف الجديد يأخذ ClientKey مؤقت وDisplayOrder بين جيرانه، ويظل ظاهرًا في لقطة Filter/Sort الحالية حتى يطبق الموظف Filter/Sort من جديد. Insert/Delete يدخلان Dirty وSheet History ولا يوجد Save لقاعدة البيانات بعد.</span>
+                <span>Gate 5B-5 يضيف Insert/Delete من قائمة الكليك اليمين وDelete/Backspace لمسح نطاق الخلايا القابلة للتعديل. Range Clear يدخل Dirty وSheet History كعملية Undo واحدة، وRemaining Amount يعاد حسابه من القيم المالية. لا يوجد Save لقاعدة البيانات بعد.</span>
             }
             else if (EnableHeaderActions)
             {

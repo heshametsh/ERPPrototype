@@ -599,6 +599,23 @@ function makeCellDetail(row, field, value) {
     };
 }
 
+function applyRevoRangeClear(grid, rows, data) {
+    const detail = makeRangeDetail(rows, data);
+    detail.oldRange = { ...detail.newRange };
+
+    const beforeRange = dispatchGridEvent(grid, "beforerangeedit", detail);
+    assert(!beforeRange.defaultPrevented, "Qualified Range Clear was blocked.");
+
+    for (const [rowIndexText, changedRow] of Object.entries(data)) {
+        const row = rows[Number(rowIndexText)];
+        for (const [field, next] of Object.entries(changedRow)) {
+            row[field] = next;
+        }
+    }
+
+    dispatchGridEvent(grid, "afteredit", detail);
+}
+
 function testFinancialRulesRejectInvalidRemaining() {
     assert(
         calculateRemainingAmount(100000, null) === 100000,
@@ -793,6 +810,210 @@ async function testSeparatePastesStaySeparateHistoryActions() {
     coordinator.destroy();
 }
 
+async function testSingleCellDeleteStillUsesCellEditPath() {
+    const rows = [{ clientKey: "single-clear", a: "1" }];
+    const grid = new BridgeMockGrid(rows);
+    const coordinator = createRevoGridHistoryCoordinator({ grid, datasetKey: "2026" });
+    const bridge = createRevoGridChangeBridge({
+        grid,
+        rows,
+        datasetKey: "2026",
+        historyCoordinator: coordinator,
+        allowPaste: true,
+        allowRangeClear: true
+    });
+
+    const before = dispatchGridEvent(
+        grid,
+        "beforeedit",
+        makeCellDetail(rows[0], "a", "")
+    );
+    assert(!before.defaultPrevented, "Single-cell Delete was incorrectly blocked by Range Clear support.");
+
+    rows[0].a = "";
+    dispatchGridEvent(
+        grid,
+        "afteredit",
+        makeCellDetail(rows[0], "a", "")
+    );
+
+    assert(coordinator.getState().undoCount === 1, "Single-cell Delete must remain one cell-edit History action.");
+    await coordinator.undo();
+    assert(rows[0].a === "1", "Single-cell Delete Undo did not restore the value.");
+
+    bridge.destroy();
+    coordinator.destroy();
+}
+
+async function testRangeClearCreatesOneHistoryTransaction() {
+    const rows = [
+        { clientKey: "r1", a: "1", b: "2" },
+        { clientKey: "r2", a: "3", b: "4" }
+    ];
+    const grid = new BridgeMockGrid(rows);
+    const coordinator = createRevoGridHistoryCoordinator({ grid, datasetKey: "2026" });
+    const bridge = createRevoGridChangeBridge({
+        grid,
+        rows,
+        datasetKey: "2026",
+        historyCoordinator: coordinator,
+        allowPaste: true,
+        allowRangeClear: true
+    });
+
+    applyRevoRangeClear(grid, rows, {
+        0: { a: "", b: "" },
+        1: { a: "", b: "" }
+    });
+
+    assert(coordinator.getState().undoCount === 1, "One 2x2 Range Clear must create one History entry.");
+    assert(bridge.getState().dirtyCellCount === 4, "2x2 Range Clear should make four cells Dirty.");
+    assert(rows[0].a === "" && rows[0].b === "", "Range Clear did not clear first row.");
+    assert(rows[1].a === "" && rows[1].b === "", "Range Clear did not clear second row.");
+
+    await coordinator.undo();
+    assert(rows[0].a === "1" && rows[0].b === "2", "Range Clear Undo did not restore first row.");
+    assert(rows[1].a === "3" && rows[1].b === "4", "Range Clear Undo did not restore second row.");
+    assert(!bridge.getState().dirty, "Undo of unsaved Range Clear should return to Clean.");
+
+    await coordinator.redo();
+    assert(rows[0].a === "" && rows[0].b === "", "Range Clear Redo did not clear first row.");
+    assert(rows[1].a === "" && rows[1].b === "", "Range Clear Redo did not clear second row.");
+
+    bridge.destroy();
+    coordinator.destroy();
+}
+
+async function testRangeClearRecalculatesFinancialFields() {
+    const rows = [{
+        clientKey: "financial:range-clear",
+        workOrderValue: 100000,
+        partialAmount: 20000,
+        remainingAmount: 80000
+    }];
+    const grid = new BridgeMockGrid(rows);
+    const coordinator = createRevoGridHistoryCoordinator({ grid, datasetKey: "2026" });
+    const bridge = createRevoGridChangeBridge({
+        grid,
+        rows,
+        datasetKey: "2026",
+        historyCoordinator: coordinator,
+        allowPaste: true,
+        allowRangeClear: true
+    });
+
+    const detail = makeRangeDetail(rows, {
+        0: { partialAmount: "" }
+    });
+    // Revo filters readonly Remaining Amount out of the payload while keeping
+    // the selected range shape. Native clear applies in place, so old/new range
+    // are the same.
+    detail.range.x1 = 1;
+    detail.newRange.x1 = 1;
+    detail.oldRange = { ...detail.newRange };
+
+    const beforeRange = dispatchGridEvent(grid, "beforerangeedit", detail);
+    assert(!beforeRange.defaultPrevented, "Financial Range Clear was blocked.");
+
+    rows[0].partialAmount = "";
+    dispatchGridEvent(grid, "afteredit", detail);
+
+    assert(rows[0].remainingAmount === 100000, "Remaining did not recalculate after clearing Partial Amount.");
+    assert(coordinator.getState().undoCount === 1, "Financial Range Clear must be one History action.");
+
+    await coordinator.undo();
+    assert(rows[0].partialAmount === 20000, "Undo did not restore cleared Partial Amount.");
+    assert(rows[0].remainingAmount === 80000, "Undo did not restore derived Remaining Amount.");
+
+    await coordinator.redo();
+    assert(
+        rows[0].partialAmount === "" || rows[0].partialAmount === null,
+        "Redo did not restore cleared Partial Amount."
+    );
+    assert(rows[0].remainingAmount === 100000, "Redo did not recalculate Remaining Amount.");
+
+    bridge.destroy();
+    coordinator.destroy();
+}
+
+async function testBlankAutofillRangeRemainsBlocked() {
+    const rows = [{ clientKey: "r1", a: "1", b: "2" }];
+    const grid = new BridgeMockGrid(rows);
+    const coordinator = createRevoGridHistoryCoordinator({ grid, datasetKey: "2026" });
+    const bridge = createRevoGridChangeBridge({
+        grid,
+        rows,
+        datasetKey: "2026",
+        historyCoordinator: coordinator,
+        allowPaste: true,
+        allowRangeClear: true
+    });
+    const detail = makeRangeDetail(rows, { 0: { a: "", b: "" } });
+    detail.oldRange = { x: 0, y: 0, x1: 0, y1: 0 };
+    detail.newRange = { x: 0, y: 0, x1: 1, y1: 0 };
+
+    const beforeRange = dispatchGridEvent(grid, "beforerangeedit", detail);
+    assert(beforeRange.defaultPrevented, "Blank Autofill was incorrectly classified as Range Clear.");
+    assert(!bridge.getState().dirty, "Blocked blank Autofill created Dirty state.");
+
+    bridge.destroy();
+    coordinator.destroy();
+}
+
+async function testBlankPasteKeepsPasteIdentity() {
+    const rows = [{ clientKey: "r1", a: "1", b: "2" }];
+    const grid = new BridgeMockGrid(rows);
+    const coordinator = createRevoGridHistoryCoordinator({ grid, datasetKey: "2026" });
+    const bridge = createRevoGridChangeBridge({
+        grid,
+        rows,
+        datasetKey: "2026",
+        historyCoordinator: coordinator,
+        allowPaste: true,
+        allowRangeClear: true
+    });
+    const detail = makeRangeDetail(rows, { 0: { a: "", b: "" } });
+    detail.oldRange = { ...detail.newRange };
+
+    const clipboard = dispatchGridEvent(grid, "clipboardrangepaste", detail);
+    assert(!clipboard.defaultPrevented, "Blank Paste intent was blocked.");
+    const beforeRange = dispatchGridEvent(grid, "beforerangeedit", detail);
+    assert(!beforeRange.defaultPrevented, "Blank Paste was blocked by Range Clear classification.");
+
+    rows[0].a = "";
+    rows[0].b = "";
+    dispatchGridEvent(grid, "afteredit", detail);
+
+    assert(coordinator.getState().undoCount === 1, "Blank Paste should create one History action.");
+    assert(bridge.getState().dirtyCellCount === 2, "Blank Paste should dirty the two pasted cells.");
+
+    bridge.destroy();
+    coordinator.destroy();
+}
+
+async function testNonBlankSameRangeMutationRemainsBlocked() {
+    const rows = [{ clientKey: "r1", a: "1", b: "2" }];
+    const grid = new BridgeMockGrid(rows);
+    const coordinator = createRevoGridHistoryCoordinator({ grid, datasetKey: "2026" });
+    const bridge = createRevoGridChangeBridge({
+        grid,
+        rows,
+        datasetKey: "2026",
+        historyCoordinator: coordinator,
+        allowPaste: true,
+        allowRangeClear: true
+    });
+    const detail = makeRangeDetail(rows, { 0: { a: "X", b: "" } });
+    detail.oldRange = { ...detail.newRange };
+
+    const beforeRange = dispatchGridEvent(grid, "beforerangeedit", detail);
+    assert(beforeRange.defaultPrevented, "Nonblank same-range mutation bypassed the Range Clear gate.");
+    assert(!bridge.getState().dirty, "Blocked nonblank range mutation created Dirty state.");
+
+    bridge.destroy();
+    coordinator.destroy();
+}
+
 function testGate5B1StillBlocksPaste() {
     const rows = [{ clientKey: "r1", a: "1" }];
     const grid = new BridgeMockGrid(rows);
@@ -823,7 +1044,8 @@ function testNonPasteRangeMutationRemainsBlocked() {
         rows,
         datasetKey: "2026",
         historyCoordinator: coordinator,
-        allowPaste: true
+        allowPaste: true,
+        allowRangeClear: true
     });
 
     const rangeEvent = dispatchGridEvent(grid, "beforerangeedit", makeRangeDetail(rows, { 0: { a: "10" } }));
@@ -887,6 +1109,12 @@ const TESTS = [
     ["Paste bridge records 2x2 as one History action", testPasteBridgeCreatesOneHistoryTransaction],
     ["Paste 5000 stays one History action", testLargePaste5000StaysOneHistoryAction],
     ["Separate Paste actions stay separate", testSeparatePastesStaySeparateHistoryActions],
+    ["Single-cell Delete still uses cell-edit path", testSingleCellDeleteStillUsesCellEditPath],
+    ["Range Clear is one Undo/Redo transaction", testRangeClearCreatesOneHistoryTransaction],
+    ["Range Clear recalculates financial derived fields", testRangeClearRecalculatesFinancialFields],
+    ["Blank Autofill stays blocked", testBlankAutofillRangeRemainsBlocked],
+    ["Blank Paste keeps Paste identity", testBlankPasteKeepsPasteIdentity],
+    ["Nonblank same-range mutation stays blocked", testNonBlankSameRangeMutationRemainsBlocked],
     ["Gate 5B-1 still blocks Paste", testGate5B1StillBlocksPaste],
     ["Non-Paste range mutation stays blocked", testNonPasteRangeMutationRemainsBlocked],
     ["Canceled Paste leaves no stale capture", testCanceledClipboardPasteDoesNotLeaveEngineBusy]
@@ -917,7 +1145,7 @@ export async function runRevoGridChangeEngineSelfTests() {
 
     return {
         engine: "RevoGrid Sheet History + Change Engine Foundation",
-        version: "Gate 5B-2 Paste Binding",
+        version: "Gate 5B-5 Range Clear Payload Classification",
         passed: results.filter(result => result.status === "PASS").length,
         failed: results.filter(result => result.status === "FAIL").length,
         total: results.length,

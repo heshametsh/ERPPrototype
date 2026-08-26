@@ -27,7 +27,7 @@ internal static class Gate5B5TraceRunner
         Exception? failure = null;
 
         Console.WriteLine("RevoGrid Gate 5B-5 real browser diagnostic journey");
-        Console.WriteLine("This is not a PASS/FAIL state lab.");
+        Console.WriteLine("The journey uses real browser assertions and returns a failing exit code on regression.");
         Console.WriteLine("The browser will perform real UI actions and preserve a full trace.");
         Console.WriteLine($"Application port: {FixedPort}");
         Console.WriteLine($"Artifacts: {artifactDirectory}");
@@ -93,6 +93,120 @@ internal static class Gate5B5TraceRunner
 
             await CaptureStepAsync(page, steps, timelinePath, "01-baseline");
             var baselineCount = await GetSourceCountAsync(page);
+
+            // Range Clear is an employee-facing cell-edit behavior, so it must
+            // be proved through the real RevoGrid UI before structural tests.
+            // The seeded rows 2..5 include non-blank Partial Amount values and
+            // blank values, which also proves that one range operation can mix
+            // effective changes with already-empty cells.
+            var partialColumnIndex = await GetColumnIndexAsync(page, "partialAmount");
+            var remainingColumnIndex = await GetColumnIndexAsync(page, "remainingAmount");
+            var rangeClearBaseline = await CaptureRangeClearStateAsync(page, 2, 5);
+
+            await SelectVisibleCellRangeAsync(
+                page,
+                startVisibleRowIndex: 2,
+                startVisibleColumnIndex: partialColumnIndex,
+                endVisibleRowIndex: 5,
+                endVisibleColumnIndex: partialColumnIndex);
+            await AssertSelectedRangeTargetsAsync(
+                page,
+                expectedFocusedProp: "partialAmount",
+                expectedStartColumnIndex: partialColumnIndex,
+                expectedEndColumnIndex: partialColumnIndex,
+                expectedStartRowIndex: 2,
+                expectedEndRowIndex: 5);
+            await CaptureStepAsync(page, steps, timelinePath, "RC-01-partial-range-selected");
+
+            await page.Keyboard.PressAsync("Delete");
+            await PauseForTraceAsync(page, 700);
+            await CaptureStepAsync(page, steps, timelinePath, "RC-02-after-delete");
+            var afterRangeDelete = await CaptureRangeClearStateAsync(page, 2, 5);
+            AssertRangeClearApplied(rangeClearBaseline, afterRangeDelete, "Delete");
+
+            await page.Locator("#revogrid-gate5b1-undo").ClickAsync();
+            await PauseForTraceAsync(page, 500);
+            await CaptureStepAsync(page, steps, timelinePath, "RC-03-after-delete-undo");
+            AssertRangeClearRestored(
+                rangeClearBaseline,
+                await CaptureRangeClearStateAsync(page, 2, 5),
+                "Undo after Delete");
+
+            await page.Locator("#revogrid-gate5b1-redo").ClickAsync();
+            await PauseForTraceAsync(page, 500);
+            await CaptureStepAsync(page, steps, timelinePath, "RC-04-after-delete-redo");
+            AssertRangeClearApplied(
+                rangeClearBaseline,
+                await CaptureRangeClearStateAsync(page, 2, 5),
+                "Redo after Delete");
+
+            // Return to the original sheet before the Backspace and mixed
+            // readonly-selection checks so each command starts from the same
+            // deterministic source values.
+            await page.Locator("#revogrid-gate5b1-undo").ClickAsync();
+            await PauseForTraceAsync(page, 400);
+            AssertRangeClearRestored(
+                rangeClearBaseline,
+                await CaptureRangeClearStateAsync(page, 2, 5),
+                "Cleanup Undo before Backspace");
+
+            await SelectVisibleCellRangeAsync(
+                page,
+                startVisibleRowIndex: 2,
+                startVisibleColumnIndex: partialColumnIndex,
+                endVisibleRowIndex: 5,
+                endVisibleColumnIndex: partialColumnIndex);
+            await AssertSelectedRangeTargetsAsync(
+                page,
+                expectedFocusedProp: "partialAmount",
+                expectedStartColumnIndex: partialColumnIndex,
+                expectedEndColumnIndex: partialColumnIndex,
+                expectedStartRowIndex: 2,
+                expectedEndRowIndex: 5);
+            await page.Keyboard.PressAsync("Backspace");
+            await PauseForTraceAsync(page, 700);
+            await CaptureStepAsync(page, steps, timelinePath, "RC-05-after-backspace");
+            AssertRangeClearApplied(
+                rangeClearBaseline,
+                await CaptureRangeClearStateAsync(page, 2, 5),
+                "Backspace");
+
+            await page.Locator("#revogrid-gate5b1-undo").ClickAsync();
+            await PauseForTraceAsync(page, 400);
+            AssertRangeClearRestored(
+                rangeClearBaseline,
+                await CaptureRangeClearStateAsync(page, 2, 5),
+                "Cleanup Undo before readonly range");
+
+            // Mixed editable + readonly selection. Revo may select Remaining
+            // Amount visually, but the readonly cells themselves must never be
+            // cleared. They may only change through the financial derivation.
+            await SelectVisibleCellRangeAsync(
+                page,
+                startVisibleRowIndex: 2,
+                startVisibleColumnIndex: partialColumnIndex,
+                endVisibleRowIndex: 5,
+                endVisibleColumnIndex: remainingColumnIndex);
+            await AssertSelectedRangeTargetsAsync(
+                page,
+                expectedFocusedProp: "partialAmount",
+                expectedStartColumnIndex: partialColumnIndex,
+                expectedEndColumnIndex: remainingColumnIndex,
+                expectedStartRowIndex: 2,
+                expectedEndRowIndex: 5);
+            await page.Keyboard.PressAsync("Delete");
+            await PauseForTraceAsync(page, 700);
+            await CaptureStepAsync(page, steps, timelinePath, "RC-06-after-mixed-readonly-delete");
+            var mixedRangeClear = await CaptureRangeClearStateAsync(page, 2, 5);
+            AssertRangeClearApplied(rangeClearBaseline, mixedRangeClear, "Delete mixed readonly range");
+            AssertRemainingAmountsAreNonBlank(mixedRangeClear);
+
+            await page.Locator("#revogrid-gate5b1-undo").ClickAsync();
+            await PauseForTraceAsync(page, 400);
+            AssertRangeClearRestored(
+                rangeClearBaseline,
+                await CaptureRangeClearStateAsync(page, 2, 5),
+                "Final Range Clear cleanup Undo");
 
             // Real UI: Insert Rows... asks for an explicit count. All inserted
             // rows must be one Sheet History action.
@@ -286,8 +400,8 @@ internal static class Gate5B5TraceRunner
                 preserveTrace: true);
 
             Console.WriteLine();
-            Console.WriteLine("REAL BROWSER JOURNEY COMPLETE");
-            Console.WriteLine("No PASS/FAIL verdict was assigned to the row behavior.");
+            Console.WriteLine("REAL BROWSER JOURNEY PASS");
+            Console.WriteLine("All asserted Gate 5B-5 browser behaviors completed successfully.");
             Console.WriteLine($"Timeline: {timelinePath}");
             Console.WriteLine($"Browser diagnostics: {diagnosticsPath}");
                 Console.WriteLine($"Notes: {notesPath}");
@@ -336,9 +450,11 @@ internal static class Gate5B5TraceRunner
                 if (!grid) return false;
 
                 const events = [];
+                let sequence = 0;
                 const names = [
                     'beforeedit', 'afteredit',
                     'beforepaste', 'afterpaste',
+                    'clipboardrangepaste', 'beforerangeedit',
                     'beforefilterapply', 'beforefiltertrimmed', 'afterfilterapply',
                     'beforesorting', 'beforesortingapply', 'aftersortingapply',
                     'beforeheaderclick', 'headerclick',
@@ -355,25 +471,75 @@ internal static class Gate5B5TraceRunner
                     return null;
                 };
 
-                const summarize = detail => ({
-                    prop: scalar(detail?.prop ?? detail?.column?.prop),
-                    type: scalar(detail?.type),
-                    order: scalar(detail?.order),
-                    trimmedType: scalar(detail?.trimmedType),
-                    key: scalar(detail?.original?.key ?? detail?.originalEvent?.key),
-                    code: scalar(detail?.original?.code ?? detail?.originalEvent?.code),
-                    clientKey: scalar(detail?.model?.clientKey),
-                    rowIndex: scalar(detail?.rowIndex),
-                    value: scalar(detail?.val ?? detail?.value)
-                });
+                const range = value => value ? {
+                    x: Number(value.x),
+                    y: Number(value.y),
+                    x1: Number(value.x1),
+                    y1: Number(value.y1)
+                } : null;
+
+                const dataLookup = data => {
+                    const result = {};
+                    for (const [rowIndex, row] of Object.entries(data || {})) {
+                        result[rowIndex] = {};
+                        for (const [prop, cellValue] of Object.entries(row || {})) {
+                            result[rowIndex][prop] = scalar(cellValue);
+                        }
+                    }
+                    return result;
+                };
+
+                const summarize = (name, detail) => {
+                    const summary = {
+                        prop: scalar(detail?.prop ?? detail?.column?.prop),
+                        type: scalar(detail?.type),
+                        order: scalar(detail?.order),
+                        trimmedType: scalar(detail?.trimmedType),
+                        key: scalar(detail?.original?.key ?? detail?.originalEvent?.key),
+                        code: scalar(detail?.original?.code ?? detail?.originalEvent?.code),
+                        clientKey: scalar(detail?.model?.clientKey),
+                        rowIndex: scalar(detail?.rowIndex),
+                        value: scalar(detail?.val ?? detail?.value)
+                    };
+
+                    if (
+                        name === 'beforerangeedit' ||
+                        name === 'afteredit' ||
+                        name === 'clipboardrangepaste'
+                    ) {
+                        summary.oldRange = range(detail?.oldRange ?? detail?.range);
+                        summary.newRange = range(detail?.newRange ?? detail?.range);
+                        summary.data = dataLookup(detail?.data);
+                        summary.models = {};
+                        for (const rowIndex of Object.keys(detail?.data || {})) {
+                            const model = detail?.models?.[rowIndex];
+                            if (!model) continue;
+                            summary.models[rowIndex] = {
+                                clientKey: scalar(model.clientKey),
+                                workOrderNumber: scalar(model.workOrderNumber),
+                                workOrderValue: scalar(model.workOrderValue),
+                                partialAmount: scalar(model.partialAmount),
+                                remainingAmount: scalar(model.remainingAmount)
+                            };
+                        }
+                    }
+
+                    return summary;
+                };
 
                 for (const name of names) {
                     grid.addEventListener(name, event => {
-                        events.push({
+                        const recorded = {
+                            sequence: ++sequence,
                             at: performance.now(),
                             name,
-                            defaultPrevented: Boolean(event.defaultPrevented),
-                            detail: summarize(event.detail)
+                            defaultPreventedAtListener: Boolean(event.defaultPrevented),
+                            defaultPreventedAfterDispatch: null,
+                            detail: summarize(name, event.detail)
+                        };
+                        events.push(recorded);
+                        queueMicrotask(() => {
+                            recorded.defaultPreventedAfterDispatch = Boolean(event.defaultPrevented);
                         });
                         if (events.length > 5000) events.shift();
                     });
@@ -404,8 +570,27 @@ internal static class Gate5B5TraceRunner
                 const store = await grid.getSourceStore('rgRow');
                 const focused = await grid.getFocused();
                 const selectedRange = await grid.getSelectedRange();
-                const module = await import('/js/revoGridGate5B1.js?v=20260822-gate5b5-multirow-1');
-                const diagnostics = await module.getDiagnostics(hostId);
+                const runtimeModules = performance.getEntriesByType('resource')
+                    .map(entry => entry.name)
+                    .filter(name =>
+                        name.includes('/js/revoGridGate5B1.js') ||
+                        name.includes('/js/revoGridChangeBridge.js'));
+                const gateModuleUrl = [...runtimeModules]
+                    .reverse()
+                    .find(name => name.includes('/js/revoGridGate5B1.js')) ?? null;
+
+                let diagnostics = null;
+                let diagnosticsError = null;
+                if (gateModuleUrl) {
+                    try {
+                        const module = await import(gateModuleUrl);
+                        diagnostics = await module.getDiagnostics(hostId);
+                    } catch (error) {
+                        diagnosticsError = String(error?.stack || error?.message || error);
+                    }
+                } else {
+                    diagnosticsError = 'The browser resource list did not contain the loaded revoGridGate5B1 module URL.';
+                }
 
                 const row = item => ({
                     clientKey: item?.clientKey ?? null,
@@ -484,6 +669,9 @@ internal static class Gate5B5TraceRunner
                     trimmed: store.get('trimmed') ?? {},
                     source: source.map(row),
                     visible: visible.map(row),
+                    runtimeModules,
+                    gateModuleUrl,
+                    diagnosticsError,
                     diagnostics,
                     revoEvents: [...(window.__erpGate5B5TraceEvents ?? [])]
                 });
@@ -586,9 +774,17 @@ internal static class Gate5B5TraceRunner
 
     private static ILocator DataCell(IPage page, int visibleRowIndex)
     {
+        return DataCell(page, visibleRowIndex, 0);
+    }
+
+    private static ILocator DataCell(
+        IPage page,
+        int visibleRowIndex,
+        int visibleColumnIndex)
+    {
         return page.Locator(
             $"#{GridHostId} revogr-viewport-scroll.rgCol:not([row-header]) " +
-            $"[data-rgRow=\"{visibleRowIndex}\"][data-rgCol=\"0\"]");
+            $"[data-rgRow=\"{visibleRowIndex}\"][data-rgCol=\"{visibleColumnIndex}\"]");
     }
 
     private static async Task ClickVisibleCellAsync(IPage page, int visibleRowIndex)
@@ -596,6 +792,321 @@ internal static class Gate5B5TraceRunner
         await WaitForRenderedCellAsync(page, visibleRowIndex);
         await DataCell(page, visibleRowIndex).ClickAsync();
         await PauseForTraceAsync(page, 150);
+    }
+
+    private static async Task<int> GetColumnIndexAsync(IPage page, string prop)
+    {
+        var index = await page.EvaluateAsync<int>(
+            """
+            prop => {
+                const grid = document.querySelector('#revogrid-native-gate5a-grid revo-grid');
+                const columns = Array.isArray(grid?.columns) ? grid.columns : [];
+                const logicalIndex = columns.findIndex(
+                    column => String(column?.prop ?? '') === prop);
+                if (logicalIndex < 0) {
+                    return -1;
+                }
+
+                // RevoGrid keeps grid.columns in logical source order, while
+                // data-rgCol in the rendered rgCol viewport follows the visual
+                // order. In RTL those orders are reversed. Browser tests must
+                // address what the employee can actually click, not assume the
+                // logical index is also the rendered coordinate.
+                return grid?.rtl
+                    ? columns.length - 1 - logicalIndex
+                    : logicalIndex;
+            }
+            """,
+            prop);
+
+        if (index < 0)
+        {
+            throw new InvalidOperationException(
+                $"RevoGrid column '{prop}' was not found in the real browser runtime.");
+        }
+
+        return index;
+    }
+
+    private static async Task AssertSelectedRangeTargetsAsync(
+        IPage page,
+        string expectedFocusedProp,
+        int expectedStartColumnIndex,
+        int expectedEndColumnIndex,
+        int expectedStartRowIndex,
+        int expectedEndRowIndex)
+    {
+        var json = await page.EvaluateAsync<string>(
+            """
+            async () => {
+                const grid = document.querySelector('#revogrid-native-gate5a-grid revo-grid');
+                if (!grid) {
+                    return JSON.stringify({ error: 'grid-not-found' });
+                }
+
+                const focused = await grid.getFocused?.();
+                const selectedRange = await grid.getSelectedRange?.();
+                return JSON.stringify({
+                    focusedProp: String(focused?.column?.prop ?? ''),
+                    focusedCell: focused?.cell ?? null,
+                    selectedRange: selectedRange ?? null
+                });
+            }
+            """);
+
+        using var document = JsonDocument.Parse(json);
+        var root = document.RootElement;
+        E2ETestAssert.True(
+            !root.TryGetProperty("error", out _),
+            $"Range selection safety check failed before editing: {json}");
+
+        var focusedProp = root.GetProperty("focusedProp").GetString() ?? string.Empty;
+        E2ETestAssert.True(
+            string.Equals(focusedProp, expectedFocusedProp, StringComparison.Ordinal),
+            $"Range selection targeted '{focusedProp}' instead of '{expectedFocusedProp}'. " +
+            "The browser harness will not press Delete on the wrong RevoGrid column.");
+
+        var range = root.GetProperty("selectedRange");
+        var expectedMinColumn = Math.Min(expectedStartColumnIndex, expectedEndColumnIndex);
+        var expectedMaxColumn = Math.Max(expectedStartColumnIndex, expectedEndColumnIndex);
+        E2ETestAssert.True(
+            range.ValueKind == JsonValueKind.Object &&
+            range.GetProperty("x").GetInt32() == expectedMinColumn &&
+            range.GetProperty("x1").GetInt32() == expectedMaxColumn &&
+            range.GetProperty("y").GetInt32() == expectedStartRowIndex &&
+            range.GetProperty("y1").GetInt32() == expectedEndRowIndex,
+            $"Range selection coordinates did not match the intended target. Actual: {json}");
+    }
+
+    private static async Task SelectVisibleCellRangeAsync(
+        IPage page,
+        int startVisibleRowIndex,
+        int startVisibleColumnIndex,
+        int endVisibleRowIndex,
+        int endVisibleColumnIndex)
+    {
+        var startCell = DataCell(
+            page,
+            startVisibleRowIndex,
+            startVisibleColumnIndex);
+        var endCell = DataCell(
+            page,
+            endVisibleRowIndex,
+            endVisibleColumnIndex);
+
+        await startCell.WaitForAsync(
+            new LocatorWaitForOptions
+            {
+                State = WaitForSelectorState.Visible,
+                Timeout = 30_000
+            });
+        await endCell.WaitForAsync(
+            new LocatorWaitForOptions
+            {
+                State = WaitForSelectorState.Visible,
+                Timeout = 30_000
+            });
+
+        await startCell.ClickAsync();
+        await PauseForTraceAsync(page, 150);
+
+        await page.Keyboard.DownAsync("Shift");
+        try
+        {
+            await endCell.ClickAsync();
+        }
+        finally
+        {
+            await page.Keyboard.UpAsync("Shift");
+        }
+
+        await PauseForTraceAsync(page, 250);
+    }
+
+    private static async Task<JsonElement> CaptureRangeClearStateAsync(
+        IPage page,
+        int startRowIndex,
+        int endRowIndex)
+    {
+        var json = await page.EvaluateAsync<string>(
+            """
+            async ({ startRowIndex, endRowIndex }) => {
+                const grid = document.querySelector('#revogrid-native-gate5a-grid revo-grid');
+                if (!grid) throw new Error('Gate 5B-5 RevoGrid element was not found.');
+                const source = await grid.getSource('rgRow');
+                const rows = [];
+                for (let rowIndex = startRowIndex; rowIndex <= endRowIndex; rowIndex++) {
+                    const row = source[rowIndex];
+                    rows.push({
+                        rowIndex,
+                        clientKey: row?.clientKey ?? null,
+                        workOrderNumber: row?.workOrderNumber ?? null,
+                        workOrderValue: row?.workOrderValue ?? null,
+                        partialAmount: row?.partialAmount ?? null,
+                        remainingAmount: row?.remainingAmount ?? null
+                    });
+                }
+
+                return JSON.stringify({
+                    sourceCount: source.length,
+                    selectedRange: await grid.getSelectedRange(),
+                    dirtyText: document.getElementById('revogrid-gate5b1-change-status')?.textContent ?? null,
+                    undoCount: Number(document.getElementById('revogrid-gate5b1-undo-count')?.textContent ?? 0),
+                    redoCount: Number(document.getElementById('revogrid-gate5b1-redo-count')?.textContent ?? 0),
+                    rows
+                });
+            }
+            """,
+            new
+            {
+                startRowIndex,
+                endRowIndex
+            });
+
+        using var document = JsonDocument.Parse(json);
+        return document.RootElement.Clone();
+    }
+
+    private static void AssertRangeClearApplied(
+        JsonElement baseline,
+        JsonElement actual,
+        string action)
+    {
+        E2ETestAssert.True(
+            baseline.GetProperty("sourceCount").GetInt32() ==
+                actual.GetProperty("sourceCount").GetInt32(),
+            $"{action} Range Clear changed the row count.");
+
+        var beforeRows = baseline.GetProperty("rows").EnumerateArray().ToArray();
+        var afterRows = actual.GetProperty("rows").EnumerateArray().ToArray();
+        E2ETestAssert.True(
+            beforeRows.Length == afterRows.Length,
+            $"{action} Range Clear changed the selected row set.");
+
+        var effectiveChanges = 0;
+        for (var index = 0; index < beforeRows.Length; index++)
+        {
+            var beforePartial = beforeRows[index].GetProperty("partialAmount");
+            var afterPartial = afterRows[index].GetProperty("partialAmount");
+            if (!IsBlankJsonValue(beforePartial))
+            {
+                effectiveChanges++;
+            }
+
+            E2ETestAssert.True(
+                IsBlankJsonValue(afterPartial),
+                $"{action} did not clear Partial Amount for row " +
+                $"{afterRows[index].GetProperty("workOrderNumber").GetString()}. " +
+                $"Actual: {afterPartial.GetRawText()}");
+
+            var workOrderValue = JsonNumber(afterRows[index].GetProperty("workOrderValue"));
+            var remainingAmount = JsonNumber(afterRows[index].GetProperty("remainingAmount"));
+            E2ETestAssert.True(
+                workOrderValue.HasValue &&
+                remainingAmount.HasValue &&
+                Math.Abs(workOrderValue.Value - remainingAmount.Value) < 0.005m,
+                $"{action} did not recalculate Remaining Amount for row " +
+                $"{afterRows[index].GetProperty("workOrderNumber").GetString()}.");
+        }
+
+        E2ETestAssert.True(
+            effectiveChanges > 0,
+            $"{action} Range Clear test did not include any originally non-blank Partial Amount value.");
+        E2ETestAssert.True(
+            actual.GetProperty("undoCount").GetInt32() == 1,
+            $"{action} Range Clear was not recorded as exactly one Sheet History operation. " +
+            $"Undo count: {actual.GetProperty("undoCount").GetInt32()}.");
+    }
+
+    private static void AssertRangeClearRestored(
+        JsonElement baseline,
+        JsonElement actual,
+        string action)
+    {
+        E2ETestAssert.True(
+            baseline.GetProperty("sourceCount").GetInt32() ==
+                actual.GetProperty("sourceCount").GetInt32(),
+            $"{action} changed the row count.");
+
+        var beforeRows = baseline.GetProperty("rows").EnumerateArray().ToArray();
+        var afterRows = actual.GetProperty("rows").EnumerateArray().ToArray();
+        E2ETestAssert.True(
+            beforeRows.Length == afterRows.Length,
+            $"{action} changed the selected row set.");
+
+        for (var index = 0; index < beforeRows.Length; index++)
+        {
+            E2ETestAssert.True(
+                JsonValuesEquivalent(
+                    beforeRows[index].GetProperty("partialAmount"),
+                    afterRows[index].GetProperty("partialAmount")),
+                $"{action} did not restore Partial Amount for row " +
+                $"{afterRows[index].GetProperty("workOrderNumber").GetString()}.");
+            E2ETestAssert.True(
+                JsonValuesEquivalent(
+                    beforeRows[index].GetProperty("remainingAmount"),
+                    afterRows[index].GetProperty("remainingAmount")),
+                $"{action} did not restore Remaining Amount for row " +
+                $"{afterRows[index].GetProperty("workOrderNumber").GetString()}.");
+        }
+    }
+
+    private static void AssertRemainingAmountsAreNonBlank(JsonElement actual)
+    {
+        foreach (var row in actual.GetProperty("rows").EnumerateArray())
+        {
+            E2ETestAssert.True(
+                !IsBlankJsonValue(row.GetProperty("remainingAmount")),
+                "Readonly Remaining Amount became blank during a mixed Range Clear selection.");
+        }
+    }
+
+    private static bool IsBlankJsonValue(JsonElement value)
+    {
+        return value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined ||
+            (value.ValueKind == JsonValueKind.String &&
+             string.IsNullOrEmpty(value.GetString()));
+    }
+
+    private static decimal? JsonNumber(JsonElement value)
+    {
+        if (value.ValueKind == JsonValueKind.Number &&
+            value.TryGetDecimal(out var number))
+        {
+            return number;
+        }
+
+        if (value.ValueKind == JsonValueKind.String &&
+            decimal.TryParse(
+                value.GetString(),
+                System.Globalization.NumberStyles.Number,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out number))
+        {
+            return number;
+        }
+
+        return null;
+    }
+
+    private static bool JsonValuesEquivalent(JsonElement left, JsonElement right)
+    {
+        if (IsBlankJsonValue(left) && IsBlankJsonValue(right))
+        {
+            return true;
+        }
+
+        var leftNumber = JsonNumber(left);
+        var rightNumber = JsonNumber(right);
+        if (leftNumber.HasValue && rightNumber.HasValue)
+        {
+            return Math.Abs(leftNumber.Value - rightNumber.Value) < 0.005m;
+        }
+
+        return string.Equals(
+            left.ToString(),
+            right.ToString(),
+            StringComparison.Ordinal);
     }
 
     private static async Task OpenRowMenuAsync(IPage page, int visibleRowIndex)
@@ -781,10 +1292,12 @@ internal static class Gate5B5TraceRunner
         {
             "Gate 5B-5 real browser diagnostic journey",
             "",
-            "This file intentionally does not declare PASS/FAIL for row behavior.",
+            "PASS means every asserted browser behavior completed; any assertion or runtime failure returns exit code 1.",
             "Each recorded step was performed against the real Gate 5B-5 page through browser UI.",
             "",
             "Important review target:",
+            "- RC-01..RC-06 execute real multi-cell Delete/Backspace, one-step Undo/Redo, financial Remaining synchronization, and a mixed readonly selection before row-structure checks.",
+            "- The trace records beforerangeedit/afteredit payloads and whether the range event was prevented, so a failed Range Clear shows where the browser path stopped.",
             "- Step 02 uses the real Insert Rows... dialog to add 3 rows in one command.",
             "- Step 03 Undo removes all 3 rows in one History action; Step 04 Redo restores all 3.",
             "- Step 06 right-clicks inside a 3-row selection and Delete must remove all 3 selected rows.",

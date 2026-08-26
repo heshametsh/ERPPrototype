@@ -1,5 +1,5 @@
 import * as nativeGate5A from "./revoGridNativeGate5A.js?v=20260822-gate5b5-search-selection-1";
-import { createRevoGridChangeBridge } from "./revoGridChangeBridge.js?v=20260822-remaining-sync-1";
+import { createRevoGridChangeBridge } from "./revoGridChangeBridge.js?v=20260825-range-clear-2";
 import { createRevoGridHistoryCoordinator } from "./revoGridHistoryCoordinator.js?v=20260821-minimal-reveal-1";
 import { createRevoGridHistoryFocus } from "./revoGridHistoryFocus.js?v=20260821-gate5b4-keyboard-sort-1";
 import { createRevoGridExcelFilter } from "./revoGridExcelFilter.js?v=20260822-gate5b5-search-selection-1";
@@ -233,6 +233,9 @@ export async function initialize(elementId, rows, customColumns, options) {
         datasetKey: activeDatasetKey,
         historyCoordinator: state.historyCoordinator,
         allowPaste: Boolean(value(options, "enablePaste", "EnablePaste", false)),
+        allowRangeClear: Boolean(
+            value(options, "enableRangeClear", "EnableRangeClear", false)
+        ),
         onStateChange: () => renderState(state)
     });
 

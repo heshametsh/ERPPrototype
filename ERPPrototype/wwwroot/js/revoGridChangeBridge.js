@@ -83,17 +83,61 @@ function valuesEqual(left, right) {
     }
 }
 
-function createIntentId() {
+function createIntentId(kind) {
     if (
         globalThis.crypto &&
         typeof globalThis.crypto.randomUUID === "function"
     ) {
-        return `paste:${globalThis.crypto.randomUUID()}`;
+        return `${kind}:${globalThis.crypto.randomUUID()}`;
     }
 
-    return `paste:${Date.now().toString(36)}:${Math.random()
+    return `${kind}:${Date.now().toString(36)}:${Math.random()
         .toString(36)
         .slice(2)}`;
+}
+
+function isMultiCellRange(range) {
+    if (!range) {
+        return false;
+    }
+
+    return Number(range.x) !== Number(range.x1) ||
+        Number(range.y) !== Number(range.y1);
+}
+
+function rangesEqual(left, right) {
+    return Boolean(
+        left &&
+        right &&
+        Number(left.x) === Number(right.x) &&
+        Number(left.y) === Number(right.y) &&
+        Number(left.x1) === Number(right.x1) &&
+        Number(left.y1) === Number(right.y1)
+    );
+}
+
+function isRangeClearMutation(detail) {
+    if (!isRangeEditDetail(detail)) {
+        return false;
+    }
+
+    const oldRange = detail.oldRange ?? detail.range;
+    const newRange = detail.newRange ?? detail.range;
+    if (!rangesEqual(oldRange, newRange)) {
+        return false;
+    }
+
+    let cellCount = 0;
+    for (const changedRow of Object.values(detail.data)) {
+        for (const value of Object.values(changedRow || {})) {
+            cellCount += 1;
+            if (value !== "") {
+                return false;
+            }
+        }
+    }
+
+    return cellCount > 0;
 }
 
 /**
@@ -117,7 +161,7 @@ function buildRangeCaptureChanges(detail) {
         const model = detail.models[rowIndex] ?? detail.models[String(rowIndex)];
 
         if (!model) {
-            throw new Error(`Paste row ${rowIndex} has no RevoGrid source model.`);
+            throw new Error(`Range row ${rowIndex} has no RevoGrid source model.`);
         }
 
         const clientKey = requireText(model.clientKey, `models[${rowIndex}].clientKey`);
@@ -145,6 +189,7 @@ export function createRevoGridChangeBridge(options) {
     const grid = options?.grid;
     const historyCoordinator = options?.historyCoordinator;
     const allowPaste = Boolean(options?.allowPaste);
+    const allowRangeClear = Boolean(options?.allowRangeClear);
 
     if (!grid || typeof grid.addEventListener !== "function") {
         throw new Error("A RevoGrid element is required.");
@@ -506,7 +551,7 @@ export function createRevoGridChangeBridge(options) {
             return;
         }
 
-        const intentId = createIntentId();
+        const intentId = createIntentId("paste");
         pendingPasteIntent = { id: intentId };
 
         // clipboardrangepaste identifies the operation as Paste, but the final
@@ -526,11 +571,22 @@ export function createRevoGridChangeBridge(options) {
             return;
         }
 
-        // Gate 5B-2 qualifies Clipboard Paste only. Autofill and any other
-        // range mutation stay blocked until they get their own explicit gate.
+        // Revo sends Paste, Delete/Backspace, and Autofill through the same
+        // range event. Paste already has an explicit clipboard intent. A native
+        // Range Clear is identified from the mutation itself: Revo clears the
+        // current range in place and proposes an empty string for every writable
+        // cell. Autofill changes the range shape, so it remains blocked.
+        const pasteIntent =
+            allowPaste && pendingPasteIntent
+                ? pendingPasteIntent
+                : null;
+        const rangeClearMutation =
+            !pasteIntent &&
+            allowRangeClear &&
+            isRangeClearMutation(event.detail);
+
         if (
-            !allowPaste ||
-            !pendingPasteIntent ||
+            (!pasteIntent && !rangeClearMutation) ||
             editLocked ||
             historyCoordinator.getState().replayActive ||
             activeCapture
@@ -539,7 +595,10 @@ export function createRevoGridChangeBridge(options) {
             return;
         }
 
-        const intent = pendingPasteIntent;
+        const intentId = pasteIntent?.id ?? createIntentId("range-clear");
+        const kind = pasteIntent ? "paste" : "range-clear";
+        const label = pasteIntent ? "Paste" : "Range Clear";
+
         pendingPasteIntent = null;
 
         let changes;
@@ -556,8 +615,8 @@ export function createRevoGridChangeBridge(options) {
 
         const captureId = engine.captureBefore({
             datasetKey,
-            kind: "paste",
-            label: "Paste",
+            kind,
+            label,
             changes: changes.map(change => ({
                 clientKey: change.clientKey,
                 field: change.field,
@@ -567,9 +626,10 @@ export function createRevoGridChangeBridge(options) {
         });
 
         activeCapture = {
-            type: "paste",
+            type: "range-edit",
+            kind,
             captureId,
-            pasteIntentId: intent.id,
+            intentId,
             targets: changes.map(change => ({
                 clientKey: change.clientKey,
                 field: change.field
@@ -648,7 +708,7 @@ export function createRevoGridChangeBridge(options) {
             return;
         }
 
-        if (!activeCapture || activeCapture.type !== "paste") {
+        if (!activeCapture || activeCapture.type !== "range-edit") {
             return;
         }
 
@@ -666,7 +726,7 @@ export function createRevoGridChangeBridge(options) {
             const row = rowByClientKey.get(target.clientKey);
             if (!row) {
                 throw new Error(
-                    `Row '${target.clientKey}' disappeared before Paste afteredit.`
+                    `Row '${target.clientKey}' disappeared before Range afteredit.`
                 );
             }
 
@@ -761,9 +821,19 @@ export function createRevoGridChangeBridge(options) {
             ...engine.getState(),
             editLocked,
             pasteEnabled: allowPaste,
-            activeDataCapture: Boolean(activeCapture || pendingPasteIntent),
+            rangeClearEnabled: allowRangeClear,
+            activeDataCapture: Boolean(
+                activeCapture ||
+                pendingPasteIntent
+            ),
             activeCellCapture: activeCapture?.type === "cell-edit",
-            activePasteCapture: activeCapture?.type === "paste" || Boolean(pendingPasteIntent),
+            activePasteCapture:
+                (activeCapture?.type === "range-edit" &&
+                    activeCapture?.kind === "paste") ||
+                Boolean(pendingPasteIntent),
+            activeRangeClearCapture:
+                activeCapture?.type === "range-edit" &&
+                activeCapture?.kind === "range-clear",
             financialInvalidRowCount: financialInvalidRows.length,
             financialInvalidCellCount: financialInvalidRows.reduce(
                 (count, row) => count + row.fields.length,

@@ -821,3 +821,19 @@ Include:
 - [ ] Ctrl+Z after a financial Edit/Paste restores the financial input and the matching `Remaining Amount`; Ctrl+Y reapplies both visible results.
 - [ ] `Remaining Amount` remains readonly and does not create its own Dirty cell, History entry, or Save field.
 - [ ] With a Sort active, recalculation updates the value but does not auto-resort the row until the employee explicitly changes/reapplies Sort.
+
+
+#### Gate 5B-5 — RevoGrid Range Clear qualification (2026-08-26)
+
+- [x] Real Chromium journey selects `Partial Amount` by verified Revo `prop`, not an assumed visual column index.
+- [x] Multi-cell `Delete` clears the selected editable cells and creates exactly one Sheet History action.
+- [x] One Undo restores the whole clear; one Redo reapplies it.
+- [x] `Backspace` follows the same multi-cell Range Clear path.
+- [x] Clearing `Partial Amount` recalculates `Remaining Amount` from the current financial inputs.
+- [x] A mixed selection that visually includes readonly `Remaining Amount` never clears that readonly field; it changes only through derivation.
+- [x] Browser evidence reports no page error, console error, failed request, or HTTP 5xx during the accepted journey.
+- [x] Change Engine self-test remains PASS 39 / FAIL 0.
+
+**Acceptance evidence:** `ERP_REVO_GATE5B5_TRACE_20260826-170911.zip` completed the real browser journey successfully. The browser harness preserves timeline, screenshot, Playwright trace, console/network diagnostics, loaded module URLs, and range-event evidence for any future failure.
+
+**Regression rule:** for employee-visible Grid behavior such as selection, edit, Paste, Range Clear, Undo/Redo, Filter, Sort, structural rows, validation, and Save, an isolated JavaScript/self-test is supporting evidence only. Acceptance requires the relevant real-browser journey to pass.

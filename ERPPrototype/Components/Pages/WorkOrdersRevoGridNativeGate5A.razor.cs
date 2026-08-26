@@ -27,6 +27,9 @@ public partial class WorkOrdersRevoGridNativeGate5A
     public bool EnablePaste { get; set; }
 
     [Parameter]
+    public bool EnableRangeClear { get; set; }
+
+    [Parameter]
     public bool EnableExcelFilter { get; set; }
 
     [Parameter]
@@ -214,7 +217,7 @@ public partial class WorkOrdersRevoGridNativeGate5A
         try
         {
             var gridModulePath = EnableChangeEngine
-                ? "./js/revoGridGate5B1.js?v=20260822-gate5b5-multirow-1"
+                ? "./js/revoGridGate5B1.js?v=20260825-range-clear-2"
                 : "./js/revoGridNativeGate5A.js?v=20260821-gate5b5-filter-refresh-1";
 
             GridModule ??=
@@ -233,6 +236,7 @@ public partial class WorkOrdersRevoGridNativeGate5A
                     WorkYear = SelectedWorkYear,
                     Rtl = true,
                     EnablePaste,
+                    EnableRangeClear,
                     EnableExcelFilter,
                     EnableHeaderActions,
                     EnableRowStructure,
