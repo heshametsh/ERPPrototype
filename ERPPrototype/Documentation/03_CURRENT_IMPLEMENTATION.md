@@ -1,3 +1,66 @@
+# CURRENT IMPLEMENTATION OVERRIDE — 2026-08-26
+
+> This section is the newest implementation snapshot. Older overrides below remain historical when they conflict.
+
+**Latest accepted Git HEAD:** `6a6f3cef807f58a41bcfefa7c08b2ebaf6220169`  
+**Live `/work-orders`:** Tabulator 6.5.0 until cutover.  
+**Current Revo route:** `/work-orders-revogrid-gate5b6` using RevoGrid Community 4.25.2.
+
+## Current Revo state
+
+Implemented/qualified in isolated Revo candidate:
+
+- real employee/year read path.
+- Change Engine.
+- Sheet History separated from Dirty/Save ownership.
+- manual edit foundation.
+- Paste.
+- Range Clear with Delete/Backspace.
+- readonly Remaining protection.
+- Remaining recalculation.
+- Excel-like filter layer.
+- sort.
+- header/column selection support.
+- multi-row Insert/Delete.
+- Undo/Redo for accepted Gate 5B-5 operations.
+- stable `ClientKey` session identity.
+- Unified Validation owner for required identity fields, identity format/duplicates, date, Basket, financial rules, and supported custom-field types.
+- soft validation: invalid input remains visible, error state is exposed, and Save eligibility is blocked until errors are corrected.
+- incremental validation for changed/identity-related rows, with validation cell styling supplied through Revo cell properties rather than scroll-time DOM scanning.
+
+Latest accepted Range Clear regression on this baseline used a real-browser journey and covered Delete, Backspace, Undo, Redo, mixed editable/readonly range, Remaining recalculation, row structure, filter and sort interactions.
+
+Gate 5B-6 Unified Validation was subsequently accepted at `6a6f3ce` with self-tests, hardened real-browser validation assertions, full existing Grid regression, and user manual browser acceptance.
+
+## Not implemented yet in Revo production path
+- production database Save.
+- full persistence/concurrency handshake using `RowVersion`.
+- server validation/error mapping.
+- production custom-column CRUD/layout persistence parity.
+- production manager/KPI/search parity.
+- final reconnect/recovery qualification.
+- production self-hosted Revo assets.
+- `/work-orders` cutover.
+
+## Business decisions vs implementation
+
+`Documentation/15_BUSINESS_DOMAIN_AND_PERMISSIONS.md` contains approved target Business rules that older audits may have listed as unresolved.
+
+Do **not** mistake those target decisions for current code behavior.
+
+Current production code does not yet necessarily enforce:
+
+- downstream-interaction identity/delete locking.
+- BranchManager-only Reopen.
+- durable business audit timeline.
+- ProjectManager global read-only Work Orders screen.
+- specialist module architecture.
+- final invoice naming/model beyond existing derived Remaining calculation.
+
+Those are approved product contracts for later implementation.
+
+---
+
 # CURRENT IMPLEMENTATION OVERRIDE — 2026-08-24
 
 ## Native V1 AI-engineering state

@@ -1,3 +1,69 @@
+# CURRENT RELEASE READINESS OVERRIDE — 2026-08-26
+
+## Gate R0 — Revo Production Candidate — OPEN
+
+Before `/work-orders` cutover:
+
+- ✅ unified validation complete at `6a6f3ce`.
+- real DB Save complete.
+- `RowVersion`/concurrency identity complete.
+- snapshot-safe Save acceptance proven.
+- server validation/duplicate/scope failure mapping proven.
+- edit during in-flight Save does not get falsely marked clean.
+- custom columns/layout and high-value employee workflow accepted.
+- exact Revo assets pinned/self-hosted.
+- target browser qualification.
+- 10k accepted on target office-class hardware.
+- reconnect/failure journeys accepted.
+- real-browser diagnostics are acceptance failures, not logging-only.
+- exact row identities verified for structural operations.
+- rollback checkpoint retained.
+
+## Gate R1 — Online Work Orders Production Safety
+
+Before real production:
+
+- current security review findings closed/verified.
+- disabled Admin cannot be silently reactivated by startup behavior.
+- user-controlled header/text rendering is safe.
+- privilege-sensitive operations recheck server authority as required.
+- Save outcome after disconnect/commit boundaries is recoverable/deterministic.
+- backup/restore and deployment rollback procedure exists.
+- database migration plan tested.
+- monitoring/logging/support evidence exists.
+
+## Gate R2 — Business Governance Before Expanded Modules
+
+Before specialist modules create irreversible business history:
+
+- durable Business Audit foundation implemented.
+- downstream interaction can be determined reliably.
+- BranchManager-sensitive identity/delete rules implemented.
+- Closure/Reopen rules implemented.
+- role/scope matrix matches `15_BUSINESS_DOMAIN_AND_PERMISSIONS.md`.
+
+## Gate R3 — Multi-user / Multi-branch Expansion
+
+Before wide rollout:
+
+- more than one Employee per Department supported where business requires.
+- department/module extensibility no longer depends on current four fixed department types.
+- ProjectManager global read-only view implemented.
+- BranchManager branch scope implemented.
+- capacity tests reflect realistic concurrent-user counts.
+
+## Gate R4 — Specialist/Field Expansion
+
+Before large Municipality/Execution/Field rollout:
+
+- Work Order remains one shared identity.
+- specialist modules do not duplicate Master records.
+- documents/evidence have intentional storage model.
+- field/offline security and sync rules are approved before implementation.
+- SEC real network/domain/firewall qualification remains mandatory.
+
+---
+
 # 10 — Release Readiness Plan
 
 **Status:** Current approved gates  

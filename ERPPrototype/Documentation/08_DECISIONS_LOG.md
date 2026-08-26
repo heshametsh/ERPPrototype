@@ -1,3 +1,99 @@
+# CURRENT ENGINEERING OVERRIDE — 2026-08-26
+
+## DEC-055 — Native V1 is historical, not the active daily engineering workflow
+
+- **Status:** Accepted / Supersedes the active-workflow status of DEC-041/DEC-042.
+- Native V1 receipts/prompts/tools may remain for historical evidence, but they are not mandatory gates for current ERP development.
+- engineering judgment stays with the Main AI/engineer reviewing the real repository.
+- local scripts/Git/Build/tests/browser automation are execution and evidence tools, not local intelligence.
+- important changes are reviewed/tested at stable candidate boundaries; automated browser evidence plus user manual acceptance is required for important employee-visible Grid behavior.
+- old Native V1 decisions below remain historical records and must not be interpreted as the current operating workflow.
+
+## DEC-054 — Revo Gate 5B-6 Unified Validation accepted
+
+- **Status:** Accepted / Implemented at `6a6f3ce`.
+- invalid values remain in the sheet and are visibly marked; Save eligibility is blocked until errors are corrected.
+- Manual Edit, Paste, Range Clear and Undo/Redo resulting state feed one validation owner without forcing all mutation types through one giant mutation gateway.
+- row structure and History retain their own owners.
+- validation is incremental for changed/identity-related rows; duplicate identity updates both affected rows.
+- Revo cell properties render validation state instead of scroll-time DOM scanning in Gate 5B-6.
+- acceptance included self-tests, hardened real-browser validation assertions, full existing Grid regression, and user manual browser verification.
+- next Revo foundation step is persistence identity/`RowVersion`, then snapshot-safe Save and real DB Save.
+
+---
+
+# BUSINESS / PRODUCT DECISION OVERRIDE — 2026-08-26
+
+## DEC-053 — ProjectManager is global operational visibility, not a Work Order editor
+
+- **Status:** Accepted
+- `ProjectManager` is manager of Branch Managers and sees all branches needed for oversight.
+- Work Orders are **read-only** for ProjectManager.
+- ProjectManager does not perform BranchManager-sensitive identity changes, delete or Reopen.
+- BranchManager remains operational authority for exceptions inside his branch.
+
+## DEC-052 — Downstream interaction, not visibility, protects Work Order identity/delete
+
+- **Status:** Accepted
+- Work Order merely appearing in another department/module queue does **not** count as interaction.
+- Interaction begins when another module records a real business action/record linked to Work Order.
+- Before interaction, Master employee may correct `WorkOrderNumber`, `WorkTypeCode`, or delete an incorrectly entered Work Order.
+- After interaction, those sensitive operations become BranchManager-only.
+- other allowed Master fields remain editable by employee.
+
+## DEC-051 — Master Work Orders creates shared Work Order; specialist departments extend same record
+
+- **Status:** Accepted
+- Master Work Orders employee is first ERP entry point.
+- Work Order then moves through branch.
+- specialist departments do not create duplicate Work Orders.
+- each specialist module stores its own work linked to same Work Order.
+- specialist details must not automatically become more Main Basket states or dozens of Master Sheet columns.
+
+## DEC-050 — Basket follows expected SEC process but remains operationally flexible
+
+- **Status:** Accepted
+- Basket represents main/general/official stage.
+- expected order is guidance, not rigid State Machine that stops real work.
+- specialist work may progress while another formal step is delayed.
+- future management logic may surface exceptions/warnings instead of preventing legitimate parallel progress.
+
+## DEC-049 — Work Order closure is operational + financial; Reopen is BranchManager-only
+
+- **Status:** Accepted
+- `انتهاء أمر العمل` means fully complete operationally and financially, including final invoice closure.
+- ordinary employees cannot reopen.
+- BranchManager may Reopen inside his branch.
+- ProjectManager remains read-only.
+- Reopen must create durable Business History.
+
+## DEC-048 — Partial Invoice is one-time; Remaining represents Final Invoice amount
+
+- **Status:** Accepted
+- invoice types in current model: Partial and Final.
+- Partial Invoice is optional and occurs once only.
+- eligibility threshold can vary by region/contract and is not frozen as one global constant.
+- `Final Invoice Amount = Work Order Value - Partial Invoice Amount`.
+- if no Partial exists, Final = Work Order Value.
+- current `Remaining Amount` is the derived final portion and does not become zero after final invoice approval.
+- Partial and Final values remain historically visible.
+
+## DEC-047 — Sensitive identity/delete actions require durable trace after downstream use
+
+- **Status:** Accepted
+- after downstream interaction, manager-authorized identity correction/delete must not erase the fact/history of what happened.
+- client Undo/Redo is not sufficient Business Audit.
+- exact technical persistence approach for archive/tombstone/audit is deferred until implementation.
+
+## DEC-046 — Cross-year AssignmentDate change requires confirmation
+
+- **Status:** Accepted
+- changing Assignment Date to another year requires user confirmation before Work Order is moved.
+- after confirmation, server Save remains authoritative.
+- supersedes older documentation that left automatic move vs confirmation open.
+
+---
+
 # NATIVE V1 AI-ENGINEERING DECISION OVERRIDE — 2026-08-24
 
 ## DEC-042 — Native V1.1 records every completed real mission

@@ -1,3 +1,101 @@
+# CURRENT PRODUCT / ENGINEERING ROADMAP — 2026-08-26
+
+This roadmap supersedes older Gate 5A-current ordering below.
+
+## Phase A — Close Revo Work Orders foundation
+
+1. ✅ Revo read path / Change Engine / Sheet History foundation.
+2. ✅ Paste / Filter / Sort / Header Selection / multi-row Insert/Delete.
+3. ✅ Range Clear Delete/Backspace + real-browser acceptance at baseline `a74c9c9`.
+4. ✅ **Unified Validation — accepted at `6a6f3ce`.**
+5. ▶ **Persistence identity contract — next:** `Id`, `ClientKey`, `RowVersion`, `WorkYear`, `DisplayOrder`, custom values.
+6. Snapshot-safe Save handshake.
+7. Real DB Save: Add/Update/Delete + server validation.
+8. Save rejection/failure mapping.
+9. Concurrency and edit-while-Save-in-flight behavior.
+10. Year move confirmation + save/Undo implications.
+11. Custom Columns + width/visibility/layout persistence.
+12. High-value employee parity: quick search, KPI/Basket summary, selection totals, production messages.
+13. Self-host/pin Revo, reconnect/recovery, target Edge/Chrome, 10k qualification.
+14. Side-by-side release candidate.
+15. Controlled `/work-orders` cutover.
+16. Separate post-cutover Tabulator retirement checkpoint.
+
+**Rule:** Tabulator is a behavior reference until cutover; do not start broad Tabulator refactoring/feature engineering.
+
+## Phase B — Operational ERP foundation
+
+After Revo cutover, shift engineering focus away from Grid feature accumulation.
+
+- Responsible/Owner.
+- Stage Entered At.
+- Next Action.
+- Due Date.
+- Blocker / Delay Reason.
+- durable Business Activity/Audit.
+- Closure/Reopen implementation.
+- BranchManager / ProjectManager views matching approved scope.
+- Contract/Project light model when exact data model is designed.
+
+## Phase C — Manager Control
+
+- overdue work.
+- aging.
+- backlog by branch/department/stage.
+- high-value Work Orders.
+- permits/obligations nearing expiry.
+- changes/events today/this week.
+- drill-down to underlying Work Orders.
+- ProjectManager comparison across Branch Managers.
+
+## Phase D — Specialist workflows
+
+Likely high-value order:
+
+1. Municipality / excavation permit lifecycle.
+2. Site / coordinates / GIS basics.
+3. Execution.
+4. Inspection / Quality / Rework.
+5. Documents / Photos.
+6. HSE / field evidence where required.
+
+Every module links to same Work Order.
+
+## Phase E — Materials and Commercial
+
+- material issue/return/consumption.
+- completion certificates.
+- commercial/payment certificates.
+- richer Partial/Final invoice lifecycle if needed.
+- retention/variations.
+- subcontractors.
+- cost/profitability.
+
+Do not build full accounting/warehouse before proven operational need.
+
+## Phase F — Scale, Offline, Integration
+
+- multiple employees per department.
+- extensible department/module model.
+- multi-branch scale.
+- 50k/100k data-plane decision only after measurement.
+- Offline/sync after workflow/conflict rules are stable.
+- APIs/integrations through application boundaries, not Grid/EF internals.
+- reporting read models where management scale requires them.
+
+## Stop rules
+
+- no Microservices without evidence.
+- no generic Workflow Designer now.
+- no giant 100-column Work Order table.
+- no Custom Columns as replacement for core domain modules.
+- no formula/smart-autofill project just because Grid can support it.
+- no full backend rewrite.
+
+See `46_FINAL_LEAD_REVIEW_2026-08-26.md`.
+
+---
+
 # CURRENT REMEDIATION ROADMAP — 2026-08-20
 
 > هذا الترتيب ينسخ “ArrowDown is current task” في Roadmap الأقدم. اختيار RevoGrid تم بعد Grid Shootout مستقل، ولا يعني Rewrite لباقي النظام.

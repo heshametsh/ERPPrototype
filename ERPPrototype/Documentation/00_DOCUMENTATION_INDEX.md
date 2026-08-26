@@ -1,75 +1,60 @@
 # 00 — Documentation Index
 
 **Status:** Current / Approved  
-**Last update:** 2026-08-22
-**Audit baseline:** `00503ab`  
-**Current production runtime baseline retained:** `0f6bd3b`  
-**Latest reviewed Git HEAD:** `04e0f1a`
+**Last update:** 2026-08-26  
+**Current accepted engineering HEAD:** `6a6f3cef807f58a41bcfefa7c08b2ebaf6220169`  
+**14-review / Final Lead Review baseline:** `a74c9c908a2372b0e9141dcf7f6ef772bd6c07b3`
 
-## Native V1 cleanup override — 2026-08-24
+## 1. Trust Order
 
-The active AI-engineering surface is defined by `AGENTS.md`, this Decisions Log, `.ai/prompts/native-reviewer-v1.md`, and `ERPPrototype/Tools/AITeam/NativeV1/`. Project Brain, V2/V3 qualification, and the old reviewer/harness infrastructure are archived under `ERPPrototype/Documentation/Archive/AI-Team-V3/`; they are retained for history only.
+When documents disagree, use this order:
 
-## ترتيب الثقة عند التعارض
+1. **Current code + migrations + tests at the same baseline** — what is actually implemented.
+2. `15_BUSINESS_DOMAIN_AND_PERMISSIONS.md` — canonical approved Business/Product rules.
+3. `46_FINAL_LEAD_REVIEW_2026-08-26.md` — current strategic synthesis and long-term roadmap.
+4. `03_CURRENT_IMPLEMENTATION.md` — current implementation snapshot/overrides.
+5. `05_WORK_ORDERS_GRID_BEHAVIOUR.md` — engine-independent Work Orders behavior contract.
+6. `06_REGRESSION_TEST_CHECKLIST.md` — acceptance/testing contract.
+7. `08_DECISIONS_LOG.md` — chronological accepted decisions.
+8. `04_ARCHITECTURE_AND_DEPENDENCIES.md` / `09_REFACTOR_ROADMAP.md` / `10_RELEASE_READINESS_PLAN.md`.
+9. Historical audit reports, change summaries and archived material.
+10. Conversation history — useful context only; settled decisions must be transferred into the documents above.
 
-1. **الكود الحالي + Migrations + Tests في نفس الـbaseline** — الحقيقة لما هو منفذ فعليًا.
-2. `12_ENGINEERING_AUDIT_REPORT.md` — الـMaster الحالي للـFindings والقرارات والخطة المستقبلية.
-3. `ERP_AUDIT_PROTOCOL.md` — قواعد تنفيذ أي Audit مستقل جديد.
-4. الوثائق التشغيلية الحالية: `03`, `05`, `06`, `07`, `08`, `09`, `10`.
-5. Git history / Change Summaries — تاريخ التنفيذ والقرارات القديمة.
-6. المحادثات — تفسير مؤقت فقط؛ القرار النهائي يجب أن ينتقل للوثائق.
+**Rule:** do not reopen a settled Business question merely because an older audit listed it as unresolved. Check `15_BUSINESS_DOMAIN_AND_PERMISSIONS.md` first.
 
-**قاعدة:** لا يتم حل تعارض مهم بصمت. إذا تعارض قرار قديم مع الـMaster، يُعامل القرار القديم كـSuperseded ما لم يثبت الكود خلاف ذلك.
+## 2. Start Here
 
-## ابدأ من هنا
-
-| الوثيقة | الاستخدام |
+| Document | Purpose |
 |---|---|
-| `../START_HERE_ERP_PROTOTYPE.md` | دخول سريع للحالة الحالية وخطوة التنفيذ التالية |
-| `12_ENGINEERING_AUDIT_REPORT.md` | **المرجع الهندسي الرئيسي الحالي**: Findings + قرارات + Offline + SEC validation + المستقبل + ترتيب التنفيذ |
-| `13_TECHNOLOGY_EVOLUTION.md` | **سجل تطور التقنية**: Power Apps → Blazor → Syncfusion → Tabulator → RevoGrid، ولماذا استمر أو تغير كل قرار |
-| `ERP_AUDIT_PROTOCOL.md` | منهج المراجعات المستقلة ومنع Confirmation Bias |
-| `41_HANDOFF_2026-08-16_POST_AUDIT.md` | تسليم تاريخي لمرحلة ما قبل الـRuntime remediation |
-| `42_HANDOFF_2026-08-17_PERFORMANCE_RECONCILIATION.md` | تسليم تاريخي قبل قرار تغيير Grid Engine؛ يظل Evidence لأداء Tabulator |
-| `03_CURRENT_IMPLEMENTATION.md` | ما الموجود في baseline الحالي فعليًا |
-| `05_WORK_ORDERS_GRID_BEHAVIOUR.md` | عقد سلوك شيت Work Orders الحالي |
-| `06_REGRESSION_TEST_CHECKLIST.md` | اختبارات عدم كسر السلوك الحالي + متطلبات التوسعة الجديدة |
-| `07_KNOWN_ISSUES_AND_TECHNICAL_DEBT.md` | المشكلات الحالية؛ الـMaster أعلى منه عند التعارض |
-| `08_DECISIONS_LOG.md` | سجل القرارات؛ تمت إضافة قرارات ما بعد الـAudit في أعلى الملف |
-| `09_REFACTOR_ROADMAP.md` | التاريخ السابق + ترتيب remediation الحالي في أعلى الملف |
-| `10_RELEASE_READINESS_PLAN.md` | بوابات Staging/Pilot/Production الحالية |
-| `Archive/AI-Team-V3/ERPPrototype/Documentation/AI_AGENT_WORKFLOW_V3.md` | Historical AI-team workflow; archived and not active |
-| `Archive/AI-Team-V3/` | Historical Project Brain, qualification, reviewer, and harness material; not an active dependency |
+| `../START_HERE_ERP_PROTOTYPE.md` | current engineering handoff and next step |
+| `15_BUSINESS_DOMAIN_AND_PERMISSIONS.md` | **business source of truth** |
+| `46_FINAL_LEAD_REVIEW_2026-08-26.md` | **long-term product/architecture synthesis** from 14 independent reviews |
+| `03_CURRENT_IMPLEMENTATION.md` | what exists in current baseline |
+| `05_WORK_ORDERS_GRID_BEHAVIOUR.md` | Work Orders behavior independent of Tabulator/Revo |
+| `06_REGRESSION_TEST_CHECKLIST.md` | mandatory regression and real-browser acceptance |
+| `08_DECISIONS_LOG.md` | chronological decision record |
+| `09_REFACTOR_ROADMAP.md` | current Revo/cutover/ERP roadmap |
+| `10_RELEASE_READINESS_PLAN.md` | production qualification gates |
+| `13_TECHNOLOGY_EVOLUTION.md` | Power Apps → Blazor → Syncfusion → Tabulator → RevoGrid |
+| `ERP_AUDIT_PROTOCOL.md` | independent-review method |
 
-## وثائق المنتج والهندسة الأساسية
+## 3. Current State — 2026-08-26
 
-| الوثيقة | الاستخدام |
-|---|---|
-| `01_PROJECT_CONTEXT.md` | نطاق المنتج والسياق |
-| `02_AI_DECISION_PRINCIPLES.md` | طريقة الاقتراح والتنفيذ والتواصل |
-| `04_ARCHITECTURE_AND_DEPENDENCIES.md` | حدود الموديولات واتجاه الاعتماد |
-| `13_TECHNOLOGY_EVOLUTION.md` | Timeline تقني موحد وEvidence لكل انتقال |
+- `/work-orders` remains live Tabulator route until Revo cutover.
+- RevoGrid Community 4.25.2 is the selected replacement.
+- isolated Gate 5B-6 contains Change Engine + Sheet History + Dirty + Paste + Range Clear + Filter/Sort + header selection + multi-row Insert/Delete + Remaining synchronization + Unified Validation.
+- Range Clear was accepted at `a74c9c9`; Unified Validation was accepted at `6a6f3ce` after automated real-browser and user manual acceptance.
+- Revo does **not** yet have production database Save/cutover.
+- next major Revo step: **persistence identity/RowVersion**, then snapshot-safe Save contract and real Save.
+- long-term direction: fast Master Sheet + one Work Order + specialist sub-workflows + manager control center.
+- Business questions previously left open in older audits are now settled in `15_BUSINESS_DOMAIN_AND_PERMISSIONS.md`.
 
-## Evidence / History
+## 4. Historical / Evidence Material
 
-- `11_CHANGE_SUMMARY_...` إلى `40_CHANGE_SUMMARY_...` = سجل تاريخي لمراحل سابقة.
-- `Review/` = أدلة مراجعة/قياسات سابقة.
-- Git history = المرجع التاريخي النهائي للملفات التي أزيلت أو تغيرت.
+- `11_CHANGE_SUMMARY_...` onward: historical implementation checkpoints.
+- `Review/`: prior audit/performance evidence.
+- `Documentation/Archive/`: historical workflows and retired AI-team infrastructure.
+- `wwwroot/grid-shootout/`: Grid qualification/lab evidence, not production runtime.
+- older Gate/lab/event-probe pages are evidence/diagnostics unless current implementation says otherwise.
 
-## الحالة الحالية المختصرة
-
-- كل الـIndependent Audits المخططة اكتملت.
-- Final Cross-Audit Synthesis اكتمل.
-- Product decision session بعد الـAudits اكتملت بدرجة كبيرة.
-- SEC browser/offline feasibility تم اختبارها عمليًا بنجاح قوي؛ ما زال اختبار **الكابل الحقيقي + الدومين الحقيقي + Proxy/Firewall** Gate مفتوحًا.
-- Runtime remediation الأساسية السابقة ما زالت محفوظة: Test Foundation + `LDR-002` + initialization recovery + financial Sort optimization.
-- **Grid Engine selection completed on 2026-08-20:** RevoGrid Community **4.25.2** is the selected Work Orders replacement target after isolated 100k + ERP behavior gates.
-- `/work-orders` الحقيقي ما زال Tabulator 6.5.0؛ قرار RevoGrid لم يتحول بعد إلى production integration.
-- Univer comparison stopped after a real native mismatch with the approved end-of-sheet Paste rule.
-- **Current Revo state:** isolated `/work-orders-revogrid-gate5b5` has Edit/Paste/History/Dirty/Filter/Sort/Header Selection/Insert-Delete/Remaining sync; real database Save and production cutover are still not implemented.
-- **Current engineering foundation task:** Native V1 cleanup is frozen by `DEC-041`; `DEC-040` remains the normative validation decision for the ERP runtime.
-- Grid qualification evidence is retained under `wwwroot/grid-shootout/`, including `REVOGRID_FROZEN_BASELINE_2026-08-20.json`.
-
-## Archived Project Brain / qualification
-
-The former Project Brain index, aliases, validator, canary, and CI check are preserved under `Documentation/Archive/AI-Team-V3/` and are not used by Native V1.
+Do not treat historical/lab artifacts as current production architecture merely because they remain in the repository.

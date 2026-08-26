@@ -1,3 +1,72 @@
+# CURRENT HANDOFF — 2026-08-26
+
+> This is newest handoff. Older handoffs below are historical when they conflict.
+
+**Current accepted Git HEAD:** `6a6f3cef807f58a41bcfefa7c08b2ebaf6220169`  
+**14-review / Final Lead Review baseline:** `a74c9c908a2372b0e9141dcf7f6ef772bd6c07b3`  
+**Live Work Orders:** Tabulator 6.5.0 until cutover.  
+**Selected target:** RevoGrid Community 4.25.2.  
+**Current isolated Revo route:** `/work-orders-revogrid-gate5b6`.  
+**Latest accepted grid milestone:** Gate 5B-6 Unified Validation at `6a6f3ce`, after automated real-browser regression and user manual acceptance.  
+**Next major Revo product step:** persistence identity/`RowVersion`, then snapshot-safe Save contract and real DB Save.
+
+## Read first
+
+1. `Documentation/00_DOCUMENTATION_INDEX.md`
+2. `Documentation/15_BUSINESS_DOMAIN_AND_PERMISSIONS.md` — **do not re-ask settled Business questions before reading this**
+3. `Documentation/46_FINAL_LEAD_REVIEW_2026-08-26.md`
+4. `Documentation/03_CURRENT_IMPLEMENTATION.md`
+5. `Documentation/08_DECISIONS_LOG.md`
+6. `Documentation/05_WORK_ORDERS_GRID_BEHAVIOUR.md`
+7. `Documentation/06_REGRESSION_TEST_CHECKLIST.md`
+8. `Documentation/09_REFACTOR_ROADMAP.md`
+
+## Product north star
+
+```text
+Fast Master Work Orders Sheet
+        ↓
+One trusted Work Order
+        ↓
+Specialist departments work on their own part
+        ↓
+Managers see exceptions/risks/actions
+```
+
+## Business decisions now settled
+
+See `15_BUSINESS_DOMAIN_AND_PERMISSIONS.md`.
+
+Do not reopen without new conflicting business evidence:
+
+- one-time Partial Invoice.
+- Final Invoice = Work Order Value - Partial.
+- Final/Remaining does not zero after final approval.
+- operational + financial closure.
+- BranchManager-only Reopen.
+- downstream interaction definition.
+- BranchManager-only identity/delete after downstream interaction.
+- ProjectManager global read-only.
+- flexible Basket / no rigid blocking State Machine.
+- year move requires confirmation.
+
+## Current engineering direction
+
+```text
+Persistence identity / RowVersion
+→ Snapshot-safe Save
+→ Real DB Save
+→ Concurrency / failure recovery
+→ important parity
+→ production qualification
+→ cutover
+→ Operational ERP foundation
+```
+
+Tabulator is now a behavior-reference source during migration, not long-term design authority.
+
+---
+
 # CURRENT HANDOFF — 2026-08-22
 
 > **هذا هو ملخص البدء الأحدث.** أي Handoff أقدم أسفل الملف يبقى تاريخيًا عند التعارض.

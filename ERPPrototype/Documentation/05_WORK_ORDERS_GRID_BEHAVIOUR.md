@@ -1,3 +1,48 @@
+# BUSINESS BEHAVIOR OVERRIDE — 2026-08-26
+
+> This document remains the engine-independent Grid behavior contract.  
+> Business semantics are canonical in `15_BUSINESS_DOMAIN_AND_PERMISSIONS.md`.
+
+## Financial field meaning
+
+- `Work Order Value` = total Work Order value.
+- `Partial Amount` = one-time Partial Invoice amount when applicable.
+- `Remaining Amount` is derived/read-only.
+- approved commercial meaning of `Remaining Amount` = Final Invoice Amount / portion not included in the one-time Partial Invoice.
+- it does **not** become zero after final invoice approval.
+- if Partial is blank, Final/Remaining equals Work Order Value.
+- Partial = 0 normalizes to blank/null.
+- Partial eligibility threshold may vary by region/contract and must not be hard-coded globally before configuration is defined.
+
+## Identity/delete after specialist interaction — target behavior
+
+Before another module records a real business interaction, Master employee may correct WorkOrderNumber/WorkTypeCode or delete an incorrectly entered Work Order.
+
+After real downstream interaction:
+
+- WorkOrderNumber/WorkTypeCode correction = BranchManager only.
+- Delete = BranchManager only.
+- ordinary allowed fields such as Basket remain editable by Master employee.
+
+Merely appearing in another department queue does not count as interaction.
+
+This is approved target behavior and is not claimed as already implemented in current live Grid.
+
+## Closure and Basket — target behavior
+
+- `انتهاء أمر العمل` = operational + financial closure.
+- Reopen = BranchManager only and must enter durable Business History.
+- Basket is main/general/official stage, not a rigid gate that forbids practical parallel work.
+- specialist detailed states belong in specialist workflows.
+
+## Year move
+
+Changing Assignment Date so Work Order moves to another year requires user confirmation before authoritative server move.
+
+This supersedes older “automatic move vs confirmation still open” statements later in this file.
+
+---
+
 # 05 — Work Orders Grid Behaviour
 
 > **Grid-engine transition 2026-08-20:** هذه الوثيقة أصبحت **engine-independent behavior contract**. `/work-orders` الحالي ما زال Tabulator 6.5.0، لكن RevoGrid Community 4.25.2 هو المحرك المختار للاستبدال. أي RevoGrid integration يجب أن يحافظ على السلوك هنا ولا يغيّره لمجرد اختلاف المكتبة.
@@ -83,16 +128,25 @@ Structural insert/delete/undo rebuilds full client data using `table.setData()` 
 
 ## 8. Validation
 
-Client validation provides immediate feedback:
+Client validation uses the approved **soft validation** behavior:
 
-- required identity fields.
-- exact digit lengths.
-- date format.
-- Basket list.
-- duplicate identity index.
-- validation navigator with Previous/Next.
+- invalid values remain visible in the sheet;
+- the affected cell/row is clearly marked as invalid;
+- the employee may continue working;
+- Save is blocked while any validation error remains;
+- Manual Edit, Paste, Range Clear and Undo/Redo resulting state follow the same rule.
 
-Server and database validation remain final.
+Gate 5B-6 currently validates:
+
+- required Work Order Number / Work Type / Basket;
+- exact identity digit lengths;
+- Assignment Date format;
+- Basket membership;
+- Work Order Number + Work Type duplicates inside the active sheet;
+- Work Order Value / Partial financial rules;
+- supported custom Text/Money/Date/whole-Number values when those definitions are supplied.
+
+Server and database validation remain final and must recheck authoritative rules during real Save.
 
 ## 9. Save
 

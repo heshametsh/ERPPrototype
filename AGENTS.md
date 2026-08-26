@@ -1,63 +1,87 @@
-# ERP Prototype — Native V1 Agent Entry Point
+# ERP Prototype — Engineering Entry Point
 
 ## Status
 
-Architecture V1 is frozen. This file is the active repository contract for engineering work.
+Current repository engineering contract.
 
-The current code, migrations, tests, and the checked-out Git snapshot are the authority for implemented reality. `ERPPrototype/Documentation/08_DECISIONS_LOG.md` is the normative decision record.
+The current code, migrations, tests, and checked-out Git snapshot are the authority for implemented reality.
+Business rules are canonical in `ERPPrototype/Documentation/15_BUSINESS_DOMAIN_AND_PERMISSIONS.md`.
+Chronological accepted decisions are recorded in `ERPPrototype/Documentation/08_DECISIONS_LOG.md`.
 
-## Active Native V1 surface
+## Current working model
 
-Only these AI-engineering pieces are active:
+Engineering judgment stays with the main AI/engineer reviewing the real repository.
+Local scripts, Git, Build, tests, browser automation, and diagnostics are execution/evidence tools; they do not replace engineering judgment.
 
-- this file, including the Native V1 risk gate;
-- `ERPPrototype/Documentation/08_DECISIONS_LOG.md`;
-- `.ai/prompts/native-reviewer-v1.md`, the single neutral reviewer contract;
-- `ERPPrototype/Tools/AITeam/NativeV1/NativeV1Receipt.psm1`, which fingerprints Git-visible state and writes Native V1.2 Receipts/events;
-- `ERPPrototype/Tools/AITeam/NativeV1/Test-NativeV1.ps1`, deterministic local checks for that small capability.
-
-The former Project Brain, V2/V3 qualification material, routing, Lead, CLI reviewer, sandbox/transport, evidence-pack, collector, learning-engine, database, and dashboard infrastructure is historical only under `ERPPrototype/Documentation/Archive/AI-Team-V3/`. It is not an active dependency and must not be revived as a compatibility path.
-
-The host-protected `.agents/skills/erp-ai-team/SKILL.md` is also deprecated/historical and MUST NOT be used for Native V1 work. It describes the archived legacy AI-team harness, not the active Native V1 contract.
+The former Native V1 / AI-Team workflow is historical only. Its receipts, prompts, tools, and archived infrastructure may remain for evidence, but they are not mandatory gates and must not be revived as the default workflow.
 
 ## Before substantial work
 
-Read only the documents relevant to the task, normally beginning with:
+Read only the documents relevant to the mission, normally beginning with:
 
 1. `ERPPrototype/Documentation/02_AI_DECISION_PRINCIPLES.md`
 2. `ERPPrototype/Documentation/03_CURRENT_IMPLEMENTATION.md`
-3. `ERPPrototype/Documentation/06_REGRESSION_TEST_CHECKLIST.md`
-4. `ERPPrototype/Documentation/08_DECISIONS_LOG.md`
+3. `ERPPrototype/Documentation/05_WORK_ORDERS_GRID_BEHAVIOUR.md`
+4. `ERPPrototype/Documentation/06_REGRESSION_TEST_CHECKLIST.md`
+5. `ERPPrototype/Documentation/08_DECISIONS_LOG.md`
+6. `ERPPrototype/Documentation/15_BUSINESS_DOMAIN_AND_PERMISSIONS.md` when business behavior/permissions are involved.
 
-For an independent Native reviewer, use only `.ai/prompts/native-reviewer-v1.md` and the current workspace evidence it names. Do not read archived AI-team reports or use them as hypotheses.
+Before changing code:
 
-## Native V1 risk gate
+- inspect the current implementation and affected dependencies;
+- explain employee/business impact before technical detail;
+- prefer the smallest correct change;
+- identify regression tests and rollback/checkpoint;
+- do not silently invent a new business rule.
 
-1. Capture the full `git rev-parse HEAD` and the Git-visible state before work.
-2. Identify the change type and risk in employee/business terms. Do not infer a product rule from code or telemetry.
-3. Stop before implementation if the request changes a frozen architecture boundary, security/data/concurrency rule, offline behavior, persistence authority, or user-visible business behavior without an explicit approved decision.
-4. Keep one clear owner for each responsibility. Do not add a router, lead, child reviewer, harness, transport, collector, database, dashboard, or replacement framework.
-5. Local code may fingerprint state and store supplied observations, but it must not select reviewers, classify findings, accept candidates, or make engineering judgments.
-6. After an approved change, run only appropriate deterministic/local checks, compare the final Git-visible state with the captured baseline, and do not run an AI reviewer unless separately requested.
+## Verification rule
 
-## Candidate Receipt contract
+AI-generated code is not accepted because it compiles or passes isolated tests.
 
-Native V1.2 Receipt is the unit of learning for every completed real mission, including diagnostic missions without a Candidate. The writer stores only supplied observations:
+For important Grid behavior, Save, validation, data integrity, permissions, concurrency, or recovery:
 
-`receiptVersion`, `receiptId`, `missionId`, `mission`, `missionType`, `baseSha`, `finalSha`, `candidateSha`, `changeType`, `risk`, `mainDecision`, `result`, `participants[]`, `reviews[]`, concise `decisionTrace[]`, factual lifecycle timestamps/state, and optional supplied failure classification context.
+1. run deterministic/unit/self-tests where useful;
+2. run the relevant real-browser/integration journey;
+3. capture evidence on failure instead of guessing;
+4. give the user a short manual browser test and require user acceptance before final closure;
+5. commit/push only after the accepted candidate is stable.
 
-Each participant records only the supplied role/purpose and available model/session/telemetry facts. Missing native telemetry is `null`; a participant is never added merely because it was available or recommended. Candidate-specific fields remain `null` for diagnostic missions.
+## Review rule
 
-Each review may contain `reviewId`, `protocolVersion`, `reviewerTransport`, `requestedReviewerModel`, `actualReviewerModel`, `reviewerResult`, `findingCount`, `findingIds`, `tokens`, `cachedTokens`, `toolCalls`, `time`, and `reviewerThread/session`. Missing telemetry is `null`. Official review-gate evidence requires the native subagent transport; CLI/child/sandbox/archived transports never satisfy it. Lifecycle events are explicit factual records: `USER_ACCEPTED`, `PUSH_COMPLETED`, and `MISSION_COMPLETED`, alongside the existing finding/diagnosis events. Completion never infers acceptance, push, or diagnosis classification. Existing V1/V1.1 receipts remain readable.
+Review at candidate boundaries, not after every edit.
+
+- cosmetic/text-only change: independent review usually unnecessary;
+- substantive behavior/data change: at least one independent review when risk justifies it;
+- security/data/concurrency/permissions: independent review is expected before production acceptance.
+
+A reviewer must receive the required behavior and immutable code evidence, not the Main's diagnosis/conclusion.
 
 ## Protected Work Orders behavior
 
-Unless an approved task explicitly changes it, preserve Excel-like edit, keyboard navigation, range selection, copy/paste, row insert/delete, filtering, sorting, Undo/Redo, Sheet History, Dirty/Baseline separation, year isolation, ERP-owned Remaining Amount rules, server authority, security, RowVersion/concurrency, and the frozen visual baseline.
+Unless an approved mission explicitly changes it, preserve:
 
-RevoGrid Community native behavior comes first for grid mechanics. Add ERP-owned logic only for ERP business rules or behavior RevoGrid does not own. Do not modify RevoGrid source. Before including or excluding Tabulator, inspect the current runtime and dependency path: `/work-orders` may still use Tabulator until the actual cutover, while Tabulator remains non-authoritative for new RevoGrid design.
+- Excel-like edit/navigation/selection;
+- Paste and partial-paste-at-end behavior;
+- Range Clear Delete/Backspace;
+- Insert/Delete rows;
+- Undo/Redo and Sheet History;
+- Dirty/Baseline separation;
+- Unified soft validation;
+- ERP-owned financial/Remaining rules;
+- year isolation;
+- server authority;
+- security and scope;
+- RowVersion/concurrency;
+- frozen UI dimensions.
+
+RevoGrid Community owns Grid mechanics where practical.
+ERP owns business semantics, validation, financial rules, Dirty/Save meaning, permissions, persistence identity, business history, and specialist workflows.
+
+Do not modify RevoGrid source.
+Tabulator remains the live `/work-orders` runtime and behavior reference only until the accepted Revo cutover; it is not the design authority for new Revo work.
 
 ## Stop conditions
 
-Stop and report before implementation when evidence conflicts on a material rule, the change would replace a working core component, a new dependency/service/framework is proposed, security/data integrity/concurrency/offline behavior could materially change, or a new product decision is required.
+Stop and surface the decision before implementation when evidence conflicts on a material rule, a working core component would be replaced, a new dependency/framework is proposed, or security/data/concurrency/business behavior would materially change without an approved decision.
 
-Important outcomes must be explained briefly in Arabic with a concrete ERP example. For example: إذا تغيّر صف أمر عمل، فالـReceipt يسجل الـSHA والقرار وما شوهد فقط؛ لا يقرر الكود أن التعديل آمن.
+Important outcomes must be explained briefly in Arabic using the Work Orders behavior the user will actually see.

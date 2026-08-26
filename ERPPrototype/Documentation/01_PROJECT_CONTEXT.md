@@ -1,186 +1,281 @@
-# 01 — UDS ERP Project Context
+# 01 — ERP Prototype Project Context
 
-**Version:** 3.0  
-**Status:** Approved for the current prototype baseline  
-**Supersedes:** `UDS_PROJECT_CONTEXT_v2.0`  
-**Baseline:** Step 16E6C  
+**Version:** 4.0  
+**Status:** Approved  
+**Last update:** 2026-08-26  
+**Current accepted implementation baseline:** `6a6f3cef807f58a41bcfefa7c08b2ebaf6220169`  
 **Owner:** Hesham Omar
 
 ## 1. Product Vision
 
-UDS ERP هو منتج ويب لمتابعة عمليات المقاولين العاملين مع الشركة السعودية للكهرباء وجهات البنية التحتية المشابهة.
+ERP Prototype هو نظام ويب لمقاول كهرباء يعمل مع الشركة السعودية للكهرباء وجهات البنية التحتية المشابهة.
 
-النظام لا يحل محل SAP أو UDS. هو طبقة متابعة داخل شركة المقاول تجمع أوامر العمل والتأخير والإنتاجية والمراحل التشغيلية والمالية بدل الاعتماد على ملفات Excel منفصلة.
+المنتج ليس بديلًا لـSAP ولا هدفه بناء ERP عام ضخم من أول نسخة.
 
-الهدف الأول هو استبدال تجربة Excel اليومية بتجربة أسرع أو مساوية لها، وليس بناء ERP ضخم كامل من أول نسخة.
+الهدف طويل المدى:
 
-## 2. Current Architecture Decision
+> **موظف الشيت يعمل بسرعة قريبة من Excel، كل الشركة تعتمد على Work Order واحدة موثوقة، كل قسم متخصص يعمل على الجزء الذي يخصه من نفس Work Order، والمدير يرى الاستثناءات والتأخير والقيم والمخاطر بدل البحث في آلاف الصفوف.**
 
-التقنية المعتمدة حاليًا:
+المراحل الطبيعية للمنتج:
 
-- Blazor Web App — Interactive Server
-- ASP.NET Core
-- ASP.NET Core Identity
-- Entity Framework Core
-- SQL Server محليًا
-- Azure SQL Database عند النشر
-- Azure App Service
-- **Current runtime grid:** Tabulator 6.5.0 في `/work-orders`
-- **Selected replacement target:** RevoGrid Community 4.25.2 — ما زال قبل production integration
+1. Master Work Orders Sheet سريع وموثوق.
+2. Specialist workflows مرتبطة بنفس Work Order.
+3. Manager Control Center.
+4. موديولات تشغيلية/تجارية حسب الحاجة الحقيقية.
 
-قرار Power Apps وDataverse الموجود في Version 2.0 أُلغي كاتجاه حالي وأُرشف، لأن الكود الفعلي والاختبارات انتقلت إلى Blazor وSQL Server.
+## 2. Current Technology Direction
 
-مسار تطور القرارات التقنية من Power Apps حتى RevoGrid موثق في `13_TECHNOLOGY_EVOLUTION.md`.
+- Blazor Web App — Interactive Server.
+- ASP.NET Core.
+- ASP.NET Core Identity.
+- Entity Framework Core.
+- SQL Server.
+- Modular Monolith.
+- `/work-orders` live route: Tabulator 6.5.0 until accepted cutover.
+- selected replacement: RevoGrid Community 4.25.2.
+- Revo target: Community/public APIs for grid mechanics while ERP owns business semantics.
 
-## 3. Customer Deployment Model
+No Microservices without a proven need.  
+No full backend rewrite.
 
-في الإصدارات التجارية الأولى:
+## 3. Deployment Model
 
-```text
-Company A -> App A + Database A + Users/Secrets/Backups A
-Company B -> App B + Database B + Users/Secrets/Backups B
-```
-
-- نفس Source Code لكل العملاء.
-- لا Shared Database Multi-Tenancy الآن.
-- لا Microservices.
-- لا ABP Framework إلا إذا ظهر احتياج مثبت لا يستطيع التصميم الحالي حله.
-- الاتجاه هو Modular Monolith: تطبيق واحد قابل للنشر، لكن داخله حدود واضحة بين الموديولات.
-
-## 4. Product Priorities
-
-بالترتيب:
-
-1. سرعة الاستخدام اليومية.
-2. تجربة قريبة من Excel.
-3. سلامة البيانات والصلاحيات.
-4. بساطة الصيانة.
-5. قابلية التوسع بدون تعقيد مبكر.
-6. الشكل الجمالي بعد نجاح الأساس الوظيفي.
-
-## 5. V1 Scope
-
-### داخل النطاق الحالي
-
-- تسجيل الدخول.
-- إدارة الفروع.
-- إنشاء الأقسام الأربعة الثابتة لكل فرع.
-- حسابات المستخدمين الثابتة.
-- أوامر العمل.
-- شيت قابل للتعديل.
-- بحث وفلاتر.
-- Keyboard navigation.
-- Copy/Paste.
-- Insert/Delete rows.
-- Undo/Redo داخل الجلسة.
-- حفظ Delta إلى SQL Server.
-- التحقق من التكرار والتعارض.
-- اختبار الأداء والاستقرار.
-- Excel Import/Export لاحقًا داخل V1 بعد استقرار الشيت.
-- Dashboard صغير بعد استقرار الشيت.
-
-### خارج النطاق الحالي
-
-- المحاسبة الكاملة.
-- الموارد البشرية.
-- الأسطول.
-- المشتريات.
-- CRM.
-- Portal عام.
-- Mobile app.
-- Offline mode.
-- Warehouse والفواتير قبل نجاح Prototype الشيت.
-
-## 6. Company Structure
+Early commercial deployments remain isolated per customer/company:
 
 ```text
-Company deployment
-  -> Branch
-      -> Department
-          -> Fixed user accounts
-          -> Work Orders
+Company A → App A + Database A + Users/Secrets/Backups A
+Company B → App B + Database B + Users/Secrets/Backups B
 ```
 
-الأقسام الثابتة:
+- same source code.
+- separate customer data.
+- browser-delivered client experience.
+- employee PCs should not require local database/runtime installation.
+- offline/field architecture is later and must not be confused with making a Blazor Server circuit “offline”.
 
-- التوصيلات/العدادات.
-- المشاريع الأرضية.
-- المشاريع الهوائية.
-- الصيانة والطوارئ.
+## 4. Core Product Structure
 
-## 7. Roles
+```text
+Company
+  → Branch
+      → Departments
+          → Master Work Orders / Specialist work
+```
 
-### Product roles المطلوبة
+Long-term domain direction:
 
-- Admin: حساب واحد فقط، يرى ويدير كل شيء.
-- ProjectManager: يرى كل الفروع والأقسام، Read-only لأوامر العمل.
-- Branch Manager: يرى فرعه Read-only، ويدير الحسابات الثابتة داخل فرعه.
-- Department Employee: يعدل أوامر العمل في قسمه فقط.
+```text
+Contract / Project
+       ↓
+    Work Order
+       ↓
+Municipality / Site / Execution / Inspection / Documents / Materials / Commercial
+```
 
-### Current code names
+Exact Contract/Project model will be designed when that phase starts.
 
-- `Admin`
-- `ProjectManager`
-- `BranchManager`
-- `Employee`
+## 5. Master Work Order Principle
 
-`ProjectManager` هو الاسم النهائي المعتمد في المنتج والكود. `Employee` هو اسم الـRole التقني الحالي، بينما **Department Employee / موظف القسم** هو اسم العرض الوظيفي. لا نعيد تسمية `Employee` في قاعدة الهوية ضمن مرحلة الأداء الحالية.
+The Work Order is created first in Master Work Orders Sheet.
 
-## 8. Work Order Identity and Year
+That original Work Order is then shared across the branch.
 
-### Current implementation
+Other departments do **not** create separate copies.
 
-- Work Order Number: تسعة أرقام.
-- Work Type Code: ثلاثة أرقام.
-- قاعدة البيانات تفرض Unique Index حاليًا على:
-  `WorkOrderNumber + WorkTypeCode` على مستوى قاعدة الشركة.
-- عند حفظ Assignment Date بسنة مختلفة، الكود الحالي ينقل الصف تلقائيًا إلى سنة التاريخ.
+Each specialist module stores its own data linked to the same Work Order.
 
-### Confirmed and open business rules
+Canonical rules: `15_BUSINESS_DOMAIN_AND_PERMISSIONS.md`.
 
-- قاعدة التفرد مؤكدة ونهائية على مستوى الشركة وكل السنوات للزوج `WorkOrderNumber + WorkTypeCode`، ومتطابقة مع الـUnique Index الحالي.
-- ما زال سلوك اختلاف سنة `AssignmentDate` يحتاج قرار UX نهائيًا: النقل التلقائي الحالي أم عرض اقتراح للمستخدم قبل النقل.
+## 6. Roles
 
-لا يجوز تغيير سلوك السنة بناءً على افتراض.
+### `Employee`
 
-## 9. UX Principles
+Department-scoped employee.
+
+- Master Work Orders employee creates/updates source Work Order.
+- specialist employees work inside permitted specialist scope/module.
+- exact specialist Identity role names are not frozen yet.
+
+### `BranchManager`
+
+Manager of one branch and all departments.
+
+- sees branch Work Orders.
+- owns sensitive operational overrides in branch.
+- after downstream interaction, identity corrections/delete require BranchManager.
+- BranchManager can reopen a fully closed Work Order.
+
+### `ProjectManager`
+
+Manager of all Branch Managers.
+
+- sees all branches.
+- monitors, compares and drills down.
+- **read-only on Work Orders.**
+- does not perform sensitive Work Order edits/deletes/reopen.
+
+### `Admin`
+
+System/account administration.
+
+Admin operational Work Order rights are not inferred automatically from Admin role; they must be explicit if needed.
+
+## 7. Work Order Identity
+
+Canonical company-wide identity:
+
+```text
+WorkOrderNumber + WorkTypeCode
+```
+
+- WorkOrderNumber = 9 digits.
+- WorkTypeCode = 3 digits.
+- globally unique across company/years.
+
+Before another module records real business interaction, Master employee may correct identity/delete an incorrectly entered Work Order.
+
+After real downstream interaction:
+
+- identity correction → BranchManager only.
+- delete → BranchManager only.
+- ordinary allowed operational fields remain editable by Master employee.
+
+Visibility in another module alone does not count as interaction.
+
+## 8. Work Year
+
+- Assignment Date can move the Work Order to another year.
+- cross-year change requires user confirmation.
+- server remains authoritative for final move.
+
+## 9. Financial Model
+
+Stored business inputs:
+
+- Work Order Value.
+- Partial Amount / one-time Partial Invoice amount.
+
+Derived:
+
+```text
+Final Invoice Amount = Work Order Value - Partial Invoice Amount
+```
+
+Current UI name remains `Remaining Amount`.
+
+Business semantics:
+
+- Partial Invoice is optional and occurs once.
+- threshold eligibility may differ by region/contract; do not hard-code one universal value.
+- if no Partial, Final = full Work Order Value.
+- Final/Remaining does not become zero after final invoice approval.
+- Partial and Final remain visible as historical values.
+- Final/Remaining is not a receivables balance.
+
+## 10. Basket and Lifecycle
+
+Basket is the main/general/official stage.
+
+It should reflect Saudi Electricity process, but remain flexible.
+
+Expected process order can exist, but real specialist work may progress while another formal step is delayed.
+
+ERP should record/surface exceptions rather than blindly block legitimate work.
+
+Detailed specialist states belong in specialist workflows, not dozens of Master Baskets.
+
+## 11. Closure
+
+`انتهاء أمر العمل` means complete operationally **and** financially.
+
+Reopen:
+
+- BranchManager only.
+- durable business history required.
+- ProjectManager remains read-only.
+
+## 12. Validation
+
+Approved soft working-sheet validation:
+
+- invalid value stays visible.
+- error is clearly marked.
+- employee may continue working.
+- Save is blocked until corrected.
+- same principle for manual edit, Paste, bulk operations and Range Clear.
+- Partial = 0 normalizes to blank/null, not an error.
+
+Server/database remain authoritative.
+
+## 13. Grid Product Principles
 
 - Keyboard first.
-- أقل عدد نقرات.
-- Inline editing.
-- المستخدم يظل داخل الشيت.
-- لا Form منفصل للتعديل اليومي.
-- Copy/Paste مع Excel.
-- تحديد خلية أو نطاق مثل Excel.
-- رسائل خطأ واضحة وتحدد مكان المشكلة.
-- لا نسأل المستخدم عن معلومة يعرفها النظام.
-- الأداء Feature أساسية وليس تحسينًا شكليًا.
+- minimum clicks.
+- inline editing.
+- Excel-compatible Copy/Paste.
+- selection/range behavior.
+- one logical History action for one user operation.
+- Paste at end of sheet uses only available rows.
+- Undo/Redo separate from business audit.
+- frozen visual dimensions remain controlled by Grid behavior document.
 
-## 10. Security and Data Principles
+Tabulator is a behavior reference during migration, not long-term architecture authority.
 
-- الواجهة ليست مصدر الصلاحية.
-- الاستعلام في السيرفر يقيد البيانات قبل إرسالها للمتصفح.
-- Service وDatabase يعيدان التحقق من القواعد المهمة.
-- لا أسرار داخل الكود.
-- لا بيانات حقيقية أو حساسة أثناء الاختبار على الإنترنت.
-- كل عميل له قاعدة وأسرار ونسخ احتياطية مستقلة.
-- مراجعة أمنية مستقلة مطلوبة قبل بيانات عملاء حقيقية.
+## 14. Near-Term Scope
 
-## 11. Success Measures
+Finish Revo production foundation:
 
-قبل اعتماد الشيت:
+- unified validation.
+- persistence identity and RowVersion.
+- snapshot-safe Save.
+- concurrency/recovery.
+- custom columns/layout.
+- important employee productivity parity.
+- 10k/browser qualification.
+- cutover.
 
-- فتح مقبول مع 3,000 صف.
-- اختبار 10,000 صف.
-- البحث والفلتر بدون تأخير مزعج.
-- التعديل والحفظ لا يضيّعان البيانات.
-- الجلسة الطويلة لا تتدهور.
-- Copy/Paste مطابق للقواعد.
-- الصلاحيات لا يمكن تجاوزها من المتصفح.
-- العمل على شبكة وأجهزة الشركة.
-- Azure وإعادة الاتصال مستقران.
+Then move product investment toward operational lifecycle, manager control and specialist workflows.
 
-## 12. Simple Example
+## 15. Long-Term High-Value Modules
 
-**لماذا نستخدم App وDatabase منفصلين لكل شركة؟**  
-مثل أن لكل عميل خزنة مستقلة. حتى لو حدث خطأ في إعداد عميل، لا تختلط أوراقه مع عميل آخر. الثمن هو أن النشر والنسخ الاحتياطي يتكرران لكل عميل، لكنه أبسط وأكثر أمانًا في الإصدارات الأولى.
+Likely order, subject to operation study:
+
+- Contract/Project light model.
+- operational ownership/due/blocker/activity.
+- manager alerts/control center.
+- Municipality/excavation permit lifecycle.
+- Site/GIS basics.
+- Execution.
+- Inspection/Quality.
+- Documents/Photos.
+- HSE where required.
+- Materials.
+- completion/payment certificates and commercial control.
+- subcontractors/cost/profitability where justified.
+- field/mobile/offline after workflows stabilize.
+
+## 16. Explicit Non-Goals for Now
+
+Do not build merely because a generic ERP has it:
+
+- full accounting.
+- HR/payroll.
+- generic CRM.
+- generic workflow designer.
+- formula engine in Work Orders.
+- microservices.
+- huge warehouse suite.
+- advanced offline architecture before stable workflows.
+- 100-column Master Work Order sheet.
+
+## 17. Success Principle
+
+A feature is valuable when it helps one of these:
+
+1. employee works faster/safer.
+2. Work Order becomes more trustworthy.
+3. specialist can do real work without duplicating data.
+4. manager can identify where intervention is required.
+5. company can reconstruct important history.
+
+If a feature only makes Grid more impressive without improving one of those, it is low priority.

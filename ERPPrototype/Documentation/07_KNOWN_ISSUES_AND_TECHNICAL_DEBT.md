@@ -1,3 +1,49 @@
+# CURRENT PRIORITY OVERRIDE — 2026-08-26
+
+> Long-term direction: `46_FINAL_LEAD_REVIEW_2026-08-26.md`.  
+> Business decisions: `15_BUSINESS_DOMAIN_AND_PERMISSIONS.md`.
+
+## Revo accepted foundation
+
+- Unified Validation accepted at `6a6f3ce`; keep it in regression coverage while persistence/Save work proceeds.
+
+## Revo production blockers
+
+- persistence identity/`RowVersion`.
+- snapshot-safe Save handshake.
+- real database Save + server validation.
+- concurrency/failure/reconnect behavior.
+- custom columns/layout and high-value employee parity.
+- self-hosted/pinned Revo assets.
+- 10k + target-browser qualification.
+- accepted `/work-orders` cutover.
+
+## Production hardening from 14-review synthesis
+
+Before real production, verify/close:
+
+- user-controlled Custom Column header text renders safely as text.
+- startup seeding never silently reverses intentional Admin disable.
+- privileged operations use fresh server authorization where required.
+- Save outcome/recovery is deterministic after disconnect/commit boundaries.
+- real-browser Revo gates fail on critical diagnostics.
+- structural E2E assertions validate exact row identities, not only counts.
+
+## Business implementation gaps now decided
+
+Older audits may list these as unresolved. They are now decisions, not Product Owner questions:
+
+- one-time Partial Invoice / Final Invoice meaning.
+- full operational + financial closure.
+- BranchManager-only Reopen.
+- downstream interaction definition.
+- identity/delete restrictions after downstream interaction.
+- BranchManager vs ProjectManager scope.
+- flexible Basket semantics.
+- AssignmentDate cross-year confirmation.
+
+---
+
 # CURRENT GRID-ENGINE OVERRIDE — 2026-08-20
 
 > هذا القسم ينسخ أولوية Grid القديمة عند التعارض، لكنه لا يمحو Evidence التاريخي أسفل الملف.

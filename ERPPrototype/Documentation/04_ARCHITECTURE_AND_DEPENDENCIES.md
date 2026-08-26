@@ -1,3 +1,78 @@
+# TARGET DOMAIN ARCHITECTURE OVERRIDE — 2026-08-26
+
+This section defines the current long-term architecture direction after the 14-review synthesis.
+
+## 1. One Work Order, Many Specialist Modules
+
+```text
+Master Work Orders
+        |
+        v
+   WorkOrder root/reference
+        |
+   +----+------+---------+----------+
+   |           |         |          |
+Municipality Execution Inspection Documents ...
+```
+
+Rules:
+
+- Master Work Orders creates original Work Order.
+- specialist modules reference same Work Order.
+- never create independent copies per department.
+- specialist lifecycle/data belongs in specialist modules, not dozens of Master columns.
+- Work Order remains shared reference, not god object implementing every subsystem.
+
+## 2. Grid Boundary
+
+> Revo owns grid mechanics; ERP owns business meaning.
+
+Revo/adapter may own:
+
+- virtualization.
+- ranges.
+- focus/navigation.
+- clipboard mechanics.
+- column mechanics.
+- filter/sort mechanics.
+
+ERP owns:
+
+- validation.
+- financial rules.
+- logical transaction/History semantics.
+- Dirty/Save state.
+- authorization.
+- persistence identity/RowVersion.
+- business audit.
+- specialist workflows.
+
+All unavoidable Revo internals use should be isolated behind narrowest practical adapter.
+
+## 3. Business Audit Boundary
+
+Client Undo/Redo is not Audit.
+
+Durable Business History is server-side and later records sensitive operations such as identity correction, manager-authorized delete, closure/reopen and specialist lifecycle events where required.
+
+## 4. Manager Boundary
+
+- BranchManager: operational authority inside one branch.
+- ProjectManager: global visibility over Branch Managers/branches, Work Orders read-only.
+- Admin: system/account role; operational authority is not implied automatically.
+
+See `15_BUSINESS_DOMAIN_AND_PERMISSIONS.md`.
+
+## 5. Future Module Boundary
+
+Municipality, Documents, Commercial, Materials, HSE and other future areas should not be implemented by expanding `WorkOrderService` indefinitely.
+
+Each should have a coherent application/domain boundary and link back to WorkOrder identity.
+
+The product remains a Modular Monolith; this does not require Microservices.
+
+---
+
 # 04 — Architecture and Dependencies
 
 ## CURRENT GRID-ENGINE TRANSITION — 2026-08-20

@@ -1,3 +1,57 @@
+# ACCEPTANCE OVERRIDE — 2026-08-26
+
+## Real-browser rule for important Grid behavior
+
+For important Work Orders Grid behavior, isolated JS/self-tests are support evidence, not final acceptance.
+
+The following require a real-browser journey before being called ready:
+
+- Paste.
+- Range Clear / Delete / Backspace.
+- Undo/Redo.
+- Insert/Delete Rows.
+- Validation.
+- Save.
+- Filter/Sort interactions.
+- selection/focus behavior when employee-visible.
+- concurrency/recovery journeys where browser state matters.
+
+## Required failure evidence
+
+A real-browser gate should capture, when relevant:
+
+- screenshot.
+- Playwright trace.
+- browser event timeline.
+- console/page errors.
+- failed requests / HTTP 5xx.
+- Revo state diagnostics.
+- server/database evidence for Save flows.
+
+## PASS rule
+
+A gate must not claim PASS while critical browser diagnostics contain an uncaught page error, critical console error, failed required request, or related HTTP 5xx.
+
+Where structural operations are tested, assert exact row identity/`ClientKey` changes where possible; count-only assertions are insufficient when the wrong rows could be affected.
+
+## Overall verification
+
+The command/process allowed to claim an overall active-candidate PASS must include the currently required Revo candidate journey; old production Tabulator suite alone does not stand in for Revo acceptance.
+
+## Gate 5B-6 accepted evidence — 2026-08-26
+
+At `6a6f3ce`, Unified Validation passed:
+
+- self-tests including 10k/incremental validation coverage;
+- hardened real-browser validation assertions;
+- full Gate 5B-6 regression for Range Clear, Undo/Redo, row structure, filter and sort;
+- user manual browser acceptance.
+
+Next acceptance focus is persistence identity/`RowVersion` and Save behavior.
+
+
+---
+
 # 06 — Regression Test Checklist
 
 > **Current reconciliation 2026-08-20:** `/work-orders` still uses Tabulator 6.5.0, while RevoGrid Community 4.25.2 is the selected replacement target. Preserve the current accepted runtime until RevoGrid passes isolated Blazor real-data, Save/Delta, visual, and full regression gates. Do not treat Lab PASS as production cutover.
@@ -10,13 +64,15 @@
 **Historical foundation checkpoint:** `M5D4R3-Stable-Range-UX` (E6C). **Current accepted checkpoint:** `0f6bd3b` per captured Git log.
 **Rule:** لا ننتقل للخطوة التالية إذا فشل اختبار أساسي.
 
-## Native V1.2 workflow checks
+## Current engineering acceptance
 
-- [ ] Native V1 deterministic checks pass: `ERPPrototype/Tools/AITeam/NativeV1/Test-NativeV1.ps1`.
-- [ ] Mission timing is factual (`startedAt`, `completedAt`, `durationSeconds`); unavailable AI telemetry remains `null`.
-- [ ] Required review evidence uses one Native subagent; excluded CLI/child/ephemeral/sandbox transports cannot satisfy the gate.
-- [ ] Employee-visible workflow changes have explicit `USER_ACCEPTED` before completion; tooling/docs missions do not invent an ERP manual test.
-- [ ] `PUSH_COMPLETED` is recorded only from factual Git evidence, and final completion is explicit `MISSION_COMPLETED`.
+- [ ] Start from a known Git checkpoint and record the exact HEAD.
+- [ ] Run the deterministic/self-tests relevant to the changed responsibility.
+- [ ] Important employee-visible Grid behavior passes its real-browser journey with failure evidence enabled.
+- [ ] After automated PASS, the user performs the short manual browser test for the changed behavior.
+- [ ] Commit/push occurs only after the candidate is stable and accepted.
+
+The former Native V1 workflow checks are historical and are not active acceptance gates.
 
 ## A. Before Testing
 
@@ -80,13 +136,13 @@
 
 ## F. Validation
 
-- [ ] WO Number أقل/أكثر من 9 أرقام يُرفض.
-- [ ] Work Type أقل/أكثر من 3 أرقام يُرفض.
+- [ ] WO Number أقل/أكثر من 9 أرقام يبقى ظاهرًا كخطأ ويمنع Save حتى التصحيح.
+- [ ] Work Type أقل/أكثر من 3 أرقام يبقى ظاهرًا كخطأ ويمنع Save حتى التصحيح.
 - [ ] Arabic digits تتحول بصورة صحيحة.
-- [ ] Invalid date يظهر خطأ.
-- [ ] Basket خارج القائمة يُرفض.
-- [ ] Custom Text أكبر من 250 حرفًا يُرفض.
-- [ ] Duplicate pair يظهر خطأ واضح.
+- [ ] Invalid date يبقى ظاهرًا ويظهر خطأ ويمنع Save.
+- [ ] Basket خارج القائمة يبقى ظاهرًا كخطأ ويمنع Save.
+- [ ] Custom Text أكبر من 250 حرفًا يبقى ظاهرًا كخطأ ويمنع Save.
+- [ ] Duplicate pair يعلّم كل الصفوف المتعارضة، وإصلاح/حذف أحدها يزيل الخطأ من الباقي.
 - [ ] Previous/Next validation ينتقلان للخلية الصحيحة.
 
 ## G. Save
