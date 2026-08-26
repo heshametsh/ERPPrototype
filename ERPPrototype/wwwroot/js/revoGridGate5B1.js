@@ -1,5 +1,5 @@
-import * as nativeGate5A from "./revoGridNativeGate5A.js?v=20260822-gate5b5-search-selection-1";
-import { createRevoGridChangeBridge } from "./revoGridChangeBridge.js?v=20260825-range-clear-2";
+import * as nativeGate5A from "./revoGridNativeGate5A.js?v=20260826-unified-validation-1";
+import { createRevoGridChangeBridge } from "./revoGridChangeBridge.js?v=20260826-unified-validation-1";
 import { createRevoGridHistoryCoordinator } from "./revoGridHistoryCoordinator.js?v=20260821-minimal-reveal-1";
 import { createRevoGridHistoryFocus } from "./revoGridHistoryFocus.js?v=20260821-gate5b4-keyboard-sort-1";
 import { createRevoGridExcelFilter } from "./revoGridExcelFilter.js?v=20260822-gate5b5-search-selection-1";
@@ -7,6 +7,7 @@ import { createRevoGridSort } from "./revoGridSort.js?v=20260821-gate5b5-row-str
 import { createRevoGridColumnSelection } from "./revoGridColumnSelection.js?v=20260821-gate5b4-keyboard-sort-1";
 import { createRevoGridSelectionLifecycle } from "./revoGridSelectionLifecycle.js?v=20260821-gate5b4-keyboard-sort-1";
 import { createRevoGridRowStructure } from "./revoGridRowStructure.js?v=20260822-gate5b5-multirow-1";
+import { createRevoGridValidation } from "./revoGridValidation.js?v=20260826-unified-validation-1";
 
 const bindings = new Map();
 
@@ -48,7 +49,8 @@ function findElement(id) {
 function combinedState(state) {
     return {
         ...state.changeBridge.getState(),
-        ...state.historyCoordinator.getState()
+        ...state.historyCoordinator.getState(),
+        ...(state.validationOwner?.getSummaryState?.() ?? {})
     };
 }
 
@@ -74,11 +76,20 @@ function renderState(state) {
     }
 
     if (state.financialErrorElement) {
-        const invalidRows = Number(current.financialInvalidRowCount ?? 0);
-        const invalidCells = Number(current.financialInvalidCellCount ?? 0);
+        const unified = Boolean(state.validationOwner);
+        const invalidRows = Number(unified
+            ? current.validationInvalidRowCount ?? 0
+            : current.financialInvalidRowCount ?? 0);
+        const invalidCells = Number(unified
+            ? current.validationInvalidCellCount ?? 0
+            : current.financialInvalidCellCount ?? 0);
         state.financialErrorElement.textContent = invalidCells > 0
-            ? `Financial errors ${invalidCells} in ${invalidRows} rows — Save blocked`
-            : "Financial inputs valid";
+            ? unified
+                ? `Validation errors ${invalidCells} in ${invalidRows} rows — Save blocked`
+                : `Financial errors ${invalidCells} in ${invalidRows} rows — Save blocked`
+            : unified
+                ? "Validation valid"
+                : "Financial inputs valid";
         state.financialErrorElement.dataset.invalid = invalidCells > 0
             ? "true"
             : "false";
@@ -164,17 +175,52 @@ async function destroyBinding(elementId) {
     } catch {
     }
 
+    try {
+        state.validationOwner?.destroy();
+    } catch {
+    }
+
     bindings.delete(elementId);
 }
 
 export async function initialize(elementId, rows, customColumns, options) {
     await destroyBinding(elementId);
     validateClientKeys(rows);
-    await nativeGate5A.initialize(elementId, rows, customColumns, options);
+
+    const enableUnifiedValidation = Boolean(
+        value(options, "enableUnifiedValidation", "EnableUnifiedValidation", false)
+    );
+    const validationOwner = enableUnifiedValidation
+        ? createRevoGridValidation({
+            rows,
+            customColumns,
+            basketValues: value(options, "basketValues", "BasketValues", [])
+        })
+        : null;
+    const nativeOptions = validationOwner
+        ? {
+            ...options,
+            validationCellProperties: props =>
+                validationOwner.getCellProperties(props)
+        }
+        : options;
+
+    try {
+        await nativeGate5A.initialize(
+            elementId,
+            rows,
+            customColumns,
+            nativeOptions
+        );
+    } catch (error) {
+        validationOwner?.destroy();
+        throw error;
+    }
 
     const host = document.getElementById(elementId);
     const grid = host?.querySelector("revo-grid");
     if (!grid) {
+        validationOwner?.destroy();
         await nativeGate5A.destroy(elementId);
         throw new Error(`RevoGrid '${elementId}' was not created.`);
     }
@@ -192,6 +238,7 @@ export async function initialize(elementId, rows, customColumns, options) {
         columnSelection: null,
         selectionLifecycle: null,
         rowStructure: null,
+        validationOwner,
         datasetSwitchActive: false,
         handledHistoryKeyEvents: new WeakSet(),
         removers: [],
@@ -236,6 +283,7 @@ export async function initialize(elementId, rows, customColumns, options) {
         allowRangeClear: Boolean(
             value(options, "enableRangeClear", "EnableRangeClear", false)
         ),
+        validationOwner: state.validationOwner,
         onStateChange: () => renderState(state)
     });
 
@@ -519,7 +567,8 @@ export async function getDiagnostics(elementId) {
         dirtyCells: state ? state.changeBridge.getDirtyCells() : [],
         filter: state?.excelFilter?.getState?.() ?? null,
         sort: state?.sortController?.getState?.() ?? null,
-        rowStructure: state?.rowStructure?.getState?.() ?? null
+        rowStructure: state?.rowStructure?.getState?.() ?? null,
+        validation: state?.validationOwner?.getState?.() ?? null
     };
 }
 

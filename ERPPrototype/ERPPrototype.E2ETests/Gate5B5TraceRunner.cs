@@ -7,26 +7,29 @@ namespace ERPPrototype.E2ETests;
 internal static class Gate5B5TraceRunner
 {
     private const int FixedPort = 5265;
-    private const string GatePath = "/work-orders-revogrid-gate5b5";
+    private const string DefaultGatePath = "/work-orders-revogrid-gate5b5";
     private const string GridHostId = "revogrid-native-gate5a-grid";
 
-    public static async Task<int> RunAsync()
+    public static async Task<int> RunAsync(
+        string gatePath = DefaultGatePath,
+        string gateLabel = "Gate 5B-5",
+        string artifactPrefix = "gate5b5")
     {
         var projectRoot = FindProjectRoot();
         var artifactDirectory = E2EArtifactManager.CreateRunDirectory(projectRoot);
         var timelinePath = Path.Combine(
             artifactDirectory,
-            "gate5b5-real-browser-journey.json");
+            $"{artifactPrefix}-real-browser-journey.json");
         var diagnosticsPath = Path.Combine(
             artifactDirectory,
-            "gate5b5-real-browser-diagnostics.txt");
+            $"{artifactPrefix}-real-browser-diagnostics.txt");
         var notesPath = Path.Combine(
             artifactDirectory,
-            "gate5b5-real-browser-notes.txt");
+            $"{artifactPrefix}-real-browser-notes.txt");
         var steps = new List<JsonElement>();
         Exception? failure = null;
 
-        Console.WriteLine("RevoGrid Gate 5B-5 real browser diagnostic journey");
+        Console.WriteLine($"RevoGrid {gateLabel} real browser diagnostic journey");
         Console.WriteLine("The journey uses real browser assertions and returns a failing exit code on regression.");
         Console.WriteLine("The browser will perform real UI actions and preserve a full trace.");
         Console.WriteLine($"Application port: {FixedPort}");
@@ -67,10 +70,10 @@ internal static class Gate5B5TraceRunner
             try
             {
                 var loginPage = new LoginPage(page, application.BaseUri);
-            await loginPage.OpenAsync(GatePath);
+            await loginPage.OpenAsync(gatePath);
             await loginPage.LoginAsync(database.Seed);
             await page.WaitForURLAsync(
-                $"**{GatePath}*",
+                $"**{gatePath}*",
                 new PageWaitForURLOptions { Timeout = 45_000 });
 
             await page.GetByTestId("revogrid-native-gate5a").WaitForAsync(
@@ -393,15 +396,15 @@ internal static class Gate5B5TraceRunner
             await browser.Diagnostics.WriteReportAsync(diagnosticsPath);
             await File.WriteAllTextAsync(
                 notesPath,
-                BuildNotes(steps));
+                BuildNotes(steps, gateLabel));
 
             await browser.CaptureSuccessAsync(
-                "gate5b5-real-browser-journey",
+                $"{artifactPrefix}-real-browser-journey",
                 preserveTrace: true);
 
             Console.WriteLine();
             Console.WriteLine("REAL BROWSER JOURNEY PASS");
-            Console.WriteLine("All asserted Gate 5B-5 browser behaviors completed successfully.");
+            Console.WriteLine($"All asserted {gateLabel} browser behaviors completed successfully.");
             Console.WriteLine($"Timeline: {timelinePath}");
             Console.WriteLine($"Browser diagnostics: {diagnosticsPath}");
                 Console.WriteLine($"Notes: {notesPath}");
@@ -409,7 +412,7 @@ internal static class Gate5B5TraceRunner
             catch
             {
                 await browser.CaptureFailureAsync(
-                    "gate5b5-real-browser-journey");
+                    $"{artifactPrefix}-real-browser-journey");
                 throw;
             }
         }
@@ -417,7 +420,7 @@ internal static class Gate5B5TraceRunner
         {
             failure = exception;
             Console.Error.WriteLine();
-            Console.Error.WriteLine("Gate 5B-5 real browser journey stopped unexpectedly.");
+            Console.Error.WriteLine($"{gateLabel} real browser journey stopped unexpectedly.");
             Console.Error.WriteLine(exception);
 
             try
@@ -433,7 +436,7 @@ internal static class Gate5B5TraceRunner
             }
         }
 
-        var bundlePath = CreateBundle(artifactDirectory);
+        var bundlePath = CreateBundle(artifactDirectory, artifactPrefix);
         Console.WriteLine();
         Console.WriteLine("READY TO UPLOAD:");
         Console.WriteLine(bundlePath);
@@ -563,7 +566,7 @@ internal static class Gate5B5TraceRunner
                 const hostId = 'revogrid-native-gate5a-grid';
                 const host = document.getElementById(hostId);
                 const grid = host?.querySelector('revo-grid');
-                if (!grid) throw new Error('Gate 5B-5 RevoGrid element was not found.');
+                if (!grid) throw new Error('RevoGrid element was not found.');
 
                 const source = await grid.getSource('rgRow');
                 const visible = await grid.getVisibleSource('rgRow');
@@ -932,7 +935,7 @@ internal static class Gate5B5TraceRunner
             """
             async ({ startRowIndex, endRowIndex }) => {
                 const grid = document.querySelector('#revogrid-native-gate5a-grid revo-grid');
-                if (!grid) throw new Error('Gate 5B-5 RevoGrid element was not found.');
+                if (!grid) throw new Error('RevoGrid element was not found.');
                 const source = await grid.getSource('rgRow');
                 const rows = [];
                 for (let rowIndex = startRowIndex; rowIndex <= endRowIndex; rowIndex++) {
@@ -1286,14 +1289,14 @@ internal static class Gate5B5TraceRunner
         }
     }
 
-    private static string BuildNotes(IReadOnlyList<JsonElement> steps)
+    private static string BuildNotes(IReadOnlyList<JsonElement> steps, string gateLabel)
     {
         var lines = new List<string>
         {
-            "Gate 5B-5 real browser diagnostic journey",
+            $"{gateLabel} real browser diagnostic journey",
             "",
             "PASS means every asserted browser behavior completed; any assertion or runtime failure returns exit code 1.",
-            "Each recorded step was performed against the real Gate 5B-5 page through browser UI.",
+            $"Each recorded step was performed against the real {gateLabel} page through browser UI.",
             "",
             "Important review target:",
             "- RC-01..RC-06 execute real multi-cell Delete/Backspace, one-step Undo/Redo, financial Remaining synchronization, and a mixed readonly selection before row-structure checks.",
@@ -1327,12 +1330,12 @@ internal static class Gate5B5TraceRunner
         return string.Join(Environment.NewLine, lines);
     }
 
-    private static string CreateBundle(string artifactDirectory)
+    private static string CreateBundle(string artifactDirectory, string artifactPrefix)
     {
         var desktop = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
         var bundlePath = Path.Combine(
             desktop,
-            $"ERP_REVO_GATE5B5_TRACE_{DateTime.Now:yyyyMMdd-HHmmss}.zip");
+            $"ERP_REVO_{artifactPrefix.ToUpperInvariant()}_TRACE_{DateTime.Now:yyyyMMdd-HHmmss}.zip");
 
         if (File.Exists(bundlePath))
         {

@@ -140,10 +140,28 @@ function buildExcelFilterGateColumns(customColumns, enableHeaderActions) {
     return core.concat(custom);
 }
 
-function buildColumns(customColumns, enableExcelFilter, enableHeaderActions) {
-    return enableExcelFilter
+function attachCellProperties(columns, provider) {
+    if (typeof provider !== "function") {
+        return columns;
+    }
+
+    return columns.map(column => ({
+        ...column,
+        cellProperties: props => provider(props)
+    }));
+}
+
+function buildColumns(
+    customColumns,
+    enableExcelFilter,
+    enableHeaderActions,
+    cellPropertiesProvider = null
+) {
+    const columns = enableExcelFilter
         ? buildExcelFilterGateColumns(customColumns, enableHeaderActions)
         : buildLegacyGateColumns(customColumns);
+
+    return attachCellProperties(columns, cellPropertiesProvider);
 }
 
 function addListener(state, target, type, handler, options) {
@@ -204,7 +222,8 @@ export async function initialize(elementId, rows, customColumns, options) {
     const columns = buildColumns(
         customColumns,
         enableExcelFilter,
-        enableHeaderActions
+        enableHeaderActions,
+        value(options, "validationCellProperties", "ValidationCellProperties", null)
     );
     const startedAt = performance.now();
 

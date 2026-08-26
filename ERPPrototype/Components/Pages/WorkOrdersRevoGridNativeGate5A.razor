@@ -16,13 +16,15 @@
 @inject IJSRuntime JSRuntime
 @inject ILogger<WorkOrdersRevoGridNativeGate5A> Logger
 
-<PageTitle>@(EnableRowStructure ? "RevoGrid Gate 5B-5" : EnableHeaderActions ? "RevoGrid Gate 5B-4" : EnableExcelFilter ? "RevoGrid Gate 5B-3" : EnablePaste ? "RevoGrid Gate 5B-2" : EnableChangeEngine ? "RevoGrid Gate 5B-1" : "RevoGrid Native Gate 5A")</PageTitle>
+<PageTitle>@(EnableUnifiedValidation ? "RevoGrid Gate 5B-6" : EnableRowStructure ? "RevoGrid Gate 5B-5" : EnableHeaderActions ? "RevoGrid Gate 5B-4" : EnableExcelFilter ? "RevoGrid Gate 5B-3" : EnablePaste ? "RevoGrid Gate 5B-2" : EnableChangeEngine ? "RevoGrid Gate 5B-1" : "RevoGrid Native Gate 5A")</PageTitle>
 
 <div class="native-gate5a" data-testid="revogrid-native-gate5a">
     <header class="native-gate5a__header">
         <div class="native-gate5a__identity">
             <strong>RevoGrid Community 4.25.2</strong>
-            <span>@(EnableRowStructure
+            <span>@(EnableUnifiedValidation
+                ? "Gate 5B-6 — Unified Validation over the stable Gate 5B-5 behavior"
+                : EnableRowStructure
                 ? "Gate 5B-5 — Insert/Delete Rows → Change Engine + Sheet History"
                 : EnableHeaderActions
                 ? "Gate 5B-4 — Excel-like Filter + dedicated Sort + visible-column selection → Sheet History"
@@ -123,7 +125,11 @@
         </main>
 
         <footer class="native-gate5a__note">
-            @if (EnableRowStructure)
+            @if (EnableUnifiedValidation)
+            {
+                <span>Gate 5B-6 يحافظ على سلوك Gate 5B-5 كما هو، ويضيف Validation موحدة بعد Manual Edit / Paste / Range Clear / Undo / Redo وتغييرات الصفوف. القيمة غير الصحيحة تظل ظاهرة ومعلّمة، وSave سيظل ممنوعًا لاحقًا حتى تختفي الأخطاء. لا يوجد Save لقاعدة البيانات بعد.</span>
+            }
+            else if (EnableRowStructure)
             {
                 <span>Gate 5B-5 يضيف Insert/Delete من قائمة الكليك اليمين وDelete/Backspace لمسح نطاق الخلايا القابلة للتعديل. Range Clear يدخل Dirty وSheet History كعملية Undo واحدة، وRemaining Amount يعاد حسابه من القيم المالية. لا يوجد Save لقاعدة البيانات بعد.</span>
             }

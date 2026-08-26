@@ -19,6 +19,7 @@ import {
     calculateRemainingAmount,
     validateFinancialInputs
 } from "./workOrderFinancialRules.js";
+import { createRevoGridValidation } from "./revoGridValidation.js";
 
 function assert(condition, message) {
     if (!condition) {
@@ -1078,7 +1079,263 @@ async function testCanceledClipboardPasteDoesNotLeaveEngineBusy() {
     coordinator.destroy();
 }
 
+
+function validValidationRow(clientKey, id = 1) {
+    return {
+        clientKey,
+        id,
+        displayOrder: id * 1000,
+        workOrderNumber: String(100000000 + id).slice(-9),
+        workTypeCode: "401",
+        assignmentDate: "26/08/2026",
+        workOrderValue: 100000,
+        partialAmount: 20000,
+        remainingAmount: 80000,
+        basket: "تحت التنفيذ"
+    };
+}
+
+const VALIDATION_BASKETS = ["تحت التنفيذ", "سلة الفحص"];
+
+function testUnifiedValidationAllowsCompletelyBlankNewRow() {
+    const row = {
+        clientKey: "temp:blank",
+        id: 0,
+        workOrderNumber: "",
+        workTypeCode: "",
+        assignmentDate: "",
+        workOrderValue: null,
+        partialAmount: null,
+        remainingAmount: null,
+        basket: ""
+    };
+    const validation = createRevoGridValidation({
+        rows: [row],
+        basketValues: VALIDATION_BASKETS
+    });
+    const state = validation.getState();
+    assert(state.validationInvalidCellCount === 0, "A completely blank new row must stay preparation-safe.");
+    assert(state.canSave, "A completely blank new row should not block Save because it is not materialized data.");
+    validation.destroy();
+}
+
+function testUnifiedValidationActivatesRequiredFieldsWhenNewRowStarts() {
+    const row = {
+        clientKey: "temp:started",
+        id: 0,
+        workOrderNumber: "123456789",
+        workTypeCode: "",
+        assignmentDate: "",
+        workOrderValue: null,
+        partialAmount: null,
+        remainingAmount: null,
+        basket: ""
+    };
+    const validation = createRevoGridValidation({
+        rows: [row],
+        basketValues: VALIDATION_BASKETS
+    });
+    const state = validation.getState();
+    assert(state.validationInvalidCellCount === 3, "Starting a new row must activate Work Type, Work Order Value, and Basket requirements.");
+    assert(!state.canSave, "An incomplete started row must block Save.");
+    validation.destroy();
+}
+
+function testUnifiedValidationRequiresPersistedRowFields() {
+    const row = {
+        clientKey: "row:persisted-blank",
+        id: 55,
+        workOrderNumber: "",
+        workTypeCode: "",
+        assignmentDate: "",
+        workOrderValue: null,
+        partialAmount: null,
+        remainingAmount: null,
+        basket: ""
+    };
+    const validation = createRevoGridValidation({
+        rows: [row],
+        basketValues: VALIDATION_BASKETS
+    });
+    const state = validation.getState();
+    assert(state.validationInvalidCellCount === 4, "Persisted blank row must require identity, value, and Basket.");
+    assert(!state.canSave, "Persisted blank row must block Save.");
+    validation.destroy();
+}
+
+function testUnifiedValidationKeepsInvalidInputVisible() {
+    const row = validValidationRow("row:invalid-visible", 1);
+    const validation = createRevoGridValidation({
+        rows: [row],
+        basketValues: VALIDATION_BASKETS
+    });
+    row.workOrderNumber = "123";
+    const result = validation.refreshForOperations([{
+        clientKey: row.clientKey,
+        field: "workOrderNumber",
+        before: "100000001",
+        after: "123"
+    }]);
+    assert(row.workOrderNumber === "123", "Validation must never rewrite invalid employee input.");
+    assert(result.validatedRows === 1, "Single-row edit should validate only the affected row.");
+    assert(validation.getCellError(row.clientKey, "workOrderNumber")?.code === "identity-format", "Invalid identity was not marked.");
+    assert(!validation.getState().canSave, "Invalid visible value must block Save.");
+    validation.destroy();
+}
+
+function testUnifiedValidationDuplicatePeersUpdateIncrementally() {
+    const first = validValidationRow("row:dup-1", 1);
+    const second = validValidationRow("row:dup-2", 2);
+    const validation = createRevoGridValidation({
+        rows: [first, second],
+        basketValues: VALIDATION_BASKETS
+    });
+
+    second.workOrderNumber = first.workOrderNumber;
+    second.workTypeCode = first.workTypeCode;
+    const duplicate = validation.refreshForOperations([
+        { clientKey: second.clientKey, field: "workOrderNumber" },
+        { clientKey: second.clientKey, field: "workTypeCode" }
+    ]);
+    assert(duplicate.validatedRows === 2, "Creating a duplicate should revalidate the touched row and its peer only.");
+    assert(validation.getCellError(first.clientKey, "workOrderNumber")?.code === "duplicate", "Original duplicate peer was not marked.");
+    assert(validation.getCellError(second.clientKey, "workTypeCode")?.code === "duplicate", "Edited duplicate row was not marked.");
+
+    second.workOrderNumber = "999999999";
+    const cleared = validation.refreshForOperations([
+        { clientKey: second.clientKey, field: "workOrderNumber" }
+    ]);
+    assert(cleared.validatedRows === 2, "Breaking a duplicate should revalidate both former peers only.");
+    assert(!validation.getCellError(first.clientKey, "workOrderNumber"), "Former duplicate peer error did not clear.");
+    assert(!validation.getCellError(second.clientKey, "workOrderNumber"), "Edited row remained invalid after duplicate was fixed.");
+    validation.destroy();
+}
+
+function testUnifiedValidationRowRemovalClearsDuplicatePeer() {
+    const first = validValidationRow("row:dup-remove-1", 11);
+    const second = validValidationRow("row:dup-remove-2", 12);
+    second.workOrderNumber = first.workOrderNumber;
+    second.workTypeCode = first.workTypeCode;
+
+    const validation = createRevoGridValidation({
+        rows: [first, second],
+        basketValues: VALIDATION_BASKETS
+    });
+
+    assert(validation.getCellError(first.clientKey, "workOrderNumber")?.code === "duplicate", "Initial duplicate peer was not marked.");
+    assert(validation.getCellError(second.clientKey, "workOrderNumber")?.code === "duplicate", "Initial duplicate row was not marked.");
+
+    const result = validation.replaceRows([first]);
+    assert(result.validatedRows === 1, "Removing a duplicate row should revalidate only the surviving peer.");
+    assert(!validation.getCellError(first.clientKey, "workOrderNumber"), "Surviving peer kept a duplicate error after the other row was removed.");
+    assert(validation.getState().canSave, "Removing the duplicate peer should restore a valid Save state.");
+    validation.destroy();
+}
+
+function testUnifiedValidationCustomTypes() {
+    const row = validValidationRow("row:custom", 3);
+    row.customText = "x".repeat(251);
+    row.customMoney = "abc";
+    row.customDate = "31/02/2026";
+    row.customNumber = "12.5";
+    const validation = createRevoGridValidation({
+        rows: [row],
+        basketValues: VALIDATION_BASKETS,
+        customColumns: [
+            { fieldKey: "customText", name: "Text", dataType: "Text" },
+            { fieldKey: "customMoney", name: "Money", dataType: "Money" },
+            { fieldKey: "customDate", name: "Date", dataType: "Date" },
+            { fieldKey: "customNumber", name: "Number", dataType: "Number" }
+        ]
+    });
+    const state = validation.getState();
+    assert(state.validationInvalidCellCount === 4, "All invalid custom-column types should be reported independently.");
+    validation.destroy();
+}
+
+function testUnifiedValidationTenThousandRowsStaysIncremental() {
+    const rows = Array.from({ length: 10000 }, (_, index) => {
+        const row = validValidationRow(`row:perf-${index}`, index + 1);
+        row.workOrderNumber = String(200000000 + index).slice(-9);
+        return row;
+    });
+    const validation = createRevoGridValidation({
+        rows,
+        basketValues: VALIDATION_BASKETS
+    });
+    const before = validation.getState();
+    assert(before.rowsValidated === 10000, "Initial validation must scan the dataset exactly once.");
+
+    rows[5000].basket = "سلة الفحص";
+    const result = validation.refreshForOperations([{
+        clientKey: rows[5000].clientKey,
+        field: "basket"
+    }]);
+    const after = validation.getState();
+    assert(result.validatedRows === 1, "One ordinary edit must not rescan 10,000 rows.");
+    assert(after.rowsValidated === 10001, "Incremental validation unexpectedly rescanned the dataset.");
+    assert(after.fullValidationPasses === 1, "Ordinary edit triggered a second full validation pass.");
+    validation.destroy();
+}
+
+async function testBridgeUndoRedoRefreshesUnifiedValidation() {
+    const row = validValidationRow("row:bridge-validation", 4);
+    const rows = [row];
+    const grid = new BridgeMockGrid(rows);
+    const coordinator = createRevoGridHistoryCoordinator({ grid, datasetKey: "2026" });
+    const validation = createRevoGridValidation({
+        rows,
+        basketValues: VALIDATION_BASKETS
+    });
+    const bridge = createRevoGridChangeBridge({
+        grid,
+        rows,
+        datasetKey: "2026",
+        historyCoordinator: coordinator,
+        allowPaste: true,
+        allowRangeClear: true,
+        validationOwner: validation
+    });
+
+    const original = row.workOrderNumber;
+    const before = dispatchGridEvent(
+        grid,
+        "beforeedit",
+        makeCellDetail(row, "workOrderNumber", "123")
+    );
+    assert(!before.defaultPrevented, "Unified Validation unexpectedly blocked the edit.");
+    row.workOrderNumber = "123";
+    dispatchGridEvent(
+        grid,
+        "afteredit",
+        makeCellDetail(row, "workOrderNumber", "123")
+    );
+    assert(row.workOrderNumber === "123", "Invalid edit did not remain visible.");
+    assert(validation.getCellError(row.clientKey, "workOrderNumber"), "Invalid edit did not create a validation error.");
+
+    await coordinator.undo();
+    assert(row.workOrderNumber === original, "Undo did not restore the original identity.");
+    assert(!validation.getCellError(row.clientKey, "workOrderNumber"), "Undo did not clear the validation error.");
+
+    await coordinator.redo();
+    assert(row.workOrderNumber === "123", "Redo did not restore the invalid visible value.");
+    assert(validation.getCellError(row.clientKey, "workOrderNumber"), "Redo did not restore the validation error.");
+
+    bridge.destroy();
+    validation.destroy();
+    coordinator.destroy();
+}
+
 const TESTS = [
+    ["Unified Validation allows completely blank new row", testUnifiedValidationAllowsCompletelyBlankNewRow],
+    ["Unified Validation activates requirements when a new row starts", testUnifiedValidationActivatesRequiredFieldsWhenNewRowStarts],
+    ["Unified Validation requires persisted blank row fields", testUnifiedValidationRequiresPersistedRowFields],
+    ["Unified Validation keeps invalid input visible", testUnifiedValidationKeepsInvalidInputVisible],
+    ["Unified Validation updates duplicate peers incrementally", testUnifiedValidationDuplicatePeersUpdateIncrementally],
+    ["Unified Validation clears duplicate peer after row removal", testUnifiedValidationRowRemovalClearsDuplicatePeer],
+    ["Unified Validation validates custom column types", testUnifiedValidationCustomTypes],
+    ["Unified Validation stays incremental across 10,000 rows", testUnifiedValidationTenThousandRowsStaysIncremental],
+    ["Undo/Redo refreshes Unified Validation", testBridgeUndoRedoRefreshesUnifiedValidation],
     ["Financial rules keep invalid Remaining blank", testFinancialRulesRejectInvalidRemaining],
     ["Partial zero normalization has one Undo/Redo transaction", testPartialZeroIsOneUndoableNormalizedEdit],
     ["Change Engine owns Dirty, not History", testChangeEngineOwnsDirtyNotHistory],
@@ -1145,7 +1402,7 @@ export async function runRevoGridChangeEngineSelfTests() {
 
     return {
         engine: "RevoGrid Sheet History + Change Engine Foundation",
-        version: "Gate 5B-5 Range Clear Payload Classification",
+        version: "Gate 5B-6 Unified Validation",
         passed: results.filter(result => result.status === "PASS").length,
         failed: results.filter(result => result.status === "FAIL").length,
         total: results.length,

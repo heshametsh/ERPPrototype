@@ -38,6 +38,9 @@ public partial class WorkOrdersRevoGridNativeGate5A
     [Parameter]
     public bool EnableRowStructure { get; set; }
 
+    [Parameter]
+    public bool EnableUnifiedValidation { get; set; }
+
     // Saudi Arabia is UTC+3 all year. The page always opens on the
     // current Saudi business year and does not persist the last selected year.
     private static int CurrentBusinessYear =>
@@ -217,7 +220,7 @@ public partial class WorkOrdersRevoGridNativeGate5A
         try
         {
             var gridModulePath = EnableChangeEngine
-                ? "./js/revoGridGate5B1.js?v=20260825-range-clear-2"
+                ? "./js/revoGridGate5B1.js?v=20260826-unified-validation-1"
                 : "./js/revoGridNativeGate5A.js?v=20260821-gate5b5-filter-refresh-1";
 
             GridModule ??=
@@ -240,6 +243,8 @@ public partial class WorkOrdersRevoGridNativeGate5A
                     EnableExcelFilter,
                     EnableHeaderActions,
                     EnableRowStructure,
+                    EnableUnifiedValidation,
+                    BasketValues = WorkOrderBuskets.All,
                     RowCountElementId,
                     ChangeStatusElementId,
                     UndoCountElementId,

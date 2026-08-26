@@ -1,3 +1,4 @@
+using System.IO.Compression;
 using System.Text.Json;
 using Microsoft.Playwright;
 
@@ -6,20 +7,26 @@ namespace ERPPrototype.E2ETests;
 internal static class FinancialDiagnosticRunner
 {
     private const int FixedPort = 5265;
-    private const string GatePath = "/work-orders-revogrid-gate5b5";
+    private const string DefaultGatePath = "/work-orders-revogrid-gate5b5";
     private const string HostId = "revogrid-native-gate5a-grid";
 
-    public static async Task<int> RunAsync()
+    public static async Task<int> RunAsync(
+        string gatePath = DefaultGatePath,
+        bool unifiedValidation = false)
     {
         var projectRoot = FindProjectRoot();
         var artifactDirectory = E2EArtifactManager.CreateRunDirectory(projectRoot);
         var observationsPath = Path.Combine(
             artifactDirectory,
-            "remaining-amount-financial-diagnostic.json");
+            unifiedValidation
+                ? "gate5b6-unified-validation-diagnostic.json"
+                : "remaining-amount-financial-diagnostic.json");
         var failure = false;
         var observations = new List<JsonElement>();
 
-        Console.WriteLine("RevoGrid Remaining Amount real-browser financial diagnostic");
+        Console.WriteLine(unifiedValidation
+            ? "RevoGrid Gate 5B-6 unified validation real-browser diagnostic"
+            : "RevoGrid Remaining Amount real-browser financial diagnostic");
         Console.WriteLine($"Application port: {FixedPort}");
         Console.WriteLine($"Artifacts: {artifactDirectory}");
 
@@ -27,7 +34,9 @@ internal static class FinancialDiagnosticRunner
         {
             await using var database = await E2ETestDatabase.CreateAsync(
                 keepDatabase: false,
-                rowsPerYear: E2ETestDatabase.DefaultRowsPerYear);
+                rowsPerYear: unifiedValidation
+                    ? 10_000
+                    : E2ETestDatabase.DefaultRowsPerYear);
             await using var application = await WebApplicationProcess.StartAsync(
                 projectRoot,
                 database.ConnectionString,
@@ -47,6 +56,9 @@ internal static class FinancialDiagnosticRunner
                 screenHeight: 1080);
 
             var page = browser.Page;
+
+            try
+            {
             await page.Context.GrantPermissionsAsync(
                 ["clipboard-read", "clipboard-write"],
                 new BrowserContextGrantPermissionsOptions
@@ -55,10 +67,10 @@ internal static class FinancialDiagnosticRunner
                 });
 
             var loginPage = new LoginPage(page, application.BaseUri);
-            await loginPage.OpenAsync(GatePath);
+            await loginPage.OpenAsync(gatePath);
             await loginPage.LoginAsync(database.Seed);
             await page.WaitForURLAsync(
-                $"**{GatePath}*",
+                $"**{gatePath}*",
                 new PageWaitForURLOptions { Timeout = 45_000 });
             await page.Locator($"#{HostId} revo-grid").WaitForAsync(
                 new LocatorWaitForOptions
@@ -273,10 +285,51 @@ internal static class FinancialDiagnosticRunner
                 expectedRemaining: null,
                 expectInvalid: true);
 
+            if (unifiedValidation)
+            {
+                // Put the sheet back into a fully valid state before testing
+                // whether identity validation alone blocks Save. Otherwise a
+                // pre-existing financial error can make canSave=false and hide
+                // a broken identity Save gate.
+                await page.Locator("#revogrid-gate5b1-undo").ClickAsync();
+                await page.WaitForTimeoutAsync(500);
+                await AssertFinancialStateAsync(
+                    page,
+                    targetClientKey,
+                    expectedPartial: "",
+                    expectedRemaining: "100000",
+                    expectInvalid: false);
+                await AssertFinancialStateAsync(
+                    page,
+                    secondClientKey,
+                    expectedPartial: "",
+                    expectedRemaining: "100000",
+                    expectInvalid: false);
+                await AssertFinancialStateAsync(
+                    page,
+                    thirdClientKey,
+                    expectedPartial: "",
+                    expectedRemaining: "100000",
+                    expectInvalid: false);
+                await AssertUnifiedValidationCleanBaselineAsync(page);
+            }
+
             observations.Add(await CaptureReadonlyAttemptAsync(
                 page,
                 targetClientKey,
                 remainingAmountColumn));
+
+            if (unifiedValidation)
+            {
+                await AssertUnifiedIdentityValidationAsync(
+                    page,
+                    targetClientKey,
+                    secondClientKey);
+                await AssertUnifiedDuplicateValidationAsync(
+                    page,
+                    targetClientKey,
+                    secondClientKey);
+            }
 
             var report = new
             {
@@ -308,8 +361,19 @@ internal static class FinancialDiagnosticRunner
             }
 
             await browser.CaptureSuccessAsync(
-                "remaining-amount-financial-diagnostic",
+                unifiedValidation
+                    ? "gate5b6-unified-validation-diagnostic"
+                    : "remaining-amount-financial-diagnostic",
                 preserveTrace: true);
+            }
+            catch
+            {
+                await browser.CaptureFailureAsync(
+                    unifiedValidation
+                        ? "gate5b6-unified-validation-diagnostic"
+                        : "remaining-amount-financial-diagnostic");
+                throw;
+            }
         }
         catch (Exception exception)
         {
@@ -325,6 +389,23 @@ internal static class FinancialDiagnosticRunner
                         failure = exception.ToString()
                     },
                     new JsonSerializerOptions { WriteIndented = true }));
+        }
+
+        if (unifiedValidation)
+        {
+            var desktop = Environment.GetFolderPath(
+                Environment.SpecialFolder.DesktopDirectory);
+            var bundlePath = Path.Combine(
+                desktop,
+                $"ERP_REVO_GATE5B6_VALIDATION_{DateTime.Now:yyyyMMdd-HHmmss}.zip");
+            if (File.Exists(bundlePath))
+            {
+                File.Delete(bundlePath);
+            }
+            ZipFile.CreateFromDirectory(artifactDirectory, bundlePath);
+            Console.WriteLine();
+            Console.WriteLine("READY TO UPLOAD:");
+            Console.WriteLine(bundlePath);
         }
 
         return failure ? 1 : 0;
@@ -396,7 +477,7 @@ internal static class FinancialDiagnosticRunner
                 const grid = host?.querySelector('revo-grid');
                 const source = await grid.getSource('rgRow');
                 const visible = await grid.getVisibleSource('rgRow');
-                const module = await import('/js/revoGridGate5B1.js?v=20260822-gate5b5-multirow-1');
+                const module = await import('/js/revoGridGate5B1.js?v=20260826-unified-validation-1');
                 const expected = args.expectedRemaining || {};
                 const columns = Array.isArray(grid.columns) ? grid.columns : [];
                 const remainingLogicalIndex = columns.findIndex(column =>
@@ -488,7 +569,7 @@ internal static class FinancialDiagnosticRunner
                 const visible = await grid.getVisibleSource('rgRow');
                 const row = source.find(item => String(item?.clientKey) === args.clientKey);
                 const columns = Array.isArray(grid.columns) ? grid.columns : [];
-                const module = await import('/js/revoGridGate5B1.js?v=20260822-gate5b5-multirow-1');
+                const module = await import('/js/revoGridGate5B1.js?v=20260826-unified-validation-1');
                 const diagnostics = await module.getDiagnostics('revogrid-native-gate5a-grid');
                 const actualPartial = row?.partialAmount === null || row?.partialAmount === undefined
                     ? ''
@@ -512,17 +593,20 @@ internal static class FinancialDiagnosticRunner
                     });
                 const partialMatches = actualPartial === (args.expectedPartial ?? '');
                 const remainingMatches = actualRemaining === (args.expectedRemaining ?? null);
-                const invalidRows = diagnostics.changeEngine?.financialInvalidRows ?? [];
+                const invalidRows = diagnostics.validation?.financialInvalidRows ??
+                    diagnostics.changeEngine?.financialInvalidRows ?? [];
                 const rowIsInvalid = invalidRows.some(item =>
                     String(item?.clientKey) === args.clientKey);
                 const invalidMatches = rowIsInvalid === args.expectInvalid;
                 const visualMatches = financialCells.some(cell =>
-                    cell?.getAttribute('data-erp-financial-invalid') === 'true') === args.expectInvalid;
+                    (cell?.getAttribute('data-erp-financial-invalid') === 'true' ||
+                        cell?.getAttribute('data-erp-validation-invalid') === 'true')) === args.expectInvalid;
                 return {
                     ok: Boolean(row) && partialMatches && remainingMatches && invalidMatches && visualMatches,
                     actualPartial,
                     actualRemaining,
-                    invalidRows: diagnostics.changeEngine?.financialInvalidRowCount ?? null,
+                    invalidRows: diagnostics.validation?.financialInvalidRowCount ??
+                        diagnostics.changeEngine?.financialInvalidRowCount ?? null,
                     rowIsInvalid,
                     visualMatches,
                     expectedPartial: args.expectedPartial ?? '',
@@ -580,6 +664,380 @@ internal static class FinancialDiagnosticRunner
 
         using var document = JsonDocument.Parse(json);
         return document.RootElement.Clone();
+    }
+
+    private static async Task AssertUnifiedValidationCleanBaselineAsync(IPage page)
+    {
+        var state = await page.EvaluateAsync<JsonElement>(
+            """
+            async () => {
+                const module = await import('/js/revoGridGate5B1.js?v=20260826-unified-validation-1');
+                const diagnostics = await module.getDiagnostics('revogrid-native-gate5a-grid');
+                return {
+                    canSave: diagnostics.validation?.canSave ?? null,
+                    invalidRows: Number(diagnostics.validation?.validationInvalidRowCount ?? -1),
+                    invalidCells: Number(diagnostics.validation?.validationInvalidCellCount ?? -1)
+                };
+            }
+            """);
+
+        if (
+            !state.GetProperty("canSave").GetBoolean() ||
+            state.GetProperty("invalidRows").GetInt32() != 0 ||
+            state.GetProperty("invalidCells").GetInt32() != 0)
+        {
+            throw new InvalidOperationException(
+                $"Unified Validation baseline is not clean before identity checks: {state}");
+        }
+    }
+
+    private static async Task AssertUnifiedDuplicateValidationAsync(
+        IPage page,
+        string firstClientKey,
+        string secondClientKey)
+    {
+        var numberColumn = await GetVisualColumnIndexAsync(page, "workOrderNumber");
+        var typeColumn = await GetVisualColumnIndexAsync(page, "workTypeCode");
+        var identity = await page.EvaluateAsync<JsonElement>(
+            """
+            async args => {
+                const grid = document.querySelector('#revogrid-native-gate5a-grid revo-grid');
+                const source = await grid.getSource('rgRow');
+                const first = source.find(item => String(item?.clientKey) === args.first);
+                const second = source.find(item => String(item?.clientKey) === args.second);
+                const used = new Set(source.map(item => String(item?.workOrderNumber ?? '')));
+                let unique = 999999999;
+                while (used.has(String(unique))) unique -= 1;
+                return {
+                    firstNumber: String(first?.workOrderNumber ?? ''),
+                    firstType: String(first?.workTypeCode ?? ''),
+                    secondNumber: String(second?.workOrderNumber ?? ''),
+                    secondType: String(second?.workTypeCode ?? ''),
+                    uniqueNumber: String(unique)
+                };
+            }
+            """,
+            new { first = firstClientKey, second = secondClientKey });
+
+        var firstNumber = identity.GetProperty("firstNumber").GetString() ?? "";
+        var firstType = identity.GetProperty("firstType").GetString() ?? "";
+        var secondNumber = identity.GetProperty("secondNumber").GetString() ?? "";
+        var secondType = identity.GetProperty("secondType").GetString() ?? "";
+        var uniqueNumber = identity.GetProperty("uniqueNumber").GetString() ?? "";
+
+        await EditCellAsync(page, 1, numberColumn, firstNumber);
+        await EditCellAsync(page, 1, typeColumn, firstType);
+        await AssertDuplicateStateAsync(
+            page,
+            firstClientKey,
+            secondClientKey,
+            expectDuplicate: true,
+            expectCanSave: false);
+
+        await EditCellAsync(page, 1, numberColumn, uniqueNumber);
+        await AssertDuplicateStateAsync(
+            page,
+            firstClientKey,
+            secondClientKey,
+            expectDuplicate: false,
+            expectCanSave: true);
+
+        await page.Locator("#revogrid-gate5b1-undo").ClickAsync();
+        await page.WaitForTimeoutAsync(500);
+        await AssertDuplicateStateAsync(
+            page,
+            firstClientKey,
+            secondClientKey,
+            expectDuplicate: true,
+            expectCanSave: false);
+
+        await page.Locator("#revogrid-gate5b1-redo").ClickAsync();
+        await page.WaitForTimeoutAsync(500);
+        await AssertDuplicateStateAsync(
+            page,
+            firstClientKey,
+            secondClientKey,
+            expectDuplicate: false,
+            expectCanSave: true);
+
+        await EditCellAsync(page, 1, numberColumn, secondNumber);
+        await EditCellAsync(page, 1, typeColumn, secondType);
+        await AssertUnifiedValidationCleanBaselineAsync(page);
+    }
+
+    private static async Task AssertDuplicateStateAsync(
+        IPage page,
+        string firstClientKey,
+        string secondClientKey,
+        bool expectDuplicate,
+        bool expectCanSave)
+    {
+        var state = await page.EvaluateAsync<JsonElement>(
+            """
+            async args => {
+                const module = await import('/js/revoGridGate5B1.js?v=20260826-unified-validation-1');
+                const diagnostics = await module.getDiagnostics('revogrid-native-gate5a-grid');
+                const invalidRows = diagnostics.validation?.validationInvalidRows ?? [];
+                const summarize = clientKey => {
+                    const errors = invalidRows.find(item =>
+                        String(item?.clientKey) === clientKey)?.errors ?? [];
+                    return {
+                        workOrderNumber: errors.some(error =>
+                            error.field === 'workOrderNumber' && error.code === 'duplicate'),
+                        workTypeCode: errors.some(error =>
+                            error.field === 'workTypeCode' && error.code === 'duplicate')
+                    };
+                };
+                return {
+                    first: summarize(args.first),
+                    second: summarize(args.second),
+                    canSave: diagnostics.validation?.canSave ?? null
+                };
+            }
+            """,
+            new { first = firstClientKey, second = secondClientKey });
+
+        var first = state.GetProperty("first");
+        var second = state.GetProperty("second");
+        var duplicateMatches =
+            first.GetProperty("workOrderNumber").GetBoolean() == expectDuplicate &&
+            first.GetProperty("workTypeCode").GetBoolean() == expectDuplicate &&
+            second.GetProperty("workOrderNumber").GetBoolean() == expectDuplicate &&
+            second.GetProperty("workTypeCode").GetBoolean() == expectDuplicate;
+
+        if (
+            !duplicateMatches ||
+            state.GetProperty("canSave").GetBoolean() != expectCanSave)
+        {
+            throw new InvalidOperationException(
+                $"Unified duplicate validation mismatch: {state}");
+        }
+    }
+
+    private static async Task AssertUnifiedIdentityValidationAsync(
+        IPage page,
+        string clientKey,
+        string secondClientKey)
+    {
+        var column = await GetVisualColumnIndexAsync(page, "workOrderNumber");
+        var original = await page.EvaluateAsync<string>(
+            """
+            async clientKey => {
+                const grid = document.querySelector('#revogrid-native-gate5a-grid revo-grid');
+                const row = (await grid.getSource('rgRow'))
+                    .find(item => String(item?.clientKey) === clientKey);
+                return String(row?.workOrderNumber ?? '');
+            }
+            """,
+            clientKey);
+        var rowsValidatedBefore = await page.EvaluateAsync<int>(
+            """
+            async () => {
+                const module = await import('/js/revoGridGate5B1.js?v=20260826-unified-validation-1');
+                const diagnostics = await module.getDiagnostics('revogrid-native-gate5a-grid');
+                return Number(diagnostics.validation?.rowsValidated ?? -1);
+            }
+            """);
+
+        await EditCellAsync(page, 0, column, "123");
+        var invalid = await page.EvaluateAsync<JsonElement>(
+            """
+            async args => {
+                const host = document.getElementById('revogrid-native-gate5a-grid');
+                const grid = host?.querySelector('revo-grid');
+                const source = await grid.getSource('rgRow');
+                const visible = await grid.getVisibleSource('rgRow');
+                const row = source.find(item => String(item?.clientKey) === args.clientKey);
+                const visibleIndex = visible.findIndex(item =>
+                    String(item?.clientKey) === args.clientKey);
+                const columns = Array.isArray(grid.columns) ? grid.columns : [];
+                const logicalIndex = columns.findIndex(column =>
+                    String(column?.prop ?? '') === 'workOrderNumber');
+                const visualColumn = grid.rtl
+                    ? columns.length - 1 - logicalIndex
+                    : logicalIndex;
+                const cell = host.querySelector(
+                    `[data-rgRow="${visibleIndex}"][data-rgCol="${visualColumn}"]`);
+                const module = await import('/js/revoGridGate5B1.js?v=20260826-unified-validation-1');
+                const diagnostics = await module.getDiagnostics('revogrid-native-gate5a-grid');
+                const invalidRows = diagnostics.validation?.validationInvalidRows ?? [];
+                const rowErrors = invalidRows.find(item =>
+                    String(item?.clientKey) === args.clientKey)?.errors ?? [];
+                return {
+                    value: String(row?.workOrderNumber ?? ''),
+                    hasIdentityError: rowErrors.some(error =>
+                        error.field === 'workOrderNumber'),
+                    canSave: diagnostics.validation?.canSave ?? null,
+                    rowsValidated: Number(diagnostics.validation?.rowsValidated ?? -1),
+                    visualInvalid: cell?.getAttribute('data-erp-validation-invalid') === 'true'
+                };
+            }
+            """,
+            new { clientKey });
+
+        if (
+            invalid.GetProperty("value").GetString() != "123" ||
+            !invalid.GetProperty("hasIdentityError").GetBoolean() ||
+            invalid.GetProperty("canSave").GetBoolean() ||
+            !invalid.GetProperty("visualInvalid").GetBoolean() ||
+            invalid.GetProperty("rowsValidated").GetInt32() - rowsValidatedBefore > 3)
+        {
+            throw new InvalidOperationException(
+                $"Unified Validation did not preserve/mark invalid identity: {invalid}");
+        }
+
+        await page.Locator("#revogrid-gate5b1-undo").ClickAsync();
+        await page.WaitForTimeoutAsync(500);
+        var afterUndo = await page.EvaluateAsync<JsonElement>(
+            """
+            async args => {
+                const grid = document.querySelector('#revogrid-native-gate5a-grid revo-grid');
+                const row = (await grid.getSource('rgRow'))
+                    .find(item => String(item?.clientKey) === args.clientKey);
+                const module = await import('/js/revoGridGate5B1.js?v=20260826-unified-validation-1');
+                const diagnostics = await module.getDiagnostics('revogrid-native-gate5a-grid');
+                const invalidRows = diagnostics.validation?.validationInvalidRows ?? [];
+                const rowErrors = invalidRows.find(item =>
+                    String(item?.clientKey) === args.clientKey)?.errors ?? [];
+                return {
+                    value: String(row?.workOrderNumber ?? ''),
+                    hasIdentityError: rowErrors.some(error =>
+                        error.field === 'workOrderNumber')
+                };
+            }
+            """,
+            new { clientKey });
+
+        if (
+            afterUndo.GetProperty("value").GetString() != original ||
+            afterUndo.GetProperty("hasIdentityError").GetBoolean())
+        {
+            throw new InvalidOperationException(
+                $"Undo did not restore Unified Validation state: {afterUndo}");
+        }
+
+        await page.Locator("#revogrid-gate5b1-redo").ClickAsync();
+        await page.WaitForTimeoutAsync(500);
+        var afterRedo = await page.EvaluateAsync<JsonElement>(
+            """
+            async args => {
+                const grid = document.querySelector('#revogrid-native-gate5a-grid revo-grid');
+                const row = (await grid.getSource('rgRow'))
+                    .find(item => String(item?.clientKey) === args.clientKey);
+                const module = await import('/js/revoGridGate5B1.js?v=20260826-unified-validation-1');
+                const diagnostics = await module.getDiagnostics('revogrid-native-gate5a-grid');
+                const invalidRows = diagnostics.validation?.validationInvalidRows ?? [];
+                const rowErrors = invalidRows.find(item =>
+                    String(item?.clientKey) === args.clientKey)?.errors ?? [];
+                return {
+                    value: String(row?.workOrderNumber ?? ''),
+                    hasIdentityError: rowErrors.some(error =>
+                        error.field === 'workOrderNumber')
+                };
+            }
+            """,
+            new { clientKey });
+
+        if (
+            afterRedo.GetProperty("value").GetString() != "123" ||
+            !afterRedo.GetProperty("hasIdentityError").GetBoolean())
+        {
+            throw new InvalidOperationException(
+                $"Redo did not restore Unified Validation state: {afterRedo}");
+        }
+
+        await page.Locator("#revogrid-gate5b1-undo").ClickAsync();
+        await page.WaitForTimeoutAsync(500);
+
+        var rangeBaseline = await page.EvaluateAsync<JsonElement>(
+            """
+            async args => {
+                const grid = document.querySelector('#revogrid-native-gate5a-grid revo-grid');
+                const source = await grid.getSource('rgRow');
+                const rows = [args.first, args.second].map(clientKey => {
+                    const row = source.find(item => String(item?.clientKey) === clientKey);
+                    return {
+                        clientKey,
+                        value: String(row?.workOrderNumber ?? '')
+                    };
+                });
+                await grid.setCellsFocus(
+                    { x: args.column, y: 0 },
+                    { x: args.column, y: 1 });
+                grid.focus({ preventScroll: true });
+                return rows;
+            }
+            """,
+            new { first = clientKey, second = secondClientKey, column });
+        await page.Keyboard.PressAsync("Delete");
+        await page.WaitForTimeoutAsync(600);
+
+        var afterClear = await page.EvaluateAsync<JsonElement>(
+            """
+            async args => {
+                const grid = document.querySelector('#revogrid-native-gate5a-grid revo-grid');
+                const source = await grid.getSource('rgRow');
+                const module = await import('/js/revoGridGate5B1.js?v=20260826-unified-validation-1');
+                const diagnostics = await module.getDiagnostics('revogrid-native-gate5a-grid');
+                const invalidRows = diagnostics.validation?.validationInvalidRows ?? [];
+                return [args.first, args.second].map(clientKey => {
+                    const row = source.find(item => String(item?.clientKey) === clientKey);
+                    const errors = invalidRows.find(item =>
+                        String(item?.clientKey) === clientKey)?.errors ?? [];
+                    return {
+                        clientKey,
+                        value: String(row?.workOrderNumber ?? ''),
+                        required: errors.some(error =>
+                            error.field === 'workOrderNumber' && error.code === 'required')
+                    };
+                });
+            }
+            """,
+            new { first = clientKey, second = secondClientKey });
+
+        foreach (var row in afterClear.EnumerateArray())
+        {
+            if (
+                row.GetProperty("value").GetString() != string.Empty ||
+                !row.GetProperty("required").GetBoolean())
+            {
+                throw new InvalidOperationException(
+                    $"Range Clear did not preserve/mark required validation: {afterClear}");
+            }
+        }
+
+        await page.Locator("#revogrid-gate5b1-undo").ClickAsync();
+        await page.WaitForTimeoutAsync(500);
+        var restored = await page.EvaluateAsync<JsonElement>(
+            """
+            async args => {
+                const grid = document.querySelector('#revogrid-native-gate5a-grid revo-grid');
+                const source = await grid.getSource('rgRow');
+                return [args.first, args.second].map(clientKey => {
+                    const row = source.find(item => String(item?.clientKey) === clientKey);
+                    return {
+                        clientKey,
+                        value: String(row?.workOrderNumber ?? '')
+                    };
+                });
+            }
+            """,
+            new { first = clientKey, second = secondClientKey });
+
+        var expected = rangeBaseline.EnumerateArray().ToArray();
+        var actual = restored.EnumerateArray().ToArray();
+        for (var index = 0; index < expected.Length; index++)
+        {
+            if (
+                actual[index].GetProperty("value").GetString() !=
+                expected[index].GetProperty("value").GetString())
+            {
+                throw new InvalidOperationException(
+                    $"Undo did not restore required-field Range Clear: {restored}");
+            }
+        }
+
+        await AssertUnifiedValidationCleanBaselineAsync(page);
     }
 
     private static async Task PrepareClipboardAsync(

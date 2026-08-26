@@ -190,6 +190,11 @@ export function createRevoGridChangeBridge(options) {
     const historyCoordinator = options?.historyCoordinator;
     const allowPaste = Boolean(options?.allowPaste);
     const allowRangeClear = Boolean(options?.allowRangeClear);
+    const validationOwner = options?.validationOwner ?? null;
+    const unifiedValidation = Boolean(
+        validationOwner &&
+        typeof validationOwner.refreshForOperations === "function"
+    );
 
     if (!grid || typeof grid.addEventListener !== "function") {
         throw new Error("A RevoGrid element is required.");
@@ -309,7 +314,9 @@ export function createRevoGridChangeBridge(options) {
     }
 
     function scheduleFinancialVisualRefresh() {
-        void refreshFinancialVisuals();
+        if (!unifiedValidation) {
+            void refreshFinancialVisuals();
+        }
     }
 
     function syncDerivedFinancialFields(operations) {
@@ -335,17 +342,26 @@ export function createRevoGridChangeBridge(options) {
                 syncWorkOrderDerivedFinancialFields(row) || changed;
         }
 
-        refreshFinancialValidation(affectedClientKeys);
-        scheduleFinancialVisualRefresh();
+        let validationVisualChanged = false;
+        if (unifiedValidation) {
+            validationVisualChanged = Boolean(
+                validationOwner.refreshForOperations(operations)?.visualChanged
+            );
+        } else {
+            refreshFinancialValidation(affectedClientKeys);
+            scheduleFinancialVisualRefresh();
+        }
 
-        return changed;
+        return changed || validationVisualChanged;
     }
 
     for (const row of rowByClientKey.values()) {
         normalizeFinancialInput(row, "partialAmount");
     }
-    refreshFinancialValidation();
-    scheduleFinancialVisualRefresh();
+    if (!unifiedValidation) {
+        refreshFinancialValidation();
+        scheduleFinancialVisualRefresh();
+    }
 
     async function applyDataHistoryEntry(entry, direction) {
         const operations = Array.isArray(entry?.payload?.operations)
@@ -409,6 +425,15 @@ export function createRevoGridChangeBridge(options) {
         } catch (error) {
             for (const backup of backups) {
                 backup.row[backup.field] = backup.value;
+            }
+
+            if (unifiedValidation) {
+                validationOwner.refreshForOperations(
+                    backups.map(backup => ({
+                        clientKey: backup.row.clientKey,
+                        field: backup.field
+                    }))
+                );
             }
 
             try {
@@ -755,7 +780,9 @@ export function createRevoGridChangeBridge(options) {
     grid.addEventListener("clipboardrangepaste", clipboardRangePaste);
     grid.addEventListener("beforerangeedit", beforeRangeEdit);
     grid.addEventListener("afteredit", afterEdit);
-    grid.addEventListener("viewportscroll", scheduleFinancialVisualRefresh);
+    if (!unifiedValidation) {
+        grid.addEventListener("viewportscroll", scheduleFinancialVisualRefresh);
+    }
 
     function setEditLocked(locked) {
         editLocked = Boolean(locked);
@@ -780,9 +807,13 @@ export function createRevoGridChangeBridge(options) {
             normalizeFinancialInput(row, "partialAmount");
         }
         financialErrorsByClientKey.clear();
-        refreshFinancialValidation();
+        if (unifiedValidation) {
+            validationOwner.resetDataset(Array.from(rowByClientKey.values()));
+        } else {
+            refreshFinancialValidation();
+            scheduleFinancialVisualRefresh();
+        }
         editLocked = false;
-        scheduleFinancialVisualRefresh();
         notifyState();
     }
 
@@ -791,15 +822,21 @@ export function createRevoGridChangeBridge(options) {
         for (const row of rowByClientKey.values()) {
             normalizeFinancialInput(row, "partialAmount");
         }
-        refreshFinancialValidation();
-        scheduleFinancialVisualRefresh();
+        if (unifiedValidation) {
+            validationOwner.replaceRows(Array.from(rowByClientKey.values()));
+        } else {
+            refreshFinancialValidation();
+            scheduleFinancialVisualRefresh();
+        }
         notifyState();
     }
 
     function applyRowChanges(changes) {
         const state = engine.applyExternalRowChanges(changes, datasetKey);
-        refreshFinancialValidation();
-        scheduleFinancialVisualRefresh();
+        if (!unifiedValidation) {
+            refreshFinancialValidation();
+            scheduleFinancialVisualRefresh();
+        }
         notifyState();
         return state;
     }
@@ -863,7 +900,9 @@ export function createRevoGridChangeBridge(options) {
         grid.removeEventListener("clipboardrangepaste", clipboardRangePaste);
         grid.removeEventListener("beforerangeedit", beforeRangeEdit);
         grid.removeEventListener("afteredit", afterEdit);
-        grid.removeEventListener("viewportscroll", scheduleFinancialVisualRefresh);
+        if (!unifiedValidation) {
+            grid.removeEventListener("viewportscroll", scheduleFinancialVisualRefresh);
+        }
         unregisterDataHistoryAdapter();
         rowByClientKey.clear();
         destroyed = true;
