@@ -465,6 +465,22 @@ export function createRevoGridSort(options) {
         return cloneValue(activeState);
     }
 
+    function refreshColumns() {
+        const next = getSortColumns(grid);
+        sortColumns.clear();
+        for (const [field, definition] of next) {
+            sortColumns.set(field, definition);
+        }
+        setVisualState(sortColumns, activeState);
+    }
+
+    async function setSortState(nextState, options = {}) {
+        await applyNativeState(nextState, {
+            remember: options.remember !== false,
+            preserveSelection: options.preserveSelection === true
+        });
+    }
+
     function destroy() {
         if (destroyed) {
             return;
@@ -488,6 +504,8 @@ export function createRevoGridSort(options) {
         resumeCurrentDataset,
         getState,
         getSortState,
+        refreshColumns,
+        setSortState,
         destroy
     });
 }

@@ -41,6 +41,18 @@ public partial class WorkOrdersRevoGridNativeGate5A
     [Parameter]
     public bool EnableUnifiedValidation { get; set; }
 
+    [Parameter]
+    public bool EnablePersistenceIdentity { get; set; }
+
+    [Parameter]
+    public bool EnableSelectionContext { get; set; }
+
+    [Parameter]
+    public bool EnableStructureWorkspace { get; set; }
+
+    [Parameter]
+    public bool EnableClipboardRangeFill { get; set; }
+
     // Saudi Arabia is UTC+3 all year. The page always opens on the
     // current Saudi business year and does not persist the last selected year.
     private static int CurrentBusinessYear =>
@@ -220,7 +232,13 @@ public partial class WorkOrdersRevoGridNativeGate5A
         try
         {
             var gridModulePath = EnableChangeEngine
-                ? "./js/revoGridGate5B1.js?v=20260826-unified-validation-1"
+                ? EnableStructureWorkspace
+                    ? "./js/revoGridGate5B1.js?v=20260828-structure-workspace-5"
+                    : EnableSelectionContext
+                    ? "./js/revoGridGate5B1.js?v=20260827-selection-context-1"
+                    : EnablePersistenceIdentity
+                        ? "./js/revoGridGate5B1.js?v=20260826-persistence-identity-1"
+                        : "./js/revoGridGate5B1.js?v=20260826-unified-validation-1"
                 : "./js/revoGridNativeGate5A.js?v=20260821-gate5b5-filter-refresh-1";
 
             GridModule ??=
@@ -244,6 +262,10 @@ public partial class WorkOrdersRevoGridNativeGate5A
                     EnableHeaderActions,
                     EnableRowStructure,
                     EnableUnifiedValidation,
+                    EnablePersistenceIdentity,
+                    EnableSelectionContext,
+                    EnableStructureWorkspace,
+                    EnableClipboardRangeFill,
                     BasketValues = WorkOrderBuskets.All,
                     RowCountElementId,
                     ChangeStatusElementId,
@@ -501,7 +523,8 @@ public partial class WorkOrdersRevoGridNativeGate5A
                         WorkOrderFinancialRules.CalculateRemainingAmount(
                             workOrder.WorkOrderValue,
                             workOrder.PartialAmount),
-                    Basket = workOrder.Busket
+                    Basket = workOrder.Busket,
+                    RowVersion = Convert.ToBase64String(workOrder.RowVersion)
                 };
 
                 foreach (var pair in CustomColumnService.DeserializeValues(
@@ -557,6 +580,7 @@ public partial class WorkOrdersRevoGridNativeGate5A
         public decimal? PartialAmount { get; set; }
         public decimal? RemainingAmount { get; set; }
         public string Basket { get; set; } = string.Empty;
+        public string RowVersion { get; set; } = string.Empty;
 
         [System.Text.Json.Serialization.JsonExtensionData]
         public Dictionary<string, JsonElement> CustomFields { get; set; } =

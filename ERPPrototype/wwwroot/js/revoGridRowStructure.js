@@ -4,6 +4,7 @@ const MENU_CLASS = "erp-revo-row-menu";
 const INSERT_DIALOG_CLASS = "erp-revo-insert-rows-dialog";
 const DISPLAY_ORDER_STEP = 1_000_000_000;
 const FILTER_TRIMMED_TYPE = "filter";
+const MAX_INSERT_ROWS = 1000;
 
 function requireText(value, name) {
     const normalized = String(value ?? "").trim();
@@ -63,7 +64,8 @@ function createBlankRow(displayOrder) {
         workOrderValue: null,
         partialAmount: null,
         remainingAmount: null,
-        basket: ""
+        basket: "",
+        rowVersion: ""
     };
 }
 
@@ -168,8 +170,8 @@ export function planDisplayOrderBatchInsertion(
     const index = Math.max(0, Math.min(source.length, Number(insertIndex) || 0));
     const count = Number(requestedCount);
 
-    if (!Number.isInteger(count) || count < 1) {
-        throw new Error("Insert row count must be a positive integer.");
+    if (!Number.isInteger(count) || count < 1 || count > MAX_INSERT_ROWS) {
+        throw new Error(`Insert row count must be between 1 and ${MAX_INSERT_ROWS}.`);
     }
 
     const previous = index > 0 ? displayOrderOf(source[index - 1]) : 0;
@@ -381,6 +383,19 @@ function createMenuButton(label, action, danger = false) {
     return button;
 }
 
+function waitForContextMenuFocusToSettle() {
+    return new Promise(resolve => {
+        if (typeof window.requestAnimationFrame !== "function") {
+            window.setTimeout(resolve, 0);
+            return;
+        }
+
+        window.requestAnimationFrame(() => {
+            window.requestAnimationFrame(resolve);
+        });
+    });
+}
+
 function positionMenu(menu, x, y) {
     menu.hidden = false;
     const margin = 8;
@@ -473,11 +488,49 @@ export function composeViewAfterDelete(view, removedKeys) {
     };
 }
 
+export function restoreDeletedItemsByIndex(existingItems, records, indexProperty, valueSelector) {
+    const current = Array.isArray(existingItems) ? existingItems : [];
+    const removed = Array.isArray(records) ? records : [];
+    if (removed.length === 0) {
+        return [...current];
+    }
+
+    const totalLength = current.length + removed.length;
+    const restoredAt = new Map();
+    for (const record of removed) {
+        const index = Number(record?.[indexProperty]);
+        if (!Number.isInteger(index) || index < 0 || index >= totalLength || restoredAt.has(index)) {
+            throw new Error(`Invalid deleted-row restore index '${indexProperty}'.`);
+        }
+        restoredAt.set(index, valueSelector(record));
+    }
+
+    const result = new Array(totalLength);
+    let currentIndex = 0;
+    for (let index = 0; index < totalLength; index += 1) {
+        if (restoredAt.has(index)) {
+            result[index] = restoredAt.get(index);
+            continue;
+        }
+        if (currentIndex >= current.length) {
+            throw new Error(`Deleted-row restore '${indexProperty}' no longer matches the current view.`);
+        }
+        result[index] = current[currentIndex++];
+    }
+
+    if (currentIndex !== current.length) {
+        throw new Error(`Deleted-row restore '${indexProperty}' left unmatched current items.`);
+    }
+    return result;
+}
+
 export function createRevoGridRowStructure(options) {
     const grid = options?.grid;
     const historyCoordinator = options?.historyCoordinator;
     const changeBridge = options?.changeBridge;
     const excelFilter = options?.excelFilter;
+    const persistenceIdentity = options?.persistenceIdentity ?? null;
+    const selectionContext = options?.selectionContext ?? null;
 
     if (!grid || typeof grid.getSource !== "function") {
         throw new Error("A compatible RevoGrid element is required.");
@@ -495,9 +548,11 @@ export function createRevoGridRowStructure(options) {
     let destroyed = false;
     let busy = false;
     let rowCount = Array.isArray(options?.rows) ? options.rows.length : 0;
+    const externalMenu = Boolean(options?.externalMenu);
     let menuContext = null;
     let insertDialogContext = null;
     let pendingRightClickContext = null;
+    let contextMenuSequence = 0;
     const removers = [];
 
     const menu = document.createElement("div");
@@ -511,7 +566,7 @@ export function createRevoGridRowStructure(options) {
         <div class="${INSERT_DIALOG_CLASS}__card" role="dialog" aria-modal="true" aria-labelledby="erp-revo-insert-rows-title">
             <h3 class="${INSERT_DIALOG_CLASS}__title" id="erp-revo-insert-rows-title">Insert Rows</h3>
             <label for="erp-revo-insert-rows-count">Number of rows</label>
-            <input id="erp-revo-insert-rows-count" type="number" min="1" step="1" value="1" inputmode="numeric" />
+            <input id="erp-revo-insert-rows-count" type="number" min="1" max="1000" step="1" value="1" inputmode="numeric" />
             <div class="${INSERT_DIALOG_CLASS}__error" aria-live="polite"></div>
             <div class="${INSERT_DIALOG_CLASS}__actions">
                 <button type="button" data-action="cancel">Cancel</button>
@@ -635,9 +690,13 @@ export function createRevoGridRowStructure(options) {
     async function applyInsertPayload(payload, direction) {
         const view = await captureView();
         const rows = Array.isArray(payload?.rows)
-            ? payload.rows.map(cloneValue)
+            ? payload.rows.map(row => persistenceIdentity?.prepareRowForReplay
+                ? persistenceIdentity.prepareRowForReplay(row)
+                : cloneValue(row))
             : payload?.row
-                ? [cloneValue(payload.row)]
+                ? [persistenceIdentity?.prepareRowForReplay
+                    ? persistenceIdentity.prepareRowForReplay(payload.row)
+                    : cloneValue(payload.row)]
                 : [];
         if (rows.length === 0) {
             throw new Error("Inserted row payload is empty.");
@@ -714,7 +773,8 @@ export function createRevoGridRowStructure(options) {
         const view = await captureView();
 
         if (direction === "redo") {
-            const nextRows = view.source.filter(row => !keys.includes(rowKey(row)));
+            const removed = new Set(keys);
+            const nextRows = view.source.filter(row => !removed.has(rowKey(row)));
             const nextView = composeViewAfterDelete(view, keys);
             await applyView(nextRows, nextView.proxyKeys, nextView.visibleKeys);
             changeBridge.applyRowChanges(
@@ -724,36 +784,40 @@ export function createRevoGridRowStructure(options) {
             return;
         }
 
-        let sourceKeys = [...view.sourceKeys];
-        let proxyKeys = [...view.proxyKeys];
-        let visibleKeys = [...view.visibleKeys];
-        let nextRows = [...view.source];
-
-        for (const record of [...records].sort((a, b) => a.sourceIndex - b.sourceIndex)) {
-            const row = cloneValue(record.row);
+        const currentKeys = new Set(view.sourceKeys);
+        const replayRows = new Map();
+        for (const record of records) {
+            const row = persistenceIdentity?.prepareRowForReplay
+                ? persistenceIdentity.prepareRowForReplay(record.row)
+                : cloneValue(record.row);
             const key = rowKey(row);
-            if (sourceKeys.includes(key)) {
+            if (currentKeys.has(key) || replayRows.has(key)) {
                 throw new Error(`Deleted row '${key}' is already present for Undo.`);
             }
-            const sourceIndex = Math.max(0, Math.min(nextRows.length, record.sourceIndex));
-            nextRows.splice(sourceIndex, 0, row);
-            sourceKeys.splice(sourceIndex, 0, key);
+            replayRows.set(key, row);
         }
 
-        for (const record of [...records].sort((a, b) => a.proxyIndex - b.proxyIndex)) {
-            proxyKeys.splice(
-                Math.max(0, Math.min(proxyKeys.length, record.proxyIndex)),
-                0,
-                rowKey(record.row)
-            );
-        }
-        for (const record of [...records].sort((a, b) => a.visibleIndex - b.visibleIndex)) {
-            visibleKeys.splice(
-                Math.max(0, Math.min(visibleKeys.length, record.visibleIndex)),
-                0,
-                rowKey(record.row)
-            );
-        }
+        // A large displayed-scope delete can contain all 10k rows. Restore the
+        // three arrays from their captured original indices in one linear pass
+        // instead of thousands of splice/includes operations.
+        const nextRows = restoreDeletedItemsByIndex(
+            view.source,
+            records,
+            "sourceIndex",
+            record => replayRows.get(rowKey(record.row))
+        );
+        const proxyKeys = restoreDeletedItemsByIndex(
+            view.proxyKeys,
+            records,
+            "proxyIndex",
+            record => rowKey(record.row)
+        );
+        const visibleKeys = restoreDeletedItemsByIndex(
+            view.visibleKeys,
+            records,
+            "visibleIndex",
+            record => rowKey(record.row)
+        );
 
         await applyView(nextRows, proxyKeys, visibleKeys);
         changeBridge.applyRowChanges(
@@ -780,36 +844,97 @@ export function createRevoGridRowStructure(options) {
         }
     );
 
-    function visibleRowIndexFromPointerEvent(event) {
+    function visibleCellFromPointerEvent(event) {
         const path = typeof event?.composedPath === "function"
             ? event.composedPath()
             : [];
+        let rowIndex = null;
+        let colIndex = null;
+
         for (const node of path) {
-            const raw = node?.dataset?.rgrow ?? node?.dataset?.rgRow;
-            if (raw !== undefined) {
-                const index = Number(raw);
-                if (Number.isInteger(index) && index >= 0) {
-                    return index;
+            if (rowIndex === null) {
+                const rawRow = node?.dataset?.rgrow ?? node?.dataset?.rgRow;
+                if (rawRow !== undefined) {
+                    const value = Number(rawRow);
+                    if (Number.isInteger(value) && value >= 0) {
+                        rowIndex = value;
+                    }
                 }
             }
+
+            if (colIndex === null) {
+                const rawCol = node?.dataset?.rgcol ?? node?.dataset?.rgCol;
+                if (rawCol !== undefined) {
+                    const value = Number(rawCol);
+                    if (Number.isInteger(value) && value >= 0) {
+                        colIndex = value;
+                    }
+                }
+            }
+
+            if (rowIndex !== null && colIndex !== null) {
+                break;
+            }
         }
-        return null;
+
+        return rowIndex === null
+            ? null
+            : {
+                rowIndex,
+                colIndex,
+                colType: "rgCol",
+                rowType: "rgRow"
+            };
     }
 
-    async function resolveMenuContext(clickedVisibleIndex = null) {
+    async function resolveMenuContext(clickedCell = null, explicitSnapshot = null) {
         const visible = await grid.getVisibleSource("rgRow");
-        const focused = await grid.getFocused();
-        const range = await grid.getSelectedRange();
+        const snapshot = explicitSnapshot ?? (selectionContext?.getSnapshot
+            ? await selectionContext.getSnapshot()
+            : null);
+        const focused = snapshot?.focused ?? await grid.getFocused();
+        const range = snapshot?.range ?? await grid.getSelectedRange();
+        const selectionKind = snapshot?.kind ?? "range";
 
         const focusedKey = String(focused?.model?.clientKey ?? "").trim();
+        const clickedVisibleIndex = Number(clickedCell?.rowIndex);
         const clickedRow = Number.isInteger(clickedVisibleIndex)
             ? visible[clickedVisibleIndex]
             : null;
         const clickedKey = clickedRow ? rowKey(clickedRow) : null;
+        const clickedInsideSelection = Boolean(
+            clickedCell &&
+            range &&
+            (selectionContext?.containsCell
+                ? selectionContext.containsCell(snapshot, clickedCell)
+                : clickedVisibleIndex >= Math.min(range.y, range.y1) &&
+                  clickedVisibleIndex <= Math.max(range.y, range.y1))
+        );
 
         let targetKey = clickedKey || focusedKey || null;
-        const selectedKeys = [];
 
+        // A whole-column selection is not a row selection. Preserve the column
+        // context when the employee right-clicks inside it, but never turn its
+        // thousands of visible cells into thousands of row-delete targets.
+        if (selectionKind === "column") {
+            if (clickedKey && clickedInsideSelection) {
+                return {
+                    targetKey: clickedKey,
+                    selectedKeys: [],
+                    selectionKind: "column",
+                    deleteRowsAllowed: false
+                };
+            }
+
+            return {
+                targetKey: clickedKey || targetKey,
+                selectedKeys: clickedKey ? [clickedKey] : [],
+                selectionKind: clickedKey ? "cell" : "none",
+                deleteRowsAllowed: Boolean(clickedKey)
+            };
+        }
+
+        const selectedKeys = [];
         if (range && Number.isInteger(range.y) && Number.isInteger(range.y1)) {
             const start = Math.max(0, Math.min(range.y, range.y1));
             const end = Math.min(visible.length - 1, Math.max(range.y, range.y1));
@@ -823,13 +948,15 @@ export function createRevoGridRowStructure(options) {
 
         const uniqueSelected = [...new Set(selectedKeys)];
 
-        // Spreadsheet-style context: right-click inside the current range keeps
-        // the whole range. Right-click outside it targets only the clicked row.
+        // Spreadsheet-style context: secondary-click inside the current range
+        // preserves it. A click outside the range targets only the clicked row.
         if (clickedKey) {
-            if (uniqueSelected.length > 0 && uniqueSelected.includes(clickedKey)) {
+            if (uniqueSelected.length > 0 && clickedInsideSelection) {
                 return {
                     targetKey: clickedKey,
                     selectedKeys: uniqueSelected,
+                    selectionKind,
+                    deleteRowsAllowed: true,
                     preserveRange: {
                         x: range.x,
                         y: range.y,
@@ -842,12 +969,14 @@ export function createRevoGridRowStructure(options) {
             }
             return {
                 targetKey: clickedKey,
-                selectedKeys: [clickedKey]
+                selectedKeys: [clickedKey],
+                selectionKind: "cell",
+                deleteRowsAllowed: true
             };
         }
 
         if (targetKey && uniqueSelected.length > 0 && !uniqueSelected.includes(targetKey)) {
-            return { targetKey, selectedKeys: [targetKey] };
+            return { targetKey, selectedKeys: [targetKey], selectionKind: "cell", deleteRowsAllowed: true };
         }
         if (!targetKey && uniqueSelected.length > 0) {
             targetKey = uniqueSelected[0];
@@ -859,7 +988,9 @@ export function createRevoGridRowStructure(options) {
                 ? uniqueSelected
                 : targetKey
                     ? [targetKey]
-                    : []
+                    : [],
+            selectionKind,
+            deleteRowsAllowed: uniqueSelected.length > 0 || Boolean(targetKey)
         };
     }
 
@@ -870,8 +1001,8 @@ export function createRevoGridRowStructure(options) {
         if (busy || !context?.targetKey) {
             return false;
         }
-        if (!Number.isInteger(count) || count < 1) {
-            throw new Error("Insert row count must be a positive integer.");
+        if (!Number.isInteger(count) || count < 1 || count > MAX_INSERT_ROWS) {
+            throw new Error(`Insert row count must be between 1 and ${MAX_INSERT_ROWS}.`);
         }
 
         busy = true;
@@ -957,24 +1088,29 @@ export function createRevoGridRowStructure(options) {
         }
     }
 
-    async function deleteSelection() {
-        if (busy || !menuContext) {
+    async function deleteKeys(requestedKeys, options = {}) {
+        if (busy) {
             return false;
         }
-        const context = menuContext;
-        hideMenu();
-        const keys = context.selectedKeys;
+
+        const keys = [...new Set(
+            (Array.isArray(requestedKeys) ? requestedKeys : [])
+                .map(value => String(value ?? "").trim())
+                .filter(Boolean)
+        )];
         if (keys.length === 0) {
             return false;
         }
 
-        const confirmed = window.confirm(
-            keys.length === 1
-                ? "هل تريد حذف الصف المحدد؟"
-                : `هل تريد حذف ${keys.length.toLocaleString()} صفوف محددة؟`
-        );
-        if (!confirmed) {
-            return false;
+        if (options.confirm !== false) {
+            const confirmed = window.confirm(
+                keys.length === 1
+                    ? "هل تريد حذف الصف المحدد؟"
+                    : `هل تريد حذف ${keys.length.toLocaleString()} صفوف محددة؟`
+            );
+            if (!confirmed) {
+                return false;
+            }
         }
 
         busy = true;
@@ -984,12 +1120,26 @@ export function createRevoGridRowStructure(options) {
             const removedSet = new Set(keys);
             const records = [];
 
+            // Structural delete may now target the entire displayed filter result
+            // (up to the full 10k dataset). Build the three lookup maps once so
+            // this remains O(n + k) instead of repeatedly scanning 10k arrays
+            // for every row covered by a large Selection-scoped structural delete.
+            const sourceIndexByKey = new Map(
+                view.sourceKeys.map((key, index) => [key, index])
+            );
+            const proxyIndexByKey = new Map(
+                view.proxyKeys.map((key, index) => [key, index])
+            );
+            const visibleIndexByKey = new Map(
+                view.visibleKeys.map((key, index) => [key, index])
+            );
+
             for (const key of keys) {
-                const sourceIndex = view.sourceKeys.indexOf(key);
-                const proxyIndex = view.proxyKeys.indexOf(key);
-                const visibleIndex = view.visibleKeys.indexOf(key);
+                const sourceIndex = sourceIndexByKey.get(key) ?? -1;
+                const proxyIndex = proxyIndexByKey.get(key) ?? -1;
+                const visibleIndex = visibleIndexByKey.get(key) ?? -1;
                 if (sourceIndex < 0 || proxyIndex < 0 || visibleIndex < 0) {
-                    throw new Error(`Selected row '${key}' is no longer visible.`);
+                    throw new Error(`Selected row '${key}' is no longer displayed.`);
                 }
                 records.push({
                     row: cloneValue(view.source[sourceIndex]),
@@ -1030,6 +1180,36 @@ export function createRevoGridRowStructure(options) {
         }
     }
 
+    async function deleteSelection() {
+        if (!menuContext || menuContext.deleteRowsAllowed === false) {
+            return false;
+        }
+
+        const context = menuContext;
+        hideMenu();
+        return deleteKeys(context.selectedKeys, { confirm: true });
+    }
+
+    async function getDisplayedKeys() {
+        const visible = await grid.getVisibleSource("rgRow");
+        return (Array.isArray(visible) ? visible : []).map(rowKey);
+    }
+
+    async function getContext(clickedCell = null, selectionSnapshot = null) {
+        return resolveMenuContext(clickedCell, selectionSnapshot);
+    }
+
+    async function insertRows({ targetKey, position, count = 1 } = {}) {
+        return insertRelative(position, count, {
+            targetKey: String(targetKey ?? "").trim(),
+            selectedKeys: []
+        });
+    }
+
+    async function deleteRows(keys) {
+        return deleteKeys(keys, { confirm: false });
+    }
+
     function openInsertRowsDialog() {
         if (busy || !menuContext?.targetKey) {
             return;
@@ -1055,9 +1235,9 @@ export function createRevoGridRowStructure(options) {
     async function submitInsertRows(position) {
         const raw = String(insertCountInput?.value ?? "").trim();
         const count = Number(raw);
-        if (!Number.isInteger(count) || count < 1) {
+        if (!Number.isInteger(count) || count < 1 || count > MAX_INSERT_ROWS) {
             if (insertDialogError) {
-                insertDialogError.textContent = "Enter a whole number greater than zero.";
+                insertDialogError.textContent = `Enter a whole number from 1 to ${MAX_INSERT_ROWS}.`;
             }
             insertCountInput?.focus();
             return;
@@ -1084,11 +1264,16 @@ export function createRevoGridRowStructure(options) {
     const separator = document.createElement("div");
     separator.className = `${MENU_CLASS}__separator`;
     menu.append(separator);
-    menu.append(
-        createMenuButton("Delete Selected Rows", () => void deleteSelection(), true)
+    const deleteRowsButton = createMenuButton(
+        "Delete Selected Rows",
+        () => void deleteSelection(),
+        true
     );
-    document.body.append(menu);
-    document.body.appendChild(insertDialog);
+    menu.append(deleteRowsButton);
+    if (!externalMenu) {
+        document.body.append(menu);
+        document.body.appendChild(insertDialog);
+    }
 
     insertDialog.querySelector('[data-action="cancel"]')?.addEventListener(
         "click",
@@ -1115,11 +1300,11 @@ export function createRevoGridRowStructure(options) {
             return;
         }
 
-        const clickedVisibleIndex = visibleRowIndexFromPointerEvent(event);
+        const clickedCell = visibleCellFromPointerEvent(event);
         // pointerdown precedes Revo's mousedown focus handling. Capture the
-        // current range here so a right-click inside a multi-row selection does
-        // not collapse the delete context to one row.
-        pendingRightClickContext = resolveMenuContext(clickedVisibleIndex)
+        // semantic selection here. The shared Selection Context distinguishes
+        // a deliberate whole-column selection from a normal vertical range.
+        pendingRightClickContext = resolveMenuContext(clickedCell)
             .catch(() => null);
     };
 
@@ -1127,19 +1312,19 @@ export function createRevoGridRowStructure(options) {
         event.preventDefault();
         const x = event.clientX;
         const y = event.clientY;
-        const clickedVisibleIndex = visibleRowIndexFromPointerEvent(event);
+        const clickedCell = visibleCellFromPointerEvent(event);
         const captured = pendingRightClickContext;
+        const sequence = ++contextMenuSequence;
         pendingRightClickContext = null;
 
         void Promise.resolve(captured)
-            .then(context => context ?? resolveMenuContext(clickedVisibleIndex))
+            .then(context => context ?? resolveMenuContext(clickedCell))
             .then(async context => {
-                if (destroyed || !context?.targetKey) {
+                if (destroyed || sequence !== contextMenuSequence || !context?.targetKey) {
                     hideMenu();
                     return;
                 }
 
-                menuContext = context;
                 if (context.preserveRange && typeof grid.setCellsFocus === "function") {
                     await grid.setCellsFocus(
                         {
@@ -1154,6 +1339,21 @@ export function createRevoGridRowStructure(options) {
                         context.preserveRange.rowType
                     );
                 }
+
+                // Revo can finish a secondary-click focus move after the native
+                // contextmenu event. That focus may emit viewportscroll and close
+                // a menu opened too early. Wait until the visual focus settles,
+                // then show the menu if no newer pointer action superseded it.
+                await waitForContextMenuFocusToSettle();
+                if (destroyed || sequence !== contextMenuSequence) {
+                    return;
+                }
+
+                menuContext = context;
+                deleteRowsButton.disabled = context.deleteRowsAllowed === false;
+                deleteRowsButton.title = context.deleteRowsAllowed === false
+                    ? "تحديد العمود ليس تحديد صفوف."
+                    : "";
                 positionMenu(menu, x, y);
             });
     };
@@ -1163,8 +1363,11 @@ export function createRevoGridRowStructure(options) {
             ? event.composedPath()
             : [];
 
-        if (!menu.hidden && !path.includes(menu)) {
-            hideMenu();
+        if (!path.includes(menu)) {
+            contextMenuSequence += 1;
+            if (!menu.hidden) {
+                hideMenu();
+            }
         }
         if (!insertDialog.hidden && !path.includes(insertDialog)) {
             // The dialog owns its backdrop, so clicks on the backdrop itself do
@@ -1173,11 +1376,24 @@ export function createRevoGridRowStructure(options) {
         }
     };
 
-    addListener(grid, "pointerdown", onGridPointerDown, true);
-    addListener(grid, "contextmenu", onContextMenu);
-    addListener(grid, "viewportscroll", hideMenu);
-    addListener(document, "pointerdown", onDocumentPointerDown, true);
-    addListener(window, "resize", hideMenu, { passive: true });
+    if (!externalMenu) {
+        const onViewportScroll = () => {
+            if (!menu.hidden) {
+                contextMenuSequence += 1;
+                hideMenu();
+            }
+        };
+        const onResize = () => {
+            contextMenuSequence += 1;
+            hideMenu();
+        };
+
+        addListener(grid, "pointerdown", onGridPointerDown, true);
+        addListener(grid, "contextmenu", onContextMenu);
+        addListener(grid, "viewportscroll", onViewportScroll);
+        addListener(document, "pointerdown", onDocumentPointerDown, true);
+        addListener(window, "resize", onResize, { passive: true });
+    }
 
     async function resetDataset(nextRows, nextDatasetKey) {
         hideMenu();
@@ -1203,6 +1419,7 @@ export function createRevoGridRowStructure(options) {
         if (destroyed) {
             return;
         }
+        contextMenuSequence += 1;
         hideMenu();
         hideInsertDialog();
         pendingRightClickContext = null;
@@ -1224,6 +1441,10 @@ export function createRevoGridRowStructure(options) {
     return Object.freeze({
         resetDataset,
         getState,
+        getContext,
+        getDisplayedKeys,
+        insertRows,
+        deleteRows,
         destroy
     });
 }
@@ -1232,5 +1453,6 @@ export const revoGridRowStructureInternals = Object.freeze({
     HISTORY_ADAPTER_KEY,
     DISPLAY_ORDER_STEP,
     FILTER_TRIMMED_TYPE,
-    INSERT_DIALOG_CLASS
+    INSERT_DIALOG_CLASS,
+    MAX_INSERT_ROWS
 });

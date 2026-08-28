@@ -64,6 +64,7 @@ export async function detachActiveCellFromRange(grid) {
 
 export function createRevoGridColumnSelection(options) {
     const grid = options?.grid;
+    const selectionContext = options?.selectionContext ?? null;
     if (!grid || typeof grid.addEventListener !== "function") {
         throw new Error("A RevoGrid element is required.");
     }
@@ -104,6 +105,7 @@ export function createRevoGridColumnSelection(options) {
             );
 
             if (!range) {
+                selectionContext?.clearExplicitSelection?.();
                 await grid.clearFocus();
                 return;
             }
@@ -119,6 +121,17 @@ export function createRevoGridColumnSelection(options) {
             // Revo-native range, but do not invent an active first cell that
             // the employee never clicked.
             await detachActiveCellFromRange(grid);
+            selectionContext?.markColumnSelection?.({
+                prop,
+                range: {
+                    x: range.start.x,
+                    y: range.start.y,
+                    x1: range.end.x,
+                    y1: range.end.y,
+                    colType,
+                    rowType: "rgRow"
+                }
+            });
         } finally {
             selecting = false;
         }
@@ -157,6 +170,7 @@ export function createRevoGridColumnSelection(options) {
             return;
         }
         grid.removeEventListener("beforeheaderclick", onBeforeHeaderClick);
+        selectionContext?.clearExplicitSelection?.();
         destroyed = true;
     }
 

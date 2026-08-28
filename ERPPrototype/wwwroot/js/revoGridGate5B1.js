@@ -1,13 +1,18 @@
-import * as nativeGate5A from "./revoGridNativeGate5A.js?v=20260826-unified-validation-1";
+import * as nativeGate5A from "./revoGridNativeGate5A.js?v=20260828-structure-workspace-2";
 import { createRevoGridChangeBridge } from "./revoGridChangeBridge.js?v=20260826-unified-validation-1";
 import { createRevoGridHistoryCoordinator } from "./revoGridHistoryCoordinator.js?v=20260821-minimal-reveal-1";
 import { createRevoGridHistoryFocus } from "./revoGridHistoryFocus.js?v=20260821-gate5b4-keyboard-sort-1";
-import { createRevoGridExcelFilter } from "./revoGridExcelFilter.js?v=20260822-gate5b5-search-selection-1";
-import { createRevoGridSort } from "./revoGridSort.js?v=20260821-gate5b5-row-structure-2";
+import { createRevoGridExcelFilter } from "./revoGridExcelFilter.js?v=20260828-structure-workspace-2";
+import { createRevoGridSort } from "./revoGridSort.js?v=20260828-structure-workspace-2";
 import { createRevoGridColumnSelection } from "./revoGridColumnSelection.js?v=20260821-gate5b4-keyboard-sort-1";
 import { createRevoGridSelectionLifecycle } from "./revoGridSelectionLifecycle.js?v=20260821-gate5b4-keyboard-sort-1";
-import { createRevoGridRowStructure } from "./revoGridRowStructure.js?v=20260822-gate5b5-multirow-1";
+import { createRevoGridSelectionContext } from "./revoGridSelectionContext.js?v=20260828-gate5b9-selection-context-2";
+import { createRevoGridRowStructure } from "./revoGridRowStructure.js?v=20260828-context-menu-settle-1";
 import { createRevoGridValidation } from "./revoGridValidation.js?v=20260826-unified-validation-1";
+import { createRevoGridPersistenceIdentity } from "./revoGridPersistenceIdentity.js?v=20260826-persistence-identity-1";
+import { createRevoGridColumnWorkspace } from "./revoGridColumnWorkspace.js?v=20260828-gate5b9-structure-workspace-4";
+import { createRevoGridStructureMenu } from "./revoGridStructureMenu.js?v=20260828-context-menu-settle-1";
+import { createRevoGridStructureCommands } from "./revoGridStructureCommands.js?v=20260828-gate5b9-structure-workspace-3";
 
 const bindings = new Map();
 
@@ -47,10 +52,16 @@ function findElement(id) {
 }
 
 function combinedState(state) {
+    const changeState = state.changeBridge.getState();
+    const columnState = state.columnWorkspace?.getState?.() ?? {};
+    const columnDirty = columnState.customColumnsChanged === true;
     return {
-        ...state.changeBridge.getState(),
+        ...changeState,
         ...state.historyCoordinator.getState(),
-        ...(state.validationOwner?.getSummaryState?.() ?? {})
+        ...(state.validationOwner?.getSummaryState?.() ?? {}),
+        ...columnState,
+        dirty: Boolean(changeState.dirty || columnDirty),
+        dirtyCount: Number(changeState.dirtyCount ?? 0) + (columnDirty ? 1 : 0)
     };
 }
 
@@ -58,7 +69,10 @@ function renderState(state) {
     const current = combinedState(state);
     const filterBusy = Boolean(state.excelFilter?.getState().filterBusy);
     const sortBusy = Boolean(state.sortController?.getState().sortBusy);
-    const structureBusy = Boolean(state.rowStructure?.getState().structureBusy);
+    const structureBusy = Boolean(
+        state.rowStructure?.getState().structureBusy ||
+        state.columnWorkspace?.getState().columnWorkspaceBusy
+    );
 
     if (state.statusElement) {
         state.statusElement.textContent = current.dirty
@@ -166,7 +180,22 @@ async function destroyBinding(elementId) {
     }
 
     try {
+        state.structureMenu?.destroy();
+    } catch {
+    }
+
+    try {
+        state.columnWorkspace?.destroy();
+    } catch {
+    }
+
+    try {
         state.rowStructure?.destroy();
+    } catch {
+    }
+
+    try {
+        state.selectionContext?.destroy();
     } catch {
     }
 
@@ -177,6 +206,11 @@ async function destroyBinding(elementId) {
 
     try {
         state.validationOwner?.destroy();
+    } catch {
+    }
+
+    try {
+        state.persistenceIdentity?.destroy();
     } catch {
     }
 
@@ -237,8 +271,15 @@ export async function initialize(elementId, rows, customColumns, options) {
         sortController: null,
         columnSelection: null,
         selectionLifecycle: null,
+        selectionContext: null,
         rowStructure: null,
+        columnWorkspace: null,
+        structureCommands: null,
+        structureMenu: null,
         validationOwner,
+        persistenceIdentity: Boolean(value(options, "enablePersistenceIdentity", "EnablePersistenceIdentity", false))
+            ? createRevoGridPersistenceIdentity({ rows })
+            : null,
         datasetSwitchActive: false,
         handledHistoryKeyEvents: new WeakSet(),
         removers: [],
@@ -288,6 +329,9 @@ export async function initialize(elementId, rows, customColumns, options) {
     });
 
     state.selectionLifecycle = createRevoGridSelectionLifecycle({ grid });
+    if (Boolean(value(options, "enableSelectionContext", "EnableSelectionContext", false))) {
+        state.selectionContext = createRevoGridSelectionContext({ grid });
+    }
 
     if (Boolean(value(options, "enableExcelFilter", "EnableExcelFilter", false))) {
         state.excelFilter = createRevoGridExcelFilter({
@@ -308,8 +352,15 @@ export async function initialize(elementId, rows, customColumns, options) {
             selectionLifecycle: state.selectionLifecycle,
             onStateChange: () => renderState(state)
         });
-        state.columnSelection = createRevoGridColumnSelection({ grid });
+        state.columnSelection = createRevoGridColumnSelection({
+            grid,
+            selectionContext: state.selectionContext
+        });
     }
+
+    const enableStructureWorkspace = Boolean(
+        value(options, "enableStructureWorkspace", "EnableStructureWorkspace", false)
+    );
 
     if (Boolean(value(options, "enableRowStructure", "EnableRowStructure", false))) {
         state.rowStructure = createRevoGridRowStructure({
@@ -320,7 +371,40 @@ export async function initialize(elementId, rows, customColumns, options) {
             changeBridge: state.changeBridge,
             excelFilter: state.excelFilter,
             sortController: state.sortController,
+            persistenceIdentity: state.persistenceIdentity,
+            selectionContext: state.selectionContext,
+            externalMenu: enableStructureWorkspace,
             onStateChange: () => renderState(state)
+        });
+    }
+
+    if (enableStructureWorkspace) {
+        if (!state.rowStructure || !state.selectionContext) {
+            throw new Error("Structure Workspace requires Row Structure and Selection Context.");
+        }
+
+        state.columnWorkspace = createRevoGridColumnWorkspace({
+            grid,
+            customColumns,
+            historyCoordinator: state.historyCoordinator,
+            validationOwner: state.validationOwner,
+            selectionContext: state.selectionContext,
+            excelFilter: state.excelFilter,
+            sortController: state.sortController,
+            replaceColumns: nextColumns =>
+                nativeGate5A.replaceCustomColumns(elementId, nextColumns),
+            onStateChange: () => renderState(state)
+        });
+
+        state.structureCommands = createRevoGridStructureCommands({
+            rowStructure: state.rowStructure,
+            columnWorkspace: state.columnWorkspace,
+            selectionContext: state.selectionContext
+        });
+
+        state.structureMenu = createRevoGridStructureMenu({
+            grid,
+            structureCommands: state.structureCommands
         });
     }
 
@@ -421,14 +505,16 @@ export async function beginDatasetSwitch(elementId) {
         current.saveActive ||
         state.excelFilter?.getState().filterBusy ||
         state.sortController?.getState().sortBusy ||
-        state.rowStructure?.getState().structureBusy
+        state.rowStructure?.getState().structureBusy ||
+        state.columnWorkspace?.getState().columnWorkspaceBusy
     ) {
         return { allowed: false, reason: "busy" };
     }
 
     // A year switch replaces the entire Work Orders dataset. Selection never
-    // crosses that boundary: clear cell/range/column selection before the
-    // source starts changing.
+    // crosses that boundary: clear semantic selection plus Revo focus/range
+    // before the source starts changing.
+    state.selectionContext?.clearExplicitSelection?.();
     await state.grid.clearFocus();
 
     state.datasetSwitchActive = true;
@@ -499,6 +585,7 @@ export async function replaceDataset(elementId, rows, workYear) {
         if (state.rowStructure) {
             await state.rowStructure.resetDataset(rows, nextDatasetKey);
         }
+        state.persistenceIdentity?.replaceRows?.(rows);
     } catch (error) {
         if (filterSuspended && state.excelFilter) {
             try {
@@ -568,7 +655,18 @@ export async function getDiagnostics(elementId) {
         filter: state?.excelFilter?.getState?.() ?? null,
         sort: state?.sortController?.getState?.() ?? null,
         rowStructure: state?.rowStructure?.getState?.() ?? null,
-        validation: state?.validationOwner?.getState?.() ?? null
+        columnWorkspace: state?.columnWorkspace?.getState?.() ?? null,
+        structureCommands: Boolean(state?.structureCommands),
+        structureMenu: state?.structureMenu?.getState?.() ?? null,
+        validation: state?.validationOwner?.getState?.() ?? null,
+        persistence: state?.persistenceIdentity
+            ? {
+                ...state.persistenceIdentity.getState(),
+                deletedRecords: state.persistenceIdentity.getDeletedRecords(
+                    state.changeBridge.getDirtyRows()
+                )
+            }
+            : null
     };
 }
 

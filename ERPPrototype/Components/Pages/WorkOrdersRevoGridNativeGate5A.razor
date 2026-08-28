@@ -16,13 +16,19 @@
 @inject IJSRuntime JSRuntime
 @inject ILogger<WorkOrdersRevoGridNativeGate5A> Logger
 
-<PageTitle>@(EnableUnifiedValidation ? "RevoGrid Gate 5B-6" : EnableRowStructure ? "RevoGrid Gate 5B-5" : EnableHeaderActions ? "RevoGrid Gate 5B-4" : EnableExcelFilter ? "RevoGrid Gate 5B-3" : EnablePaste ? "RevoGrid Gate 5B-2" : EnableChangeEngine ? "RevoGrid Gate 5B-1" : "RevoGrid Native Gate 5A")</PageTitle>
+<PageTitle>@(EnableStructureWorkspace ? "RevoGrid Gate 5B-9" : EnableSelectionContext ? "RevoGrid Gate 5B-8" : EnablePersistenceIdentity ? "RevoGrid Gate 5B-7" : EnableUnifiedValidation ? "RevoGrid Gate 5B-6" : EnableRowStructure ? "RevoGrid Gate 5B-5" : EnableHeaderActions ? "RevoGrid Gate 5B-4" : EnableExcelFilter ? "RevoGrid Gate 5B-3" : EnablePaste ? "RevoGrid Gate 5B-2" : EnableChangeEngine ? "RevoGrid Gate 5B-1" : "RevoGrid Native Gate 5A")</PageTitle>
 
 <div class="native-gate5a" data-testid="revogrid-native-gate5a">
     <header class="native-gate5a__header">
         <div class="native-gate5a__identity">
             <strong>RevoGrid Community 4.25.2</strong>
-            <span>@(EnableUnifiedValidation
+            <span>@(EnableStructureWorkspace
+                ? "Gate 5B-9 — Shared Rows/Columns Structure Workspace over the stable Gate 5B-8 behavior"
+                : EnableSelectionContext
+                ? "Gate 5B-8 — Shared Selection Context over the stable Gate 5B-7 behavior"
+                : EnablePersistenceIdentity
+                ? "Gate 5B-7 — Persistence Identity over the stable Gate 5B-6 behavior"
+                : EnableUnifiedValidation
                 ? "Gate 5B-6 — Unified Validation over the stable Gate 5B-5 behavior"
                 : EnableRowStructure
                 ? "Gate 5B-5 — Insert/Delete Rows → Change Engine + Sheet History"
@@ -125,7 +131,19 @@
         </main>
 
         <footer class="native-gate5a__note">
-            @if (EnableUnifiedValidation)
+            @if (EnableStructureWorkspace)
+            {
+                <span>Gate 5B-9 ينقل قائمة الكليك اليمين إلى Structure Menu واحدة للصفوف والأعمدة. Insert يحدد العدد والاتجاه داخل Dialog، والحذف يعمل على Rows/Custom Columns الموجودة في Selection فقط. إضافة/حذف Custom Columns يدخلان نفس Sheet History. Paste-to-fill يستخدم Revo Community rangeFill. لا يوجد Save لقاعدة البيانات بعد.</span>
+            }
+            else if (EnableSelectionContext)
+            {
+                <span>Gate 5B-8 يحافظ على سلوك Gate 5B-7 كما هو، ويضيف فهمًا موحدًا لمعنى التحديد. الكليك اليمين داخل عمود محدد بالكامل لا يحوله إلى خلية واحدة، وتحديد العمود لا يُفسر كأنه تحديد لكل صفوف الشيت.</span>
+            }
+            else if (EnablePersistenceIdentity)
+            {
+                <span>Gate 5B-7 يحافظ على سلوك Gate 5B-6 كما هو، ويضيف تتبع هوية الصف المحفوظة حتى لو اختفى الصف من الشاشة. الحذف يظل مؤقتًا حتى Save لاحق، وUndo/Redo لا يفقدان هوية أمر العمل. لا يوجد Save لقاعدة البيانات بعد.</span>
+            }
+            else if (EnableUnifiedValidation)
             {
                 <span>Gate 5B-6 يحافظ على سلوك Gate 5B-5 كما هو، ويضيف Validation موحدة بعد Manual Edit / Paste / Range Clear / Undo / Redo وتغييرات الصفوف. القيمة غير الصحيحة تظل ظاهرة ومعلّمة، وSave سيظل ممنوعًا لاحقًا حتى تختفي الأخطاء. لا يوجد Save لقاعدة البيانات بعد.</span>
             }

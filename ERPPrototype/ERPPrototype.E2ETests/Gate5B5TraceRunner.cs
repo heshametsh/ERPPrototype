@@ -13,7 +13,9 @@ internal static class Gate5B5TraceRunner
     public static async Task<int> RunAsync(
         string gatePath = DefaultGatePath,
         string gateLabel = "Gate 5B-5",
-        string artifactPrefix = "gate5b5")
+        string artifactPrefix = "gate5b5",
+        bool assertPersistenceIdentity = false,
+        bool assertSelectionContext = false)
     {
         var projectRoot = FindProjectRoot();
         var artifactDirectory = E2EArtifactManager.CreateRunDirectory(projectRoot);
@@ -94,8 +96,21 @@ internal static class Gate5B5TraceRunner
             await InstallEventRecorderAsync(page);
             page.Dialog += AcceptDialog;
 
-            await CaptureStepAsync(page, steps, timelinePath, "01-baseline");
+            var baselineSnapshot = await CaptureStepAsync(page, steps, timelinePath, "01-baseline");
+            if (assertPersistenceIdentity)
+            {
+                AssertPersistenceIdentity(
+                    baselineSnapshot,
+                    expectedDeletedCount: 0,
+                    requireAllSourceRowsPersisted: true);
+            }
             var baselineCount = await GetSourceCountAsync(page);
+
+            if (assertSelectionContext)
+            {
+                await AssertWholeColumnContextSelectionAsync(page, baselineCount);
+                await CaptureStepAsync(page, steps, timelinePath, "SC-01-column-context-selection-pass");
+            }
 
             // Range Clear is an employee-facing cell-edit behavior, so it must
             // be proved through the real RevoGrid UI before structural tests.
@@ -243,12 +258,42 @@ internal static class Gate5B5TraceRunner
             await ClickVisibleRowMenuButtonAsync(page, "Delete Selected Rows");
             await WaitForSourceCountAsync(page, baselineCount - 3);
             await PauseForTraceAsync(page);
-            await CaptureStepAsync(page, steps, timelinePath, "06-delete-3-selected-rows");
+            var persistedDeleteSnapshot = await CaptureStepAsync(page, steps, timelinePath, "06-delete-3-selected-rows");
+            if (assertPersistenceIdentity)
+            {
+                AssertPersistenceIdentity(persistedDeleteSnapshot, expectedDeletedCount: 3);
+            }
 
             await page.Locator("#revogrid-gate5b1-undo").ClickAsync();
             await WaitForSourceCountAsync(page, baselineCount);
             await PauseForTraceAsync(page);
-            await CaptureStepAsync(page, steps, timelinePath, "07-undo-delete-3-one-step");
+            var persistedDeleteUndoSnapshot = await CaptureStepAsync(page, steps, timelinePath, "07-undo-delete-3-one-step");
+            if (assertPersistenceIdentity)
+            {
+                AssertPersistenceIdentity(persistedDeleteUndoSnapshot, expectedDeletedCount: 0);
+            }
+
+            // Redo must delete the exact same persisted rows again. This proves
+            // Sheet History restores the persistence tombstones, not just the UI rows.
+            await page.Locator("#revogrid-gate5b1-redo").ClickAsync();
+            await WaitForSourceCountAsync(page, baselineCount - 3);
+            await PauseForTraceAsync(page);
+            var persistedDeleteRedoSnapshot = await CaptureStepAsync(page, steps, timelinePath, "08-redo-delete-3-one-step");
+            if (assertPersistenceIdentity)
+            {
+                AssertPersistenceIdentity(persistedDeleteRedoSnapshot, expectedDeletedCount: 3);
+                AssertSamePersistenceDeletes(persistedDeleteSnapshot, persistedDeleteRedoSnapshot);
+            }
+
+            // Restore the clean baseline before the remaining regression journey.
+            await page.Locator("#revogrid-gate5b1-undo").ClickAsync();
+            await WaitForSourceCountAsync(page, baselineCount);
+            await PauseForTraceAsync(page);
+            var persistedDeleteFinalUndoSnapshot = await CaptureStepAsync(page, steps, timelinePath, "09-final-undo-delete-3-clean");
+            if (assertPersistenceIdentity)
+            {
+                AssertPersistenceIdentity(persistedDeleteFinalUndoSnapshot, expectedDeletedCount: 0);
+            }
 
             // Real UI: right-click a rendered cell and insert below it.
             await OpenRowMenuAsync(page, visibleRowIndex: 2);
@@ -281,7 +326,11 @@ internal static class Gate5B5TraceRunner
             await ClickVisibleRowMenuButtonAsync(page, "Delete Selected Rows");
             await WaitForSourceCountAsync(page, baselineCount);
             await PauseForTraceAsync(page);
-            await CaptureStepAsync(page, steps, timelinePath, "05-delete-temporary-row");
+            var temporaryDeleteSnapshot = await CaptureStepAsync(page, steps, timelinePath, "05-delete-temporary-row");
+            if (assertPersistenceIdentity)
+            {
+                AssertPersistenceIdentity(temporaryDeleteSnapshot, expectedDeletedCount: 0);
+            }
 
             // Keyboard shortcut path: give focus back to a real grid cell first.
             await ClickVisibleCellAsync(page, 0);
@@ -554,7 +603,7 @@ internal static class Gate5B5TraceRunner
             """);
     }
 
-    private static async Task CaptureStepAsync(
+    private static async Task<JsonElement> CaptureStepAsync(
         IPage page,
         List<JsonElement> steps,
         string timelinePath,
@@ -701,6 +750,90 @@ internal static class Gate5B5TraceRunner
             $"dirty={ui.GetProperty("dirtyText").GetString()}, " +
             $"undo={ui.GetProperty("undoText").GetString()}, " +
             $"redo={ui.GetProperty("redoText").GetString()}");
+
+        return snapshot;
+    }
+
+    private static void AssertPersistenceIdentity(
+        JsonElement snapshot,
+        int expectedDeletedCount,
+        bool requireAllSourceRowsPersisted = false)
+    {
+        var diagnostics = snapshot.GetProperty("diagnostics");
+        if (diagnostics.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
+        {
+            throw new InvalidOperationException("Persistence diagnostics were not available.");
+        }
+
+        var persistence = diagnostics.GetProperty("persistence");
+        if (persistence.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
+        {
+            throw new InvalidOperationException("Gate did not expose Persistence Identity diagnostics.");
+        }
+
+        var missingRowVersions = persistence.GetProperty("missingRowVersionCount").GetInt32();
+        if (missingRowVersions != 0)
+        {
+            throw new InvalidOperationException(
+                $"Persistence Identity has {missingRowVersions} persisted rows without RowVersion.");
+        }
+
+        var deleted = persistence.GetProperty("deletedRecords");
+        if (deleted.GetArrayLength() != expectedDeletedCount)
+        {
+            throw new InvalidOperationException(
+                $"Expected {expectedDeletedCount} persistence delete records, got {deleted.GetArrayLength()}.");
+        }
+
+        foreach (var record in deleted.EnumerateArray())
+        {
+            if (record.GetProperty("id").GetInt32() <= 0 ||
+                string.IsNullOrWhiteSpace(record.GetProperty("rowVersion").GetString()))
+            {
+                throw new InvalidOperationException(
+                    "A persisted delete lost its database Id or RowVersion.");
+            }
+        }
+
+        if (requireAllSourceRowsPersisted)
+        {
+            var sourceCount = snapshot.GetProperty("counts").GetProperty("source").GetInt32();
+            var persistedCount = persistence.GetProperty("persistedIdentityCount").GetInt32();
+            if (persistedCount != sourceCount)
+            {
+                throw new InvalidOperationException(
+                    $"Expected all {sourceCount} loaded rows to have persistence identity, got {persistedCount}.");
+            }
+        }
+    }
+
+    private static void AssertSamePersistenceDeletes(JsonElement firstSnapshot, JsonElement secondSnapshot)
+    {
+        static string[] ReadKeys(JsonElement snapshot)
+        {
+            var deleted = snapshot
+                .GetProperty("diagnostics")
+                .GetProperty("persistence")
+                .GetProperty("deletedRecords");
+
+            return deleted
+                .EnumerateArray()
+                .Select(record =>
+                    $"{record.GetProperty("clientKey").GetString()}|" +
+                    $"{record.GetProperty("id").GetInt32()}|" +
+                    $"{record.GetProperty("rowVersion").GetString()}")
+                .OrderBy(value => value, StringComparer.Ordinal)
+                .ToArray();
+        }
+
+        var first = ReadKeys(firstSnapshot);
+        var second = ReadKeys(secondSnapshot);
+
+        if (!first.SequenceEqual(second, StringComparer.Ordinal))
+        {
+            throw new InvalidOperationException(
+                "Persistence Identity Redo did not restore the exact same deleted rows and RowVersions.");
+        }
     }
 
     private static async Task<int> GetSourceCountAsync(IPage page)
@@ -1112,6 +1245,144 @@ internal static class Gate5B5TraceRunner
             StringComparison.Ordinal);
     }
 
+    private static async Task AssertWholeColumnContextSelectionAsync(
+        IPage page,
+        int visibleRowCount)
+    {
+        var partialColumnIndex = await GetColumnIndexAsync(page, "partialAmount");
+        var workOrderColumnIndex = await GetColumnIndexAsync(page, "workOrderNumber");
+
+        var header = page.Locator(
+            $"#{GridHostId} .rgHeaderCell[data-rgCol=\"{partialColumnIndex}\"] .header-content");
+        await header.ClickAsync();
+        await PauseForTraceAsync(page, 250);
+
+        var selected = await CaptureSelectionStateAsync(page);
+        AssertWholeColumnSelection(
+            selected,
+            partialColumnIndex,
+            visibleRowCount,
+            "Header whole-column selection");
+
+        // Secondary-click inside the deliberate whole-column selection must be
+        // context only. Revo must not focus/collapse to the clicked cell.
+        await DataCell(page, 3, partialColumnIndex).ClickAsync(
+            new LocatorClickOptions { Button = MouseButton.Right });
+        await page.Locator(".erp-revo-row-menu:not([hidden])").WaitForAsync(
+            new LocatorWaitForOptions
+            {
+                State = WaitForSelectorState.Visible,
+                Timeout = 10_000
+            });
+
+        var afterInsideRightClick = await CaptureSelectionStateAsync(page);
+        AssertWholeColumnSelection(
+            afterInsideRightClick,
+            partialColumnIndex,
+            visibleRowCount,
+            "Right-click inside whole-column selection");
+
+        var deleteRows = page.Locator(
+            ".erp-revo-row-menu:not([hidden]) button:has-text(\"Delete Selected Rows\")");
+        E2ETestAssert.True(
+            await deleteRows.IsDisabledAsync(),
+            "Whole-column selection was exposed as a row-delete selection.");
+
+        // A secondary-click outside the selected column is a new target. This
+        // must end the explicit whole-column mode instead of preserving it.
+        await DataCell(page, 3, workOrderColumnIndex).ClickAsync(
+            new LocatorClickOptions { Button = MouseButton.Right });
+        await PauseForTraceAsync(page, 200);
+
+        var outside = await CaptureSelectionStateAsync(page);
+        var focusedProp = outside.GetProperty("focusedProp").GetString() ?? string.Empty;
+        E2ETestAssert.True(
+            string.Equals(focusedProp, "workOrderNumber", StringComparison.Ordinal),
+            $"Right-click outside the selected column focused '{focusedProp}' instead of the clicked cell.");
+        E2ETestAssert.True(
+            !await deleteRows.IsDisabledAsync(),
+            "A normal clicked row remained blocked after leaving whole-column selection.");
+
+        // Close the row menu without mutating data; the rest of the regression
+        // journey starts from an ordinary single-cell selection.
+        await page.Locator(".native-gate5a__header").ClickAsync();
+        await PauseForTraceAsync(page, 150);
+    }
+
+    private static async Task<JsonElement> CaptureSelectionStateAsync(IPage page)
+    {
+        var json = await page.EvaluateAsync<string>(
+            """
+            async () => {
+                const grid = document.querySelector('#revogrid-native-gate5a-grid revo-grid');
+                const focused = await grid?.getFocused?.();
+                const range = await grid?.getSelectedRange?.();
+                const providers = await grid?.getProviders?.();
+                const columnRanges = Object.entries(providers?.selection?.columnStores ?? {})
+                    .map(([index, selectionStore]) => ({
+                        index: Number(index),
+                        range: selectionStore?.store?.get?.('range') ?? null
+                    }))
+                    .filter(item => item.range);
+                return JSON.stringify({
+                    focusedProp: String(focused?.column?.prop ?? ''),
+                    focusedCell: focused?.cell ?? null,
+                    range: range ?? null,
+                    columnRanges
+                });
+            }
+            """);
+        using var document = JsonDocument.Parse(json);
+        return document.RootElement.Clone();
+    }
+
+    private static void AssertWholeColumnSelection(
+        JsonElement selection,
+        int expectedColumnIndex,
+        int visibleRowCount,
+        string action)
+    {
+        var focusedProp = selection.GetProperty("focusedProp").GetString() ?? string.Empty;
+        E2ETestAssert.True(
+            string.IsNullOrEmpty(focusedProp),
+            $"{action} invented focused cell '{focusedProp}'.");
+
+        var range = selection.GetProperty("range");
+        var publicRangeMatches =
+            range.ValueKind == JsonValueKind.Object &&
+            range.GetProperty("x").GetInt32() == expectedColumnIndex &&
+            range.GetProperty("x1").GetInt32() == expectedColumnIndex &&
+            range.GetProperty("y").GetInt32() == 0 &&
+            range.GetProperty("y1").GetInt32() == visibleRowCount - 1;
+
+        var nativeColumnRangeMatches = false;
+        if (selection.TryGetProperty("columnRanges", out var columnRanges) &&
+            columnRanges.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in columnRanges.EnumerateArray())
+            {
+                // columnStores is keyed by Revo viewport/column store, not by
+                // the employee-visible column coordinate. The actual selected
+                // column is represented by range.x/range.x1 inside that store.
+                var nativeRange = item.GetProperty("range");
+                nativeColumnRangeMatches =
+                    nativeRange.ValueKind == JsonValueKind.Object &&
+                    nativeRange.GetProperty("x").GetInt32() == expectedColumnIndex &&
+                    nativeRange.GetProperty("x1").GetInt32() == expectedColumnIndex &&
+                    nativeRange.GetProperty("y").GetInt32() == 0 &&
+                    nativeRange.GetProperty("y1").GetInt32() == visibleRowCount - 1;
+                if (nativeColumnRangeMatches)
+                {
+                    break;
+                }
+            }
+        }
+
+        E2ETestAssert.True(
+            publicRangeMatches || nativeColumnRangeMatches,
+            $"{action} did not preserve the whole visible column. Actual: {selection}");
+    }
+
     private static async Task OpenRowMenuAsync(IPage page, int visibleRowIndex)
     {
         await ClickVisibleCellAsync(page, visibleRowIndex);
@@ -1305,6 +1576,7 @@ internal static class Gate5B5TraceRunner
             "- Step 03 Undo removes all 3 rows in one History action; Step 04 Redo restores all 3.",
             "- Step 06 right-clicks inside a 3-row selection and Delete must remove all 3 selected rows.",
             "- Step 07 Undo restores all 3 deleted rows in one History action.",
+            "- Step 08 Redo deletes the exact same persisted rows again, including the same database Id and RowVersion; Step 09 Undo restores the clean baseline.",
             "- Later filtered Insert keeps a blank row visible until the employee reapplies the filter.",
             "- Step 12 presses Apply again without changing the filter selection; the blank row must disappear.",
             "- Step 13 Undo restores the exact pre-Apply working snapshot without undoing the Insert.",

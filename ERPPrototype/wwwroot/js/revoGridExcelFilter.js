@@ -1445,6 +1445,22 @@ export function createRevoGridExcelFilter(options) {
         return cloneValue(activeState);
     }
 
+    function refreshColumns() {
+        closePopup();
+        const next = getFilterColumns(grid);
+        filterColumns.clear();
+        for (const [field, definition] of next) {
+            filterColumns.set(field, definition);
+        }
+    }
+
+    async function setFilterState(nextState, options = {}) {
+        await applyNativeState(nextState, {
+            remember: options.remember !== false,
+            preserveSelection: options.preserveSelection === true
+        });
+    }
+
     function destroy() {
         if (destroyed) {
             return;
@@ -1470,6 +1486,8 @@ export function createRevoGridExcelFilter(options) {
         replaceRows,
         getState,
         getFilterState,
+        refreshColumns,
+        setFilterState,
         ownsKeyboardEvent,
         destroy
     });

@@ -88,6 +88,9 @@ internal static class IntegrationTestRunner
                 "Custom columns persist across years and remain department-scoped",
                 integrationTests.CustomColumnsPersistAcrossYearsAndRemainDepartmentScopedAsync),
             (
+                "Custom column positions rebalance with RowVersion protection",
+                integrationTests.CustomColumnLayoutOrderCanRebalanceWithRowVersionProtectionAsync),
+            (
                 "Custom Number rejects decimals atomically",
                 integrationTests.DecimalCustomNumberIsRejectedAtomicallyAsync),
             (

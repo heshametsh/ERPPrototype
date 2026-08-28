@@ -9,7 +9,7 @@ namespace ERPPrototype.Data;
 /// <summary>
 /// Owns department custom-column definitions and the typed values stored in
 /// each WorkOrder.CustomValuesJson document. The service validates create,
-/// rename, immutable types, and transactional deletion.
+/// rename, immutable types, saved positions, and transactional deletion.
 /// </summary>
 public static partial class CustomColumnService
 {
@@ -126,7 +126,6 @@ public static partial class CustomColumnService
                     incomingColumn.FieldKey?.Trim(),
                     existingColumn.FieldKey,
                     StringComparison.Ordinal) ||
-                incomingColumn.LayoutOrder != existingColumn.LayoutOrder ||
                 !RowVersionMatches(
                     incomingColumn.RowVersion,
                     existingColumn.RowVersion))
@@ -139,6 +138,14 @@ public static partial class CustomColumnService
             {
                 deleted.Add(existingColumn);
                 continue;
+            }
+
+            if (
+                incomingColumn.LayoutOrder <= 0 ||
+                CoreLayoutOrders.Contains(incomingColumn.LayoutOrder))
+            {
+                return CustomColumnPreparationResult.Failed(
+                    "The custom column position is invalid.");
             }
 
             var name = incomingColumn.Name?.Trim() ?? string.Empty;
@@ -166,13 +173,14 @@ public static partial class CustomColumnService
                     "The same custom column was submitted more than once.");
             }
 
-            if (!layoutOrders.Add(existingColumn.LayoutOrder))
+            if (!layoutOrders.Add(incomingColumn.LayoutOrder))
             {
                 return CustomColumnPreparationResult.Failed(
                     "Two custom columns cannot occupy the same position.");
             }
 
             existingColumn.Name = name;
+            existingColumn.LayoutOrder = incomingColumn.LayoutOrder;
             activeDefinitions.Add(existingColumn);
         }
 

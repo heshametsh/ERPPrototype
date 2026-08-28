@@ -85,3 +85,44 @@ Tabulator remains the live `/work-orders` runtime and behavior reference only un
 Stop and surface the decision before implementation when evidence conflicts on a material rule, a working core component would be replaced, a new dependency/framework is proposed, or security/data/concurrency/business behavior would materially change without an approved decision.
 
 Important outcomes must be explained briefly in Arabic using the Work Orders behavior the user will actually see.
+
+## USER COMMUNICATION STYLE — ERP PROTOTYPE
+
+When communicating with the user about ERP Prototype:
+
+1. Start with what actually happens in the ERP or what the problem is.
+2. Explain the practical effect on the employee, manager, data, or workflow.
+3. Give the decision/recommendation and explain why.
+4. Give one practical ERP example when it improves understanding.
+5. Technical/code details come only after the logic, and only when they affect the decision or execution.
+
+The user understands logic well but is not a programmer.
+
+Required style:
+- concise but sufficiently explained
+- logic-first
+- practical ERP examples
+- no superficial summaries
+- no long technical essays
+- no unnecessary architecture diagrams
+- no repeating the same point in different words
+- do not sacrifice clarity just to make the response shorter
+
+Preferred response shape:
+
+Problem:
+<what is actually happening>
+
+Effect:
+<what this means inside the ERP>
+
+Decision:
+<what we should do and why>
+
+Example:
+<one practical example if useful>
+
+Technical details:
+<only when necessary>
+
+If a response becomes long, prioritize the decision and one clear example, then provide additional technical detail only when it is needed.

@@ -20,6 +20,25 @@ import {
     validateFinancialInputs
 } from "./workOrderFinancialRules.js";
 import { createRevoGridValidation } from "./revoGridValidation.js";
+import { createRevoGridPersistenceIdentity } from "./revoGridPersistenceIdentity.js";
+import {
+    classifyRevoGridSelection,
+    createRevoGridSelectionContext,
+    isCellInsideSelectionRange
+} from "./revoGridSelectionContext.js";
+import {
+    planDisplayOrderBatchInsertion,
+    restoreDeletedItemsByIndex
+} from "./revoGridRowStructure.js";
+import {
+    planColumnBatchInsertion,
+    planColumnWorkspaceInsertion,
+    revoGridColumnWorkspaceInternals
+} from "./revoGridColumnWorkspace.js";
+import {
+    createRevoGridStructureCommands,
+    REVO_GRID_STRUCTURE_COMMANDS
+} from "./revoGridStructureCommands.js";
 
 function assert(condition, message) {
     if (!condition) {
@@ -1326,7 +1345,613 @@ async function testBridgeUndoRedoRefreshesUnifiedValidation() {
     coordinator.destroy();
 }
 
+
+function testPersistenceIdentityTracksDeletedPersistedRow() {
+    const row = {
+        clientKey: "row:persisted",
+        id: 41,
+        rowVersion: "persisted-version",
+        displayOrder: 10
+    };
+    const identity = createRevoGridPersistenceIdentity({ rows: [row] });
+    const engine = createRevoGridChangeEngine({ datasetKey: "2026" });
+
+    engine.applyExternalRowChanges([
+        {
+            clientKey: row.clientKey,
+            before: { exists: true, displayOrder: 10 },
+            after: { exists: false, displayOrder: null }
+        }
+    ]);
+
+    const deleted = identity.getDeletedRecords(engine.getDirtyRows());
+    assert(deleted.length === 1, "Persisted deleted row was not retained for Save.");
+    assert(deleted[0].id === 41, "Deleted row database Id was lost.");
+    assert(deleted[0].rowVersion === "persisted-version", "Deleted row RowVersion was lost.");
+
+    engine.applyExternalRowChanges([
+        {
+            clientKey: row.clientKey,
+            before: { exists: false, displayOrder: null },
+            after: { exists: true, displayOrder: 10 }
+        }
+    ]);
+    assert(identity.getDeletedRecords(engine.getDirtyRows()).length === 0, "Undo did not cancel the pending database delete.");
+    identity.destroy();
+}
+
+function testPersistenceIdentityIgnoresTemporaryDelete() {
+    const row = {
+        clientKey: "temp:1",
+        id: 0,
+        rowVersion: "",
+        displayOrder: 10
+    };
+    const identity = createRevoGridPersistenceIdentity({ rows: [row] });
+    const engine = createRevoGridChangeEngine({ datasetKey: "2026" });
+
+    engine.applyExternalRowChanges([
+        {
+            clientKey: row.clientKey,
+            before: { exists: false, displayOrder: null },
+            after: { exists: true, displayOrder: 10 }
+        }
+    ]);
+    engine.applyExternalRowChanges([
+        {
+            clientKey: row.clientKey,
+            before: { exists: true, displayOrder: 10 },
+            after: { exists: false, displayOrder: null }
+        }
+    ]);
+
+    assert(identity.getDeletedRecords(engine.getDirtyRows()).length === 0, "Temporary row was incorrectly turned into a database delete.");
+    identity.destroy();
+}
+
+function testPersistenceIdentityRebasesInsertedRowAfterSave() {
+    const oldHistoryRow = {
+        clientKey: "temp:saved",
+        id: 0,
+        rowVersion: "",
+        displayOrder: 10,
+        workOrderNumber: "233039311"
+    };
+    const identity = createRevoGridPersistenceIdentity({ rows: [oldHistoryRow] });
+
+    identity.acceptSaveResult({
+        savedRows: [
+            { id: 77, rowVersion: "server-version" }
+        ],
+        savedRowMappings: [
+            { clientKey: oldHistoryRow.clientKey, databaseId: 77 }
+        ],
+        removedRowIds: []
+    });
+
+    const replayRow = identity.prepareRowForReplay(oldHistoryRow);
+    assert(replayRow.id === 77, "Redo would restore the saved row with its old temporary Id.");
+    assert(replayRow.rowVersion === "server-version", "Redo would restore a stale RowVersion after Save.");
+    assert(replayRow.workOrderNumber === oldHistoryRow.workOrderNumber, "Persistence identity changed business data during replay.");
+    identity.destroy();
+}
+
+
+function testPersistenceIdentityTenThousandRowsStaysTargeted() {
+    const rows = Array.from({ length: 10_000 }, (_, index) => ({
+        clientKey: `row:${index + 1}`,
+        id: index + 1,
+        rowVersion: `version-${index + 1}`,
+        displayOrder: (index + 1) * 10
+    }));
+    const identity = createRevoGridPersistenceIdentity({ rows });
+    const dirtyRows = [{
+        clientKey: "row:5000",
+        baseline: { exists: true, displayOrder: 50_000 },
+        current: { exists: false, displayOrder: null }
+    }];
+
+    const deleted = identity.getDeletedRecords(dirtyRows);
+    assert(identity.getState().persistedIdentityCount === 10_000, "Persistence identity did not index all 10,000 rows.");
+    assert(deleted.length === 1 && deleted[0].id === 5000, "One-row delete lookup scanned into the wrong persistence identity.");
+    identity.destroy();
+}
+
+
+function testPersistenceIdentityReconcilesVisibleRowAfterCommittedDelete() {
+    const restoredBeforeSaveFinished = {
+        clientKey: "row:in-flight-delete",
+        id: 99,
+        rowVersion: "version-before-delete",
+        displayOrder: 10,
+        workOrderNumber: "233039313"
+    };
+    const identity = createRevoGridPersistenceIdentity({
+        rows: [restoredBeforeSaveFinished]
+    });
+
+    // The employee undid the row delete while the server was still saving the
+    // older deletion snapshot. Once the server accepts the delete, this visible
+    // row must become a new unsaved row instead of keeping a dead database Id.
+    identity.acceptSaveResult({
+        savedRows: [],
+        savedRowMappings: [],
+        removedRowIds: [99]
+    });
+
+    const [reconciled] = identity.reconcileRows([restoredBeforeSaveFinished]);
+    assert(reconciled.id === 0, "Visible row kept a database Id that the accepted Save deleted.");
+    assert(reconciled.rowVersion === "", "Visible row kept a RowVersion that the accepted Save deleted.");
+    assert(reconciled.workOrderNumber === restoredBeforeSaveFinished.workOrderNumber, "Identity reconciliation changed business data.");
+    identity.destroy();
+}
+
+function testPersistenceIdentityMakesSavedDeleteUndoAnewRow() {
+    const oldHistoryRow = {
+        clientKey: "row:deleted",
+        id: 88,
+        rowVersion: "old-version",
+        displayOrder: 10,
+        workOrderNumber: "233039312"
+    };
+    const identity = createRevoGridPersistenceIdentity({ rows: [oldHistoryRow] });
+
+    identity.acceptSaveResult({
+        savedRows: [],
+        savedRowMappings: [],
+        removedRowIds: [88]
+    });
+
+    const replayRow = identity.prepareRowForReplay(oldHistoryRow);
+    assert(replayRow.id === 0, "Undo after a committed database delete would reuse a deleted database Id.");
+    assert(replayRow.rowVersion === "", "Undo after a committed delete would reuse a deleted RowVersion.");
+    assert(replayRow.workOrderNumber === oldHistoryRow.workOrderNumber, "Undo after Save lost the deleted row data.");
+    identity.destroy();
+}
+
+
+function testSelectionContextRecognizesWholeColumnWithoutRows() {
+    const range = {
+        x: 4,
+        y: 0,
+        x1: 4,
+        y1: 9_999,
+        colType: "rgCol",
+        rowType: "rgRow"
+    };
+    const snapshot = classifyRevoGridSelection({
+        focused: null,
+        selectedRange: range,
+        explicitColumn: {
+            prop: "partialAmount",
+            range
+        }
+    });
+
+    assert(snapshot.kind === "column", "Whole-column selection lost its semantic kind.");
+    assert(snapshot.prop === "partialAmount", "Whole-column selection lost its field identity.");
+    assert(snapshot.focused === null, "Whole-column selection invented an active cell.");
+}
+
+function testSelectionContextKeepsWholeColumnWhenPublicRangeIsDetached() {
+    const range = {
+        x: 4,
+        y: 0,
+        x1: 4,
+        y1: 9_999,
+        colType: "rgCol",
+        rowType: "rgRow"
+    };
+    const snapshot = classifyRevoGridSelection({
+        focused: null,
+        selectedRange: null,
+        explicitColumn: {
+            prop: "partialAmount",
+            range
+        }
+    });
+
+    assert(snapshot.kind === "column", "Detached native focus lost whole-column semantics.");
+    assert(snapshot.prop === "partialAmount", "Detached whole-column selection lost its field identity.");
+    assert(snapshot.range.y1 === 9_999, "Detached whole-column selection lost its explicit range.");
+}
+
+function testSelectionContextDoesNotConfuseVerticalRangeWithWholeColumn() {
+    const range = {
+        x: 4,
+        y: 2,
+        x1: 4,
+        y1: 4,
+        colType: "rgCol",
+        rowType: "rgRow"
+    };
+    const snapshot = classifyRevoGridSelection({
+        focused: { model: { clientKey: "row:3" }, column: { prop: "partialAmount" } },
+        selectedRange: range,
+        explicitColumn: null
+    });
+
+    assert(snapshot.kind === "range", "A normal vertical range was misclassified as a whole column.");
+}
+
+function testSelectionContextHitTestingUsesRowsAndColumns() {
+    const range = {
+        x: 4,
+        y: 0,
+        x1: 4,
+        y1: 9_999,
+        colType: "rgCol",
+        rowType: "rgRow"
+    };
+
+    assert(
+        isCellInsideSelectionRange(range, {
+            rowIndex: 5000,
+            colIndex: 4,
+            colType: "rgCol",
+            rowType: "rgRow"
+        }),
+        "A cell inside the selected column was not recognized."
+    );
+    assert(
+        !isCellInsideSelectionRange(range, {
+            rowIndex: 5000,
+            colIndex: 3,
+            colType: "rgCol",
+            rowType: "rgRow"
+        }),
+        "A right-click outside the selected column was treated as inside it."
+    );
+}
+
+
+async function testSelectionContextPreservesSecondaryClickInsideRange() {
+    const grid = new EventTarget();
+    grid.getFocused = async () => ({ model: { clientKey: "row:3" }, column: { prop: "workOrderNumber" } });
+    grid.getSelectedRange = async () => ({
+        x: 0,
+        y: 2,
+        x1: 2,
+        y1: 4,
+        colType: "rgCol",
+        rowType: "rgRow"
+    });
+
+    const context = createRevoGridSelectionContext({ grid });
+    grid.dispatchEvent(new CustomEvent("setrange", {
+        detail: { x: 0, y: 2, x1: 2, y1: 4, type: "rgRow" }
+    }));
+
+    const inside = new CustomEvent("beforecellfocus", {
+        cancelable: true,
+        detail: {
+            rowIndex: 3,
+            colIndex: 1,
+            colType: "rgCol",
+            type: "rgRow",
+            prop: "workTypeCode",
+            originalEvent: new MouseEvent("mousedown", { button: 2 })
+        }
+    });
+    grid.dispatchEvent(inside);
+    assert(inside.defaultPrevented, "Secondary-click inside a selected range collapsed the native Selection.");
+
+    const outside = new CustomEvent("beforecellfocus", {
+        cancelable: true,
+        detail: {
+            rowIndex: 6,
+            colIndex: 1,
+            colType: "rgCol",
+            type: "rgRow",
+            prop: "workTypeCode",
+            originalEvent: new MouseEvent("mousedown", { button: 2 })
+        }
+    });
+    grid.dispatchEvent(outside);
+    assert(!outside.defaultPrevented, "Secondary-click outside a selected range failed to retarget the clicked cell.");
+
+    context.destroy();
+}
+
+async function testStructureCommandsOwnRoutingAndScopeMeaning() {
+    const calls = [];
+    const rowStructure = {
+        async getContext() {
+            return { targetKey: "row-2", selectedKeys: ["row-2", "row-3"], selectionKind: "range" };
+        },
+        async getDisplayedKeys() {
+            return ["row-1", "row-2", "row-3"];
+        },
+        async insertRows(payload) {
+            calls.push({ type: "row-insert", payload });
+            return true;
+        },
+        async deleteRows(keys) {
+            calls.push({ type: "row-delete", keys: [...keys] });
+            return true;
+        }
+    };
+    const columnWorkspace = {
+        async resolveContext() {
+            return {
+                targetProp: "custom_a",
+                targetCustom: true,
+                selectedCustomProps: ["custom_a", "custom_b"],
+                allCustomProps: ["custom_a", "custom_b", "custom_c"]
+            };
+        },
+        getOrderedProps() {
+            return ["workOrderNumber", "custom_a", "basket"];
+        },
+        async insertColumns(payload) {
+            calls.push({ type: "column-insert", payload });
+            return true;
+        },
+        async deleteColumns(props) {
+            calls.push({ type: "column-delete", props: [...props] });
+            return true;
+        }
+    };
+    const selectionContext = {
+        async getSnapshot() {
+            return { kind: "range", range: { x: 0, x1: 1, y: 1, y1: 2 } };
+        }
+    };
+
+    const commands = createRevoGridStructureCommands({
+        rowStructure,
+        columnWorkspace,
+        selectionContext
+    });
+    const context = await commands.captureContext({ rowIndex: 2, colIndex: 1 });
+
+    await commands.execute(
+        REVO_GRID_STRUCTURE_COMMANDS.DELETE_ROWS,
+        context,
+        { scope: "selection" }
+    );
+    await commands.execute(
+        REVO_GRID_STRUCTURE_COMMANDS.DELETE_COLUMNS,
+        context,
+        { scope: "selection" }
+    );
+    await commands.execute(
+        REVO_GRID_STRUCTURE_COMMANDS.INSERT_ROWS,
+        context,
+        { position: "below", count: 4 }
+    );
+
+    assert(
+        calls[0]?.type === "row-delete" && calls[0].keys.join(",") === "row-2,row-3",
+        "Structure Commands did not keep row Selection scope out of the Menu."
+    );
+    assert(
+        calls[1]?.type === "column-delete" && calls[1].props.join(",") === "custom_a,custom_b",
+        "Structure Commands did not keep Custom Columns in Selection scope out of the Menu."
+    );
+    assert(
+        calls[2]?.type === "row-insert" &&
+        calls[2].payload.targetKey === "row-2" &&
+        calls[2].payload.position === "below" &&
+        calls[2].payload.count === 4,
+        "Structure Commands did not preserve the explicit Insert Rows target/count."
+    );
+}
+
+async function testStructureCommandsMapWholeColumnToDisplayedRows() {
+    const deleted = [];
+    const rowStructure = {
+        async getContext() {
+            return { targetKey: "row-2", selectedKeys: [], selectionKind: "column" };
+        },
+        async getDisplayedKeys() {
+            return ["row-1", "row-2", "row-3", "row-4"];
+        },
+        async insertRows() { return true; },
+        async deleteRows(keys) {
+            deleted.push(...keys);
+            return true;
+        }
+    };
+    const columnWorkspace = {
+        async resolveContext() {
+            return { targetProp: "partialAmount", targetCustom: false, selectedCustomProps: [] };
+        },
+        getOrderedProps() { return ["partialAmount"]; },
+        async insertColumns() { return true; },
+        async deleteColumns() { return true; }
+    };
+    const selectionContext = {
+        async getSnapshot() {
+            return { kind: "column", range: { x: 4, x1: 4, y: 0, y1: 3 } };
+        }
+    };
+
+    const commands = createRevoGridStructureCommands({ rowStructure, columnWorkspace, selectionContext });
+    const context = await commands.captureContext({ rowIndex: 1, colIndex: 4 });
+    const description = await commands.describeRowDelete(context);
+    assert(description.selectionCount === 4, "Whole-column row scope did not report displayed rows as the Selection.");
+    await commands.execute(REVO_GRID_STRUCTURE_COMMANDS.DELETE_ROWS, context, { scope: "selection" });
+    assert(deleted.join(",") === "row-1,row-2,row-3,row-4", "Whole-column Rows in Selection did not resolve to displayed rows.");
+}
+
+function testRowInsertRestoresThousandRowSafetyLimit() {
+    let thrown = null;
+    try {
+        planDisplayOrderBatchInsertion([], 0, 1001);
+    } catch (error) {
+        thrown = error;
+    }
+    assert(thrown instanceof Error, "Insert Rows accepted more than 1,000 rows in one command.");
+}
+
+function testLargeDeleteRestoreUsesCapturedIndices() {
+    const original = Array.from({ length: 10_000 }, (_, index) => `row-${index}`);
+    const removedIndexes = new Set(Array.from({ length: 5_000 }, (_, index) => index * 2));
+    const existing = original.filter((_, index) => !removedIndexes.has(index));
+    const records = [...removedIndexes].map(index => ({ sourceIndex: index, value: original[index] }));
+    const restored = restoreDeletedItemsByIndex(existing, records, "sourceIndex", record => record.value);
+    assert(restored.length === original.length, "Large delete Undo did not restore the original row count.");
+    assert(restored.every((value, index) => value === original[index]), "Large delete Undo did not restore original row order.");
+}
+
+function testColumnBatchInsertionUsesOneStableGap() {
+    const orders = planColumnBatchInsertion(
+        [],
+        "partialAmount",
+        "right",
+        3
+    );
+    assert(orders.length === 3, "Column batch insertion did not allocate all requested columns.");
+    assert(orders[0] > 5_000_000_000_000, "First inserted column was not after Partial Amount.");
+    assert(orders[2] < 6_000_000_000_000, "Last inserted column crossed Remaining Amount.");
+    assert(orders[0] < orders[1] && orders[1] < orders[2], "Inserted column orders are not stable and ascending.");
+}
+
+function testColumnVisualDirectionAndSpecificationOrderAreStable() {
+    const {
+        logicalInsertionPosition,
+        additionsForLogicalPosition
+    } = revoGridColumnWorkspaceInternals;
+
+    assert(
+        logicalInsertionPosition("right", true) === "left" &&
+        logicalInsertionPosition("left", true) === "right",
+        "RTL visual left/right did not map to the opposite logical layout direction."
+    );
+    assert(
+        logicalInsertionPosition("right", false) === "right" &&
+        logicalInsertionPosition("left", false) === "left",
+        "LTR visual left/right unexpectedly changed logical layout direction."
+    );
+
+    const requested = [
+        {
+            id: 0,
+            fieldKey: "custom_zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz",
+            name: "Column 1",
+            dataType: "Text",
+            layoutOrder: 0,
+            rowVersion: ""
+        },
+        {
+            id: 0,
+            fieldKey: "custom_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            name: "Column 2",
+            dataType: "Number",
+            layoutOrder: 0,
+            rowVersion: ""
+        }
+    ];
+    const prepared = additionsForLogicalPosition(requested, "left");
+    const plan = planColumnWorkspaceInsertion(
+        [],
+        "partialAmount",
+        "left",
+        prepared
+    );
+    const first = plan.columns.find(column => column.name === "Column 1");
+    const second = plan.columns.find(column => column.name === "Column 2");
+    assert(first && second, "Column insertion lost one of the requested definitions.");
+    assert(
+        first.layoutOrder > second.layoutOrder,
+        "Column 1 was not kept nearest to the anchor when insertion uses the logical left side."
+    );
+}
+
+function testColumnInsertionRebalancesExhaustedGap() {
+    const existing = [
+        {
+            id: 40,
+            fieldKey: "custom_cccccccccccccccccccccccccccccccc",
+            name: "Unrelated Column",
+            dataType: "Text",
+            layoutOrder: 3_500_000_000_000,
+            rowVersion: "rv-40"
+        },
+        {
+            id: 41,
+            fieldKey: "custom_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            name: "Existing Tight Column",
+            dataType: "Text",
+            layoutOrder: 5_000_000_000_001,
+            rowVersion: "rv-41"
+        }
+    ];
+    const added = [{
+        id: 0,
+        fieldKey: "custom_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        name: "New Tight Column",
+        dataType: "Number",
+        layoutOrder: 0,
+        rowVersion: ""
+    }];
+
+    const plan = planColumnWorkspaceInsertion(
+        existing,
+        "partialAmount",
+        "right",
+        added
+    );
+
+    assert(plan.rebalanced, "An exhausted one-slot gap did not trigger column rebalancing.");
+    const unrelatedAfter = plan.columns.find(column => column.fieldKey === existing[0].fieldKey);
+    const existingAfter = plan.columns.find(column => column.fieldKey === existing[1].fieldKey);
+    const addedAfter = plan.columns.find(column => column.fieldKey === added[0].fieldKey);
+    assert(existingAfter && addedAfter, "Rebalancing lost an existing or inserted Custom Column.");
+    assert(
+        addedAfter.layoutOrder > 5_000_000_000_000 &&
+        addedAfter.layoutOrder < existingAfter.layoutOrder &&
+        existingAfter.layoutOrder < 6_000_000_000_000,
+        "Rebalanced Custom Columns did not preserve the requested order between core columns."
+    );
+    assert(
+        existingAfter.rowVersion === "rv-41",
+        "Rebalancing changed the persisted column concurrency token on the client."
+    );
+    assert(
+        unrelatedAfter?.layoutOrder === 3_500_000_000_000,
+        "Rebalancing one exhausted section unnecessarily moved an unrelated Custom Column."
+    );
+}
+
+function testColumnBatchRejectsDuplicateNamesBeforeMutation() {
+    const { validateSpecifications } = revoGridColumnWorkspaceInternals;
+    let thrown = null;
+    try {
+        validateSpecifications(
+            [
+                { name: "Permit", dataType: "Text" },
+                { name: "permit", dataType: "Number" }
+            ],
+            []
+        );
+    } catch (error) {
+        thrown = error;
+    }
+    assert(thrown instanceof Error, "Duplicate column names in the same Insert Columns command were accepted.");
+}
+
 const TESTS = [
+    ["Structure Commands own routing and scope meaning", testStructureCommandsOwnRoutingAndScopeMeaning],
+    ["Structure Commands map whole column to displayed row selection", testStructureCommandsMapWholeColumnToDisplayedRows],
+    ["Row Insert restores 1,000-row safety limit", testRowInsertRestoresThousandRowSafetyLimit],
+    ["Large displayed delete restores 10k order linearly", testLargeDeleteRestoreUsesCapturedIndices],
+    ["Column batch insertion stays inside anchor gap", testColumnBatchInsertionUsesOneStableGap],
+    ["Column visual direction and specification order stay stable", testColumnVisualDirectionAndSpecificationOrderAreStable],
+    ["Column insertion rebalances an exhausted gap", testColumnInsertionRebalancesExhaustedGap],
+    ["Column batch rejects duplicate names before mutation", testColumnBatchRejectsDuplicateNamesBeforeMutation],
+    ["Selection Context recognizes whole column", testSelectionContextRecognizesWholeColumnWithoutRows],
+    ["Selection Context survives detached public range", testSelectionContextKeepsWholeColumnWhenPublicRangeIsDetached],
+    ["Selection Context keeps normal vertical range distinct", testSelectionContextDoesNotConfuseVerticalRangeWithWholeColumn],
+    ["Selection Context hit-testing uses row and column", testSelectionContextHitTestingUsesRowsAndColumns],
+    ["Selection Context preserves secondary-click inside range", testSelectionContextPreservesSecondaryClickInsideRange],
+    ["Persistence identity retains persisted delete", testPersistenceIdentityTracksDeletedPersistedRow],
+    ["Persistence identity ignores temporary delete", testPersistenceIdentityIgnoresTemporaryDelete],
+    ["Persistence identity rebases inserted row after Save", testPersistenceIdentityRebasesInsertedRowAfterSave],
+    ["Persistence identity stays targeted across 10,000 rows", testPersistenceIdentityTenThousandRowsStaysTargeted],
+    ["Persistence identity reconciles visible row after committed delete", testPersistenceIdentityReconcilesVisibleRowAfterCommittedDelete],
+    ["Persistence identity makes committed delete Undo a new row", testPersistenceIdentityMakesSavedDeleteUndoAnewRow],
     ["Unified Validation allows completely blank new row", testUnifiedValidationAllowsCompletelyBlankNewRow],
     ["Unified Validation activates requirements when a new row starts", testUnifiedValidationActivatesRequiredFieldsWhenNewRowStarts],
     ["Unified Validation requires persisted blank row fields", testUnifiedValidationRequiresPersistedRowFields],
@@ -1402,7 +2027,7 @@ export async function runRevoGridChangeEngineSelfTests() {
 
     return {
         engine: "RevoGrid Sheet History + Change Engine Foundation",
-        version: "Gate 5B-6 Unified Validation",
+        version: "Gate 5B-9 Structure Workspace Foundation",
         passed: results.filter(result => result.status === "PASS").length,
         failed: results.filter(result => result.status === "FAIL").length,
         total: results.length,

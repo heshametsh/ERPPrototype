@@ -694,6 +694,114 @@ internal sealed class WorkOrderSaveIntegrationTests(
             "Custom columns leaked into another department.");
     }
 
+    public async Task CustomColumnLayoutOrderCanRebalanceWithRowVersionProtectionAsync()
+    {
+        const int workYear = 2026;
+        const string firstFieldKey = "custom_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab";
+        const string secondFieldKey = "custom_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaac";
+
+        var sheet = await database.Service.LoadSheetAsync(
+            database.EmployeeAId,
+            workYear);
+
+        TestAssert.NotNull(
+            sheet,
+            "The sheet could not be loaded before the custom-column rebalance test.");
+
+        var createInputs = sheet!.CustomColumns
+            .Select(ToCustomColumnInput)
+            .Append(new CustomColumnDefinitionInput(
+                0,
+                firstFieldKey,
+                "Rebalance First",
+                "Text",
+                5_000_000_000_001L))
+            .Append(new CustomColumnDefinitionInput(
+                0,
+                secondFieldKey,
+                "Rebalance Second",
+                "Number",
+                5_000_000_000_002L))
+            .ToList();
+
+        var createResult = await database.Service.SaveChangesAsync(
+            database.EmployeeAId,
+            workYear,
+            addedRecords: [],
+            changedRecords: Array.Empty<WorkOrderChangeSet>(),
+            deletedRecords: [],
+            customColumns: createInputs,
+            customColumnsChanged: true);
+
+        TestAssert.True(
+            createResult.Succeeded,
+            $"Creating tightly packed custom columns failed: {createResult.ErrorMessage}");
+
+        var created = createResult.SavedCustomColumns!;
+        var rebalanceInputs = created
+            .Select(column => new CustomColumnDefinitionInput(
+                column.Id,
+                column.FieldKey,
+                column.Name,
+                column.DataType,
+                column.FieldKey switch
+                {
+                    firstFieldKey => 5_333_333_333_333L,
+                    secondFieldKey => 5_666_666_666_666L,
+                    _ => column.LayoutOrder
+                },
+                column.RowVersion))
+            .ToList();
+
+        var rebalanceResult = await database.Service.SaveChangesAsync(
+            database.EmployeeAId,
+            workYear,
+            addedRecords: [],
+            changedRecords: Array.Empty<WorkOrderChangeSet>(),
+            deletedRecords: [],
+            customColumns: rebalanceInputs,
+            customColumnsChanged: true);
+
+        TestAssert.True(
+            rebalanceResult.Succeeded,
+            $"Rebalancing persisted custom-column positions failed: {rebalanceResult.ErrorMessage}");
+
+        var rebalanced = rebalanceResult.SavedCustomColumns!;
+        TestAssert.Equal(
+            5_333_333_333_333L,
+            rebalanced.Single(column => column.FieldKey == firstFieldKey).LayoutOrder,
+            "The first persisted custom column did not accept its rebalanced position.");
+        TestAssert.Equal(
+            5_666_666_666_666L,
+            rebalanced.Single(column => column.FieldKey == secondFieldKey).LayoutOrder,
+            "The second persisted custom column did not accept its rebalanced position.");
+
+        var staleInputs = rebalanceInputs
+            .Select(input => input with
+            {
+                LayoutOrder = input.FieldKey == firstFieldKey
+                    ? 5_250_000_000_000L
+                    : input.LayoutOrder
+            })
+            .ToList();
+
+        var staleResult = await database.Service.SaveChangesAsync(
+            database.EmployeeAId,
+            workYear,
+            addedRecords: [],
+            changedRecords: Array.Empty<WorkOrderChangeSet>(),
+            deletedRecords: [],
+            customColumns: staleInputs,
+            customColumnsChanged: true);
+
+        TestAssert.False(
+            staleResult.Succeeded,
+            "A stale Custom Column RowVersion was allowed to move a persisted column.");
+        TestAssert.True(
+            staleResult.ErrorMessage.Contains("another session", StringComparison.OrdinalIgnoreCase),
+            "The stale custom-column move failed for a reason other than RowVersion protection.");
+    }
+
     public async Task DecimalCustomNumberIsRejectedAtomicallyAsync()
     {
         const int workYear = 2026;

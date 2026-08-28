@@ -3,10 +3,20 @@ import { defineCustomElement as defineFilterPanel } from "https://cdn.jsdelivr.n
 import {
     createExcelFilterColumn,
     createExcelFilterNativeConfig
-} from "./revoGridExcelFilter.js?v=20260822-gate5b5-search-selection-1";
-import { createSortOnlyColumn } from "./revoGridSort.js?v=20260821-gate5b4-header-sort-1";
+} from "./revoGridExcelFilter.js?v=20260828-structure-workspace-2";
+import { createSortOnlyColumn } from "./revoGridSort.js?v=20260828-structure-workspace-2";
 
 const VERSION = "4.25.2";
+const COLUMN_LAYOUT_STEP = 1_000_000_000_000;
+const CORE_LAYOUT_ORDERS = Object.freeze({
+    workOrderNumber: 1 * COLUMN_LAYOUT_STEP,
+    workTypeCode: 2 * COLUMN_LAYOUT_STEP,
+    assignmentDate: 3 * COLUMN_LAYOUT_STEP,
+    workOrderValue: 4 * COLUMN_LAYOUT_STEP,
+    partialAmount: 5 * COLUMN_LAYOUT_STEP,
+    remainingAmount: 6 * COLUMN_LAYOUT_STEP,
+    basket: 7 * COLUMN_LAYOUT_STEP
+});
 const states = new Map();
 const initializationCounts = new Map();
 
@@ -46,6 +56,41 @@ function customFilterType(dataType) {
         : "string";
 }
 
+
+function mergeOrderedColumns(core, customDefinitions, customColumns) {
+    const customByProp = new Map(
+        (Array.isArray(customColumns) ? customColumns : [])
+            .map(normalizeCustomColumn)
+            .filter(column => column.fieldKey)
+            .map(column => [column.fieldKey, column])
+    );
+
+    const decoratedCore = core.map(column => ({
+        ...column,
+        erpLayoutOrder:
+            CORE_LAYOUT_ORDERS[String(column?.prop ?? "")] ??
+            Number.MAX_SAFE_INTEGER,
+        erpCustomColumn: false
+    }));
+
+    const decoratedCustom = customDefinitions.map(column => {
+        const definition = customByProp.get(String(column?.prop ?? ""));
+        return {
+            ...column,
+            erpLayoutOrder:
+                Number(definition?.layoutOrder) || Number.MAX_SAFE_INTEGER,
+            erpCustomColumn: true,
+            erpCustomColumnType: String(definition?.dataType ?? "Text")
+        };
+    });
+
+    return [...decoratedCore, ...decoratedCustom]
+        .sort((left, right) =>
+            Number(left.erpLayoutOrder) - Number(right.erpLayoutOrder) ||
+            String(left.prop).localeCompare(String(right.prop))
+        );
+}
+
 function buildLegacyGateColumns(customColumns) {
     const core = [
         { name: "Work Order Number", prop: "workOrderNumber", size: 220, sortable: true, filter: "string", autoSize: true },
@@ -72,7 +117,7 @@ function buildLegacyGateColumns(customColumns) {
             autoSize: true
         }));
 
-    return core.concat(custom);
+    return mergeOrderedColumns(core, custom, customColumns);
 }
 
 function buildExcelFilterGateColumns(customColumns, enableHeaderActions) {
@@ -137,7 +182,7 @@ function buildExcelFilterGateColumns(customColumns, enableHeaderActions) {
                 normalizedType === "date" ? "date" : "values");
         });
 
-    return core.concat(custom);
+    return mergeOrderedColumns(core, custom, customColumns);
 }
 
 function attachCellProperties(columns, provider) {
@@ -240,7 +285,11 @@ export async function initialize(elementId, rows, customColumns, options) {
     grid.filter = enableExcelFilter
         ? createExcelFilterNativeConfig()
         : true;
-    grid.useClipboard = true;
+    grid.useClipboard = Boolean(
+        value(options, "enableClipboardRangeFill", "EnableClipboardRangeFill", false)
+    )
+        ? { rangeFill: true }
+        : true;
     grid.rtl = Boolean(value(options, "rtl", "Rtl", true));
     grid.autoSizeColumn = true;
     grid.stretch = true;
@@ -261,7 +310,12 @@ export async function initialize(elementId, rows, customColumns, options) {
         observer: null,
         initializationCount: (initializationCounts.get(elementId) || 0) + 1,
         version: String(value(options, "version", "Version", VERSION) || VERSION),
-        excelFilterEnabled: enableExcelFilter
+        excelFilterEnabled: enableExcelFilter,
+        headerActionsEnabled: enableHeaderActions,
+        validationCellProperties:
+            value(options, "validationCellProperties", "ValidationCellProperties", null),
+        customColumns: (Array.isArray(customColumns) ? customColumns : [])
+            .map(normalizeCustomColumn)
     };
 
     addListener(state, grid, "viewportscroll", () => {
@@ -287,6 +341,32 @@ export async function initialize(elementId, rows, customColumns, options) {
 
     state.readyMs = performance.now() - startedAt;
     states.set(elementId, state);
+}
+
+export async function replaceCustomColumns(elementId, customColumns) {
+    const state = states.get(elementId);
+    if (!state) {
+        throw new Error(`Native RevoGrid state '${elementId}' was not found.`);
+    }
+
+    const normalized = (Array.isArray(customColumns) ? customColumns : [])
+        .map(normalizeCustomColumn)
+        .filter(column => column.fieldKey && column.name);
+
+    const columns = buildColumns(
+        normalized,
+        state.excelFilterEnabled,
+        state.headerActionsEnabled,
+        state.validationCellProperties
+    );
+
+    state.grid.columns = columns;
+    state.customColumns = normalized;
+    state.columns = columns.length;
+
+    await new Promise(resolve =>
+        requestAnimationFrame(() =>
+            requestAnimationFrame(resolve)));
 }
 
 // RevoGrid's documented integration rule is to replace source when the
