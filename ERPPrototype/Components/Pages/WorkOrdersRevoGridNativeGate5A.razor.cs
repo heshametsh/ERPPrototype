@@ -243,9 +243,9 @@ public partial class WorkOrdersRevoGridNativeGate5A
         {
             var gridModulePath = EnableChangeEngine
                 ? EnableSaveHandshake
-                    ? "./js/revoGridGate5B1.js?v=20260830-gate5b11-save-handshake-clean-3"
+                    ? "./js/revoGridGate5B1.js?v=20260830-selection-core-r2"
                     : EnableHeaderMultiSelection
-                    ? "./js/revoGridGate5B1.js?v=20260829-gate5b10-header-selection-plugin-1"
+                    ? "./js/revoGridGate5B1.js?v=20260830-selection-core-r2"
                     : EnableStructureWorkspace
                     ? "./js/revoGridGate5B1.js?v=20260828-structure-workspace-5"
                     : EnableSelectionContext

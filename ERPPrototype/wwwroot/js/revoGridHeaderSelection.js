@@ -3,6 +3,7 @@ const ROW_CELL_CLASS = "erp-revo-selected-row-cell";
 const COLUMN_CELL_CLASS = "erp-revo-selected-column-cell";
 const ROW_HEADER_CLASS = "erp-revo-selected-row-header";
 const COLUMN_HEADER_CLASS = "erp-revo-selected-column-header";
+const ROW_POSITION_MAP_THRESHOLD = 64;
 
 function text(value) {
     return String(value ?? "").trim();
@@ -101,16 +102,16 @@ function symmetricDifference(left, right) {
 export function createRevoGridHeaderSelectionModel() {
     let mode = "none";
     let rowAnchorKey = null;
+    let rowPrimaryKey = null;
     let columnAnchorProp = null;
-    let activeRowKeys = [];
-    let activeColumnProps = [];
+    let columnPrimaryProp = null;
     const selectedRowKeys = new Set();
     const selectedColumnProps = new Set();
 
     function clearRows() {
         selectedRowKeys.clear();
         rowAnchorKey = null;
-        activeRowKeys = [];
+        rowPrimaryKey = null;
         if (mode === "rows") {
             mode = "none";
         }
@@ -119,7 +120,7 @@ export function createRevoGridHeaderSelectionModel() {
     function clearColumns() {
         selectedColumnProps.clear();
         columnAnchorProp = null;
-        activeColumnProps = [];
+        columnPrimaryProp = null;
         if (mode === "columns") {
             mode = "none";
         }
@@ -129,9 +130,9 @@ export function createRevoGridHeaderSelectionModel() {
         selectedRowKeys.clear();
         selectedColumnProps.clear();
         rowAnchorKey = null;
+        rowPrimaryKey = null;
         columnAnchorProp = null;
-        activeRowKeys = [];
-        activeColumnProps = [];
+        columnPrimaryProp = null;
         mode = "none";
     }
 
@@ -144,42 +145,43 @@ export function createRevoGridHeaderSelectionModel() {
         const before = JSON.stringify(getState());
         selectedColumnProps.clear();
         columnAnchorProp = null;
-        activeColumnProps = [];
+        columnPrimaryProp = null;
         mode = "rows";
 
         if (modifiers.shiftKey) {
-            const next = contiguousValues(
-                visibleKeys,
-                rowAnchorKey || normalized,
-                normalized
-            );
+            const visible = (Array.isArray(visibleKeys) ? visibleKeys : [])
+                .map(text)
+                .filter(Boolean);
+            const effectiveAnchor = visible.includes(rowAnchorKey)
+                ? rowAnchorKey
+                : visible.includes(rowPrimaryKey)
+                    ? rowPrimaryKey
+                    : normalized;
+            const next = contiguousValues(visible, effectiveAnchor, normalized);
             selectedRowKeys.clear();
             next.forEach(value => selectedRowKeys.add(value));
-            activeRowKeys = [...next];
-            if (!rowAnchorKey || !next.includes(rowAnchorKey)) {
-                rowAnchorKey = normalized;
-            }
+            rowAnchorKey = effectiveAnchor;
+            rowPrimaryKey = normalized;
         } else if (modifiers.ctrlKey || modifiers.metaKey) {
             if (selectedRowKeys.has(normalized)) {
                 selectedRowKeys.delete(normalized);
-                const fallback = lastValue(selectedRowKeys);
-                activeRowKeys = fallback ? [fallback] : [];
+                rowPrimaryKey = lastValue(selectedRowKeys);
             } else {
                 selectedRowKeys.add(normalized);
-                activeRowKeys = [normalized];
+                rowPrimaryKey = normalized;
             }
-            rowAnchorKey = normalized;
+            rowAnchorKey = rowPrimaryKey;
         } else {
             selectedRowKeys.clear();
             selectedRowKeys.add(normalized);
-            activeRowKeys = [normalized];
             rowAnchorKey = normalized;
+            rowPrimaryKey = normalized;
         }
 
         if (selectedRowKeys.size === 0) {
             mode = "none";
             rowAnchorKey = null;
-            activeRowKeys = [];
+            rowPrimaryKey = null;
         }
         return before !== JSON.stringify(getState());
     }
@@ -193,42 +195,43 @@ export function createRevoGridHeaderSelectionModel() {
         const before = JSON.stringify(getState());
         selectedRowKeys.clear();
         rowAnchorKey = null;
-        activeRowKeys = [];
+        rowPrimaryKey = null;
         mode = "columns";
 
         if (modifiers.shiftKey) {
-            const next = contiguousValues(
-                orderedProps,
-                columnAnchorProp || normalized,
-                normalized
-            );
+            const ordered = (Array.isArray(orderedProps) ? orderedProps : [])
+                .map(text)
+                .filter(Boolean);
+            const effectiveAnchor = ordered.includes(columnAnchorProp)
+                ? columnAnchorProp
+                : ordered.includes(columnPrimaryProp)
+                    ? columnPrimaryProp
+                    : normalized;
+            const next = contiguousValues(ordered, effectiveAnchor, normalized);
             selectedColumnProps.clear();
             next.forEach(value => selectedColumnProps.add(value));
-            activeColumnProps = [...next];
-            if (!columnAnchorProp || !next.includes(columnAnchorProp)) {
-                columnAnchorProp = normalized;
-            }
+            columnAnchorProp = effectiveAnchor;
+            columnPrimaryProp = normalized;
         } else if (modifiers.ctrlKey || modifiers.metaKey) {
             if (selectedColumnProps.has(normalized)) {
                 selectedColumnProps.delete(normalized);
-                const fallback = lastValue(selectedColumnProps);
-                activeColumnProps = fallback ? [fallback] : [];
+                columnPrimaryProp = lastValue(selectedColumnProps);
             } else {
                 selectedColumnProps.add(normalized);
-                activeColumnProps = [normalized];
+                columnPrimaryProp = normalized;
             }
-            columnAnchorProp = normalized;
+            columnAnchorProp = columnPrimaryProp;
         } else {
             selectedColumnProps.clear();
             selectedColumnProps.add(normalized);
-            activeColumnProps = [normalized];
             columnAnchorProp = normalized;
+            columnPrimaryProp = normalized;
         }
 
         if (selectedColumnProps.size === 0) {
             mode = "none";
             columnAnchorProp = null;
-            activeColumnProps = [];
+            columnPrimaryProp = null;
         }
         return before !== JSON.stringify(getState());
     }
@@ -246,23 +249,19 @@ export function createRevoGridHeaderSelectionModel() {
             }
         }
 
-        const nextActive = activeRowKeys.filter(key => visible.has(key));
-        if (nextActive.length !== activeRowKeys.length) {
-            activeRowKeys = nextActive;
+        if (rowPrimaryKey && !selectedRowKeys.has(rowPrimaryKey)) {
+            rowPrimaryKey = lastValue(selectedRowKeys);
             changed = true;
         }
-
-        if (rowAnchorKey && !visible.has(rowAnchorKey)) {
-            rowAnchorKey = null;
+        if (rowAnchorKey && !selectedRowKeys.has(rowAnchorKey)) {
+            rowAnchorKey = rowPrimaryKey;
             changed = true;
         }
 
         if (mode === "rows" && selectedRowKeys.size === 0) {
             mode = "none";
-            activeRowKeys = [];
-        } else if (mode === "rows" && activeRowKeys.length === 0) {
-            const fallback = lastValue(selectedRowKeys);
-            activeRowKeys = fallback ? [fallback] : [];
+            rowAnchorKey = null;
+            rowPrimaryKey = null;
         }
 
         return changed;
@@ -281,23 +280,19 @@ export function createRevoGridHeaderSelectionModel() {
             }
         }
 
-        const nextActive = activeColumnProps.filter(prop => existing.has(prop));
-        if (nextActive.length !== activeColumnProps.length) {
-            activeColumnProps = nextActive;
+        if (columnPrimaryProp && !selectedColumnProps.has(columnPrimaryProp)) {
+            columnPrimaryProp = lastValue(selectedColumnProps);
             changed = true;
         }
-
-        if (columnAnchorProp && !existing.has(columnAnchorProp)) {
-            columnAnchorProp = null;
+        if (columnAnchorProp && !selectedColumnProps.has(columnAnchorProp)) {
+            columnAnchorProp = columnPrimaryProp;
             changed = true;
         }
 
         if (mode === "columns" && selectedColumnProps.size === 0) {
             mode = "none";
-            activeColumnProps = [];
-        } else if (mode === "columns" && activeColumnProps.length === 0) {
-            const fallback = lastValue(selectedColumnProps);
-            activeColumnProps = fallback ? [fallback] : [];
+            columnAnchorProp = null;
+            columnPrimaryProp = null;
         }
 
         return changed;
@@ -367,10 +362,10 @@ export function createRevoGridHeaderSelectionModel() {
             kind: mode,
             selectedKeys: [...selectedRowKeys],
             selectedProps: [...selectedColumnProps],
-            activeRowKeys: [...activeRowKeys],
-            activeColumnProps: [...activeColumnProps],
             rowAnchorKey,
-            columnAnchorProp
+            rowPrimaryKey,
+            columnAnchorProp,
+            columnPrimaryProp
         };
     }
 
@@ -390,6 +385,20 @@ export function createRevoGridHeaderSelectionModel() {
     });
 }
 
+function contiguousPositions(values) {
+    const positions = [...new Set((Array.isArray(values) ? values : []).filter(Number.isInteger))]
+        .sort((left, right) => left - right);
+    if (positions.length === 0) {
+        return false;
+    }
+    for (let index = 1; index < positions.length; index += 1) {
+        if (positions[index] !== positions[index - 1] + 1) {
+            return false;
+        }
+    }
+    return true;
+}
+
 export function createRevoGridHeaderSelectionFeature() {
     const model = createRevoGridHeaderSelectionModel();
     let pluginInstance = null;
@@ -397,10 +406,9 @@ export function createRevoGridHeaderSelectionFeature() {
     class RevoGridHeaderSelectionPlugin {
         constructor(grid, providers) {
             this.grid = grid;
-            this.providers = providers;
             this.destroyed = false;
             this.nativeSyncDepth = 0;
-            this.selectionContext = null;
+            this.nativeProjectionQueue = Promise.resolve(false);
             this.onBeforeHeaderClick = event => this.handleBeforeHeaderClick(event);
             this.onAfterSortingApply = () => {
                 queueMicrotask(() => {
@@ -414,9 +422,6 @@ export function createRevoGridHeaderSelectionFeature() {
             pluginInstance = this;
         }
 
-        setSelectionContext(selectionContext) {
-            this.selectionContext = selectionContext ?? null;
-        }
 
         async visibleRows() {
             const rows = await this.grid.getVisibleSource("rgRow");
@@ -444,7 +449,7 @@ export function createRevoGridHeaderSelectionFeature() {
         }
 
         async applyNativeRowRange(state = model.getState()) {
-            if (state.kind !== "rows" || state.activeRowKeys.length === 0) {
+            if (state.kind !== "rows" || state.selectedKeys.length === 0) {
                 return false;
             }
 
@@ -452,8 +457,19 @@ export function createRevoGridHeaderSelectionFeature() {
                 this.visibleRows(),
                 this.columns()
             ]);
-            const positions = state.activeRowKeys
-                .map(key => rows.findIndex(row => text(row?.clientKey) === key))
+            const usePositionMap = state.selectedKeys.length >= ROW_POSITION_MAP_THRESHOLD;
+            const positionByKey = usePositionMap
+                ? new Map(
+                    rows
+                        .map((row, index) => [text(row?.clientKey), index])
+                        .filter(([key]) => Boolean(key))
+                )
+                : null;
+            const findPosition = key => positionByKey
+                ? (positionByKey.get(text(key)) ?? -1)
+                : rows.findIndex(row => text(row?.clientKey) === text(key));
+            const positions = state.selectedKeys
+                .map(findPosition)
                 .filter(index => index >= 0);
             const regularColumns = columns.filter(
                 column => text(column?.pin || "rgCol") === "rgCol"
@@ -463,8 +479,21 @@ export function createRevoGridHeaderSelectionFeature() {
                 return false;
             }
 
-            const startY = Math.min(...positions);
-            const endY = Math.max(...positions);
+            let startY;
+            let endY;
+            if (contiguousPositions(positions)) {
+                startY = Math.min(...positions);
+                endY = Math.max(...positions);
+            } else {
+                const primaryKey = text(state.rowPrimaryKey) || text(lastValue(state.selectedKeys));
+                const primaryPosition = findPosition(primaryKey);
+                const safePosition = primaryPosition >= 0
+                    ? primaryPosition
+                    : positions[positions.length - 1];
+                startY = safePosition;
+                endY = safePosition;
+            }
+
             await this.withNativeSync(() => this.grid.setCellsFocus(
                 { x: 0, y: startY },
                 { x: regularColumns.length - 1, y: endY },
@@ -475,7 +504,7 @@ export function createRevoGridHeaderSelectionFeature() {
         }
 
         async applyNativeColumnRange(state = model.getState()) {
-            if (state.kind !== "columns" || state.activeColumnProps.length === 0) {
+            if (state.kind !== "columns" || state.selectedProps.length === 0) {
                 return false;
             }
 
@@ -487,52 +516,96 @@ export function createRevoGridHeaderSelectionFeature() {
                 return false;
             }
 
-            const activeColumns = state.activeColumnProps
+            const selectedColumns = state.selectedProps
                 .map(prop => columns.find(column => text(column?.prop) === prop))
                 .filter(Boolean);
-            if (activeColumns.length === 0) {
+            if (selectedColumns.length === 0) {
                 return false;
             }
 
-            const colType = text(activeColumns[activeColumns.length - 1]?.pin || "rgCol") || "rgCol";
-            const viewportColumns = columns.filter(
-                column => text(column?.pin || "rgCol") === colType
+            const primaryProp = text(state.columnPrimaryProp) || text(lastValue(state.selectedProps));
+            const primaryColumn = columns.find(column => text(column?.prop) === primaryProp) ?? selectedColumns[selectedColumns.length - 1];
+            const primaryColType = text(primaryColumn?.pin || "rgCol") || "rgCol";
+            const selectedColTypes = new Set(
+                selectedColumns.map(column => text(column?.pin || "rgCol") || "rgCol")
             );
-            const positions = state.activeColumnProps
+            const viewportColumns = columns.filter(
+                column => text(column?.pin || "rgCol") === primaryColType
+            );
+            const positions = state.selectedProps
                 .map(prop => viewportColumns.findIndex(column => text(column?.prop) === prop))
                 .filter(index => index >= 0);
-            if (positions.length === 0) {
-                return false;
+
+            let startX;
+            let endX;
+            if (
+                selectedColTypes.size === 1 &&
+                positions.length === state.selectedProps.length &&
+                contiguousPositions(positions)
+            ) {
+                startX = Math.min(...positions);
+                endX = Math.max(...positions);
+            } else {
+                const primaryPosition = viewportColumns.findIndex(
+                    column => text(column?.prop) === text(primaryColumn?.prop)
+                );
+                if (primaryPosition < 0) {
+                    return false;
+                }
+                startX = primaryPosition;
+                endX = primaryPosition;
             }
 
-            const startX = Math.min(...positions);
-            const endX = Math.max(...positions);
             await this.withNativeSync(() => this.grid.setCellsFocus(
                 { x: startX, y: 0 },
                 { x: endX, y: rows.length - 1 },
-                colType,
+                primaryColType,
                 "rgRow"
             ));
             return true;
         }
 
         async reapplyNativeRange() {
-            if (this.destroyed) {
-                return false;
-            }
+            const run = async () => {
+                if (this.destroyed) {
+                    return false;
+                }
 
-            const state = model.getState();
-            if (state.kind === "rows") {
-                return await this.applyNativeRowRange(state);
-            }
-            if (state.kind === "columns") {
-                return await this.applyNativeColumnRange(state);
-            }
-            return false;
+                // Header clicks can arrive faster than Revo finishes applying
+                // setCellsFocus. Serialize only the native projection so an
+                // older async projection can never become the final range.
+                const state = model.getState();
+                if (state.kind === "rows") {
+                    return await this.applyNativeRowRange(state);
+                }
+                if (state.kind === "columns") {
+                    return await this.applyNativeColumnRange(state);
+                }
+                return false;
+            };
+
+            const result = this.nativeProjectionQueue.then(run, run);
+            this.nativeProjectionQueue = result.catch(() => false);
+            return await result;
         }
 
-        async refreshRows() {
+        async refreshRows(changedKeys) {
+            const keys = [...new Set(
+                (Array.isArray(changedKeys) ? changedKeys : [])
+                    .map(text)
+                    .filter(Boolean)
+            )];
+            if (keys.length === 0) {
+                return;
+            }
+
+            // Revo Community's public targeted cell refresh only redraws cell
+            // inner content. Semantic row selection is expressed through
+            // cellProperties (classes/data attributes), so those properties
+            // require the public virtualized row viewport refresh.
             await this.grid.refresh("rgRow");
+
+            // Row headers live in their own lightweight viewport.
             if (this.grid.rowHeaders && typeof this.grid.rowHeaders === "object") {
                 this.grid.rowHeaders = { ...this.grid.rowHeaders };
             }
@@ -556,17 +629,18 @@ export function createRevoGridHeaderSelectionFeature() {
         }
 
         async refreshDiff(before, after) {
-            const rowsChanged = before.kind === "rows" || after.kind === "rows"
-                ? JSON.stringify(before.selectedKeys) !== JSON.stringify(after.selectedKeys) || before.kind !== after.kind
-                : false;
+            const changedRows = symmetricDifference(
+                before.kind === "rows" ? before.selectedKeys : [],
+                after.kind === "rows" ? after.selectedKeys : []
+            );
             const changedColumns = symmetricDifference(
                 before.kind === "columns" ? before.selectedProps : [],
                 after.kind === "columns" ? after.selectedProps : []
             );
 
             const tasks = [];
-            if (rowsChanged) {
-                tasks.push(this.refreshRows());
+            if (changedRows.length > 0) {
+                tasks.push(this.refreshRows(changedRows));
             }
             if (changedColumns.length > 0) {
                 tasks.push(this.refreshColumns(changedColumns));
@@ -636,6 +710,11 @@ export function createRevoGridHeaderSelectionFeature() {
                 rows.map(row => text(row?.clientKey)).filter(Boolean)
             );
             if (!changed) {
+                // Filter/Insert/Delete can move a still-selected row, or change
+                // the vertical extent of a whole-column range, without changing
+                // semantic selection. Re-project the current selection into
+                // Revo so visual meaning and native command range stay aligned.
+                await this.reapplyNativeRange();
                 return false;
             }
 
@@ -647,6 +726,10 @@ export function createRevoGridHeaderSelectionFeature() {
             const before = model.getState();
             const changed = model.pruneColumns(await this.orderedColumnProps());
             if (!changed) {
+                // Column workspace changes can move a still-selected column
+                // without changing its prop. Keep Revo's native coordinates
+                // synchronized with the semantic prop-based selection.
+                await this.reapplyNativeRange();
                 return false;
             }
 
@@ -699,7 +782,9 @@ export function createRevoGridHeaderSelectionFeature() {
                 selectedKeys: Object.freeze([...state.selectedKeys]),
                 selectedProps: Object.freeze([...state.selectedProps]),
                 rowAnchorKey: state.rowAnchorKey,
+                rowPrimaryKey: state.rowPrimaryKey,
                 columnAnchorProp: state.columnAnchorProp,
+                columnPrimaryProp: state.columnPrimaryProp,
                 range: null,
                 focused: null
             });

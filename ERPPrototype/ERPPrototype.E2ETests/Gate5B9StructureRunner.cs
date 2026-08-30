@@ -639,8 +639,11 @@ internal static class Gate5B9StructureRunner
 
     private static string CreateBundle(string artifactDirectory)
     {
-        var desktop = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
-        var path = Path.Combine(desktop, $"ERP_REVO_GATE5B9_TRACE_{DateTime.Now:yyyyMMdd-HHmmss}.zip");
+        var downloads = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            "Downloads");
+        Directory.CreateDirectory(downloads);
+        var path = Path.Combine(downloads, $"ERP_REVO_GATE5B9_TRACE_{DateTime.Now:yyyyMMdd-HHmmss}.zip");
         if (File.Exists(path)) File.Delete(path);
         ZipFile.CreateFromDirectory(artifactDirectory, path, CompressionLevel.Optimal, includeBaseDirectory: false);
         return path;

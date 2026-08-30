@@ -18,8 +18,8 @@ internal static class Gate5B9ToB11RegressionRunner
         if (b9 != 0) failures.Add("B9 Structure");
 
         Console.WriteLine();
-        Console.WriteLine("SCENARIO 2/3 - Selection + Sort + Filter + Virtualization");
-        Console.WriteLine("Purpose: prove selected Work Orders survive view movement and obey Filter policy.");
+        Console.WriteLine("SCENARIO 2/3 - Selection Core + Command Scope + Sort/Filter + Repaint");
+        Console.WriteLine("Purpose: prove Selected + Anchor + Primary owns semantic selection, commands use exact ClientKeys, native ranges stay safe after view movement, and small changes repaint narrowly.");
         var b10 = await Gate5B10SelectionRunner.RunAsync();
         if (b10 != 0) failures.Add("B10 Selection");
 

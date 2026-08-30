@@ -10,7 +10,7 @@ internal static class Gate5B11SaveHandshakeRunner
     private const int FixedPort = 5265;
     private const string GatePath = "/work-orders-revogrid-gate5b11";
     private const string GridHostId = "revogrid-native-gate5a-grid";
-    private const string ModulePath = "/js/revoGridGate5B1.js?v=20260830-gate5b11-save-handshake-clean-3";
+    private const string ModulePath = "/js/revoGridGate5B1.js?v=20260830-selection-core-r2";
 
     public static async Task<int> RunAsync()
     {

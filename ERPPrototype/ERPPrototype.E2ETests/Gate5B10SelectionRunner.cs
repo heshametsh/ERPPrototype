@@ -16,7 +16,7 @@ internal static class Gate5B10SelectionRunner
         Exception? failure = null;
 
         Console.WriteLine("RevoGrid Gate 5B-10 Header Selection real-browser journey");
-        Console.WriteLine("The journey proves visible row/column Ctrl+Shift selection, identity preservation, Filter pruning, virtualization, and right-click behavior.");
+        Console.WriteLine("The journey proves visible row/column Ctrl+Shift selection, exact semantic command scope, safe native-range projection after view movement, bounded virtualized repaint, Filter pruning, virtualization, and right-click behavior.");
         Console.WriteLine($"Application port: {FixedPort}");
         Console.WriteLine($"Artifacts: {artifactDirectory}");
         Console.WriteLine();
@@ -65,29 +65,53 @@ internal static class Gate5B10SelectionRunner
                 await AssertNativeCellSelectionStillWorksAsync(page);
                 Console.WriteLine("[01-native] PASS — ordinary Revo cell focus/range still works");
 
+                await AssertRowSelectionUsesBoundedViewportRefreshAsync(page);
+                Console.WriteLine("[02-render-contract] PASS — semantic row selection uses bounded rgRow viewport refresh only; no full-grid refresh or source replacement");
+
+                await AssertSelectionStateHasOnePrimaryAsync(page);
+                Console.WriteLine("[03-state-shape] PASS — semantic selection uses Selected + Anchor + Primary only; no parallel Active/Lead state");
+
                 await AssertRowPlainCtrlShiftAsync(page);
-                Console.WriteLine("[02-rows] PASS — visible Plain/Ctrl/Shift row selection");
+                Console.WriteLine("[04-rows] PASS — visible Plain/Ctrl/Shift row selection");
+
+                await AssertCtrlRowDeleteUsesExactSemanticKeysAsync(page);
+                Console.WriteLine("[05-semantic-delete] PASS — Ctrl-selected rows delete exactly the selected ClientKeys and Undo restores them");
 
                 await AssertRowRightClickPreservesSelectionAsync(page);
-                Console.WriteLine("[03-row-context] PASS — right-click inside row selection preserves it");
+                Console.WriteLine("[06-row-context] PASS — right-click inside row selection preserves it");
 
                 await AssertSortPreservesSelectedWorkOrderAsync(page);
-                Console.WriteLine("[04-sort] PASS — selected ClientKey survives position changes");
+                Console.WriteLine("[07-sort] PASS — selected ClientKey survives position changes");
+
+                await AssertShiftSelectionAfterSortNeverBridgesUnselectedRowsAsync(page);
+                Console.WriteLine("[08-native-safety] PASS — view movement never projects a fake native range across unselected rows");
 
                 await AssertFilterPrunesSelectionAsync(page);
-                Console.WriteLine("[05-filter] PASS — hidden row leaves selection and does not return");
+                Console.WriteLine("[09-filter] PASS — hidden row leaves selection and does not return");
+
+                await AssertFilterRepositionsStillSelectedRowAsync(page);
+                Console.WriteLine("[10-filter-native-sync] PASS — a still-visible selected Work Order keeps semantic identity and native range after Filter moves it");
+
+                await AssertInsertPreservesSelectedRowAsync(page);
+                Console.WriteLine("[11-insert-native-sync] PASS — Insert Above preserves the same selected Work Order and reprojects Revo to its new row position");
+
+                await AssertRapidCtrlSelectionConvergesAsync(page);
+                Console.WriteLine("[12-rapid-ctrl] PASS — rapid Ctrl header clicks converge to one correct semantic/native selection");
 
                 await AssertRowVirtualizationAsync(page);
-                Console.WriteLine("[06-row-scroll] PASS — selected Work Order repaints after virtualization");
+                Console.WriteLine("[13-row-scroll] PASS — selected Work Order repaints after virtualization");
 
                 await AssertColumnPlainCtrlShiftAsync(page);
-                Console.WriteLine("[07-columns] PASS — visible Plain/Ctrl/Shift column selection");
+                Console.WriteLine("[14-columns] PASS — visible Plain/Ctrl/Shift column selection");
+
+                await AssertCtrlColumnNativeRangeNeverBridgesUnselectedColumnsAsync(page);
+                Console.WriteLine("[15-column-native-safety] PASS — Ctrl column selection never projects a fake native range across unselected columns");
 
                 await AssertColumnRightClickPreservesSelectionAsync(page);
-                Console.WriteLine("[08-column-context] PASS — right-click inside column selection preserves it");
+                Console.WriteLine("[16-column-context] PASS — right-click inside column selection preserves it");
 
                 await AssertDatasetSwitchClearsSelectionAsync(page);
-                Console.WriteLine("[09-dataset] PASS — year switch clears semantic selection");
+                Console.WriteLine("[17-dataset] PASS — year switch clears semantic selection");
 
                 browser.Diagnostics.AssertNoCriticalErrors();
                 await browser.CaptureSuccessAsync(
@@ -153,6 +177,136 @@ internal static class Gate5B10SelectionRunner
         E2ETestAssert.True(matches, "B10 changed Revo's ordinary Shift cell-range behavior.");
     }
 
+    private static async Task AssertRowSelectionUsesBoundedViewportRefreshAsync(IPage page)
+    {
+        await ScrollToRowAsync(page, 0);
+        await page.EvaluateAsync(
+            """
+            async () => {
+                const grid = document.querySelector('#revogrid-native-gate5a-grid revo-grid');
+                if (!grid || grid.__gate5b10RefreshProbe) return;
+
+                const original = grid.refresh.bind(grid);
+                const sourceBefore = await grid.getSource('rgRow');
+                const probe = {
+                    rgRowCount: 0,
+                    allCount: 0,
+                    otherCount: 0,
+                    original,
+                    sourceBefore
+                };
+
+                grid.__gate5b10RefreshProbe = probe;
+                grid.refresh = async type => {
+                    const normalized = String(type ?? 'all');
+                    if (normalized === 'rgRow') probe.rgRowCount += 1;
+                    else if (normalized === 'all') probe.allCount += 1;
+                    else probe.otherCount += 1;
+                    return await original(type);
+                };
+            }
+            """);
+
+        try
+        {
+            await RowHeader(page, 6).ClickAsync();
+            await AssertRowVisualAsync(page, 6, selected: true);
+
+            await WithKeyAsync(page, "Control", () => RowHeader(page, 8).ClickAsync());
+            await AssertRowVisualAsync(page, 6, selected: true);
+            await AssertRowVisualAsync(page, 8, selected: true);
+
+            await DataCell(page, 0, 0).ClickAsync();
+            await page.WaitForFunctionAsync(
+                """
+                () => document.querySelectorAll('#revogrid-native-gate5a-grid [data-erp-row-selected="true"]').length === 0
+                """,
+                null,
+                new PageWaitForFunctionOptions { Timeout = 10_000 });
+
+            var diagnosticsJson = await page.EvaluateAsync<string>(
+                """
+                async () => {
+                    const grid = document.querySelector('#revogrid-native-gate5a-grid revo-grid');
+                    const probe = grid?.__gate5b10RefreshProbe;
+                    const sourceAfter = grid ? await grid.getSource('rgRow') : null;
+                    return JSON.stringify({
+                        rgRowCount: probe?.rgRowCount ?? -1,
+                        allCount: probe?.allCount ?? -1,
+                        otherCount: probe?.otherCount ?? -1,
+                        sourceSame: Boolean(probe && sourceAfter === probe.sourceBefore)
+                    });
+                }
+                """);
+
+            using var diagnosticsDocument = System.Text.Json.JsonDocument.Parse(diagnosticsJson);
+            var diagnostics = diagnosticsDocument.RootElement;
+            var rgRowCount = diagnostics.GetProperty("rgRowCount").GetInt32();
+            var allCount = diagnostics.GetProperty("allCount").GetInt32();
+            var otherCount = diagnostics.GetProperty("otherCount").GetInt32();
+            var sourceSame = diagnostics.GetProperty("sourceSame").GetBoolean();
+
+            E2ETestAssert.True(
+                rgRowCount > 0 && rgRowCount <= 3,
+                $"Selection repaint should be bounded to one virtualized rgRow refresh per semantic change. Actual: {rgRowCount}.");
+
+            E2ETestAssert.Equal(
+                0,
+                allCount,
+                "Semantic row selection requested a full-grid refresh.");
+
+            E2ETestAssert.Equal(
+                0,
+                otherCount,
+                "Semantic row selection requested an unexpected viewport refresh type.");
+
+            E2ETestAssert.True(
+                sourceSame,
+                "Semantic row selection replaced the rgRow source instead of repainting the existing virtualized viewport.");
+        }
+        finally
+        {
+            await page.EvaluateAsync(
+                """
+                () => {
+                    const grid = document.querySelector('#revogrid-native-gate5a-grid revo-grid');
+                    const probe = grid?.__gate5b10RefreshProbe;
+                    if (!grid || !probe) return;
+                    grid.refresh = probe.original;
+                    delete grid.__gate5b10RefreshProbe;
+                }
+                """);
+        }
+    }
+
+    private static async Task AssertSelectionStateHasOnePrimaryAsync(IPage page)
+    {
+        await ScrollToRowAsync(page, 0);
+        await RowHeader(page, 1).ClickAsync();
+        await WithKeyAsync(page, "Control", () => RowHeader(page, 3).ClickAsync());
+
+        var shapeIsClean = await page.EvaluateAsync<bool>(
+            """
+            async () => {
+                const module = await import('/js/revoGridGate5B1.js?v=20260830-selection-core-r2');
+                const state = await module.getDiagnostics('revogrid-native-gate5a-grid');
+                const selection = state?.headerSelection ?? {};
+                return String(selection.kind ?? '') === 'rows' &&
+                    Array.isArray(selection.selectedKeys) &&
+                    selection.selectedKeys.length === 2 &&
+                    Boolean(selection.rowAnchorKey) &&
+                    Boolean(selection.rowPrimaryKey) &&
+                    !Object.prototype.hasOwnProperty.call(selection, 'activeRowKeys') &&
+                    !Object.prototype.hasOwnProperty.call(selection, 'rowLeadKey');
+            }
+            """);
+
+        E2ETestAssert.True(shapeIsClean,
+            "Selection state is not the intended Selected + Anchor + Primary shape.");
+
+        await DataCell(page, 0, 0).ClickAsync();
+    }
+
     private static async Task AssertRowPlainCtrlShiftAsync(IPage page)
     {
         await RowHeader(page, 1).ClickAsync();
@@ -177,6 +331,50 @@ internal static class Gate5B10SelectionRunner
         }
         await AssertRowVisualAsync(page, 5, selected: false);
         await AssertNativeRowRangeAsync(page, 1, 4);
+    }
+
+    private static async Task AssertCtrlRowDeleteUsesExactSemanticKeysAsync(IPage page)
+    {
+        await ScrollToRowAsync(page, 0);
+        var baselineCount = await GetSourceCountAsync(page);
+        var firstKey = await GetVisibleClientKeyAsync(page, 2);
+        var middleKey = await GetVisibleClientKeyAsync(page, 3);
+        var secondKey = await GetVisibleClientKeyAsync(page, 4);
+
+        await RowHeader(page, 2).ClickAsync();
+        await WithKeyAsync(page, "Control", () => RowHeader(page, 4).ClickAsync());
+        await DataCell(page, 4, 1).ClickAsync(new LocatorClickOptions { Button = MouseButton.Right });
+        await StructureMenu(page).WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 10_000
+        });
+
+        await ClickStructureMenuAsync(page, "Delete Rows...");
+        var dialog = VisibleDialog(page, "Delete Rows");
+        var selectionScope = dialog.Locator("input[type=\"radio\"][value=\"selection\"]");
+        E2ETestAssert.True(await selectionScope.IsEnabledAsync(),
+            "Ctrl row selection did not expose Rows in Selection.");
+        E2ETestAssert.True(await selectionScope.IsCheckedAsync(),
+            "Rows in Selection was not the default for Ctrl-selected rows.");
+        await dialog.Locator("button:has-text(\"Delete\")").ClickAsync();
+        await WaitForSourceCountAsync(page, baselineCount - 2);
+
+        E2ETestAssert.Equal(-1, await FindSourceIndexByClientKeyAsync(page, firstKey),
+            "Delete Selection kept the first Ctrl-selected Work Order.");
+        E2ETestAssert.Equal(-1, await FindSourceIndexByClientKeyAsync(page, secondKey),
+            "Delete Selection kept the second Ctrl-selected Work Order.");
+        E2ETestAssert.True(await FindSourceIndexByClientKeyAsync(page, middleKey) >= 0,
+            "Delete Selection incorrectly deleted an unselected Work Order between Ctrl selections.");
+
+        await page.Locator("#revogrid-gate5b1-undo").ClickAsync();
+        await WaitForSourceCountAsync(page, baselineCount);
+        E2ETestAssert.True(await FindSourceIndexByClientKeyAsync(page, firstKey) >= 0,
+            "Undo did not restore the first deleted Ctrl-selected Work Order.");
+        E2ETestAssert.True(await FindSourceIndexByClientKeyAsync(page, secondKey) >= 0,
+            "Undo did not restore the second deleted Ctrl-selected Work Order.");
+        E2ETestAssert.True(await FindSourceIndexByClientKeyAsync(page, middleKey) >= 0,
+            "Undo disturbed the unselected Work Order between Ctrl selections.");
     }
 
     private static async Task AssertRowRightClickPreservesSelectionAsync(IPage page)
@@ -296,6 +494,93 @@ internal static class Gate5B10SelectionRunner
             new PageWaitForFunctionOptions { Timeout = 10_000 });
     }
 
+    private static async Task AssertShiftSelectionAfterSortNeverBridgesUnselectedRowsAsync(IPage page)
+    {
+        var sort = page.Locator(".erp-revo-sort-button[data-erp-sort-prop=\"workOrderValue\"]");
+        await EnsureSortClearedAsync(page, sort);
+
+        const int startRow = 399;
+        const int endRow = 401;
+        await ScrollToRowAsync(page, startRow);
+        var selectedKeys = new[]
+        {
+            await GetVisibleClientKeyAsync(page, startRow),
+            await GetVisibleClientKeyAsync(page, startRow + 1),
+            await GetVisibleClientKeyAsync(page, endRow)
+        };
+
+        await RowHeader(page, startRow).ClickAsync();
+        await WithKeyAsync(page, "Shift", () => RowHeader(page, endRow).ClickAsync());
+        await AssertNativeRowRangeAsync(page, startRow, endRow);
+
+        int[] positions = Array.Empty<int>();
+        var separated = false;
+        for (var attempt = 0; attempt < 3 && !separated; attempt++)
+        {
+            await ClickSortAndWaitForApplyAsync(page, sort);
+            positions = new int[selectedKeys.Length];
+            for (var index = 0; index < selectedKeys.Length; index++)
+            {
+                positions[index] = await FindVisibleIndexByClientKeyAsync(page, selectedKeys[index]);
+            }
+
+            E2ETestAssert.True(positions.All(position => position >= 0),
+                "Sort lost one of the Shift-selected Work Orders from the current view.");
+            var ordered = positions.OrderBy(position => position).ToArray();
+            separated = ordered.Zip(ordered.Skip(1), (left, right) => right - left)
+                .Any(gap => gap > 1);
+        }
+
+        E2ETestAssert.True(separated,
+            "Sort fixture never separated the originally contiguous Shift selection, so fake-range safety was not proven.");
+
+        var nativeRangeIsSafe = await page.EvaluateAsync<bool>(
+            """
+            async keys => {
+                const grid = document.querySelector('#revogrid-native-gate5a-grid revo-grid');
+                const rows = await grid.getVisibleSource('rgRow');
+                const range = await grid.getSelectedRange();
+                if (!range || !Array.isArray(rows)) return false;
+                const y0 = Math.min(Number(range.y), Number(range.y1));
+                const y1 = Math.max(Number(range.y), Number(range.y1));
+                if (!Number.isInteger(y0) || !Number.isInteger(y1) || y0 < 0 || y1 >= rows.length) return false;
+                const selected = new Set(keys.map(value => String(value)));
+                const covered = rows.slice(y0, y1 + 1)
+                    .map(row => String(row?.clientKey ?? ''));
+                return covered.length > 0 && covered.every(key => selected.has(key));
+            }
+            """,
+            selectedKeys);
+        E2ETestAssert.True(nativeRangeIsSafe,
+            "Revo native range bridged unselected rows after Sort separated a semantic Shift selection.");
+
+        foreach (var key in selectedKeys)
+        {
+            var index = await FindVisibleIndexByClientKeyAsync(page, key);
+            await ScrollToRowAsync(page, index);
+            await AssertSelectedKeyVisibleAsync(page, key, expected: true);
+        }
+
+        await EnsureSortClearedAsync(page, sort);
+        await ScrollToRowAsync(page, 0);
+        await DataCell(page, 0, 0).ClickAsync();
+    }
+
+    private static async Task EnsureSortClearedAsync(IPage page, ILocator sortButton)
+    {
+        for (var attempt = 0; attempt < 4; attempt++)
+        {
+            var label = await sortButton.GetAttributeAsync("aria-label") ?? "";
+            if (label.Contains("not sorted", StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+            await ClickSortAndWaitForApplyAsync(page, sortButton);
+        }
+
+        throw new InvalidOperationException("Could not return Work Order Value Sort to its clear state.");
+    }
+
     private static async Task AssertFilterPrunesSelectionAsync(IPage page)
     {
         var targetIndex = await FindVisibleIndexByWorkTypeAsync(page, "402");
@@ -319,6 +604,153 @@ internal static class Gate5B10SelectionRunner
         await ScrollToRowAsync(page, restoredIndex);
         await WaitForRenderedCellAsync(page, restoredIndex, 0);
         await AssertSelectedKeyVisibleAsync(page, selectedKey, expected: false);
+    }
+
+    private static async Task AssertFilterRepositionsStillSelectedRowAsync(IPage page)
+    {
+        var fixture = await page.EvaluateAsync<string[]>(
+            """
+            async () => {
+                const grid = document.querySelector('#revogrid-native-gate5a-grid revo-grid');
+                const rows = await grid.getVisibleSource('rgRow');
+                for (let index = 1; index < rows.length; index += 1) {
+                    if (String(rows[index]?.workTypeCode ?? '') !== '401') continue;
+                    const hasPriorNonMatch = rows.slice(0, index)
+                        .some(row => String(row?.workTypeCode ?? '') !== '401');
+                    if (hasPriorNonMatch) {
+                        return [String(rows[index]?.clientKey ?? ''), String(index)];
+                    }
+                }
+                return ['', '-1'];
+            }
+            """);
+
+        var selectedKey = fixture[0];
+        var beforeIndex = int.Parse(fixture[1]);
+        E2ETestAssert.True(!string.IsNullOrWhiteSpace(selectedKey) && beforeIndex >= 0,
+            "Filter movement fixture could not find a 401 Work Order that changes visible position.");
+
+        await ScrollToRowAsync(page, beforeIndex);
+        await RowHeader(page, beforeIndex).ClickAsync();
+        await AssertNativeWholeRowRangeAsync(page, beforeIndex);
+
+        await ApplySingleWorkTypeFilterAsync(page, "401");
+        var filteredIndex = await FindVisibleIndexByClientKeyAsync(page, selectedKey);
+        E2ETestAssert.True(filteredIndex >= 0,
+            "Filter unexpectedly removed the selected 401 Work Order from the current view.");
+        E2ETestAssert.True(filteredIndex != beforeIndex,
+            "Filter fixture did not move the selected Work Order, so native re-projection was not proven.");
+
+        await ScrollToRowAsync(page, filteredIndex);
+        await AssertSelectedKeyVisibleAsync(page, selectedKey, expected: true);
+        await WaitForNativeWholeRowRangeAsync(page, filteredIndex);
+
+        await ClearWorkTypeFilterAsync(page);
+        var restoredIndex = await FindVisibleIndexByClientKeyAsync(page, selectedKey);
+        E2ETestAssert.True(restoredIndex >= 0,
+            "Clearing Filter lost the still-selected Work Order.");
+        await ScrollToRowAsync(page, restoredIndex);
+        await AssertSelectedKeyVisibleAsync(page, selectedKey, expected: true);
+        await WaitForNativeWholeRowRangeAsync(page, restoredIndex);
+
+        await DataCell(page, restoredIndex, 0).ClickAsync();
+    }
+
+    private static async Task AssertInsertPreservesSelectedRowAsync(IPage page)
+    {
+        const int beforeIndex = 8;
+        await ScrollToRowAsync(page, beforeIndex);
+        var baselineCount = await GetSourceCountAsync(page);
+        var selectedKey = await GetVisibleClientKeyAsync(page, beforeIndex);
+
+        await RowHeader(page, beforeIndex).ClickAsync();
+        await AssertSelectedKeyVisibleAsync(page, selectedKey, expected: true);
+        await AssertNativeWholeRowRangeAsync(page, beforeIndex);
+
+        await DataCell(page, beforeIndex, 0).ClickAsync(
+            new LocatorClickOptions { Button = MouseButton.Right });
+        await StructureMenu(page).WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 10_000
+        });
+        await ClickStructureMenuAsync(page, "Insert Rows...");
+        var dialog = VisibleDialog(page, "Insert Rows");
+        await dialog.Locator("input[type=\"number\"]").FillAsync("1");
+        await dialog.Locator("button:has-text(\"Insert Above\")").ClickAsync();
+        await WaitForSourceCountAsync(page, baselineCount + 1);
+
+        var movedIndex = await FindVisibleIndexByClientKeyAsync(page, selectedKey);
+        E2ETestAssert.Equal(beforeIndex + 1, movedIndex,
+            "Insert Above did not move the originally selected Work Order by exactly one visible row.");
+        await ScrollToRowAsync(page, movedIndex);
+        await AssertSelectedKeyVisibleAsync(page, selectedKey, expected: true);
+        await WaitForNativeWholeRowRangeAsync(page, movedIndex);
+
+        await page.Locator("#revogrid-gate5b1-undo").ClickAsync();
+        await WaitForSourceCountAsync(page, baselineCount);
+        var restoredIndex = await FindVisibleIndexByClientKeyAsync(page, selectedKey);
+        E2ETestAssert.Equal(beforeIndex, restoredIndex,
+            "Undo Insert did not restore the selected Work Order to its original visible position.");
+        await ScrollToRowAsync(page, restoredIndex);
+        await AssertSelectedKeyVisibleAsync(page, selectedKey, expected: true);
+        await WaitForNativeWholeRowRangeAsync(page, restoredIndex);
+
+        await DataCell(page, restoredIndex, 0).ClickAsync();
+    }
+
+    private static async Task AssertRapidCtrlSelectionConvergesAsync(IPage page)
+    {
+        await ScrollToRowAsync(page, 0);
+        await DataCell(page, 0, 0).ClickAsync();
+
+        await page.EvaluateAsync(
+            """
+            () => {
+                const root = document.querySelector('#revogrid-native-gate5a-grid revogr-row-headers');
+                const send = (row, ctrlKey) => {
+                    const target = root?.querySelector(`[data-rgRow="${row}"]`);
+                    if (!target) throw new Error(`Missing row header ${row}.`);
+                    target.dispatchEvent(new PointerEvent('pointerdown', {
+                        bubbles: true,
+                        composed: true,
+                        button: 0,
+                        ctrlKey
+                    }));
+                };
+
+                send(1, false);
+                send(3, true);
+                send(5, true);
+                send(7, true);
+                send(9, true);
+                send(3, true);
+                send(7, true);
+            }
+            """);
+
+        await page.WaitForFunctionAsync(
+            """
+            () => {
+                const selected = new Set(
+                    [...document.querySelectorAll('#revogrid-native-gate5a-grid [data-erp-row-selected="true"]')]
+                        .map(element => element.getAttribute('data-erp-selected-row-key'))
+                        .filter(Boolean)
+                );
+                return selected.size === 3;
+            }
+            """,
+            null,
+            new PageWaitForFunctionOptions { Timeout = 10_000 });
+
+        await AssertRowVisualAsync(page, 1, selected: true);
+        await AssertRowVisualAsync(page, 3, selected: false);
+        await AssertRowVisualAsync(page, 5, selected: true);
+        await AssertRowVisualAsync(page, 7, selected: false);
+        await AssertRowVisualAsync(page, 9, selected: true);
+        await WaitForNativeWholeRowRangeAsync(page, 9);
+
+        await DataCell(page, 0, 0).ClickAsync();
     }
 
     private static async Task AssertRowVirtualizationAsync(IPage page)
@@ -378,6 +810,42 @@ internal static class Gate5B10SelectionRunner
         await AssertColumnVisualAsync(page, partialAmountColumn, "partialAmount", selected: true);
         await AssertColumnVisualAsync(page, remainingAmountColumn, "remainingAmount", selected: false);
         await AssertNativeColumnRangeAsync(page, workTypeColumn, partialAmountColumn);
+    }
+
+    private static async Task AssertCtrlColumnNativeRangeNeverBridgesUnselectedColumnsAsync(IPage page)
+    {
+        await ScrollToRowAsync(page, 0);
+        var firstColumn = await GetVisualColumnIndexAsync(page, "workTypeCode");
+        var secondColumn = await GetVisualColumnIndexAsync(page, "workOrderValue");
+
+        await ColumnHeader(page, firstColumn).ClickAsync();
+        await WithKeyAsync(page, "Control", () => ColumnHeader(page, secondColumn).ClickAsync());
+        await AssertColumnVisualAsync(page, firstColumn, "workTypeCode", selected: true);
+        await AssertColumnVisualAsync(page, secondColumn, "workOrderValue", selected: true);
+
+        var nativeRangeIsSafe = await page.EvaluateAsync<bool>(
+            """
+            async selectedProps => {
+                const grid = document.querySelector('#revogrid-native-gate5a-grid revo-grid');
+                const range = await grid.getSelectedRange();
+                const columns = (await grid.getColumns())
+                    .filter(column => String(column?.pin ?? 'rgCol') === String(range?.colType ?? 'rgCol'));
+                if (!range || !Array.isArray(columns)) return false;
+                const x0 = Math.min(Number(range.x), Number(range.x1));
+                const x1 = Math.max(Number(range.x), Number(range.x1));
+                if (!Number.isInteger(x0) || !Number.isInteger(x1) || x0 < 0 || x1 >= columns.length) return false;
+                const selected = new Set(selectedProps.map(value => String(value)));
+                const covered = columns.slice(x0, x1 + 1)
+                    .map(column => String(column?.prop ?? ''));
+                return covered.length > 0 && covered.every(prop => selected.has(prop));
+            }
+            """,
+            new[] { "workTypeCode", "workOrderValue" });
+
+        E2ETestAssert.True(nativeRangeIsSafe,
+            "Revo native column range bridged an unselected column between Ctrl selections.");
+
+        await DataCell(page, 0, 0).ClickAsync();
     }
 
     private static async Task AssertColumnRightClickPreservesSelectionAsync(IPage page)
@@ -523,6 +991,26 @@ internal static class Gate5B10SelectionRunner
             E2ETestAssert.Equal(0, await selectedCells.CountAsync(),
                 $"Column '{prop}' cells stayed selected unexpectedly.");
         }
+    }
+
+    private static async Task WaitForNativeWholeRowRangeAsync(IPage page, int row)
+    {
+        await page.WaitForFunctionAsync(
+            """
+            async expectedRow => {
+                const grid = document.querySelector('#revogrid-native-gate5a-grid revo-grid');
+                const focused = await grid.getFocused();
+                const range = await grid.getSelectedRange();
+                if (!focused || !range) return false;
+                const y0 = Math.min(Number(range.y), Number(range.y1));
+                const y1 = Math.max(Number(range.y), Number(range.y1));
+                const x0 = Math.min(Number(range.x), Number(range.x1));
+                const x1 = Math.max(Number(range.x), Number(range.x1));
+                return y0 === expectedRow && y1 === expectedRow && x1 > x0;
+            }
+            """,
+            row,
+            new PageWaitForFunctionOptions { Timeout = 10_000 });
     }
 
     private static async Task AssertNativeWholeRowRangeAsync(IPage page, int row)
@@ -680,6 +1168,28 @@ internal static class Gate5B10SelectionRunner
         await page.WaitForTimeoutAsync(100);
     }
 
+    private static async Task<int> GetSourceCountAsync(IPage page) =>
+        await page.EvaluateAsync<int>(
+            """
+            async () => (await document.querySelector('#revogrid-native-gate5a-grid revo-grid').getSource('rgRow')).length
+            """);
+
+    private static async Task WaitForSourceCountAsync(IPage page, int expected) =>
+        await page.WaitForFunctionAsync(
+            """
+            async expected => (await document.querySelector('#revogrid-native-gate5a-grid revo-grid').getSource('rgRow')).length === expected
+            """,
+            expected,
+            new PageWaitForFunctionOptions { Timeout = 15_000 });
+
+    private static async Task<int> FindSourceIndexByClientKeyAsync(IPage page, string key) =>
+        await page.EvaluateAsync<int>(
+            """
+            async key => (await document.querySelector('#revogrid-native-gate5a-grid revo-grid').getSource('rgRow'))
+                .findIndex(row => String(row?.clientKey ?? '') === key)
+            """,
+            key);
+
     private static async Task<string> GetVisibleClientKeyAsync(IPage page, int index) =>
         await page.EvaluateAsync<string>(
             """
@@ -748,4 +1258,5 @@ internal static class Gate5B10SelectionRunner
 
         throw new DirectoryNotFoundException("Could not locate ERPPrototype.csproj from the E2E runner.");
     }
+
 }

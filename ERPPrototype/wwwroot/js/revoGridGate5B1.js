@@ -15,7 +15,7 @@ import { createRevoGridStructureMenu } from "./revoGridStructureMenu.js?v=202608
 import { createRevoGridStructureCommands } from "./revoGridStructureCommands.js?v=20260829-gate5b10-header-selection-1";
 import {
     createRevoGridHeaderSelectionFeature
-} from "./revoGridHeaderSelection.js?v=20260829-gate5b10-header-selection-plugin-1";
+} from "./revoGridHeaderSelection.js?v=20260830-selection-core-r2";
 
 const bindings = new Map();
 
@@ -323,7 +323,6 @@ export async function initialize(elementId, rows, customColumns, options) {
     const headerSelectionFeature = enableHeaderMultiSelection
         ? createRevoGridHeaderSelectionFeature()
         : null;
-    const headerSelectionModel = headerSelectionFeature?.model ?? null;
     const validationOwner = enableUnifiedValidation
         ? createRevoGridValidation({
             rows,
@@ -386,7 +385,6 @@ export async function initialize(elementId, rows, customColumns, options) {
         excelFilter: null,
         sortController: null,
         columnSelection: null,
-        headerSelectionModel,
         headerSelectionFeature,
         headerSelection: null,
         selectionLifecycle: null,
@@ -473,7 +471,6 @@ export async function initialize(elementId, rows, customColumns, options) {
             throw new Error("Header Selection plugin was not registered by RevoGrid.");
         }
 
-        state.headerSelection.setSelectionContext?.(state.selectionContext);
         state.selectionContext.setSemanticSelectionProvider(state.headerSelection);
     }
 
