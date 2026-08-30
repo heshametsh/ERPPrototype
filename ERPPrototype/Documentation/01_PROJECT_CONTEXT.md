@@ -1,9 +1,9 @@
 # 01 — ERP Prototype Project Context
 
-**Version:** 4.0  
-**Status:** Approved  
-**Last update:** 2026-08-26  
-**Current accepted implementation baseline:** `6a6f3cef807f58a41bcfefa7c08b2ebaf6220169`  
+**Version:** 4.2
+**Status:** Approved
+**Last update:** 2026-08-30
+**Accepted Revo code checkpoint:** `86eb2ff3ce51addc2046133c820dd5dc75bfd08f`
 **Owner:** Hesham Omar
 
 ## 1. Product Vision
@@ -35,8 +35,20 @@ ERP Prototype هو نظام ويب لمقاول كهرباء يعمل مع ال�
 - selected replacement: RevoGrid Community 4.25.2.
 - Revo target: Community/public APIs for grid mechanics while ERP owns business semantics.
 
-No Microservices without a proven need.  
+No Microservices without a proven need.
 No full backend rewrite.
+
+### Current Revo checkpoint — 2026-08-30
+
+- stable isolated route: `/work-orders-revogrid-gate5b10`.
+- accepted Revo code checkpoint: `86eb2ff3ce51addc2046133c820dd5dc75bfd08f`.
+- Gate 5B-7 persistence identity, Gate 5B-8 selection context, Gate 5B-9 Structure Workspace and Gate 5B-10 Header Selection are present.
+- Gate 5B-10 provides visible Plain/Ctrl/Shift whole-row/whole-column selection while Revo keeps native active range/focus, keyboard/editing and virtualization ownership.
+- Filter removes filtered-out Work Orders from row selection and does not automatically reselect them when the Filter is cleared; Sort preserves identity and Scroll only changes the virtual viewport.
+- Gate 5B-9 regression, Gate 5B-10 real-browser acceptance and user manual verification passed.
+- the Revo candidate still does not perform real database Save.
+- next bounded engineering step is the snapshot-safe Save contract, then real DB Save and end-to-end concurrency/recovery.
+- dirty work created before a row becomes filtered-out remains valid dirty work and may still be saved once the Save path is connected.
 
 ## 3. Deployment Model
 
@@ -225,14 +237,18 @@ Tabulator is a behavior reference during migration, not long-term architecture a
 
 Finish Revo production foundation:
 
-- unified validation.
-- persistence identity and RowVersion.
+- ✅ unified validation.
+- ✅ client persistence-identity foundation (`ClientKey` / `Id` / `RowVersion`) through row History.
+- ✅ selection-context and Structure Workspace foundation through Gate 5B-9.
+- clean Ctrl/Shift row/column selection and Filter-pruning behavior without replacing Revo native cell-range/focus ownership.
 - snapshot-safe Save.
+- real DB Save + server failure mapping.
 - concurrency/recovery.
-- custom columns/layout.
+- database-connected custom columns/layout acceptance.
 - important employee productivity parity.
+- self-hosted/pinned Revo assets.
 - 10k/browser qualification.
-- cutover.
+- controlled cutover.
 
 Then move product investment toward operational lifecycle, manager control and specialist workflows.
 

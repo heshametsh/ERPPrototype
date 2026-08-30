@@ -1,6 +1,76 @@
+# CURRENT PRIORITY OVERRIDE — 2026-08-30
+
+> Accepted Revo code checkpoint: `86eb2ff3ce51addc2046133c820dd5dc75bfd08f` / Gate 5B-10.
+> The 2026-08-29 B10 items below are closed by the accepted Gate 5B-10 implementation unless explicitly retained here.
+
+## Gate 5B-10 status
+
+- whole-row/whole-column Plain/Ctrl/Shift selection: **Closed / accepted**.
+- Filter-driven row-selection pruning: **Closed / accepted**.
+- Sort identity preservation and virtualization repaint: **Closed / accepted**.
+- visible real-browser selection acceptance: **Closed / accepted**.
+- right-click selection preservation and dataset-switch clearing: **Closed / accepted**.
+- disjoint Ctrl multi-cell ranges: **intentionally postponed**, not a defect in the accepted product scope.
+
+## Selection technical debt after B10
+
+- do not spread the older B9 private-selection-store workaround in `revoGridColumnSelection.js`; Gate 5B-10 does not require it as a new dependency.
+- keep B10 on public Revo/plugin/render boundaries. If a future change requires DOM scanning or replacing Revo native focus/range ownership, stop and redesign.
+- production Revo runtime still imports 4.25.2 from jsDelivr; exact self-hosted/pinned assets remain a cutover blocker.
+
+## Immediate engineering priority
+
+1. snapshot-safe Save handshake.
+2. real database Save + server validation/failure mapping.
+3. end-to-end `RowVersion` concurrency and edit-during-Save correctness.
+4. database-connected Custom Column/layout Save.
+5. reconnect/lost-response recovery.
+6. high-value production parity, asset pinning, target-browser/10k qualification and cutover.
+
+---
+
+# CURRENT PRIORITY OVERRIDE — 2026-08-29
+
+> Stable Revo checkpoint: `202cf3f` / Gate 5B-9.
+> This section supersedes the 2026-08-26 priority list where implementation status changed.
+
+## Completed Revo foundation now present
+
+- Gate 5B-6 Unified Validation.
+- Gate 5B-7 client persistence identity (`ClientKey`, database `Id`, `RowVersion`, persisted delete identity through Undo/Redo).
+- Gate 5B-8 selection-context/right-click foundation.
+- Gate 5B-9 shared Structure Workspace, filtered displayed-row delete scope, Custom Column structural History, RTL insert direction, and clipboard range fill.
+
+## Immediate bounded Grid work
+
+- clean Ctrl/Shift whole-row and whole-column selection over Revo native cell range/focus.
+- Filter-pruning rule: a row leaving the Filter result leaves semantic row selection and is not automatically reselected later.
+- every new sheet mutation that resolves row/cell targets rechecks its final target against the current filtered result.
+- visible selection acceptance under virtualization must be added; internal selection-store assertions alone are insufficient.
+
+## Current technical debt to protect while doing B10
+
+- `revoGridColumnSelection.js` currently reaches `grid.getProviders()` and selection-store internals to detach the synthetic active cell after whole-column selection. This is a fragile Revo-private dependency and should not be spread into new selection behavior.
+- `revoGridSelectionContext.js` contains explicit-column/native-range transition logic and event suppression around right-click/focus. New B10 code must extend the smallest owner rather than introduce a second selection coordinator.
+- the stable B9 tests prove important command outcomes, but whole-column visual coverage partly relies on Revo internal selection state; B10 requires rendered/virtualized visual assertions.
+- production Revo runtime still imports 4.25.2 from jsDelivr CDN; self-hosting/pinning remains a cutover blocker.
+
+## Revo production blockers still open
+
+- snapshot-safe Save handshake.
+- real database Save + server validation/failure mapping.
+- end-to-end `RowVersion` concurrency behavior from Revo client through server acceptance.
+- database-connected Custom Column save from the Revo route.
+- reconnect/failure/lost-response recovery.
+- production manager/KPI/search parity.
+- self-hosted/pinned Revo assets.
+- 10k + target-browser qualification.
+- accepted `/work-orders` cutover.
+---
+
 # CURRENT PRIORITY OVERRIDE — 2026-08-26
 
-> Long-term direction: `46_FINAL_LEAD_REVIEW_2026-08-26.md`.  
+> Long-term direction: `46_FINAL_LEAD_REVIEW_2026-08-26.md`.
 > Business decisions: `15_BUSINESS_DOMAIN_AND_PERMISSIONS.md`.
 
 ## Revo accepted foundation
@@ -205,4 +275,3 @@ The confirmed 18-second duplicate-query regression was fixed by scoping identity
 - The first run may download Playwright Chromium into the current Windows user's browser cache. This increases machine cache usage but does not increase the clean project ZIP.
 - Phase 9.0 passed Login, Employee scope, initial sheet rendering, and year switching. Phase 9.0B hardens the platform but does not yet cover Edit/Save, duplicate UI messages, Copy/Paste, Undo/Redo, filters, custom columns, or financial fields.
 - The test-only `E2ETest` environment disables HTTPS redirection for the random loopback process. Normal Development and Production behavior is unchanged.
-

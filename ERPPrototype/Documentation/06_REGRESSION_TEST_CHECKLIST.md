@@ -1,3 +1,78 @@
+# ACCEPTANCE OVERRIDE — 2026-08-30
+
+## Gate 5B-10 accepted Revo checkpoint
+
+**Accepted Revo code checkpoint:** `86eb2ff3ce51addc2046133c820dd5dc75bfd08f`
+**Route:** `/work-orders-revogrid-gate5b10`
+
+Acceptance evidence completed before checkpointing:
+
+- `dotnet build` PASS.
+- Gate 5B-9 Structure Workspace real-browser regression PASS.
+- Gate 5B-10 Header Selection real-browser journey PASS.
+- user manual browser verification PASS on 2026-08-30.
+
+Gate 5B-10 real-browser scenarios:
+
+1. ordinary Revo native cell focus/range remains functional.
+2. visible Plain/Ctrl/Shift whole-row selection.
+3. right-click inside row selection preserves it.
+4. Sort moves a selected Work Order while the same `ClientKey` remains selected.
+5. Filter removes hidden row selection and clearing the Filter does not restore it.
+6. selected Work Order repaints correctly after virtualization/scroll.
+7. visible Plain/Ctrl/Shift whole-column selection.
+8. right-click inside column selection preserves it.
+9. year/dataset switch clears semantic selection.
+
+**Regression rule:** Gate 5B-9 remains mandatory with B10 because B10 must not break Structure Workspace, Selection-scoped delete, Custom Column History or range-fill Paste.
+
+**Visual rule:** B10 PASS requires rendered cells/headers to show the selection after virtualization. Internal Sets, `getSelectedRange()` or private/provider state cannot independently claim PASS.
+
+---
+
+# ACCEPTANCE OVERRIDE — 2026-08-29
+
+## Current stable Revo checkpoint
+
+**Git:** `202cf3f831609b6bfb7a74c79d3f200842cd7eb4`
+**Route:** `/work-orders-revogrid-gate5b9`
+
+The repository contains dedicated browser gates for:
+
+- Gate 5B-7 persistence identity, including exact persisted delete `Id`/`RowVersion` through Undo/Redo.
+- Gate 5B-8 selection context, including whole-column context/right-click semantics.
+- Gate 5B-9 Structure Workspace.
+- Gate 5B-9 runner scenarios: menu scope, selection preservation, explicit row insert count + one Undo/Redo, filtered whole-column row-delete scope, batch Custom Column insert/delete + History, and range-fill Paste + one Undo.
+
+The stable B9 checkpoint remains the base for the next selection work. Rejected B10 experiments are not acceptance evidence.
+
+## Gate 5B-10 acceptance requirements
+
+A clean B10 candidate is not accepted merely because internal Sets or Revo stores contain the expected values.
+
+It must prove in a real browser:
+
+- ordinary Revo cell click/drag/keyboard/edit remains unchanged.
+- whole-row and whole-column selection is visibly correct across multiple rendered cells.
+- Ctrl adds/removes non-adjacent rows/columns without collapsing the other selections.
+- Shift creates the contiguous row/column range from the intended anchor; Ctrl+Shift behavior must match the approved contract if implemented.
+- Sort preserves the same selected `ClientKey` Work Orders even when their positions move.
+- Filter removes filtered-out Work Orders from row selection; clearing the Filter does not silently reselect them.
+- Delete/Clear/Paste/structural row actions cannot affect a row outside the current filtered result even if stale semantic selection state somehow exists.
+- Scroll/virtualization preserves selection; after scrolling a selected Work Order/column back into the rendered viewport, its visible selected state is correct.
+- right-click inside selection preserves it; right-click outside uses the clicked target.
+- year/dataset switch clears selection.
+- Undo restores data/history meaning, not an old selection snapshot unless a feature explicitly defines otherwise.
+- no intrusive inner active-cell marker is shown for larger whole-row/whole-column/multi selections if it can be hidden without breaking Revo focus/edit behavior.
+- browser console/page errors, failed required requests and HTTP 5xx remain zero.
+
+## Test-design rule added after B9 review
+
+`Gate5B9StructureRunner.IsWholeColumnSelectedAsync` uses `getSelectedRange()` and Revo selection-provider state as part of its assertion. That is useful diagnostic evidence, but it is **not sufficient for B10 visual selection acceptance**.
+
+B10 tests must scroll the target into view and assert employee-visible rendered state across multiple cells/headers. Internal/provider diagnostics may remain supplemental.
+---
+
 # ACCEPTANCE OVERRIDE — 2026-08-26
 
 ## Real-browser rule for important Grid behavior

@@ -8,6 +8,9 @@ The current code, migrations, tests, and checked-out Git snapshot are the author
 Business rules are canonical in `ERPPrototype/Documentation/15_BUSINESS_DOMAIN_AND_PERMISSIONS.md`.
 Chronological accepted decisions are recorded in `ERPPrototype/Documentation/08_DECISIONS_LOG.md`.
 
+Current stable Revo code checkpoint: `86eb2ff3ce51addc2046133c820dd5dc75bfd08f` / `/work-orders-revogrid-gate5b10`.
+Gate 5B-10 Header Selection is accepted after real-browser regression and user manual verification. The next bounded Revo mission is the snapshot-safe Save contract, followed by real DB Save and concurrency/recovery.
+
 ## Current working model
 
 Engineering judgment stays with the main AI/engineer reviewing the real repository.
@@ -72,9 +75,13 @@ Unless an approved mission explicitly changes it, preserve:
 - server authority;
 - security and scope;
 - RowVersion/concurrency;
-- frozen UI dimensions.
+- frozen UI dimensions;
+- Scroll preserves selection; Sort preserves selected Work Order identity;
+- Filter-pruned rows leave row selection and must not be silently targeted by new row/cell mutations;
+- dirty changes made before a later Filter hides a row remain eligible for Save.
 
-RevoGrid Community owns Grid mechanics where practical.
+RevoGrid Community owns native cell range/focus/keyboard/edit/virtualization mechanics where practical.
+ERP may add only the missing semantic whole-row/whole-column Ctrl/Shift selection needed by the product; do not create a second full selection engine or DOM-scanning selection painter.
 ERP owns business semantics, validation, financial rules, Dirty/Save meaning, permissions, persistence identity, business history, and specialist workflows.
 
 Do not modify RevoGrid source.

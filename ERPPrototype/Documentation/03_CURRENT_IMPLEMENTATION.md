@@ -1,9 +1,124 @@
+# CURRENT IMPLEMENTATION OVERRIDE — 2026-08-30
+
+> This is the newest implementation snapshot. Older overrides below remain historical when they conflict.
+
+**Accepted Revo code checkpoint:** `86eb2ff3ce51addc2046133c820dd5dc75bfd08f`
+**Live `/work-orders`:** Tabulator 6.5.0 until accepted cutover.
+**Current Revo route:** `/work-orders-revogrid-gate5b10` using RevoGrid Community 4.25.2.
+
+## Gate 5B-10 — Header Selection
+
+- Plain/Ctrl/Shift whole-row selection is implemented by stable row `ClientKey`.
+- Plain/Ctrl/Shift whole-column selection is implemented by stable column `prop`.
+- the extension is registered as a Revo plugin through `grid.plugins`.
+- Row Header interaction is attached through `rowHeaders.cellProperties`; Column Header interaction uses Revo `beforeheaderclick`.
+- Revo native focus/range remains active and is synchronized for the active contiguous row/column portion through public `setCellsFocus(...)`.
+- ERP semantic selection stores identity, not a duplicate full cell-range engine.
+- selected-row/selected-column visuals are emitted through Revo `cellProperties`, `rowHeaders.cellProperties` and column properties; no virtualized DOM scan/painter is used.
+- changed column headers are refreshed through public `updateColumns(...)`; B10 does not reassign the whole `grid.columns` list.
+- Filter reconciles visible rows and prunes selected `ClientKey` values that leave the current result.
+- Sort re-applies the native active range after `aftersortingapply` while semantic selection stays keyed by identity.
+- Scroll/virtualization repaint selected rows/columns from render properties.
+- right-click inside selection preserves it; outside selection uses the clicked context target.
+- year/dataset switch clears semantic selection.
+- disjoint Ctrl multi-cell ranges remain out of scope.
+
+## Acceptance
+
+- Build PASS.
+- Gate 5B-9 Structure Workspace real-browser regression PASS.
+- Gate 5B-10 Header Selection real-browser journey PASS across scenarios 01-09.
+- user manual browser verification PASS on 2026-08-30.
+- acceptance is based on visible rendered state in addition to diagnostic/native state.
+
+## Not implemented yet in Revo production path
+
+- snapshot-safe Save acceptance/rejection handshake.
+- production database Save.
+- end-to-end `RowVersion` concurrency handling through Revo Save.
+- server validation/duplicate/scope failure mapping into the Revo sheet.
+- database-connected Custom Column CRUD/layout persistence.
+- reconnect/lost-response recovery.
+- production self-hosted/pinned Revo assets.
+- high-value manager/KPI/search parity.
+- `/work-orders` cutover.
+
+---
+
+# CURRENT IMPLEMENTATION OVERRIDE — 2026-08-29
+
+> This is the newest implementation snapshot. Older overrides below remain historical when they conflict.
+
+**Latest accepted Git HEAD:** `202cf3f831609b6bfb7a74c79d3f200842cd7eb4`
+**Live `/work-orders`:** Tabulator 6.5.0 until accepted cutover.
+**Current Revo route:** `/work-orders-revogrid-gate5b9` using RevoGrid Community 4.25.2.
+
+## Current Revo state
+
+The B6 foundation remains present: Change Engine, Sheet History/Dirty separation, Manual Edit, Paste, Range Clear, Excel-like Filter, Sort, header selection, row Insert/Delete, Remaining synchronization and Unified soft Validation.
+
+### Gate 5B-7 — Persistence Identity
+
+- every row carries stable `ClientKey`.
+- persisted rows retain database `Id` and `RowVersion`.
+- persisted deletion records carry exact database `Id` + `RowVersion`.
+- delete → Undo → Redo preserves the same persisted identities.
+- temporary unsaved-row deletion does not create a persisted-delete record.
+- persisted rows missing `RowVersion` are treated as invalid persistence identity.
+- this is browser-side identity/reconciliation preparation; the Revo route still does not perform real DB Save.
+
+### Gate 5B-8 — Selection Context
+
+- right-click inside the employee's current range/whole-column selection preserves that selection for context commands.
+- right-click outside the current selection may target the clicked location instead of applying a stale selection.
+- deliberate whole-column selection is represented as column intent and must not be interpreted as permission to act on every source row.
+- year/dataset switch clears selection because the dataset boundary changed.
+
+### Gate 5B-9 — Structure Workspace
+
+- one neutral context menu exposes Rows/Columns structure commands only.
+- Insert Rows/Columns asks for explicit count/direction; selection size does not multiply insert count.
+- row deletion from a whole-column selection is constrained to the displayed/current filtered rows.
+- Custom Column insert/delete uses one Sheet History transaction and protects core columns.
+- visual RTL `Insert Left/Right` is translated to the correct logical order and can rebalance adjacent Custom Column layout order.
+- right-click inside selected columns preserves the existing selection; outside targets the clicked column.
+- clipboard single-cell paste can fill the selected range as one logical operation.
+- current route explicitly states that database Save is not connected.
+
+## Approved next behavior, not implemented at this baseline
+
+Gate 5B-10 will be rebuilt cleanly from B9:
+
+- Revo owns native cell range, focus, editing, keyboard and virtualization.
+- ERP adds only missing Ctrl/Shift row/column semantic selection; no second full selection engine or DOM repaint scanner.
+- disjoint Ctrl multi-cell ranges are postponed.
+- filtered-out rows must leave row selection and must not re-enter it automatically when the filter is cleared.
+- new sheet mutations that resolve row/cell targets must recheck those targets against the current filtered result.
+- Scroll and Sort do not prune identity selection.
+- dirty changes made while a row was visible remain eligible for Save if a later Filter hides the row.
+- future B10 tests must assert visible rendered selection under virtualization; internal selection-store assertions are supplemental only.
+
+## Not implemented yet in Revo production path
+
+- production database Save.
+- snapshot-safe Save acceptance/rejection handshake.
+- end-to-end `RowVersion` concurrency handling through the Revo Save path.
+- server validation/duplicate/scope error mapping into the Revo sheet.
+- database-connected Custom Column CRUD/layout save from the Revo candidate.
+- Ctrl/Shift row/column multi-selection described above.
+- Filter-driven selection pruning described above.
+- final reconnect/recovery qualification.
+- production self-hosted Revo assets.
+- production manager/KPI/search parity.
+- `/work-orders` cutover.
+---
+
 # CURRENT IMPLEMENTATION OVERRIDE — 2026-08-26
 
 > This section is the newest implementation snapshot. Older overrides below remain historical when they conflict.
 
-**Latest accepted Git HEAD:** `6a6f3cef807f58a41bcfefa7c08b2ebaf6220169`  
-**Live `/work-orders`:** Tabulator 6.5.0 until cutover.  
+**Latest accepted Git HEAD:** `6a6f3cef807f58a41bcfefa7c08b2ebaf6220169`
+**Live `/work-orders`:** Tabulator 6.5.0 until cutover.
 **Current Revo route:** `/work-orders-revogrid-gate5b6` using RevoGrid Community 4.25.2.
 
 ## Current Revo state
@@ -78,7 +193,7 @@ Those are approved product contracts for later implementation.
 
 > هذا القسم هو الوصف الأحدث للواقع الحالي، وينسخ أقسام الـOverride الأقدم عند التعارض. الكود الحالي والاختبارات في نفس الـcommit يظلان الدليل النهائي لما هو منفذ.
 
-**Latest reviewed Git HEAD:** `04e0f1a`  
+**Latest reviewed Git HEAD:** `04e0f1a`
 **Current reviewed source snapshot:** `ERP_REVO_FULL_REVIEW_04e0f1a.zip`
 
 ## Work Orders grid state
@@ -108,9 +223,9 @@ Those are approved product contracts for later implementation.
 
 > هذا القسم ينسخ أي وصف أقدم لحالة Grid Engine أو “Current task” عند التعارض. الكود الحالي يظل الحقيقة لما هو منفذ.
 
-**Audit baseline:** `00503ab`  
-**Current production runtime baseline retained:** `0f6bd3b`  
-**Latest reviewed Git HEAD:** `dc0b2b0`  
+**Audit baseline:** `00503ab`
+**Current production runtime baseline retained:** `0f6bd3b`
+**Latest reviewed Git HEAD:** `dc0b2b0`
 **Current source package reviewed:** `ERPPrototype_Current_Review_2026-08-20.zip`
 
 ## Grid engine state
@@ -140,8 +255,8 @@ Tabulator ظل قابلًا للعمل لكنه احتاج تراكمًا كبي
 
 > هذا القسم يحدد الواقع الفعلي الأحدث. التفاصيل التاريخية أسفل الملف لا تُستخدم لتجاوز هذا القسم.
 
-**Audit baseline:** `00503ab`  
-**Latest confirmed Git checkpoint from captured log:** `0f6bd3b`  
+**Audit baseline:** `00503ab`
+**Latest confirmed Git checkpoint from captured log:** `0f6bd3b`
 **Current source package reviewed:** `ERPPrototype_Current_2026-08-17.zip`
 
 ## منفذ فعليًا الآن بعد الـAudits

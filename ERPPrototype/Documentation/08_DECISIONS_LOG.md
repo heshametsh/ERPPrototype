@@ -1,3 +1,73 @@
+# CURRENT GRID DECISION OVERRIDE — 2026-08-30
+
+## DEC-061 — Gate 5B-10 Header Selection is accepted without replacing Revo native selection ownership
+
+- **Status:** Accepted / Implemented at Revo code checkpoint `86eb2ff3ce51addc2046133c820dd5dc75bfd08f`.
+- Gate 5B-10 provides Plain/Ctrl/Shift whole-row and whole-column selection.
+- row semantic identity is `ClientKey`; column semantic identity is `prop`.
+- the ERP extension is registered through Revo `grid.plugins` and uses Revo event/render boundaries instead of patching Revo source.
+- the active contiguous row/column portion remains represented through Revo public `setCellsFocus(...)`; ERP state carries only the semantic whole-row/whole-column identities needed for product behavior.
+- selected visuals are emitted through Revo render properties so virtualization recreates them correctly.
+- column refresh uses public `updateColumns(...)`; reassigning the full `grid.columns` collection merely to repaint is rejected because it can break RTL logical/display ordering.
+- Filter prunes hidden row identities; Sort and Scroll preserve identity selection; year/dataset switch clears selection.
+- right-click inside selection preserves it and existing B9 command targeting remains regression-protected.
+- acceptance evidence: Build PASS, Gate 5B-9 real-browser PASS, Gate 5B-10 scenarios 01-09 PASS, and user manual browser verification PASS on 2026-08-30.
+- disjoint Ctrl multi-cell ranges remain postponed.
+
+## DEC-060 — B10 selection extension must preserve Revo as native selection owner
+
+- **Status:** Accepted / Implemented by Gate 5B-10.
+- Gate 5B-10 is accepted at `86eb2ff3ce51addc2046133c820dd5dc75bfd08f`; rejected earlier B10 experiments are not part of the accepted implementation.
+- Revo owns native active cell/range, focus, keyboard editing/navigation and virtualization.
+- ERP may add only the missing semantic Ctrl/Shift selection for whole rows/columns, keyed by stable row `ClientKey` and column `prop`.
+- do not build a parallel full selection engine, clear Revo focus to manufacture selection, or use a DOM-scanning painter that fights virtualization.
+- right-click commands consume a combined selection snapshot but do not become another selection owner.
+- disjoint Ctrl multi-cell ranges are postponed until complete Copy/Paste/Delete/Undo semantics are explicitly designed and tested.
+- tests must prove employee-visible rendered selection, including after virtualization scroll; internal store assertions are supplemental.
+
+## DEC-059 — Filter removes hidden rows from future row-selection scope
+
+- **Status:** Accepted / Implemented by Gate 5B-10.
+- Filter is the operation that changes the employee's current row result for this rule.
+- when a selected Work Order is filtered out, it leaves row selection immediately.
+- clearing the Filter does not automatically restore that old selection.
+- Scroll does not prune selection; it only changes the virtual viewport.
+- Sort preserves selection by stable Work Order identity.
+- every new sheet mutation that resolves row/cell targets must intersect its final target with the current filtered result as a safety check.
+- a dirty change made while the row was visible remains a legitimate pending change and may be saved if a later Filter hides the row.
+- Undo/Redo continues the earlier logical History operation and is not redefined as a new hidden-row command.
+
+## DEC-058 — Gate 5B-9 Structure Workspace is the stable Revo checkpoint
+
+- **Status:** Accepted / Checkpointed at `202cf3f`.
+- one neutral context menu contains Rows/Columns structural commands; Copy/Paste/Clear are not duplicated there.
+- Insert Rows/Columns uses explicit count and direction; selection size does not multiply insert count.
+- row deletion from whole-column selection is constrained to displayed/current filtered rows.
+- Custom Column Insert/Delete uses one Sheet History transaction; core columns remain protected.
+- visual RTL Left/Right insertion is translated to logical order and adjacent Custom Column layout can rebalance safely.
+- right-click inside current selected columns/range preserves selection; outside targets clicked column.
+- clipboard single-cell paste can fill selected range as one logical operation.
+- real DB Save is still intentionally absent from this isolated route.
+
+## DEC-057 — Gate 5B-8 Selection Context preserves selection meaning for commands
+
+- **Status:** Accepted / Included in stable `202cf3f`.
+- right-click inside an existing range/whole-column selection is context only and must not collapse it to the pointer cell.
+- right-click outside the current selection may target the clicked location.
+- whole-column intent is a column selection meaning, not automatic permission to act on all source rows.
+- year/dataset switch clears selection.
+
+## DEC-056 — Gate 5B-7 Persistence Identity preserves persisted row identity through History
+
+- **Status:** Accepted / Included in stable `202cf3f`.
+- browser rows use stable `ClientKey`; persisted rows retain database `Id` and `RowVersion`.
+- persisted row delete records carry exact `Id` + `RowVersion`; Undo/Redo does not lose or invent identity.
+- deleting a temporary unsaved row does not create a database-delete record.
+- persisted rows missing `RowVersion` fail the persistence-identity contract.
+- this is preparation for Save; it does not mean the Revo route already performs production DB Save.
+
+---
+
 # CURRENT ENGINEERING OVERRIDE — 2026-08-26
 
 ## DEC-055 — Native V1 is historical, not the active daily engineering workflow
@@ -188,7 +258,7 @@
 
 # 08 — Decisions Log
 
-**Status:** Approved  
+**Status:** Approved
 **Purpose:** حفظ سبب القرارات حتى لا نعيد المناقشة من الصفر أو نغيّر الاتجاه بصمت.
 
 ## DEC-001 — Blazor instead of Power Apps

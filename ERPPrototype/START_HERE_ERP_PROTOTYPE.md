@@ -1,13 +1,136 @@
+# CURRENT HANDOFF — 2026-08-30
+
+> This is the newest handoff. Older handoffs below are historical when they conflict.
+
+**Accepted Revo code checkpoint:** `86eb2ff3ce51addc2046133c820dd5dc75bfd08f`
+**B10 starting baseline:** `202cf3f831609b6bfb7a74c79d3f200842cd7eb4`
+**Live Work Orders:** Tabulator 6.5.0 until accepted Revo cutover.
+**Selected target:** RevoGrid Community 4.25.2.
+**Current isolated Revo route:** `/work-orders-revogrid-gate5b10`.
+**Current stable Revo milestone:** Gate 5B-10 Header Selection.
+**Next bounded mission:** snapshot-safe Save contract, then real DB Save and concurrency/recovery.
+
+## What Gate 5B-10 added
+
+- Plain/Ctrl/Shift whole-row and whole-column selection.
+- row identity is `ClientKey`; column identity is `prop`.
+- Revo remains owner of native cell focus/range, keyboard/editing and virtualization.
+- the ERP extension is registered through `grid.plugins`; it uses Revo render hooks and public APIs instead of a DOM-scanning painter or Revo source patch.
+- Revo native range is kept in sync with the active contiguous row/column portion through `setCellsFocus(...)`; ERP semantic state holds the identity-based whole-row/whole-column selection needed for Ctrl behavior.
+- Filter prunes rows that leave the current result and clearing the Filter does not silently reselect them.
+- Sort preserves selected Work Order identity; Scroll/virtualization preserves and repaints visible selection.
+- right-click inside selection preserves it; right-click outside uses the clicked target.
+- year/dataset switch clears semantic selection.
+- disjoint Ctrl multi-cell ranges remain postponed.
+
+## Acceptance evidence
+
+- `dotnet build` — PASS.
+- Gate 5B-9 Structure Workspace real-browser regression — PASS.
+- Gate 5B-10 Header Selection real-browser journey — PASS for native range, Rows, row context, Sort identity, Filter pruning, row virtualization, Columns, column context and dataset switch.
+- user manual browser verification — PASS on 2026-08-30, including Ctrl/Shift, Sort, Filter, Scroll, Right-click and RTL header/data alignment.
+- B10 acceptance asserts employee-visible rendered state; internal Revo/provider state is supplemental evidence only.
+
+## Current engineering sequence
+
+```text
+Stable Gate 5B-10 checkpoint
+→ snapshot-safe Save contract
+→ real DB Save
+→ RowVersion concurrency / Save failure recovery
+→ high-value production parity
+→ production qualification
+→ controlled cutover
+```
+
+## Read first
+
+1. `Documentation/00_DOCUMENTATION_INDEX.md`
+2. `Documentation/47_GATE5B10_ACCEPTANCE_2026-08-30.md`
+3. `Documentation/15_BUSINESS_DOMAIN_AND_PERMISSIONS.md`
+4. `Documentation/03_CURRENT_IMPLEMENTATION.md`
+5. `Documentation/05_WORK_ORDERS_GRID_BEHAVIOUR.md`
+6. `Documentation/06_REGRESSION_TEST_CHECKLIST.md`
+7. `Documentation/08_DECISIONS_LOG.md`
+8. `Documentation/07_KNOWN_ISSUES_AND_TECHNICAL_DEBT.md`
+9. `Documentation/09_REFACTOR_ROADMAP.md`
+
+---
+
+# CURRENT HANDOFF — 2026-08-29
+
+> This is the newest handoff. Older handoffs below are historical when they conflict.
+
+**Current accepted Git HEAD:** `202cf3f831609b6bfb7a74c79d3f200842cd7eb4`
+**14-review / Final Lead Review baseline:** `a74c9c908a2372b0e9141dcf7f6ef772bd6c07b3`
+**Live Work Orders:** Tabulator 6.5.0 until accepted Revo cutover.
+**Selected target:** RevoGrid Community 4.25.2.
+**Current isolated Revo route:** `/work-orders-revogrid-gate5b9`.
+**Current stable Revo milestone:** Gate 5B-9 Structure Workspace, including the Gate 5B-7 persistence-identity foundation and Gate 5B-8 selection-context foundation.
+**Next bounded Grid mission:** rebuild Gate 5B-10 selection behavior cleanly from the B9 checkpoint; no rejected B10 experiment is part of this baseline.
+
+## What B7-B9 added
+
+- **Gate 5B-7 — Persistence Identity:** keeps `ClientKey`, database `Id`, and `RowVersion` identity stable through temporary row deletion and Undo/Redo. This is a client persistence-identity foundation; real database Save is still not connected to the Revo route.
+- **Gate 5B-8 — Selection Context:** right-click inside an existing range/whole-column selection preserves its meaning; right-click outside targets the clicked location. A whole-column selection is not interpreted as permission to operate on every source row.
+- **Gate 5B-9 — Structure Workspace:** one neutral Rows/Columns context menu; explicit Insert count/direction; selection-aware row/custom-column delete with safe Current-vs-Selection scope; custom-column Insert/Delete in Sheet History; single-cell clipboard fill across a selected range.
+- Year/dataset switch clears selection because it replaces the Work Orders dataset.
+
+## Approved selection/filter rule for the next mission
+
+This is an **approved behavior contract, not yet implemented at `202cf3f`**:
+
+- Scroll does not remove selection.
+- Sort preserves selection by Work Order identity.
+- If Filter removes a row from the current result, that row leaves row selection immediately and does not become selected again merely because the filter is later cleared.
+- A new sheet mutation that resolves row/cell targets (for example Delete, Clear, Paste, or a structural row action) must intersect its target with the current filtered result as a final safety check.
+- A change that was legitimately made while a row was visible remains dirty and Save may persist it even if a later Filter hides that row.
+- Undo/Redo continues to describe the earlier logical operation; Filter visibility must not corrupt History semantics.
+
+## Gate 5B-10 architecture boundary
+
+- Revo remains owner of native cell range, focus, keyboard, editing, and virtualization.
+- ERP may add only the missing semantic row/column selection behavior needed by the product, including Ctrl/Shift row/column selection.
+- Do not create a second full selection engine, DOM repaint scanner, or clear Revo focus merely to simulate selection.
+- Disjoint Ctrl multi-cell ranges are postponed; they require complete Copy/Paste/Delete/Undo semantics before adoption.
+- Future tests must prove visible employee behavior under virtualization, not only internal selection-store state.
+
+## Read first
+
+1. `Documentation/00_DOCUMENTATION_INDEX.md`
+2. `Documentation/15_BUSINESS_DOMAIN_AND_PERMISSIONS.md`
+3. `Documentation/03_CURRENT_IMPLEMENTATION.md`
+4. `Documentation/05_WORK_ORDERS_GRID_BEHAVIOUR.md`
+5. `Documentation/06_REGRESSION_TEST_CHECKLIST.md`
+6. `Documentation/08_DECISIONS_LOG.md`
+7. `Documentation/07_KNOWN_ISSUES_AND_TECHNICAL_DEBT.md`
+8. `Documentation/09_REFACTOR_ROADMAP.md`
+9. `Documentation/46_FINAL_LEAD_REVIEW_2026-08-26.md`
+
+## Current engineering sequence
+
+```text
+Stable B9 checkpoint
+→ clean B10 row/column selection extension
+→ persistence Save contract
+→ real DB Save
+→ concurrency / failure recovery
+→ high-value production parity
+→ production qualification
+→ controlled cutover
+```
+---
+
 # CURRENT HANDOFF — 2026-08-26
 
 > This is newest handoff. Older handoffs below are historical when they conflict.
 
-**Current accepted Git HEAD:** `6a6f3cef807f58a41bcfefa7c08b2ebaf6220169`  
-**14-review / Final Lead Review baseline:** `a74c9c908a2372b0e9141dcf7f6ef772bd6c07b3`  
-**Live Work Orders:** Tabulator 6.5.0 until cutover.  
-**Selected target:** RevoGrid Community 4.25.2.  
-**Current isolated Revo route:** `/work-orders-revogrid-gate5b6`.  
-**Latest accepted grid milestone:** Gate 5B-6 Unified Validation at `6a6f3ce`, after automated real-browser regression and user manual acceptance.  
+**Current accepted Git HEAD:** `6a6f3cef807f58a41bcfefa7c08b2ebaf6220169`
+**14-review / Final Lead Review baseline:** `a74c9c908a2372b0e9141dcf7f6ef772bd6c07b3`
+**Live Work Orders:** Tabulator 6.5.0 until cutover.
+**Selected target:** RevoGrid Community 4.25.2.
+**Current isolated Revo route:** `/work-orders-revogrid-gate5b6`.
+**Latest accepted grid milestone:** Gate 5B-6 Unified Validation at `6a6f3ce`, after automated real-browser regression and user manual acceptance.
 **Next major Revo product step:** persistence identity/`RowVersion`, then snapshot-safe Save contract and real DB Save.
 
 ## Read first
@@ -71,11 +194,11 @@ Tabulator is now a behavior-reference source during migration, not long-term des
 
 > **هذا هو ملخص البدء الأحدث.** أي Handoff أقدم أسفل الملف يبقى تاريخيًا عند التعارض.
 
-**Latest reviewed Git HEAD:** `04e0f1a`  
-**Current `/work-orders` engine:** Tabulator 6.5.0 — ما زال live/fallback.  
-**Current Revo target:** RevoGrid Community 4.25.2 on `/work-orders-revogrid-gate5b5`.  
-**Revo state:** Edit/Paste/History/Dirty/Filter/Sort/Header Selection/Insert-Delete/Remaining sync موجودة في المسار المعزول؛ real database Save/cutover غير منفذ بعد.  
-**Approved next product behavior:** `DEC-040` soft working-sheet Validation؛ التنفيذ لم يبدأ بعد.  
+**Latest reviewed Git HEAD:** `04e0f1a`
+**Current `/work-orders` engine:** Tabulator 6.5.0 — ما زال live/fallback.
+**Current Revo target:** RevoGrid Community 4.25.2 on `/work-orders-revogrid-gate5b5`.
+**Revo state:** Edit/Paste/History/Dirty/Filter/Sort/Header Selection/Insert-Delete/Remaining sync موجودة في المسار المعزول؛ real database Save/cutover غير منفذ بعد.
+**Approved next product behavior:** `DEC-040` soft working-sheet Validation؛ التنفيذ لم يبدأ بعد.
 **Current engineering foundation task:** Project Brain V1 + `PartialAmount` Change Mapper Canary قبل الاعتماد على Agent routing.
 
 ## اقرأ أولًا الآن
@@ -94,12 +217,12 @@ Tabulator is now a behavior-reference source during migration, not long-term des
 
 > **هذا القسم هو الحالة الحالية المعتمدة.** أي خطة أقدم أسفل الملف تُعامل كتاريخ إذا تعارضت مع هذا القسم أو مع `Documentation/12_ENGINEERING_AUDIT_REPORT.md`.
 
-**Audit baseline:** `00503ab`  
-**Current production runtime baseline retained:** `0f6bd3b` — accepted financial-sort optimization  
-**Latest reviewed Git HEAD:** `dc0b2b0` — `Checkpoint before Univer Gate U1`  
-**Current source ZIP reviewed:** `ERPPrototype_Current_Review_2026-08-20.zip`  
-**Current `/work-orders` engine:** Tabulator 6.5.0 — still the live implementation.  
-**Selected replacement engine:** **RevoGrid Community 4.25.2** — selected after isolated 100,000-row and ERP-behaviour qualification; not yet integrated into `/work-orders`.  
+**Audit baseline:** `00503ab`
+**Current production runtime baseline retained:** `0f6bd3b` — accepted financial-sort optimization
+**Latest reviewed Git HEAD:** `dc0b2b0` — `Checkpoint before Univer Gate U1`
+**Current source ZIP reviewed:** `ERPPrototype_Current_Review_2026-08-20.zip`
+**Current `/work-orders` engine:** Tabulator 6.5.0 — still the live implementation.
+**Selected replacement engine:** **RevoGrid Community 4.25.2** — selected after isolated 100,000-row and ERP-behaviour qualification; not yet integrated into `/work-orders`.
 **Current task:** **Gate 5A — isolated Blazor + RevoGrid real-data integration. No production cutover yet.**
 
 ## Grid-engine decision

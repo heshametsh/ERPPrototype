@@ -1,3 +1,36 @@
+# CURRENT RELEASE READINESS OVERRIDE — 2026-08-30
+
+## Gate R0 — Revo Production Candidate — OPEN
+
+Current completed foundation:
+
+- ✅ Unified Validation.
+- ✅ client persistence identity through `ClientKey`/`Id`/`RowVersion` and delete Undo/Redo.
+- ✅ selection-context/right-click foundation.
+- ✅ Gate 5B-9 Structure Workspace and range-fill foundation.
+- ✅ Gate 5B-10 Header Selection: visible Plain/Ctrl/Shift rows/columns, Filter pruning, Sort identity, virtualization and right-click acceptance.
+
+Still required before `/work-orders` cutover:
+
+- snapshot-safe Save acceptance/rejection.
+- real DB Save.
+- end-to-end `RowVersion` concurrency through the Revo Save path.
+- server validation/duplicate/scope failure mapping.
+- edit during in-flight Save must not be falsely marked clean.
+- database-connected Custom Column/layout save.
+- year-move confirmation through real Save.
+- high-value employee workflow parity.
+- exact Revo assets pinned/self-hosted.
+- target browser + office-class 10k qualification.
+- reconnect/failure/lost-response journeys.
+- real-browser diagnostics treated as acceptance failures.
+- exact row identities verified for structural/destructive operations.
+- rollback checkpoint retained.
+
+**Important:** Gate 5B-7 is a persistence-identity foundation, not completion of production Save/concurrency.
+
+---
+
 # CURRENT RELEASE READINESS OVERRIDE — 2026-08-26
 
 ## Gate R0 — Revo Production Candidate — OPEN
@@ -66,7 +99,7 @@ Before large Municipality/Execution/Field rollout:
 
 # 10 — Release Readiness Plan
 
-**Status:** Current approved gates  
+**Status:** Current approved gates
 **Last update:** 2026-08-20
 
 ## Gate 0 — Engineering Remediation Baseline — **PASS / CHECKPOINTED**

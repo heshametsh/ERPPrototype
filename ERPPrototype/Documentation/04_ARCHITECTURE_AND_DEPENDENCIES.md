@@ -1,3 +1,34 @@
+# CURRENT GRID/SELECTION ARCHITECTURE OVERRIDE — 2026-08-30
+
+This section records the accepted Gate 5B-10 selection boundary. Older architecture sections remain valid unless they conflict with this boundary.
+
+## Selection ownership
+
+- RevoGrid Community remains owner of native cell range, focus, keyboard navigation/editing, scrolling and virtualization.
+- Gate 5B-10 registers a narrow ERP selection plugin through Revo `grid.plugins` for product concepts Community does not natively provide: whole-row/whole-column Plain/Ctrl/Shift selection.
+- ERP semantic state stores stable identities (`ClientKey` for rows, column `prop` for columns), not a duplicate full cell-range engine.
+- Revo native focus/range stays active; the plugin synchronizes the active contiguous row/column portion through public `setCellsFocus(...)`.
+- Row Header events enter through `rowHeaders.cellProperties`; Column Header events enter through Revo `beforeheaderclick`.
+- selected visuals are produced through Revo render properties (`cellProperties`, row-header properties and column properties), so virtualization owns creation/destruction of rendered DOM.
+- changed column headers use public `updateColumns(...)`; do not reassign `grid.columns` merely to force a repaint because RTL/display ordering can diverge from logical ordering.
+- command targeting combines Revo native active range with ERP semantic selection through the existing read-only selection-context boundary.
+- do not create a parallel full selection coordinator, use Revo private selection stores as a new dependency, clear Revo focus to manufacture a non-empty selection, or repaint virtualized DOM by scanning rendered cells.
+
+## Filter/current-view safety boundary
+
+- Revo Filter owns which rows are trimmed from the current result.
+- ERP row-selection semantics must prune rows that leave the current Filter result.
+- any new sheet mutation that resolves row/cell targets must intersect those resolved targets with the current filtered result before mutation.
+- Scroll is only virtualization/viewport movement and must not prune selection.
+- Sort changes position, not Work Order identity, and must not prune identity-based selection.
+- Save/Undo/Redo operate on already-created state/history; they are not reinterpreted as new hidden-row targeting.
+
+## Current implementation status
+
+The accepted implementation checkpoint is Gate 5B-10 at `86eb2ff3ce51addc2046133c820dd5dc75bfd08f`. Filter-pruning, identity-preserving Sort/Scroll behavior, visible virtualization-safe row/column selection and dataset-switch clearing are implemented and accepted. The next bounded architecture work is the snapshot-safe Save contract; selection architecture should remain closed unless new regression evidence requires change.
+
+---
+
 # TARGET DOMAIN ARCHITECTURE OVERRIDE — 2026-08-26
 
 This section defines the current long-term architecture direction after the 14-review synthesis.
@@ -77,8 +108,8 @@ The product remains a Modular Monolith; this does not require Microservices.
 
 ## CURRENT GRID-ENGINE TRANSITION — 2026-08-20
 
-**Current runtime:** `/work-orders` still uses Tabulator 6.5.0.  
-**Selected target:** RevoGrid Community 4.25.2.  
+**Current runtime:** `/work-orders` still uses Tabulator 6.5.0.
+**Selected target:** RevoGrid Community 4.25.2.
 **Scope:** replace the browser grid engine only; preserve the current Blazor/server/database boundaries.
 
 ### Gate 5 architecture rule
@@ -114,16 +145,16 @@ Rules:
 
 ---
 
-**Status:** Approved direction  
-**Current state:** One project with partial separation  
+**Status:** Approved direction
+**Current state:** One project with partial separation
 **Target:** Modular Monolith without a full rewrite
 
 ## 1. Decision
 
 نستمر كتطبيق واحد قابل للنشر، لكن نفصل المسؤوليات داخله إلى موديولات واضحة.
 
-لا نستخدم Microservices.  
-لا نقسم المشروع إلى عشرات المشاريع الآن.  
+لا نستخدم Microservices.
+لا نقسم المشروع إلى عشرات المشاريع الآن.
 لا نعيد كتابة الشيت من الصفر.
 
 ## 2. Current Layers
@@ -287,7 +318,7 @@ Components
 
 ## 11. Simple Example
 
-الملف الحالي يشبه لوحة كهرباء واحدة فيها مفاتيح الإنارة والتكييف والمضخة بلا تقسيم واضح.  
+الملف الحالي يشبه لوحة كهرباء واحدة فيها مفاتيح الإنارة والتكييف والمضخة بلا تقسيم واضح.
 التقسيم المطلوب لا يعني بناء مبنى جديد؛ يعني وضع كل دائرة في قاطع معروف، مع لوحة رئيسية صغيرة مشتركة. عند إصلاح التكييف لا تنطفئ الإنارة.
 
 

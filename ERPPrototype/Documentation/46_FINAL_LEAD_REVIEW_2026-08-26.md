@@ -1,17 +1,28 @@
 # 46 — Final Lead Review and Long-Term Product Direction — 2026-08-26
 
-## Post-review execution status
+## Post-review execution status — updated 2026-08-30
 
 This review remains evidence for baseline `a74c9c9`; do not rewrite its findings as if they were produced against later code.
 
-After the review, Gate 5B-6 Unified Validation was implemented and accepted at `6a6f3ce` with automated real-browser regression and user manual acceptance. The next Revo foundation step is persistence identity/`RowVersion`, then snapshot-safe Save and real DB Save.
+Post-review implementation has advanced through Gate 5B-10; accepted Revo code checkpoint is `86eb2ff3ce51addc2046133c820dd5dc75bfd08f`:
+
+- Gate 5B-6 Unified Validation remains accepted.
+- Gate 5B-7 adds client persistence identity (`ClientKey` / `Id` / `RowVersion`) through structural History.
+- Gate 5B-8 adds selection-context/right-click semantics.
+- Gate 5B-9 adds the shared Structure Workspace, filtered displayed-row delete scope, Custom Column structural History, RTL insertion handling and clipboard range fill.
+- Gate 5B-10 adds accepted Plain/Ctrl/Shift whole-row/whole-column selection, Filter-pruning, Sort identity preservation, virtualization-safe visual selection, right-click preservation and dataset-switch clearing while Revo keeps native cell range/focus ownership.
+- Gate 5B-9 + Gate 5B-10 real-browser regressions and user manual B10 verification passed.
+- the Revo route still has no production DB Save/cutover.
+- the next bounded mission is snapshot-safe Save, then real DB Save and concurrency/recovery.
+
+The strategic findings below remain tied to the original `a74c9c9` review baseline.
 
 ---
 
 
-**Status:** Current strategic synthesis  
-**Baseline reviewed:** `a74c9c908a2372b0e9141dcf7f6ef772bd6c07b3`  
-**Inputs:** 14 independent reviews: UX, business logic, Saudi market fit, product strategy, architecture, shared infrastructure, data integrity, grid technology, Revo migration, performance, security, testing, maintainability, deployment/operations.  
+**Status:** Current strategic synthesis
+**Baseline reviewed:** `a74c9c908a2372b0e9141dcf7f6ef772bd6c07b3`
+**Inputs:** 14 independent reviews: UX, business logic, Saudi market fit, product strategy, architecture, shared infrastructure, data integrity, grid technology, Revo migration, performance, security, testing, maintainability, deployment/operations.
 **Important:** this document is a synthesis and roadmap. It does not claim every approved target behavior is implemented today.
 
 ---

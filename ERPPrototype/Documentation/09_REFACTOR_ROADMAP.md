@@ -1,3 +1,29 @@
+# CURRENT REVO ROADMAP OVERRIDE — 2026-08-30
+
+The stable Revo code checkpoint is Gate 5B-10 at `86eb2ff3ce51addc2046133c820dd5dc75bfd08f`. Older roadmap items remain historical when they describe B6/B9 or B10 selection as the next step.
+
+## Phase A — Finish the Revo production candidate
+
+1. ✅ Gate 5B-6 Unified Validation.
+2. ✅ Gate 5B-7 client Persistence Identity.
+3. ✅ Gate 5B-8 Selection Context.
+4. ✅ Gate 5B-9 Structure Workspace + clipboard range fill.
+5. ✅ **Gate 5B-10 — Header Selection:** Plain/Ctrl/Shift whole-row/whole-column selection, Filter-driven row pruning, Sort identity preservation, virtualization-safe visible selection, right-click preservation and dataset-switch clearing while Revo keeps native cell range/focus ownership.
+6. ▶ **Snapshot-safe Save handshake — current bounded mission.**
+7. Real DB Save with Add/Update/Delete + server validation/scope/duplicate mapping.
+8. End-to-end `RowVersion` concurrency and edit-while-Save-in-flight behavior.
+9. database-connected Custom Column/layout Save from Revo.
+10. year-move confirmation through the real Revo Save path.
+11. high-value employee parity: quick search, KPI/Basket summary, selection totals, production messages.
+12. self-host/pin exact Revo assets, reconnect/recovery, target Edge/Chrome and 10k qualification.
+13. side-by-side release candidate.
+14. controlled `/work-orders` cutover.
+15. separate post-cutover Tabulator retirement checkpoint.
+
+**Selection stop rule:** Gate 5B-10 is closed. Do not reopen it into a new selection framework unless regression evidence requires change. Revo remains owner of native range/focus/keyboard/editing/virtualization; disjoint Ctrl multi-cell ranges remain postponed.
+
+---
+
 # CURRENT PRODUCT / ENGINEERING ROADMAP — 2026-08-26
 
 This roadmap supersedes older Gate 5A-current ordering below.

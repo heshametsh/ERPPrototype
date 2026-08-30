@@ -1,8 +1,8 @@
 # 00 — Documentation Index
 
-**Status:** Current / Approved  
-**Last update:** 2026-08-26  
-**Current accepted engineering HEAD:** `6a6f3cef807f58a41bcfefa7c08b2ebaf6220169`  
+**Status:** Current / Approved
+**Last update:** 2026-08-30
+**Accepted Revo code checkpoint:** `86eb2ff3ce51addc2046133c820dd5dc75bfd08f`
 **14-review / Final Lead Review baseline:** `a74c9c908a2372b0e9141dcf7f6ef772bd6c07b3`
 
 ## 1. Trust Order
@@ -29,6 +29,7 @@ When documents disagree, use this order:
 | `../START_HERE_ERP_PROTOTYPE.md` | current engineering handoff and next step |
 | `15_BUSINESS_DOMAIN_AND_PERMISSIONS.md` | **business source of truth** |
 | `46_FINAL_LEAD_REVIEW_2026-08-26.md` | **long-term product/architecture synthesis** from 14 independent reviews |
+| `47_GATE5B10_ACCEPTANCE_2026-08-30.md` | Gate 5B-10 implementation/acceptance evidence and exact next boundary |
 | `03_CURRENT_IMPLEMENTATION.md` | what exists in current baseline |
 | `05_WORK_ORDERS_GRID_BEHAVIOUR.md` | Work Orders behavior independent of Tabulator/Revo |
 | `06_REGRESSION_TEST_CHECKLIST.md` | mandatory regression and real-browser acceptance |
@@ -38,16 +39,20 @@ When documents disagree, use this order:
 | `13_TECHNOLOGY_EVOLUTION.md` | Power Apps → Blazor → Syncfusion → Tabulator → RevoGrid |
 | `ERP_AUDIT_PROTOCOL.md` | independent-review method |
 
-## 3. Current State — 2026-08-26
+## 3. Current State — 2026-08-30
 
-- `/work-orders` remains live Tabulator route until Revo cutover.
-- RevoGrid Community 4.25.2 is the selected replacement.
-- isolated Gate 5B-6 contains Change Engine + Sheet History + Dirty + Paste + Range Clear + Filter/Sort + header selection + multi-row Insert/Delete + Remaining synchronization + Unified Validation.
-- Range Clear was accepted at `a74c9c9`; Unified Validation was accepted at `6a6f3ce` after automated real-browser and user manual acceptance.
-- Revo does **not** yet have production database Save/cutover.
-- next major Revo step: **persistence identity/RowVersion**, then snapshot-safe Save contract and real Save.
-- long-term direction: fast Master Sheet + one Work Order + specialist sub-workflows + manager control center.
-- Business questions previously left open in older audits are now settled in `15_BUSINESS_DOMAIN_AND_PERMISSIONS.md`.
+- `/work-orders` remains the live Tabulator route until accepted Revo cutover.
+- RevoGrid Community 4.25.2 remains the selected replacement.
+- accepted isolated Revo candidate is `/work-orders-revogrid-gate5b10` at code checkpoint `86eb2ff3ce51addc2046133c820dd5dc75bfd08f`.
+- Gates 5B-7 through 5B-9 remain present: persistence identity, selection context, Structure Workspace, Custom Column structural History and range fill.
+- Gate 5B-10 adds Plain/Ctrl/Shift whole-row/whole-column selection without replacing Revo native cell focus/range/keyboard/editing/virtualization ownership.
+- row selection is identity-based on `ClientKey`; column selection is identity-based on `prop`.
+- Filter-pruning is implemented: filtered-out selected rows leave row selection and are not reselected merely because the Filter is cleared.
+- Sort preserves selected Work Order identity; Scroll/virtualization preserves and repaints visible selection.
+- right-click inside semantic selection preserves it; year/dataset switch clears it.
+- Gate 5B-9 regression + Gate 5B-10 real-browser journey + user manual browser verification all passed before acceptance.
+- Revo still has **no production database Save binding or `/work-orders` cutover**.
+- next bounded mission is snapshot-safe Save, then real DB Save and end-to-end `RowVersion` concurrency/recovery.
 
 ## 4. Historical / Evidence Material
 

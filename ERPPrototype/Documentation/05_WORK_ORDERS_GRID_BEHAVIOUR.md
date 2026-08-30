@@ -1,6 +1,6 @@
-# BUSINESS BEHAVIOR OVERRIDE — 2026-08-26
+# BUSINESS BEHAVIOR OVERRIDE — 2026-08-30
 
-> This document remains the engine-independent Grid behavior contract.  
+> This document remains the engine-independent Grid behavior contract.
 > Business semantics are canonical in `15_BUSINESS_DOMAIN_AND_PERMISSIONS.md`.
 
 ## Financial field meaning
@@ -41,14 +41,41 @@ Changing Assignment Date so Work Order moves to another year requires user confi
 
 This supersedes older “automatic move vs confirmation still open” statements later in this file.
 
+## Selection, Filter, and current-view targeting
+
+Approved product behavior for the Revo candidate:
+
+- Scroll does not cancel selection; virtualization is not a Filter.
+- Sort keeps the same selected Work Orders by stable identity even when their positions move.
+- when Filter removes a row from the current result, that row leaves row selection immediately.
+- clearing the Filter does not silently restore that old row selection.
+- any **new** sheet mutation that resolves row/cell targets must resolve its final targets only from rows still in the current filtered result.
+- a change made while a row was visible remains a valid dirty change; Save may persist it even if a later Filter hides the row.
+- Undo/Redo continues the earlier logical operation and must not be corrupted merely because Filter visibility later changed.
+- changing year/dataset clears selection because it is a different dataset.
+
+Example:
+
+> Employee selects Work Orders A, B, C. A Filter removes B. Selection becomes A + C. Delete may target A + C only. Clearing the Filter makes B visible again, but B does not become selected again automatically.
+
+## Selection architecture boundary
+
+- Revo owns the native active cell/range, focus, edit and keyboard mechanics.
+- ERP may add missing semantic Ctrl/Shift selection for whole rows/columns using stable row/column identity.
+- right-click inside current selection preserves it; right-click outside targets the clicked location.
+- disjoint Ctrl multi-cell ranges are postponed until their Copy/Paste/Delete/Undo meaning is fully defined.
+- a large/whole-row/whole-column selection may visually suppress an intrusive inner active-cell marker only if Revo focus remains functionally intact.
+
+**Implementation note:** Gate 5B-10 at `86eb2ff3ce51addc2046133c820dd5dc75bfd08f` implements the whole-row/whole-column Plain/Ctrl/Shift behavior and Filter-pruning contract above. Sort identity preservation, virtualization repaint, right-click preservation and dataset-switch clearing passed real-browser and manual acceptance. Disjoint Ctrl multi-cell ranges remain postponed.
+
 ---
 
 # 05 — Work Orders Grid Behaviour
 
 > **Grid-engine transition 2026-08-20:** هذه الوثيقة أصبحت **engine-independent behavior contract**. `/work-orders` الحالي ما زال Tabulator 6.5.0، لكن RevoGrid Community 4.25.2 هو المحرك المختار للاستبدال. أي RevoGrid integration يجب أن يحافظ على السلوك هنا ولا يغيّره لمجرد اختلاف المكتبة.
 
-**Status:** Approved description of `M5D4R3-Stable-Range-UX` behavior and acceptance contract  
-**Route:** `/work-orders`  
+**Status:** Approved description of `M5D4R3-Stable-Range-UX` behavior and acceptance contract
+**Route:** `/work-orders`
 **Authorized current role:** `Employee`
 
 ## 1. Sheet Scope
@@ -163,15 +190,19 @@ Server and database validation remain final and must recheck authoritative rules
 
 ## 10. Year Behaviour
 
-Current implementation:
+Live Tabulator implementation/history:
 
 - A blank Assignment Date keeps the row in the open Work Year.
-- An Assignment Date in another year moves the saved row automatically to that year.
-- The year list updates after save.
-- Changing the year destroys and creates a fresh Tabulator instance.
-- This currently restores speed after the long-session fatigue issue.
+- older live behavior can route a saved row to the year implied by Assignment Date.
+- the year list updates after save.
+- the live Tabulator path recreates its grid instance on year change.
 
-The final business choice between automatic move and user confirmation remains an open decision before commercial release.
+Approved product contract:
+
+- a cross-year Assignment Date change must ask for user confirmation **before** the authoritative move.
+- after confirmation, the server remains authoritative for the final saved year.
+- this decision is closed; it is not an open automatic-vs-confirmation question.
+- the Revo isolated candidate treats each year as a separate dataset and clears selection/history state at the dataset boundary as defined by its current owners.
 
 ## 11. Resize Behaviour — E6C Foundation
 
@@ -243,7 +274,7 @@ A grid change is not accepted until all pass:
 
 ## 15. Simple Example
 
-عند الوقوف على الصف 2,576 ثم تصغير النافذة، حفظ `scrollTop` بالبكسل قد يعيدك إلى 2,583 لأن ارتفاع العرض تغير.  
+عند الوقوف على الصف 2,576 ثم تصغير النافذة، حفظ `scrollTop` بالبكسل قد يعيدك إلى 2,583 لأن ارتفاع العرض تغير.
 E6C يحفظ هوية الصف نفسه، مثل حفظ رقم المنزل بدل حفظ عدد الأمتار التي مشيتها.
 
 
