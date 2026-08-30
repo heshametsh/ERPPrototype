@@ -19,6 +19,8 @@ public partial class WorkOrdersRevoGridNativeGate5A
     private const string RedoButtonId = "revogrid-gate5b1-redo";
     private const string FinancialErrorElementId = "revogrid-gate5b-financial-errors";
     private const string RowCountElementId = "revogrid-gate5b-row-count";
+    private const string SaveButtonId = "revogrid-gate5b11-save";
+    private const string SaveStatusElementId = "revogrid-gate5b11-save-status";
 
     [Parameter]
     public bool EnableChangeEngine { get; set; }
@@ -56,6 +58,9 @@ public partial class WorkOrdersRevoGridNativeGate5A
     [Parameter]
     public bool EnableClipboardRangeFill { get; set; }
 
+    [Parameter]
+    public bool EnableSaveHandshake { get; set; }
+
     // Saudi Arabia is UTC+3 all year. The page always opens on the
     // current Saudi business year and does not persist the last selected year.
     private static int CurrentBusinessYear =>
@@ -67,6 +72,8 @@ public partial class WorkOrdersRevoGridNativeGate5A
     private bool IsYearLoading;
     private bool GridInitialized;
     private bool GridInitializationInProgress;
+    private bool IsSaveHandshakeInFlight;
+    private bool SimulateSaveHandshakeFailure;
 
     private string CurrentUserId = string.Empty;
     private string BranchName = string.Empty;
@@ -235,7 +242,9 @@ public partial class WorkOrdersRevoGridNativeGate5A
         try
         {
             var gridModulePath = EnableChangeEngine
-                ? EnableHeaderMultiSelection
+                ? EnableSaveHandshake
+                    ? "./js/revoGridGate5B1.js?v=20260830-gate5b11-save-handshake-clean-3"
+                    : EnableHeaderMultiSelection
                     ? "./js/revoGridGate5B1.js?v=20260829-gate5b10-header-selection-plugin-1"
                     : EnableStructureWorkspace
                     ? "./js/revoGridGate5B1.js?v=20260828-structure-workspace-5"
@@ -272,6 +281,7 @@ public partial class WorkOrdersRevoGridNativeGate5A
                     EnableStructureWorkspace,
                     EnableHeaderMultiSelection,
                     EnableClipboardRangeFill,
+                    EnableSaveHandshake,
                     BasketValues = WorkOrderBuskets.All,
                     RowCountElementId,
                     ChangeStatusElementId,
@@ -279,7 +289,9 @@ public partial class WorkOrdersRevoGridNativeGate5A
                     RedoCountElementId,
                     UndoButtonId,
                     RedoButtonId,
-                    FinancialErrorElementId
+                    FinancialErrorElementId,
+                    SaveButtonId,
+                    SaveStatusElementId
                 });
 
             GridInitialized = true;
@@ -305,6 +317,103 @@ public partial class WorkOrdersRevoGridNativeGate5A
         finally
         {
             GridInitializationInProgress = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task HandleSaveHandshakeAsync()
+    {
+        if (
+            !EnableSaveHandshake ||
+            IsSaveHandshakeInFlight ||
+            !GridInitialized ||
+            GridModule is null)
+        {
+            return;
+        }
+
+        NativeGate5B11BeginSaveDecision? decision = null;
+        IsSaveHandshakeInFlight = true;
+        OperationMessage = string.Empty;
+        StateHasChanged();
+
+        try
+        {
+            decision =
+                await GridModule.InvokeAsync<NativeGate5B11BeginSaveDecision>(
+                    "beginSaveHandshake",
+                    GridElementId);
+
+            if (!decision.Allowed || string.IsNullOrWhiteSpace(decision.SaveId))
+            {
+                OperationMessage = decision.Reason switch
+                {
+                    "clean" => "No row changes to save.",
+                    "validation" => "Save blocked by validation.",
+                    "custom-columns-pending" => "Row Save is blocked while Custom Column changes are pending.",
+                    "save-active" => "A Save handshake is already running.",
+                    _ => "Save is temporarily unavailable while the sheet is busy."
+                };
+                return;
+            }
+
+            OperationMessage =
+                $"Saving snapshot r{decision.Revision}: " +
+                $"{decision.DirtyCellCount} cell changes, " +
+                $"{decision.DirtyRowCount} row changes. No database write.";
+            StateHasChanged();
+
+            // Gate 5B-11 intentionally leaves the grid editable while the
+            // accepted snapshot is in flight. This delay is a stand-in for the
+            // real server call that Gate R4 will connect later.
+            await Task.Delay(2_500);
+
+            if (SimulateSaveHandshakeFailure)
+            {
+                await GridModule.InvokeVoidAsync(
+                    "rejectSaveHandshake",
+                    GridElementId,
+                    decision.SaveId);
+                OperationMessage =
+                    "Snapshot rejected. Pending work remains Dirty. No database write.";
+                return;
+            }
+
+            var result =
+                await GridModule.InvokeAsync<NativeGate5B11AcceptSaveResult>(
+                    "acceptSaveHandshake",
+                    GridElementId,
+                    decision.SaveId);
+
+            OperationMessage = result.Dirty
+                ? $"Snapshot accepted; {result.DirtyCount} newer changes remain Dirty. No database write."
+                : "Snapshot accepted; row Change Engine is Clean. No database write.";
+        }
+        catch (JSDisconnectedException)
+        {
+        }
+        catch (Exception exception)
+        {
+            if (!string.IsNullOrWhiteSpace(decision?.SaveId) && GridModule is not null)
+            {
+                try
+                {
+                    await GridModule.InvokeVoidAsync(
+                        "rejectSaveHandshake",
+                        GridElementId,
+                        decision.SaveId);
+                }
+                catch
+                {
+                }
+            }
+
+            Logger.LogError(exception, "Gate 5B-11 Save handshake failed.");
+            OperationMessage = "Save handshake failed; pending work remains Dirty.";
+        }
+        finally
+        {
+            IsSaveHandshakeInFlight = false;
             StateHasChanged();
         }
     }
@@ -591,6 +700,26 @@ public partial class WorkOrdersRevoGridNativeGate5A
         [System.Text.Json.Serialization.JsonExtensionData]
         public Dictionary<string, JsonElement> CustomFields { get; set; } =
             new(StringComparer.Ordinal);
+    }
+
+    private sealed class NativeGate5B11BeginSaveDecision
+    {
+        public bool Allowed { get; set; }
+        public string? Reason { get; set; }
+        public string? SaveId { get; set; }
+        public long Revision { get; set; }
+        public int DirtyCellCount { get; set; }
+        public int DirtyRowCount { get; set; }
+        public int ChangedRecordCount { get; set; }
+        public int DeletedRecordCount { get; set; }
+    }
+
+    private sealed class NativeGate5B11AcceptSaveResult
+    {
+        public string SaveId { get; set; } = string.Empty;
+        public bool Dirty { get; set; }
+        public int DirtyCount { get; set; }
+        public bool SaveActive { get; set; }
     }
 
     private sealed class NativeGate5B1DatasetSwitchDecision

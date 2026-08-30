@@ -845,6 +845,24 @@ export function createRevoGridChangeBridge(options) {
         return engine.getDirtyRows();
     }
 
+    function beginSave() {
+        const snapshot = engine.beginSave();
+        notifyState();
+        return snapshot;
+    }
+
+    function acceptSave(saveId) {
+        const accepted = engine.acceptSave(saveId);
+        notifyState();
+        return accepted;
+    }
+
+    function rejectSave(saveId) {
+        const rejected = engine.rejectSave(saveId);
+        notifyState();
+        return rejected;
+    }
+
     function getState() {
         const financialInvalidRows = Array.from(
             financialErrorsByClientKey.entries()
@@ -913,6 +931,9 @@ export function createRevoGridChangeBridge(options) {
         resetDataset,
         replaceRowIndex,
         applyRowChanges,
+        beginSave,
+        acceptSave,
+        rejectSave,
         getState,
         getDirtyCells,
         getDirtyRows,

@@ -80,6 +80,21 @@ function findElement(id) {
     return id ? document.getElementById(id) : null;
 }
 
+function cloneValue(value) {
+    if (value === undefined) {
+        return undefined;
+    }
+
+    if (typeof structuredClone === "function") {
+        try {
+            return structuredClone(value);
+        } catch {
+        }
+    }
+
+    return JSON.parse(JSON.stringify(value));
+}
+
 function combinedState(state) {
     const changeState = state.changeBridge.getState();
     const columnState = state.columnWorkspace?.getState?.() ?? {};
@@ -164,6 +179,47 @@ function renderState(state) {
             current.editLocked ||
             current.replayActive ||
             current.redoCount === 0;
+    }
+
+    if (state.saveButton) {
+        const rowDirty = Boolean(state.changeBridge.getState().dirty);
+        const invalidCells = Number(current.validationInvalidCellCount ?? 0);
+        const columnDirty = current.customColumnsChanged === true;
+        // Keep Save clickable while the grid is otherwise available.
+        // An active Revo editor can contain the user's newest value before the
+        // Change Engine is Dirty. Clicking Save moves focus away from the editor;
+        // applyOnClose commits that value through Revo's native edit lifecycle,
+        // then beginSaveHandshake decides whether there is anything to save.
+        state.saveButton.disabled =
+            !state.enableSaveHandshake ||
+            state.datasetSwitchActive ||
+            filterBusy ||
+            sortBusy ||
+            structureBusy ||
+            current.editLocked ||
+            current.replayActive ||
+            current.saveActive ||
+            invalidCells > 0 ||
+            columnDirty;
+    }
+
+    if (state.saveStatusElement) {
+        const rowState = state.changeBridge.getState();
+        const invalidCells = Number(current.validationInvalidCellCount ?? 0);
+        const columnDirty = current.customColumnsChanged === true;
+
+        state.saveStatusElement.textContent = current.saveActive
+            ? "Snapshot in flight"
+            : columnDirty
+                ? "Row Save blocked by pending Custom Column changes"
+                : invalidCells > 0
+                    ? "Save blocked by validation"
+                    : rowState.dirty
+                        ? `Ready — ${rowState.dirtyCount} row/cell changes`
+                        : "No row changes";
+        state.saveStatusElement.dataset.saveActive = current.saveActive
+            ? "true"
+            : "false";
     }
 }
 
@@ -261,6 +317,9 @@ export async function initialize(elementId, rows, customColumns, options) {
     const enableHeaderMultiSelection = Boolean(
         value(options, "enableHeaderMultiSelection", "EnableHeaderMultiSelection", false)
     );
+    const enableSaveHandshake = Boolean(
+        value(options, "enableSaveHandshake", "EnableSaveHandshake", false)
+    );
     const headerSelectionFeature = enableHeaderMultiSelection
         ? createRevoGridHeaderSelectionFeature()
         : null;
@@ -280,6 +339,9 @@ export async function initialize(elementId, rows, customColumns, options) {
                 validationOwner?.getCellProperties?.(props),
                 headerSelectionFeature?.cellProperties?.(props)
             )
+        } : {}),
+        ...(enableSaveHandshake ? {
+            applyOnClose: true
         } : {}),
         ...(headerSelectionFeature ? {
             columnPropertiesProvider: props =>
@@ -337,6 +399,8 @@ export async function initialize(elementId, rows, customColumns, options) {
         persistenceIdentity: Boolean(value(options, "enablePersistenceIdentity", "EnablePersistenceIdentity", false))
             ? createRevoGridPersistenceIdentity({ rows })
             : null,
+        enableSaveHandshake,
+        activeSaveContract: null,
         datasetSwitchActive: false,
         handledHistoryKeyEvents: new WeakSet(),
         removers: [],
@@ -360,6 +424,12 @@ export async function initialize(elementId, rows, customColumns, options) {
         ),
         rowCountElement: findElement(
             value(options, "rowCountElementId", "RowCountElementId", "")
+        ),
+        saveButton: findElement(
+            value(options, "saveButtonId", "SaveButtonId", "")
+        ),
+        saveStatusElement: findElement(
+            value(options, "saveStatusElementId", "SaveStatusElementId", "")
         )
     };
 
@@ -586,10 +656,10 @@ export async function beginDatasetSwitch(elementId) {
 
     const current = combinedState(state);
 
-    if (current.dirty) {
-        return { allowed: false, reason: "dirty" };
-    }
-
+    // Busy operations take precedence over Dirty. During a Save handshake the
+    // user may already have newer unsaved edits, so both saveActive and dirty
+    // can be true at the same time. A dataset switch must report the active
+    // Save as the blocking reason instead of telling the user to save again.
     if (
         current.activeDataCapture ||
         current.replayActive ||
@@ -600,6 +670,10 @@ export async function beginDatasetSwitch(elementId) {
         state.columnWorkspace?.getState().columnWorkspaceBusy
     ) {
         return { allowed: false, reason: "busy" };
+    }
+
+    if (current.dirty) {
+        return { allowed: false, reason: "dirty" };
     }
 
     // A year switch replaces the entire Work Orders dataset. Selection never
@@ -699,6 +773,211 @@ export async function replaceDataset(elementId, rows, workYear) {
     }
 }
 
+async function settleNativeEditorBeforeSave(state) {
+    // Gate 5B-11 enables Revo's public applyOnClose contract. Clicking the
+    // external Save button therefore closes an active editor through Revo's
+    // own lifecycle before the Change Engine snapshot is taken.
+    await new Promise(resolve => requestAnimationFrame(() => resolve()));
+    await new Promise(resolve => requestAnimationFrame(() => resolve()));
+
+    const deadline = performance.now() + 1_500;
+    while (state.changeBridge.getState().activeDataCapture) {
+        if (performance.now() >= deadline) {
+            throw new Error("The active Revo edit did not settle before Save.");
+        }
+        await new Promise(resolve => setTimeout(resolve, 10));
+    }
+}
+
+function buildSaveContractSnapshot(state, engineSnapshot, sourceRows) {
+    const rowsByClientKey = new Map();
+    for (const row of Array.isArray(sourceRows) ? sourceRows : []) {
+        const clientKey = String(row?.clientKey ?? "").trim();
+        if (clientKey) {
+            rowsByClientKey.set(clientKey, cloneValue(row));
+        }
+    }
+
+    const changedFieldsByClientKey = new Map();
+    for (const cell of engineSnapshot.cells ?? []) {
+        const clientKey = String(cell?.clientKey ?? "").trim();
+        const field = String(cell?.field ?? "").trim();
+        if (!clientKey || !field) {
+            continue;
+        }
+        if (!changedFieldsByClientKey.has(clientKey)) {
+            changedFieldsByClientKey.set(clientKey, new Set());
+        }
+        changedFieldsByClientKey.get(clientKey).add(field);
+    }
+
+    const rowStateByClientKey = new Map(
+        (engineSnapshot.rows ?? []).map(row => [
+            String(row?.clientKey ?? "").trim(),
+            cloneValue(row)
+        ])
+    );
+
+    const changedClientKeys = new Set([
+        ...changedFieldsByClientKey.keys(),
+        ...Array.from(rowStateByClientKey.entries())
+            .filter(([, row]) => row?.state?.exists)
+            .map(([clientKey]) => clientKey)
+    ]);
+
+    const changedRecords = [];
+    for (const clientKey of changedClientKeys) {
+        const row = rowsByClientKey.get(clientKey);
+        if (!row) {
+            throw new Error(`Save snapshot row '${clientKey}' is not present in Revo source.`);
+        }
+
+        changedRecords.push({
+            clientKey,
+            identity: state.persistenceIdentity?.getIdentity?.(clientKey) ?? null,
+            changedFields: Array.from(changedFieldsByClientKey.get(clientKey) ?? []).sort(),
+            rowState: rowStateByClientKey.get(clientKey) ?? null,
+            row
+        });
+    }
+
+    const structuralRows = (engineSnapshot.rows ?? []).map(row => ({
+        clientKey: row.clientKey,
+        baseline: cloneValue(row.baseline),
+        current: cloneValue(row.state)
+    }));
+
+    const deletedRecords = state.persistenceIdentity?.getDeletedRecords?.(structuralRows) ?? [];
+
+    return {
+        id: engineSnapshot.id,
+        datasetKey: engineSnapshot.datasetKey,
+        startedAt: engineSnapshot.startedAt,
+        revision: engineSnapshot.revision,
+        cells: cloneValue(engineSnapshot.cells ?? []),
+        rows: cloneValue(engineSnapshot.rows ?? []),
+        changedRecords,
+        deletedRecords
+    };
+}
+
+export async function beginSaveHandshake(elementId) {
+    const state = bindings.get(elementId);
+    if (!state || !state.enableSaveHandshake) {
+        return { allowed: false, reason: "not-enabled" };
+    }
+
+    await settleNativeEditorBeforeSave(state);
+
+    const current = combinedState(state);
+    const changeState = state.changeBridge.getState();
+    const filterBusy = Boolean(state.excelFilter?.getState().filterBusy);
+    const sortBusy = Boolean(state.sortController?.getState().sortBusy);
+    const structureBusy = Boolean(
+        state.rowStructure?.getState().structureBusy ||
+        state.columnWorkspace?.getState().columnWorkspaceBusy
+    );
+
+    if (current.saveActive || state.activeSaveContract) {
+        return { allowed: false, reason: "save-active" };
+    }
+    if (state.datasetSwitchActive || current.replayActive || changeState.activeDataCapture || filterBusy || sortBusy || structureBusy) {
+        return { allowed: false, reason: "busy" };
+    }
+    if (Number(current.validationInvalidCellCount ?? 0) > 0) {
+        return { allowed: false, reason: "validation" };
+    }
+    if (current.customColumnsChanged === true) {
+        return { allowed: false, reason: "custom-columns-pending" };
+    }
+    if (!changeState.dirty) {
+        return { allowed: false, reason: "clean" };
+    }
+    if (!state.persistenceIdentity) {
+        throw new Error("Save handshake requires Persistence Identity.");
+    }
+
+    // Clone Revo source immediately before beginSave. No await occurs between
+    // this clone and engine.beginSave(), so the row payload and change
+    // generation represent the same browser moment.
+    const sourceRows = cloneValue(await state.grid.getSource("rgRow"));
+    let snapshot = null;
+    try {
+        snapshot = state.changeBridge.beginSave();
+        const contract = buildSaveContractSnapshot(state, snapshot, sourceRows);
+        state.activeSaveContract = contract;
+        renderState(state);
+        return {
+            allowed: true,
+            reason: null,
+            saveId: contract.id,
+            revision: contract.revision,
+            dirtyCellCount: contract.cells.length,
+            dirtyRowCount: contract.rows.length,
+            changedRecordCount: contract.changedRecords.length,
+            deletedRecordCount: contract.deletedRecords.length
+        };
+    } catch (error) {
+        if (snapshot?.id) {
+            state.changeBridge.rejectSave(snapshot.id);
+        }
+        state.activeSaveContract = null;
+        renderState(state);
+        throw error;
+    }
+}
+
+export function acceptSaveHandshake(elementId, saveId) {
+    const state = bindings.get(elementId);
+    if (!state || !state.activeSaveContract) {
+        throw new Error("No Save handshake is active.");
+    }
+    if (state.activeSaveContract.id !== String(saveId ?? "")) {
+        throw new Error("Save handshake id does not match the active snapshot.");
+    }
+
+    const accepted = state.changeBridge.acceptSave(saveId);
+    state.activeSaveContract = null;
+    renderState(state);
+    const current = combinedState(state);
+    return {
+        saveId: accepted.id,
+        dirty: Boolean(current.dirty),
+        dirtyCount: Number(current.dirtyCount ?? 0),
+        saveActive: Boolean(current.saveActive)
+    };
+}
+
+export function rejectSaveHandshake(elementId, saveId) {
+    const state = bindings.get(elementId);
+    if (!state || !state.activeSaveContract) {
+        return false;
+    }
+    if (state.activeSaveContract.id !== String(saveId ?? "")) {
+        return false;
+    }
+
+    const rejected = state.changeBridge.rejectSave(saveId);
+    state.activeSaveContract = null;
+    renderState(state);
+    return rejected;
+}
+
+export function getSaveHandshakeDiagnostics(elementId) {
+    const state = bindings.get(elementId);
+    if (!state) {
+        throw new Error(`Gate 5B state '${elementId}' was not found.`);
+    }
+
+    return {
+        enabled: state.enableSaveHandshake,
+        active: Boolean(state.activeSaveContract),
+        contract: cloneValue(state.activeSaveContract),
+        changeState: state.changeBridge.getState(),
+        combinedState: combinedState(state)
+    };
+}
+
 export function getChangeState(elementId) {
     const state = bindings.get(elementId);
     if (!state) {
@@ -758,6 +1037,13 @@ export async function getDiagnostics(elementId) {
                 deletedRecords: state.persistenceIdentity.getDeletedRecords(
                     state.changeBridge.getDirtyRows()
                 )
+            }
+            : null,
+        saveHandshake: state
+            ? {
+                enabled: state.enableSaveHandshake,
+                active: Boolean(state.activeSaveContract),
+                contract: cloneValue(state.activeSaveContract)
             }
             : null
     };

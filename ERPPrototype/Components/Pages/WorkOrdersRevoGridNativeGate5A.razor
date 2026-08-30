@@ -16,13 +16,15 @@
 @inject IJSRuntime JSRuntime
 @inject ILogger<WorkOrdersRevoGridNativeGate5A> Logger
 
-<PageTitle>@(EnableHeaderMultiSelection ? "RevoGrid Gate 5B-10" : EnableStructureWorkspace ? "RevoGrid Gate 5B-9" : EnableSelectionContext ? "RevoGrid Gate 5B-8" : EnablePersistenceIdentity ? "RevoGrid Gate 5B-7" : EnableUnifiedValidation ? "RevoGrid Gate 5B-6" : EnableRowStructure ? "RevoGrid Gate 5B-5" : EnableHeaderActions ? "RevoGrid Gate 5B-4" : EnableExcelFilter ? "RevoGrid Gate 5B-3" : EnablePaste ? "RevoGrid Gate 5B-2" : EnableChangeEngine ? "RevoGrid Gate 5B-1" : "RevoGrid Native Gate 5A")</PageTitle>
+<PageTitle>@(EnableSaveHandshake ? "RevoGrid Gate 5B-11" : EnableHeaderMultiSelection ? "RevoGrid Gate 5B-10" : EnableStructureWorkspace ? "RevoGrid Gate 5B-9" : EnableSelectionContext ? "RevoGrid Gate 5B-8" : EnablePersistenceIdentity ? "RevoGrid Gate 5B-7" : EnableUnifiedValidation ? "RevoGrid Gate 5B-6" : EnableRowStructure ? "RevoGrid Gate 5B-5" : EnableHeaderActions ? "RevoGrid Gate 5B-4" : EnableExcelFilter ? "RevoGrid Gate 5B-3" : EnablePaste ? "RevoGrid Gate 5B-2" : EnableChangeEngine ? "RevoGrid Gate 5B-1" : "RevoGrid Native Gate 5A")</PageTitle>
 
 <div class="native-gate5a" data-testid="revogrid-native-gate5a">
     <header class="native-gate5a__header">
         <div class="native-gate5a__identity">
             <strong>RevoGrid Community 4.25.2</strong>
-            <span>@(EnableHeaderMultiSelection
+            <span>@(EnableSaveHandshake
+                ? "Gate 5B-11 — snapshot-safe row Save handshake over the accepted Gate 5B-10 behavior"
+                : EnableHeaderMultiSelection
                 ? "Gate 5B-10 — Ctrl/Shift whole-row/whole-column selection over the stable Gate 5B-9 behavior"
                 : EnableStructureWorkspace
                 ? "Gate 5B-9 — Shared Rows/Columns Structure Workspace over the stable Gate 5B-8 behavior"
@@ -59,7 +61,7 @@
             <label>
                 <span>السنة</span>
                 <select @onchange="HandleYearChangedAsync"
-                        disabled="@(IsLoading || IsYearLoading)"
+                        disabled="@(IsLoading || IsYearLoading || IsSaveHandshakeInFlight)"
                         data-testid="gate5a-year-selector">
                     @foreach (var year in AvailableWorkYears)
                     {
@@ -112,9 +114,28 @@
                 </span>
             }
 
+            @if (EnableSaveHandshake)
+            {
+                <span class="native-gate5a__save-handshake">
+                    <button id="@SaveButtonId"
+                            type="button"
+                            @onclick="HandleSaveHandshakeAsync">
+                        Save handshake
+                    </button>
+                    <span id="@SaveStatusElementId">No row changes</span>
+                    <label>
+                        <input type="checkbox"
+                               @bind="SimulateSaveHandshakeFailure"
+                               disabled="@IsSaveHandshakeInFlight"
+                               data-testid="gate5b11-reject-toggle" />
+                        Reject next handshake
+                    </label>
+                </span>
+            }
+
             <button type="button"
                     @onclick="RefreshDiagnosticsAsync"
-                    disabled="@(!GridInitialized || IsYearLoading)">
+                    disabled="@(!GridInitialized || IsYearLoading || IsSaveHandshakeInFlight)">
                 تحديث القياس
             </button>
         </div>
@@ -133,7 +154,11 @@
         </main>
 
         <footer class="native-gate5a__note">
-            @if (EnableHeaderMultiSelection)
+            @if (EnableSaveHandshake)
+            {
+                <span>Gate 5B-11 proves the row Save handshake only: exact snapshot generation, accept/reject, edits during Save staying Dirty, and native Revo editor commit-on-close. It does not write to the database.</span>
+            }
+            else if (EnableHeaderMultiSelection)
             {
                 <span>Gate 5B-10 يضيف Ctrl/Shift لتحديد الصفوف والأعمدة بالهوية فوق Revo Community، مع بقاء Revo مسؤولًا عن Cell Focus/Range/Keyboard/Editing/Virtualization. Filter يزيل الصف المخفي من التحديد ولا يعيده تلقائيًا، بينما Sort/Scroll يحافظان على نفس Work Orders. لا يوجد Save لقاعدة البيانات بعد.</span>
             }

@@ -337,6 +337,9 @@ export async function initialize(elementId, rows, customColumns, options) {
 
     grid.range = true;
     grid.resize = true;
+    grid.applyOnClose = Boolean(
+        value(options, "applyOnClose", "ApplyOnClose", false)
+    );
     const rowHeaderCellProperties = value(
         options,
         "rowHeaderCellProperties",

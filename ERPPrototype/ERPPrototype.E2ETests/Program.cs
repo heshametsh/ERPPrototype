@@ -80,6 +80,26 @@ internal static class Program
                 argument =>
                     string.Equals(
                         argument,
+                        "--revo-gate5b11-save",
+                        StringComparison.OrdinalIgnoreCase)))
+        {
+            return await Gate5B11SaveHandshakeRunner.RunAsync();
+        }
+
+        if (args.Any(
+                argument =>
+                    string.Equals(
+                        argument,
+                        "--revo-b9-b11-full-regression",
+                        StringComparison.OrdinalIgnoreCase)))
+        {
+            return await Gate5B9ToB11RegressionRunner.RunAsync();
+        }
+
+        if (args.Any(
+                argument =>
+                    string.Equals(
+                        argument,
                         "--revo-gate5b6-validation",
                         StringComparison.OrdinalIgnoreCase)))
         {
