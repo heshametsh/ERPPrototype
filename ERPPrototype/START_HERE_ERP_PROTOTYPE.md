@@ -1,3 +1,44 @@
+# CURRENT HANDOFF — 2026-08-30 — POST V4R3
+
+This is the newest handoff. Older handoffs remain historical when they conflict.
+
+**Accepted Revo checkpoint:** `0e7a6be512f92fe076f21261b86da5079897d48e`
+**Current Revo route:** `/work-orders-revogrid-gate5b11`
+**Current milestone:** Gate 5B-11 + Selection Core V4R3
+**Next mission:** Real DB Save
+
+## Current state
+
+- Gate 5B-11 snapshot-safe Save handshake is accepted.
+- Selection Core V4R3 is accepted.
+- Rows remain identified by `ClientKey`.
+- Columns remain identified by `prop`.
+- Revo remains owner of native focus, range, editing and virtualization.
+- ERP owns semantic row/column selection identity.
+- Filter, Sort and Structure movement preserve the intended selected identity.
+- Revo native range is resynchronized when a still-selected item changes visible position.
+- rapid Ctrl interaction is protected from stale asynchronous range updates.
+- no parallel cell-selection engine was introduced.
+- no production database Save exists yet.
+
+## Acceptance evidence
+
+- Build PASS.
+- Gate 5B-10 browser journey PASS.
+- Gate 5B-11 Save browser journey PASS.
+- Full B9 -> B11 regression PASS.
+- manual V4R3 browser verification PASS.
+
+## Next engineering sequence
+
+Real DB Save
+-> RowVersion concurrency and failure recovery
+-> database-connected custom structure persistence
+-> production qualification
+-> controlled Revo cutover
+
+---
+
 # CURRENT HANDOFF — 2026-08-30
 
 > This is the newest handoff. Older handoffs below are historical when they conflict.

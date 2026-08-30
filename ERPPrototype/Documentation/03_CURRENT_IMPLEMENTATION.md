@@ -1,3 +1,31 @@
+# CURRENT IMPLEMENTATION OVERRIDE — 2026-08-30 — POST V4R3
+
+**Accepted Revo checkpoint:** `0e7a6be512f92fe076f21261b86da5079897d48e`
+**Route:** `/work-orders-revogrid-gate5b11`
+
+Gate 5B-11 and Selection Core V4R3 are accepted.
+
+Selection Core V4R3 keeps semantic selection identity-based:
+
+- rows use `ClientKey`
+- columns use `prop`
+- semantic state remains Selected + Anchor + Primary
+
+Revo continues to own:
+
+- native focus/range
+- keyboard/editing
+- editor lifecycle
+- virtualization/rendering
+
+V4R3 adds native-range resynchronization after Filter/Structure movement and protection against stale asynchronous Ctrl selection completion.
+
+The Revo candidate still does not write to the production database.
+
+**Next bounded mission:** Real DB Save using the accepted Gate 5B-11 snapshot/accept/reject contract.
+
+---
+
 # CURRENT IMPLEMENTATION OVERRIDE — 2026-08-30
 
 > This is the newest implementation snapshot. Older overrides below remain historical when they conflict.

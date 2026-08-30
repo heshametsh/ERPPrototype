@@ -1,3 +1,18 @@
+# CURRENT REVO CHECKPOINT — 2026-08-30
+
+Accepted code checkpoint: `0e7a6be512f92fe076f21261b86da5079897d48e`.
+
+Current isolated Revo route: `/work-orders-revogrid-gate5b11`.
+
+Gate 5B-11 Snapshot-safe Save is accepted.
+Selection Core V4R3 is accepted as post-B11 hardening.
+
+The next bounded mission is Real DB Save using the existing B11 snapshot handshake.
+
+Do not reopen Selection architecture unless new regression evidence proves a real defect.
+
+---
+
 # ERP Prototype — Engineering Entry Point
 
 ## Status

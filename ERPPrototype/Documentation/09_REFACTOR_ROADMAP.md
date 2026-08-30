@@ -1,3 +1,33 @@
+# CURRENT REVO ROADMAP OVERRIDE — POST V4R3
+
+Accepted checkpoint: `0e7a6be512f92fe076f21261b86da5079897d48e`.
+
+Completed:
+
+1. Gate 5B-6 Unified Validation
+2. Gate 5B-7 Persistence Identity
+3. Gate 5B-8 Selection Context
+4. Gate 5B-9 Structure Workspace
+5. Gate 5B-10 Header Selection
+6. Gate 5B-11 Snapshot-safe Save
+7. Selection Core V4R3 hardening
+
+Current mission:
+
+8. Real DB Save
+
+Then:
+
+9. RowVersion concurrency and Save failure recovery
+10. database-connected Custom Column/layout persistence
+11. production parity and qualification
+12. controlled `/work-orders` cutover
+
+B12 must reuse the accepted B11 snapshot handshake.
+Do not create a second Save architecture.
+
+---
+
 # CURRENT REVO ROADMAP OVERRIDE — 2026-08-30
 
 The stable Revo code checkpoint is Gate 5B-10 at `86eb2ff3ce51addc2046133c820dd5dc75bfd08f`. Older roadmap items remain historical when they describe B6/B9 or B10 selection as the next step.
