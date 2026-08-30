@@ -122,6 +122,7 @@ export function createRevoGridSelectionContext(options) {
     let destroyed = false;
     let explicitColumn = null;
     let nativeRange = null;
+    let semanticSelectionProvider = null;
     let suppressNextSecondaryFocusScroll = false;
 
     function clearExplicitSelection() {
@@ -145,6 +146,11 @@ export function createRevoGridSelectionContext(options) {
     }
 
     async function getSnapshot() {
+        const semanticSnapshot = semanticSelectionProvider?.getSnapshot?.() ?? null;
+        if (semanticSnapshot) {
+            return semanticSnapshot;
+        }
+
         const [focused, selectedRange] = await Promise.all([
             grid.getFocused(),
             grid.getSelectedRange()
@@ -170,6 +176,23 @@ export function createRevoGridSelectionContext(options) {
         const detail = event.detail;
         const originalEvent = detail?.originalEvent;
         const secondary = isSecondaryMouseEvent(originalEvent);
+
+        if (semanticSelectionProvider?.getSnapshot?.()) {
+            const insideSemanticSelection = Boolean(
+                semanticSelectionProvider?.containsDetail?.(detail)
+            );
+            if (secondary && insideSemanticSelection) {
+                // Context click inside semantic row/column selection must not let
+                // Revo replace the employee's header selection with a cell focus.
+                suppressNextSecondaryFocusScroll = false;
+                event.preventDefault();
+                return;
+            }
+
+            // Any real native cell focus outside semantic header selection ends
+            // that mode. Revo then continues as the sole cell focus/range owner.
+            semanticSelectionProvider?.clearForNativeFocus?.();
+        }
 
         const cell = {
             rowIndex: detail?.rowIndex,
@@ -256,6 +279,10 @@ export function createRevoGridSelectionContext(options) {
     grid.addEventListener("afterfocus", onAfterFocus);
     grid.addEventListener("beforefocuslost", onBeforeFocusLost);
 
+    function setSemanticSelectionProvider(provider) {
+        semanticSelectionProvider = provider ?? null;
+    }
+
     function destroy() {
         if (destroyed) {
             return;
@@ -267,6 +294,7 @@ export function createRevoGridSelectionContext(options) {
         grid.removeEventListener("beforefocuslost", onBeforeFocusLost);
         suppressNextSecondaryFocusScroll = false;
         nativeRange = null;
+        semanticSelectionProvider = null;
         clearExplicitSelection();
         destroyed = true;
     }
@@ -274,6 +302,7 @@ export function createRevoGridSelectionContext(options) {
     return Object.freeze({
         markColumnSelection,
         clearExplicitSelection,
+        setSemanticSelectionProvider,
         getSnapshot,
         containsCell,
         destroy

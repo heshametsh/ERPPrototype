@@ -70,6 +70,16 @@ internal static class Program
                 argument =>
                     string.Equals(
                         argument,
+                        "--revo-gate5b10-selection",
+                        StringComparison.OrdinalIgnoreCase)))
+        {
+            return await Gate5B10SelectionRunner.RunAsync();
+        }
+
+        if (args.Any(
+                argument =>
+                    string.Equals(
+                        argument,
                         "--revo-gate5b6-validation",
                         StringComparison.OrdinalIgnoreCase)))
         {

@@ -51,6 +51,9 @@ public partial class WorkOrdersRevoGridNativeGate5A
     public bool EnableStructureWorkspace { get; set; }
 
     [Parameter]
+    public bool EnableHeaderMultiSelection { get; set; }
+
+    [Parameter]
     public bool EnableClipboardRangeFill { get; set; }
 
     // Saudi Arabia is UTC+3 all year. The page always opens on the
@@ -232,7 +235,9 @@ public partial class WorkOrdersRevoGridNativeGate5A
         try
         {
             var gridModulePath = EnableChangeEngine
-                ? EnableStructureWorkspace
+                ? EnableHeaderMultiSelection
+                    ? "./js/revoGridGate5B1.js?v=20260829-gate5b10-header-selection-plugin-1"
+                    : EnableStructureWorkspace
                     ? "./js/revoGridGate5B1.js?v=20260828-structure-workspace-5"
                     : EnableSelectionContext
                     ? "./js/revoGridGate5B1.js?v=20260827-selection-context-1"
@@ -265,6 +270,7 @@ public partial class WorkOrdersRevoGridNativeGate5A
                     EnablePersistenceIdentity,
                     EnableSelectionContext,
                     EnableStructureWorkspace,
+                    EnableHeaderMultiSelection,
                     EnableClipboardRangeFill,
                     BasketValues = WorkOrderBuskets.All,
                     RowCountElementId,

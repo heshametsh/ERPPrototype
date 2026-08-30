@@ -913,15 +913,66 @@ export function createRevoGridRowStructure(options) {
 
         let targetKey = clickedKey || focusedKey || null;
 
+        if (selectionKind === "rows") {
+            const visibleKeySet = new Set(visible.map(rowKey));
+            const selectedKeys = [...new Set(
+                (Array.isArray(snapshot?.selectedKeys) ? snapshot.selectedKeys : [])
+                    .map(value => String(value ?? "").trim())
+                    .filter(key => key && visibleKeySet.has(key))
+            )];
+            const clickedInsideSelection = Boolean(
+                clickedKey && selectedKeys.includes(clickedKey)
+            );
+
+            if (clickedKey && !clickedInsideSelection) {
+                return {
+                    targetKey: clickedKey,
+                    selectedKeys: [clickedKey],
+                    selectionKind: "cell",
+                    deleteRowsAllowed: true
+                };
+            }
+
+            targetKey = clickedKey || selectedKeys[0] || targetKey;
+            return {
+                targetKey,
+                selectedKeys,
+                selectionKind: selectedKeys.length ? "rows" : (targetKey ? "cell" : "none"),
+                deleteRowsAllowed: selectedKeys.length > 0 || Boolean(targetKey)
+            };
+        }
+
         // A whole-column selection is not a row selection. Preserve the column
         // context when the employee right-clicks inside it, but never turn its
         // thousands of visible cells into thousands of row-delete targets.
-        if (selectionKind === "column") {
-            if (clickedKey && clickedInsideSelection) {
+        if (selectionKind === "column" || selectionKind === "columns") {
+            let clickedInsideColumnSelection = clickedInsideSelection;
+
+            // Native B9 whole-column selection has a Revo range, while B10
+            // semantic multi-column selection intentionally does not. Resolve
+            // the clicked column by prop so the Structure menu still knows a
+            // right-click happened inside the selected columns.
+            if (selectionKind === "columns" && clickedCell) {
+                const columns = await grid.getColumns();
+                const clickedColumnIndex = Number(clickedCell.colIndex);
+                const clickedProp = Number.isInteger(clickedColumnIndex)
+                    ? String(columns[clickedColumnIndex]?.prop ?? "").trim()
+                    : "";
+                const selectedProps = new Set(
+                    (Array.isArray(snapshot?.selectedProps) ? snapshot.selectedProps : [])
+                        .map(value => String(value ?? "").trim())
+                        .filter(Boolean)
+                );
+                clickedInsideColumnSelection = Boolean(
+                    clickedProp && selectedProps.has(clickedProp)
+                );
+            }
+
+            if (clickedKey && clickedInsideColumnSelection) {
                 return {
                     targetKey: clickedKey,
                     selectedKeys: [],
-                    selectionKind: "column",
+                    selectionKind,
                     deleteRowsAllowed: false
                 };
             }

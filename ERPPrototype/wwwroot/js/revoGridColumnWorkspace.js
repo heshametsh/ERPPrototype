@@ -504,6 +504,45 @@ export function createRevoGridColumnWorkspace(options) {
             (selectionContext?.getSnapshot ? await selectionContext.getSnapshot() : null);
         const range = snapshot?.range;
         const selectedProps = [];
+
+        if (snapshot?.kind === "columns") {
+            const existingProps = new Set(
+                (Array.isArray(columns) ? columns : [])
+                    .map(column => String(column?.prop ?? "").trim())
+                    .filter(Boolean)
+            );
+            const semanticProps = [...new Set(
+                (Array.isArray(snapshot?.selectedProps) ? snapshot.selectedProps : [])
+                    .map(value => String(value ?? "").trim())
+                    .filter(prop => prop && existingProps.has(prop))
+            )];
+            const clickedInside = Boolean(targetProp && semanticProps.includes(targetProp));
+            const clickedOutside = Boolean(
+                targetProp && semanticProps.length > 0 && !clickedInside
+            );
+            const effectiveProps = clickedOutside
+                ? [targetProp]
+                : semanticProps.length > 0
+                    ? semanticProps
+                    : targetProp
+                        ? [targetProp]
+                        : [];
+            const customKeys = new Set(current.map(column => column.fieldKey));
+            return {
+                targetProp,
+                targetCustom: Boolean(targetProp && customKeys.has(targetProp)),
+                selectedProps: effectiveProps,
+                selectedCustomProps: effectiveProps.filter(prop => customKeys.has(prop)),
+                allCustomProps: current.map(column => column.fieldKey),
+                customColumnCount: current.length,
+                selectionKind: clickedOutside
+                    ? "cell"
+                    : semanticProps.length
+                        ? "columns"
+                        : (targetProp ? "cell" : "none")
+            };
+        }
+
         const clickedInsideSelectedColumns = Boolean(
             Number.isInteger(targetIndex) &&
             range &&

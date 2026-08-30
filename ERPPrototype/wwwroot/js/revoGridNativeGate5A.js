@@ -185,28 +185,81 @@ function buildExcelFilterGateColumns(customColumns, enableHeaderActions) {
     return mergeOrderedColumns(core, custom, customColumns);
 }
 
+function mergeRenderProperties(existing, extra) {
+    if (!existing) return extra;
+    if (!extra) return existing;
+
+    const normalizeClass = value => typeof value === "string"
+        ? { [value]: true }
+        : (value ?? {});
+
+    return {
+        ...existing,
+        ...extra,
+        ...(existing.class || extra.class ? {
+            class: {
+                ...normalizeClass(existing.class),
+                ...normalizeClass(extra.class)
+            }
+        } : {}),
+        ...(existing.style || extra.style ? {
+            style: {
+                ...(existing.style ?? {}),
+                ...(extra.style ?? {})
+            }
+        } : {})
+    };
+}
+
 function attachCellProperties(columns, provider) {
     if (typeof provider !== "function") {
         return columns;
     }
 
-    return columns.map(column => ({
-        ...column,
-        cellProperties: props => provider(props)
-    }));
+    return columns.map(column => {
+        const existing = column.cellProperties;
+        return {
+            ...column,
+            cellProperties: props => mergeRenderProperties(
+                typeof existing === "function" ? existing(props) : undefined,
+                provider(props)
+            )
+        };
+    });
+}
+
+function attachColumnProperties(columns, provider) {
+    if (typeof provider !== "function") {
+        return columns;
+    }
+
+    return columns.map(column => {
+        const existing = column.columnProperties;
+        return {
+            ...column,
+            columnProperties: props => mergeRenderProperties(
+                typeof existing === "function" ? existing(props) : undefined,
+                provider(props)
+            )
+        };
+    });
 }
 
 function buildColumns(
     customColumns,
     enableExcelFilter,
     enableHeaderActions,
-    cellPropertiesProvider = null
+    cellPropertiesProvider = null,
+    columnPropertiesProvider = null
 ) {
     const columns = enableExcelFilter
         ? buildExcelFilterGateColumns(customColumns, enableHeaderActions)
         : buildLegacyGateColumns(customColumns);
 
-    return attachCellProperties(columns, cellPropertiesProvider);
+    return attachColumnProperties(
+        attachCellProperties(columns, cellPropertiesProvider),
+        columnPropertiesProvider
+    );
 }
 
 function addListener(state, target, type, handler, options) {
@@ -268,7 +321,8 @@ export async function initialize(elementId, rows, customColumns, options) {
         customColumns,
         enableExcelFilter,
         enableHeaderActions,
-        value(options, "validationCellProperties", "ValidationCellProperties", null)
+        value(options, "validationCellProperties", "ValidationCellProperties", null),
+        value(options, "columnPropertiesProvider", "ColumnPropertiesProvider", null)
     );
     const startedAt = performance.now();
 
@@ -278,10 +332,20 @@ export async function initialize(elementId, rows, customColumns, options) {
 
     grid.source = source;
     grid.columns = columns;
+    const plugins = value(options, "plugins", "Plugins", []);
+    grid.plugins = Array.isArray(plugins) ? plugins : [];
 
     grid.range = true;
     grid.resize = true;
-    grid.rowHeaders = true;
+    const rowHeaderCellProperties = value(
+        options,
+        "rowHeaderCellProperties",
+        "RowHeaderCellProperties",
+        null
+    );
+    grid.rowHeaders = typeof rowHeaderCellProperties === "function"
+        ? { cellProperties: rowHeaderCellProperties }
+        : true;
     grid.filter = enableExcelFilter
         ? createExcelFilterNativeConfig()
         : true;
@@ -314,6 +378,8 @@ export async function initialize(elementId, rows, customColumns, options) {
         headerActionsEnabled: enableHeaderActions,
         validationCellProperties:
             value(options, "validationCellProperties", "ValidationCellProperties", null),
+        columnPropertiesProvider:
+            value(options, "columnPropertiesProvider", "ColumnPropertiesProvider", null),
         customColumns: (Array.isArray(customColumns) ? customColumns : [])
             .map(normalizeCustomColumn)
     };
@@ -357,7 +423,8 @@ export async function replaceCustomColumns(elementId, customColumns) {
         normalized,
         state.excelFilterEnabled,
         state.headerActionsEnabled,
-        state.validationCellProperties
+        state.validationCellProperties,
+        state.columnPropertiesProvider
     );
 
     state.grid.columns = columns;

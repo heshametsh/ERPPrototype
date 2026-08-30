@@ -1,4 +1,4 @@
-import * as nativeGate5A from "./revoGridNativeGate5A.js?v=20260828-structure-workspace-2";
+import * as nativeGate5A from "./revoGridNativeGate5A.js?v=20260829-gate5b10-header-selection-plugin-1";
 import { createRevoGridChangeBridge } from "./revoGridChangeBridge.js?v=20260826-unified-validation-1";
 import { createRevoGridHistoryCoordinator } from "./revoGridHistoryCoordinator.js?v=20260821-minimal-reveal-1";
 import { createRevoGridHistoryFocus } from "./revoGridHistoryFocus.js?v=20260821-gate5b4-keyboard-sort-1";
@@ -6,13 +6,16 @@ import { createRevoGridExcelFilter } from "./revoGridExcelFilter.js?v=20260828-s
 import { createRevoGridSort } from "./revoGridSort.js?v=20260828-structure-workspace-2";
 import { createRevoGridColumnSelection } from "./revoGridColumnSelection.js?v=20260821-gate5b4-keyboard-sort-1";
 import { createRevoGridSelectionLifecycle } from "./revoGridSelectionLifecycle.js?v=20260821-gate5b4-keyboard-sort-1";
-import { createRevoGridSelectionContext } from "./revoGridSelectionContext.js?v=20260828-gate5b9-selection-context-2";
-import { createRevoGridRowStructure } from "./revoGridRowStructure.js?v=20260828-context-menu-settle-1";
+import { createRevoGridSelectionContext } from "./revoGridSelectionContext.js?v=20260829-gate5b10-header-selection-1";
+import { createRevoGridRowStructure } from "./revoGridRowStructure.js?v=20260829-gate5b10-header-selection-1";
 import { createRevoGridValidation } from "./revoGridValidation.js?v=20260826-unified-validation-1";
 import { createRevoGridPersistenceIdentity } from "./revoGridPersistenceIdentity.js?v=20260826-persistence-identity-1";
-import { createRevoGridColumnWorkspace } from "./revoGridColumnWorkspace.js?v=20260828-gate5b9-structure-workspace-4";
+import { createRevoGridColumnWorkspace } from "./revoGridColumnWorkspace.js?v=20260829-gate5b10-header-selection-1";
 import { createRevoGridStructureMenu } from "./revoGridStructureMenu.js?v=20260828-context-menu-settle-1";
-import { createRevoGridStructureCommands } from "./revoGridStructureCommands.js?v=20260828-gate5b9-structure-workspace-3";
+import { createRevoGridStructureCommands } from "./revoGridStructureCommands.js?v=20260829-gate5b10-header-selection-1";
+import {
+    createRevoGridHeaderSelectionFeature
+} from "./revoGridHeaderSelection.js?v=20260829-gate5b10-header-selection-plugin-1";
 
 const bindings = new Map();
 
@@ -26,6 +29,32 @@ function value(source, camelName, pascalName, fallback = null) {
     }
 
     return fallback;
+}
+
+function mergeRenderProperties(existing, extra) {
+    if (!existing) return extra;
+    if (!extra) return existing;
+
+    const normalizeClass = value => typeof value === "string"
+        ? { [value]: true }
+        : (value ?? {});
+
+    return {
+        ...existing,
+        ...extra,
+        ...(existing.class || extra.class ? {
+            class: {
+                ...normalizeClass(existing.class),
+                ...normalizeClass(extra.class)
+            }
+        } : {}),
+        ...(existing.style || extra.style ? {
+            style: {
+                ...(existing.style ?? {}),
+                ...(extra.style ?? {})
+            }
+        } : {})
+    };
 }
 
 function datasetKey(workYear) {
@@ -180,6 +209,11 @@ async function destroyBinding(elementId) {
     }
 
     try {
+        state.headerSelection?.destroy();
+    } catch {
+    }
+
+    try {
         state.structureMenu?.destroy();
     } catch {
     }
@@ -224,6 +258,13 @@ export async function initialize(elementId, rows, customColumns, options) {
     const enableUnifiedValidation = Boolean(
         value(options, "enableUnifiedValidation", "EnableUnifiedValidation", false)
     );
+    const enableHeaderMultiSelection = Boolean(
+        value(options, "enableHeaderMultiSelection", "EnableHeaderMultiSelection", false)
+    );
+    const headerSelectionFeature = enableHeaderMultiSelection
+        ? createRevoGridHeaderSelectionFeature()
+        : null;
+    const headerSelectionModel = headerSelectionFeature?.model ?? null;
     const validationOwner = enableUnifiedValidation
         ? createRevoGridValidation({
             rows,
@@ -231,13 +272,26 @@ export async function initialize(elementId, rows, customColumns, options) {
             basketValues: value(options, "basketValues", "BasketValues", [])
         })
         : null;
-    const nativeOptions = validationOwner
-        ? {
-            ...options,
-            validationCellProperties: props =>
-                validationOwner.getCellProperties(props)
-        }
-        : options;
+    const configuredPlugins = value(options, "plugins", "Plugins", []);
+    const nativeOptions = {
+        ...options,
+        ...(validationOwner || headerSelectionFeature ? {
+            validationCellProperties: props => mergeRenderProperties(
+                validationOwner?.getCellProperties?.(props),
+                headerSelectionFeature?.cellProperties?.(props)
+            )
+        } : {}),
+        ...(headerSelectionFeature ? {
+            columnPropertiesProvider: props =>
+                headerSelectionFeature.columnProperties(props),
+            rowHeaderCellProperties: props =>
+                headerSelectionFeature.rowHeaderCellProperties(props),
+            plugins: [
+                ...(Array.isArray(configuredPlugins) ? configuredPlugins : []),
+                headerSelectionFeature.Plugin
+            ]
+        } : {})
+    };
 
     try {
         await nativeGate5A.initialize(
@@ -270,6 +324,9 @@ export async function initialize(elementId, rows, customColumns, options) {
         excelFilter: null,
         sortController: null,
         columnSelection: null,
+        headerSelectionModel,
+        headerSelectionFeature,
+        headerSelection: null,
         selectionLifecycle: null,
         selectionContext: null,
         rowStructure: null,
@@ -333,6 +390,23 @@ export async function initialize(elementId, rows, customColumns, options) {
         state.selectionContext = createRevoGridSelectionContext({ grid });
     }
 
+    if (state.headerSelectionFeature) {
+        if (!state.selectionContext) {
+            throw new Error("Header multi-selection requires Selection Context.");
+        }
+
+        const providers = await grid.getProviders();
+        state.headerSelection =
+            providers?.plugins?.getByClass?.(state.headerSelectionFeature.Plugin) ??
+            state.headerSelectionFeature.getPlugin();
+        if (!state.headerSelection) {
+            throw new Error("Header Selection plugin was not registered by RevoGrid.");
+        }
+
+        state.headerSelection.setSelectionContext?.(state.selectionContext);
+        state.selectionContext.setSemanticSelectionProvider(state.headerSelection);
+    }
+
     if (Boolean(value(options, "enableExcelFilter", "EnableExcelFilter", false))) {
         state.excelFilter = createRevoGridExcelFilter({
             grid,
@@ -340,7 +414,12 @@ export async function initialize(elementId, rows, customColumns, options) {
             datasetKey: activeDatasetKey,
             historyCoordinator: state.historyCoordinator,
             selectionLifecycle: state.selectionLifecycle,
-            onStateChange: () => renderState(state)
+            onStateChange: filterState => {
+                renderState(state);
+                if (state.headerSelection && filterState?.filterBusy === false) {
+                    void state.headerSelection.reconcileVisibleRows();
+                }
+            }
         });
     }
 
@@ -352,10 +431,12 @@ export async function initialize(elementId, rows, customColumns, options) {
             selectionLifecycle: state.selectionLifecycle,
             onStateChange: () => renderState(state)
         });
-        state.columnSelection = createRevoGridColumnSelection({
-            grid,
-            selectionContext: state.selectionContext
-        });
+        if (!state.headerSelection) {
+            state.columnSelection = createRevoGridColumnSelection({
+                grid,
+                selectionContext: state.selectionContext
+            });
+        }
     }
 
     const enableStructureWorkspace = Boolean(
@@ -374,7 +455,12 @@ export async function initialize(elementId, rows, customColumns, options) {
             persistenceIdentity: state.persistenceIdentity,
             selectionContext: state.selectionContext,
             externalMenu: enableStructureWorkspace,
-            onStateChange: () => renderState(state)
+            onStateChange: rowState => {
+                renderState(state);
+                if (state.headerSelection && rowState?.structureBusy === false) {
+                    void state.headerSelection.reconcileVisibleRows();
+                }
+            }
         });
     }
 
@@ -393,7 +479,12 @@ export async function initialize(elementId, rows, customColumns, options) {
             sortController: state.sortController,
             replaceColumns: nextColumns =>
                 nativeGate5A.replaceCustomColumns(elementId, nextColumns),
-            onStateChange: () => renderState(state)
+            onStateChange: columnState => {
+                renderState(state);
+                if (state.headerSelection && columnState?.columnWorkspaceBusy === false) {
+                    void state.headerSelection.reconcileColumns();
+                }
+            }
         });
 
         state.structureCommands = createRevoGridStructureCommands({
@@ -515,6 +606,7 @@ export async function beginDatasetSwitch(elementId) {
     // crosses that boundary: clear semantic selection plus Revo focus/range
     // before the source starts changing.
     state.selectionContext?.clearExplicitSelection?.();
+    await state.headerSelection?.clear?.({ refresh: false });
     await state.grid.clearFocus();
 
     state.datasetSwitchActive = true;
@@ -658,6 +750,7 @@ export async function getDiagnostics(elementId) {
         columnWorkspace: state?.columnWorkspace?.getState?.() ?? null,
         structureCommands: Boolean(state?.structureCommands),
         structureMenu: state?.structureMenu?.getState?.() ?? null,
+        headerSelection: state?.headerSelection?.getState?.() ?? null,
         validation: state?.validationOwner?.getState?.() ?? null,
         persistence: state?.persistenceIdentity
             ? {

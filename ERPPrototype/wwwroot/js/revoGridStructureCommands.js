@@ -40,7 +40,7 @@ export function createRevoGridStructureCommands(options) {
 
     async function describeRowDelete(context) {
         const row = context?.row ?? {};
-        const selectionCount = row.selectionKind === "column"
+        const selectionCount = row.selectionKind === "column" || row.selectionKind === "columns"
             ? (await rowStructure.getDisplayedKeys()).length
             : (row.selectedKeys?.length ?? 0);
         return Object.freeze({
@@ -88,7 +88,7 @@ export function createRevoGridStructureCommands(options) {
                 if (scope === "current" && context?.row?.targetKey) {
                     keys = [context.row.targetKey];
                 } else if (scope === "selection") {
-                    keys = context?.row?.selectionKind === "column"
+                    keys = context?.row?.selectionKind === "column" || context?.row?.selectionKind === "columns"
                         ? await rowStructure.getDisplayedKeys()
                         : [...(context?.row?.selectedKeys ?? [])];
                 }
