@@ -16,6 +16,10 @@ import { createRevoGridStructureCommands } from "./revoGridStructureCommands.js?
 import {
     createRevoGridHeaderSelectionFeature
 } from "./revoGridHeaderSelection.js?v=20260830-selection-core-r2";
+import {
+    encodeRevoGridPersistenceProjection,
+    REVO_GRID_PERSISTENCE_SCHEMA_VERSION
+} from "./revoGridPersistenceProjection.js?v=20260901-b12-stream-1";
 
 const bindings = new Map();
 
@@ -303,6 +307,11 @@ async function destroyBinding(elementId) {
         state.persistenceIdentity?.destroy();
     } catch {
     }
+    try {
+        state.visibleAggregates?.destroy();
+    } catch {
+    }
+
 
     bindings.delete(elementId);
 }
@@ -319,6 +328,9 @@ export async function initialize(elementId, rows, customColumns, options) {
     );
     const enableSaveHandshake = Boolean(
         value(options, "enableSaveHandshake", "EnableSaveHandshake", false)
+    );
+    const enableVisibleAggregates = Boolean(
+        value(options, "enableVisibleAggregates", "EnableVisibleAggregates", false)
     );
     const headerSelectionFeature = enableHeaderMultiSelection
         ? createRevoGridHeaderSelectionFeature()
@@ -393,12 +405,14 @@ export async function initialize(elementId, rows, customColumns, options) {
         columnWorkspace: null,
         structureCommands: null,
         structureMenu: null,
+        visibleAggregates: null,
         validationOwner,
         persistenceIdentity: Boolean(value(options, "enablePersistenceIdentity", "EnablePersistenceIdentity", false))
             ? createRevoGridPersistenceIdentity({ rows })
             : null,
         enableSaveHandshake,
         activeSaveContract: null,
+        crossYearSaveLocked: false,
         datasetSwitchActive: false,
         handledHistoryKeyEvents: new WeakSet(),
         removers: [],
@@ -428,6 +442,9 @@ export async function initialize(elementId, rows, customColumns, options) {
         ),
         saveStatusElement: findElement(
             value(options, "saveStatusElementId", "SaveStatusElementId", "")
+        ),
+        visibleAggregateElement: findElement(
+            value(options, "visibleAggregateElementId", "VisibleAggregateElementId", "")
         )
     };
 
@@ -483,6 +500,9 @@ export async function initialize(elementId, rows, customColumns, options) {
             selectionLifecycle: state.selectionLifecycle,
             onStateChange: filterState => {
                 renderState(state);
+                if (filterState?.filterBusy === false) {
+                    state.visibleAggregates?.scheduleRefresh?.("filter");
+                }
                 if (state.headerSelection && filterState?.filterBusy === false) {
                     void state.headerSelection.reconcileVisibleRows();
                 }
@@ -524,6 +544,9 @@ export async function initialize(elementId, rows, customColumns, options) {
             externalMenu: enableStructureWorkspace,
             onStateChange: rowState => {
                 renderState(state);
+                if (rowState?.structureBusy === false) {
+                    state.visibleAggregates?.scheduleRefresh?.("row-structure");
+                }
                 if (state.headerSelection && rowState?.structureBusy === false) {
                     void state.headerSelection.reconcileVisibleRows();
                 }
@@ -548,6 +571,9 @@ export async function initialize(elementId, rows, customColumns, options) {
                 nativeGate5A.replaceCustomColumns(elementId, nextColumns),
             onStateChange: columnState => {
                 renderState(state);
+                if (columnState?.columnWorkspaceBusy === false) {
+                    state.visibleAggregates?.scheduleRefresh?.("column-workspace");
+                }
                 if (state.headerSelection && columnState?.columnWorkspaceBusy === false) {
                     void state.headerSelection.reconcileColumns();
                 }
@@ -566,6 +592,28 @@ export async function initialize(elementId, rows, customColumns, options) {
         });
     }
 
+    if (enableVisibleAggregates) {
+        if (!state.visibleAggregateElement) {
+            throw new Error("Visible Aggregates require their route-owned UI host.");
+        }
+
+        const aggregateModule =
+            await import("./revoGridVisibleAggregates.js?v=20260902-gate5c1-v3");
+
+        state.visibleAggregates =
+            aggregateModule.createRevoGridVisibleAggregates({
+                grid,
+                host: state.visibleAggregateElement,
+                customColumns,
+                getCustomColumns: () =>
+                    state.columnWorkspace?.getState?.().customColumns ??
+                    customColumns,
+                hasActiveFilters: () =>
+                    Number(
+                        state.excelFilter?.getState?.().activeFilterCount ?? 0
+                    ) > 0
+            });
+    }
     addListener(state, state.undoButton, "click", async () => {
         await state.historyCoordinator.undo();
     });
@@ -749,6 +797,7 @@ export async function replaceDataset(elementId, rows, workYear) {
             await state.rowStructure.resetDataset(rows, nextDatasetKey);
         }
         state.persistenceIdentity?.replaceRows?.(rows);
+        await state.visibleAggregates?.refreshVisible?.("dataset-switch");
     } catch (error) {
         if (filterSuspended && state.excelFilter) {
             try {
@@ -791,7 +840,11 @@ function buildSaveContractSnapshot(state, engineSnapshot, sourceRows) {
     for (const row of Array.isArray(sourceRows) ? sourceRows : []) {
         const clientKey = String(row?.clientKey ?? "").trim();
         if (clientKey) {
-            rowsByClientKey.set(clientKey, cloneValue(row));
+            // Keep only a lightweight lookup over Revo source. The exact
+            // changed rows are cloned below, synchronously in the same event
+            // turn as Change Engine beginSave(). This preserves B11 snapshot
+            // semantics without deep-cloning the whole sheet.
+            rowsByClientKey.set(clientKey, row);
         }
     }
 
@@ -834,7 +887,7 @@ function buildSaveContractSnapshot(state, engineSnapshot, sourceRows) {
             identity: state.persistenceIdentity?.getIdentity?.(clientKey) ?? null,
             changedFields: Array.from(changedFieldsByClientKey.get(clientKey) ?? []).sort(),
             rowState: rowStateByClientKey.get(clientKey) ?? null,
-            row
+            row: cloneValue(row)
         });
     }
 
@@ -894,14 +947,40 @@ export async function beginSaveHandshake(elementId) {
         throw new Error("Save handshake requires Persistence Identity.");
     }
 
-    // Clone Revo source immediately before beginSave. No await occurs between
-    // this clone and engine.beginSave(), so the row payload and change
-    // generation represent the same browser moment.
-    const sourceRows = cloneValue(await state.grid.getSource("rgRow"));
+    // Fetch the source reference, then freeze the Change Engine generation and
+    // clone only the rows that belong to that generation. There is no await
+    // between beginSave() and contract construction, so user input cannot
+    // interleave and the B11 exact-generation invariant is preserved.
+    const handshakeStartedAt = performance.now();
+    const sourceFetchStartedAt = performance.now();
+    const sourceRows = await state.grid.getSource("rgRow");
+    const sourceFetchMs = performance.now() - sourceFetchStartedAt;
+    const sourceCloneMs = 0;
+
     let snapshot = null;
     try {
+        const engineBeginStartedAt = performance.now();
         snapshot = state.changeBridge.beginSave();
+        const engineBeginMs = performance.now() - engineBeginStartedAt;
+
+        const contractBuildStartedAt = performance.now();
         const contract = buildSaveContractSnapshot(state, snapshot, sourceRows);
+        const contractBuildMs = performance.now() - contractBuildStartedAt;
+
+        state.lastSavePerformance = {
+            saveId: contract.id,
+            sourceRowCount: Array.isArray(sourceRows) ? sourceRows.length : 0,
+            dirtyCellCount: contract.cells.length,
+            dirtyRowCount: contract.rows.length,
+            changedRecordCount: contract.changedRecords.length,
+            deletedRecordCount: contract.deletedRecords.length,
+            sourceFetchMs,
+            sourceCloneMs,
+            engineBeginMs,
+            contractBuildMs,
+            handshakeTotalMs: performance.now() - handshakeStartedAt
+        };
+
         state.activeSaveContract = contract;
         renderState(state);
         return {
@@ -924,6 +1003,330 @@ export async function beginSaveHandshake(elementId) {
     }
 }
 
+export function lockCrossYearSave(elementId, saveId, clientKeys) {
+    const state = bindings.get(elementId);
+    if (!state || !state.activeSaveContract) {
+        throw new Error("No Save handshake is active.");
+    }
+    if (state.activeSaveContract.id !== String(saveId ?? "")) {
+        throw new Error("Save handshake id does not match the active snapshot.");
+    }
+
+    const targetKeys = new Set((Array.isArray(clientKeys) ? clientKeys : [])
+        .map(key => String(key ?? "").trim())
+        .filter(Boolean));
+
+    state.changeBridge.setEditLocked(true);
+    state.crossYearSaveLocked = true;
+
+    const savedCells = new Map(
+        (state.activeSaveContract.cells ?? [])
+            .filter(cell => targetKeys.has(String(cell?.clientKey ?? "").trim()))
+            .map(cell => [`${cell.clientKey}\u0000${cell.field}`, cell.value])
+    );
+    const savedRows = new Map(
+        (state.activeSaveContract.rows ?? [])
+            .filter(row => targetKeys.has(String(row?.clientKey ?? "").trim()))
+            .map(row => [row.clientKey, row.state])
+    );
+
+    const newerCell = state.changeBridge.getDirtyCells().some(cell => {
+        if (!targetKeys.has(String(cell?.clientKey ?? "").trim())) {
+            return false;
+        }
+        const key = `${cell.clientKey}\u0000${cell.field}`;
+        return savedCells.has(key) && JSON.stringify(cell.current) !== JSON.stringify(savedCells.get(key));
+    });
+
+    const newerRow = state.changeBridge.getDirtyRows().some(row =>
+        targetKeys.has(String(row?.clientKey ?? "").trim()) &&
+        savedRows.has(row.clientKey) &&
+        JSON.stringify(row.current) !== JSON.stringify(savedRows.get(row.clientKey))
+    );
+
+    if (newerCell || newerRow) {
+        state.crossYearSaveLocked = false;
+        state.changeBridge.setEditLocked(false);
+        renderState(state);
+        return { allowed: false, reason: "newer-cross-year-edit" };
+    }
+
+    renderState(state);
+    return { allowed: true, reason: null };
+}
+
+export function getActiveSaveContractMetrics(elementId, saveId) {
+    const state = bindings.get(elementId);
+    if (!state || !state.activeSaveContract) {
+        throw new Error("No Save handshake is active.");
+    }
+    if (state.activeSaveContract.id !== String(saveId ?? "")) {
+        throw new Error("Save handshake id does not match the active snapshot.");
+    }
+
+    const jsonMeasureStartedAt = performance.now();
+    const encoder = typeof TextEncoder === "function" ? new TextEncoder() : null;
+    const measureJson = value => {
+        const json = JSON.stringify(value);
+        return {
+            chars: json.length,
+            bytes: encoder ? encoder.encode(json).length : json.length
+        };
+    };
+
+    const contractSize = measureJson(state.activeSaveContract);
+    const cellsSize = measureJson(state.activeSaveContract.cells ?? []);
+    const rowsSize = measureJson(state.activeSaveContract.rows ?? []);
+    const changedRecordsSize = measureJson(state.activeSaveContract.changedRecords ?? []);
+    const deletedRecordsSize = measureJson(state.activeSaveContract.deletedRecords ?? []);
+    const jsonMeasureMs = performance.now() - jsonMeasureStartedAt;
+
+    return cloneValue({
+        ...(state.lastSavePerformance ?? {
+            saveId: state.activeSaveContract.id
+        }),
+        jsonMeasureMs,
+        contractJsonChars: contractSize.chars,
+        contractJsonBytes: contractSize.bytes,
+        cellsJsonBytes: cellsSize.bytes,
+        rowsJsonBytes: rowsSize.bytes,
+        changedRecordsJsonBytes: changedRecordsSize.bytes,
+        deletedRecordsJsonBytes: deletedRecordsSize.bytes
+    });
+}
+
+/**
+ * Return the frozen B11 generation as a bounded JS stream. The full B11
+ * contract stays browser-local for Accept/Reject reconciliation; C# receives
+ * only the persistence projection needed by WorkOrderService.
+ *
+ * This projection is also the future offline-sync boundary: it has a schema
+ * version and stable ClientKey/Id/RowVersion identity, but no IndexedDB or
+ * server idempotency semantics are introduced in B12.
+ */
+export function getActiveSavePersistenceStream(elementId, saveId) {
+    const state = bindings.get(elementId);
+    if (!state || !state.activeSaveContract) {
+        throw new Error("No Save handshake is active.");
+    }
+    if (state.activeSaveContract.id !== String(saveId ?? "")) {
+        throw new Error("Save handshake id does not match the active snapshot.");
+    }
+
+    const startedAt = performance.now();
+    const { projection, bytes } =
+        encodeRevoGridPersistenceProjection(state.activeSaveContract);
+
+    state.lastPersistenceProjectionMetrics = {
+        saveId: projection.id,
+        schemaVersion: projection.schemaVersion,
+        changedRecordCount: projection.changedRecords.length,
+        deletedRecordCount: projection.deletedRecords.length,
+        bytes: bytes.byteLength,
+        buildMs: performance.now() - startedAt
+    };
+
+    return bytes;
+}
+
+export function getActiveSaveId(elementId) {
+    const state = bindings.get(elementId);
+    return state?.activeSaveContract?.id ?? null;
+}
+
+export function getActiveSavePersistenceMetrics(elementId, saveId) {
+    const state = bindings.get(elementId);
+    if (!state || !state.activeSaveContract) {
+        throw new Error("No Save handshake is active.");
+    }
+    if (state.activeSaveContract.id !== String(saveId ?? "")) {
+        throw new Error("Save handshake id does not match the active snapshot.");
+    }
+
+    return cloneValue(state.lastPersistenceProjectionMetrics ?? {
+        saveId: state.activeSaveContract.id,
+        schemaVersion: REVO_GRID_PERSISTENCE_SCHEMA_VERSION,
+        changedRecordCount: 0,
+        deletedRecordCount: 0,
+        bytes: 0,
+        buildMs: 0
+    });
+}
+
+export function getActiveSaveContract(elementId, saveId) {
+    const state = bindings.get(elementId);
+    if (!state || !state.activeSaveContract) {
+        throw new Error("No Save handshake is active.");
+    }
+    if (state.activeSaveContract.id !== String(saveId ?? "")) {
+        throw new Error("Save handshake id does not match the active snapshot.");
+    }
+    return cloneValue(state.activeSaveContract);
+}
+
+export async function acceptRealDbSaveResult(elementId, saveId, result = {}) {
+    const state = bindings.get(elementId);
+    if (!state || !state.activeSaveContract) {
+        throw new Error("No Save handshake is active.");
+    }
+    if (state.activeSaveContract.id !== String(saveId ?? "")) {
+        throw new Error("Save handshake id does not match the active snapshot.");
+    }
+
+    const contract = state.activeSaveContract;
+    const savedRows = Array.isArray(result.savedRows) ? result.savedRows : [];
+    const removedClientKeys = (Array.isArray(result.removedClientKeys) ? result.removedClientKeys : [])
+        .map(key => String(key ?? "").trim())
+        .filter(Boolean);
+    const changedByKey = new Map(
+        (contract.changedRecords ?? []).map(record => [String(record?.clientKey ?? "").trim(), record])
+    );
+
+    const source = await state.grid.getSource("rgRow");
+    const sourceByKey = new Map(
+        (Array.isArray(source) ? source : []).map(row => [String(row?.clientKey ?? "").trim(), row])
+    );
+
+    const acceptedCells = [];
+    const acceptedRows = [];
+
+    for (const saved of savedRows) {
+        const clientKey = String(saved?.clientKey ?? "").trim();
+        if (!clientKey) {
+            throw new Error("Every saved row requires ClientKey.");
+        }
+        const currentRow = sourceByKey.get(clientKey);
+        const snapshotRow = changedByKey.get(clientKey)?.row;
+        if (!currentRow || !snapshotRow) {
+            continue;
+        }
+
+        // Persistence identity is server-authoritative even when a newer edit
+        // happened while SQL was running. Business values are only replaced in
+        // the visible row when the employee has not changed that value since
+        // the captured Save snapshot.
+        currentRow.id = Number(saved.id ?? currentRow.id ?? 0);
+        currentRow.rowVersion = String(saved.rowVersion ?? currentRow.rowVersion ?? "");
+
+        const fields = new Set(changedByKey.get(clientKey)?.changedFields ?? []);
+        fields.add("displayOrder");
+        for (const field of fields) {
+            if (!(field in saved) || !(field in snapshotRow)) {
+                continue;
+            }
+            const serverValue = cloneValue(saved[field]);
+            acceptedCells.push({ clientKey, field, value: serverValue });
+            if (JSON.stringify(currentRow[field]) === JSON.stringify(snapshotRow[field])) {
+                currentRow[field] = cloneValue(serverValue);
+            }
+        }
+
+        // Custom fields are returned as normal custom_xxx properties. They may
+        // not be present in changedFields after server mapping to CustomValues,
+        // so reconcile every custom property that existed in the snapshot.
+        for (const [field, snapshotValue] of Object.entries(snapshotRow)) {
+            if (!field.startsWith("custom_") || !(field in saved)) {
+                continue;
+            }
+            const serverValue = cloneValue(saved[field]);
+            acceptedCells.push({ clientKey, field, value: serverValue });
+            if (JSON.stringify(currentRow[field]) === JSON.stringify(snapshotValue)) {
+                currentRow[field] = cloneValue(serverValue);
+            }
+        }
+
+        acceptedRows.push({
+            clientKey,
+            state: { exists: true, displayOrder: Number(saved.displayOrder ?? snapshotRow.displayOrder ?? 0) }
+        });
+    }
+
+    const deletedByKey = new Map(
+        (contract.deletedRecords ?? []).map(record => [
+            String(record?.clientKey ?? "").trim(),
+            record
+        ])
+    );
+    const removedDatabaseIds = removedClientKeys
+        .map(clientKey => {
+            const changedId = Number(changedByKey.get(clientKey)?.row?.id ?? 0);
+            const deletedId = Number(deletedByKey.get(clientKey)?.id ?? 0);
+            const identityId = Number(state.persistenceIdentity?.getIdentity?.(clientKey)?.id ?? 0);
+            return changedId > 0 ? changedId : deletedId > 0 ? deletedId : identityId;
+        })
+        .filter(id => Number.isInteger(id) && id > 0);
+
+    state.persistenceIdentity?.acceptSaveResult?.({
+        savedRows,
+        savedRowMappings: savedRows
+            .filter(row => Number(row?.id ?? 0) > 0)
+            .map(row => ({ clientKey: row.clientKey, databaseId: row.id })),
+        removedRowIds: removedDatabaseIds
+    });
+
+    // A persisted Delete can be undone while its older Save generation is in
+    // flight. Once SQL accepts that older Delete, the deleted ClientKey owns no
+    // database identity anymore. A row already restored in the browser must be
+    // rebased to Id=0/RowVersion=""; a later Undo will get the same temporary
+    // identity through Row Structure's prepareRowForReplay hook.
+    const deletedSnapshotKeys = new Set(deletedByKey.keys());
+    if (deletedSnapshotKeys.size > 0) {
+        const sourceAfterIdentityAcceptance = await state.grid.getSource("rgRow");
+        for (const currentRow of Array.isArray(sourceAfterIdentityAcceptance)
+            ? sourceAfterIdentityAcceptance
+            : []) {
+            const clientKey = String(currentRow?.clientKey ?? "").trim();
+            if (!deletedSnapshotKeys.has(clientKey)) {
+                continue;
+            }
+            const reconciled = state.persistenceIdentity?.prepareRowForReplay?.(currentRow);
+            currentRow.id = Number(reconciled?.id ?? 0);
+            currentRow.rowVersion = String(reconciled?.rowVersion ?? "");
+        }
+    }
+
+    // A normal Delete was already removed by the employee action that created
+    // the snapshot, so never remove its ClientKey again during acceptance: an
+    // in-flight Undo may have legitimately restored it. Cross-year rows were
+    // not structurally deleted by the employee and therefore must be removed
+    // from the source dataset after the confirmed server move succeeds.
+    const keysToRemoveFromSource = removedClientKeys
+        .filter(clientKey => !deletedSnapshotKeys.has(clientKey));
+
+    // Complete all potentially failing Revo/view work before accepting the
+    // Change Engine generation. If this stage fails after SQL commit, the same
+    // server result can be applied again without executing SQL a second time.
+    if (keysToRemoveFromSource.length > 0) {
+        await state.rowStructure?.removeAcceptedRows?.(keysToRemoveFromSource);
+        await state.headerSelection?.reconcileVisibleRows?.();
+    } else {
+        await state.grid.refresh("rgRow");
+    }
+    await state.visibleAggregates?.refreshVisible?.("save-reconcile");
+
+    const accepted = state.changeBridge.acceptSave(saveId, {
+        cells: acceptedCells,
+        rows: acceptedRows
+    });
+    state.activeSaveContract = null;
+    state.lastPersistenceProjectionMetrics = null;
+
+    if (state.crossYearSaveLocked) {
+        state.crossYearSaveLocked = false;
+        state.changeBridge.setEditLocked(false);
+    }
+    renderState(state);
+    const current = combinedState(state);
+    return {
+        saveId: accepted.id,
+        dirty: Boolean(current.dirty),
+        dirtyCount: Number(current.dirtyCount ?? 0),
+        saveActive: Boolean(current.saveActive),
+        removedRowCount: removedClientKeys.length,
+        rowCount: Number(state.rowStructure?.getState?.().rowCount ?? source.length)
+    };
+}
+
 export function acceptSaveHandshake(elementId, saveId) {
     const state = bindings.get(elementId);
     if (!state || !state.activeSaveContract) {
@@ -935,6 +1338,7 @@ export function acceptSaveHandshake(elementId, saveId) {
 
     const accepted = state.changeBridge.acceptSave(saveId);
     state.activeSaveContract = null;
+    state.lastPersistenceProjectionMetrics = null;
     renderState(state);
     const current = combinedState(state);
     return {
@@ -956,8 +1360,23 @@ export function rejectSaveHandshake(elementId, saveId) {
 
     const rejected = state.changeBridge.rejectSave(saveId);
     state.activeSaveContract = null;
+    state.lastPersistenceProjectionMetrics = null;
+    if (state.crossYearSaveLocked) {
+        state.crossYearSaveLocked = false;
+        state.changeBridge.setEditLocked(false);
+    }
     renderState(state);
     return rejected;
+}
+
+export function clearSheetHistory(elementId) {
+    const state = bindings.get(elementId);
+    if (!state) {
+        throw new Error(`Gate 5B state '${elementId}' was not found.`);
+    }
+    state.historyCoordinator.resetDataset(state.changeBridge.getState().datasetKey);
+    renderState(state);
+    return state.historyCoordinator.getState();
 }
 
 export function getSaveHandshakeDiagnostics(elementId) {
@@ -1050,3 +1469,5 @@ export async function destroy(elementId) {
     await destroyBinding(elementId);
     await nativeGate5A.destroy(elementId);
 }
+
+

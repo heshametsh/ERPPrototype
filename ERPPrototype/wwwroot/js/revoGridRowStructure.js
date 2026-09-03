@@ -1261,6 +1261,43 @@ export function createRevoGridRowStructure(options) {
         return deleteKeys(keys, { confirm: false });
     }
 
+    // Persistence acceptance is not a new employee edit. Remove rows that the
+    // server has already deleted or moved to another year without creating a
+    // second History/Dirty operation. The existing view adapter preserves the
+    // current Sort/Filter projections by ClientKey.
+    async function removeAcceptedRows(keys) {
+        const keySet = new Set((Array.isArray(keys) ? keys : [])
+            .map(key => String(key ?? "").trim())
+            .filter(Boolean));
+        if (keySet.size === 0) {
+            return { removed: 0, rowCount };
+        }
+        if (busy) {
+            throw new Error("Row Structure is busy.");
+        }
+
+        busy = true;
+        notifyState();
+        try {
+            const view = await captureView();
+            const nextRows = view.source.filter(row => !keySet.has(rowKey(row)));
+            const removed = view.source.length - nextRows.length;
+            if (removed === 0) {
+                return { removed: 0, rowCount };
+            }
+
+            await applyView(
+                nextRows,
+                view.proxyKeys.filter(key => !keySet.has(key)),
+                view.visibleKeys.filter(key => !keySet.has(key))
+            );
+            return { removed, rowCount };
+        } finally {
+            busy = false;
+            notifyState();
+        }
+    }
+
     function openInsertRowsDialog() {
         if (busy || !menuContext?.targetKey) {
             return;
@@ -1496,6 +1533,7 @@ export function createRevoGridRowStructure(options) {
         getDisplayedKeys,
         insertRows,
         deleteRows,
+        removeAcceptedRows,
         destroy
     });
 }

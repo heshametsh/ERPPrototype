@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json;
 using ERPPrototype.Data;
@@ -21,6 +21,7 @@ public partial class WorkOrdersRevoGridNativeGate5A
     private const string RowCountElementId = "revogrid-gate5b-row-count";
     private const string SaveButtonId = "revogrid-gate5b11-save";
     private const string SaveStatusElementId = "revogrid-gate5b11-save-status";
+    private const string VisibleAggregateElementId = "revogrid-gate5c1-visible-aggregates";
 
     [Parameter]
     public bool EnableChangeEngine { get; set; }
@@ -61,6 +62,12 @@ public partial class WorkOrdersRevoGridNativeGate5A
     [Parameter]
     public bool EnableSaveHandshake { get; set; }
 
+    [Parameter]
+    public bool EnableRealDbSave { get; set; }
+
+    [Parameter]
+    public bool EnableVisibleAggregates { get; set; }
+
     // Saudi Arabia is UTC+3 all year. The page always opens on the
     // current Saudi business year and does not persist the last selected year.
     private static int CurrentBusinessYear =>
@@ -83,6 +90,7 @@ public partial class WorkOrdersRevoGridNativeGate5A
 
     private int SelectedWorkYear = CurrentBusinessYear;
     private double ServerLoadMilliseconds;
+    private int DisplayedRowCount;
 
     private List<int> AvailableWorkYears = [CurrentBusinessYear];
     private List<NativeGate5ARow> Rows = [];
@@ -226,6 +234,7 @@ public partial class WorkOrdersRevoGridNativeGate5A
         SelectedWorkYear = snapshot.WorkYear;
         AvailableWorkYears = snapshot.AvailableWorkYears;
         Rows = snapshot.Rows;
+        DisplayedRowCount = snapshot.Rows.Count;
         CustomColumns = snapshot.CustomColumns;
         ServerLoadMilliseconds = snapshot.ServerLoadMilliseconds;
     }
@@ -243,7 +252,7 @@ public partial class WorkOrdersRevoGridNativeGate5A
         {
             var gridModulePath = EnableChangeEngine
                 ? EnableSaveHandshake
-                    ? "./js/revoGridGate5B1.js?v=20260830-selection-core-r2"
+                    ? "./js/revoGridGate5B1.js?v=20260901-b12-final-1"
                     : EnableHeaderMultiSelection
                     ? "./js/revoGridGate5B1.js?v=20260830-selection-core-r2"
                     : EnableStructureWorkspace
@@ -282,6 +291,7 @@ public partial class WorkOrdersRevoGridNativeGate5A
                     EnableHeaderMultiSelection,
                     EnableClipboardRangeFill,
                     EnableSaveHandshake,
+                    EnableVisibleAggregates,
                     BasketValues = WorkOrderBuskets.All,
                     RowCountElementId,
                     ChangeStatusElementId,
@@ -291,7 +301,8 @@ public partial class WorkOrdersRevoGridNativeGate5A
                     RedoButtonId,
                     FinancialErrorElementId,
                     SaveButtonId,
-                    SaveStatusElementId
+                    SaveStatusElementId,
+                    VisibleAggregateElementId
                 });
 
             GridInitialized = true;
@@ -323,6 +334,12 @@ public partial class WorkOrdersRevoGridNativeGate5A
 
     private async Task HandleSaveHandshakeAsync()
     {
+        if (EnableRealDbSave)
+        {
+            await HandleRealDbSaveAsync();
+            return;
+        }
+
         if (
             !EnableSaveHandshake ||
             IsSaveHandshakeInFlight ||
@@ -720,6 +737,7 @@ public partial class WorkOrdersRevoGridNativeGate5A
         public bool Dirty { get; set; }
         public int DirtyCount { get; set; }
         public bool SaveActive { get; set; }
+        public int RowCount { get; set; }
     }
 
     private sealed class NativeGate5B1DatasetSwitchDecision
@@ -747,3 +765,4 @@ public partial class WorkOrdersRevoGridNativeGate5A
         public double LongTaskMaxMs { get; set; }
     }
 }
+

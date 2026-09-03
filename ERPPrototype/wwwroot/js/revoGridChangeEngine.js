@@ -637,15 +637,45 @@ export function createRevoGridChangeEngine(options = {}) {
         }
 
         const saveId = createId("save");
-        const cells = getDirtyCells().map(cell => ({
-            key: cellKey(cell.clientKey, cell.field),
-            clientKey: cell.clientKey,
-            field: cell.field,
-            baseline: cloneValue(cell.baseline),
-            value: cloneValue(cell.current)
-        }));
+        const dirtyRows = getDirtyRows();
+        const newlyInsertedRowKeys = new Set(
+            dirtyRows
+                .filter(row => !row.baseline.exists && row.current.exists)
+                .map(row => row.clientKey)
+        );
 
-        const rows = getDirtyRows().map(row => ({
+        // Cells inside a brand-new unsaved row are intentionally not counted
+        // as separate Dirty items while the row itself is structurally Dirty.
+        // They still belong to the first Add snapshot, though. Snapshot them
+        // here so a successful first Save can promote their Baselines to the
+        // accepted server values instead of making every filled cell Dirty as
+        // soon as the row becomes persisted.
+        const saveCellsByKey = new Map();
+        for (const cell of getDirtyCells()) {
+            const key = cellKey(cell.clientKey, cell.field);
+            saveCellsByKey.set(key, {
+                key,
+                clientKey: cell.clientKey,
+                field: cell.field,
+                baseline: cloneValue(cell.baseline),
+                value: cloneValue(cell.current)
+            });
+        }
+        for (const [key, tracked] of trackedCells.entries()) {
+            if (!newlyInsertedRowKeys.has(tracked.clientKey) || saveCellsByKey.has(key)) {
+                continue;
+            }
+            saveCellsByKey.set(key, {
+                key,
+                clientKey: tracked.clientKey,
+                field: tracked.field,
+                baseline: cloneValue(tracked.baseline),
+                value: cloneValue(tracked.current)
+            });
+        }
+        const cells = Array.from(saveCellsByKey.values());
+
+        const rows = dirtyRows.map(row => ({
             clientKey: row.clientKey,
             baseline: cloneValue(row.baseline),
             state: cloneValue(row.current)
@@ -663,7 +693,7 @@ export function createRevoGridChangeEngine(options = {}) {
         return cloneValue(pendingSave);
     }
 
-    function acceptSave(saveId) {
+    function acceptSave(saveId, acceptedValues = null) {
         const normalizedSaveId = requireText(saveId, "saveId");
 
         if (!pendingSave || pendingSave.id !== normalizedSaveId) {
@@ -678,6 +708,23 @@ export function createRevoGridChangeEngine(options = {}) {
         const accepted = pendingSave;
         pendingSave = null;
 
+        const acceptedCellValues = new Map();
+        for (const item of Array.isArray(acceptedValues?.cells) ? acceptedValues.cells : []) {
+            const clientKey = String(item?.clientKey ?? "").trim();
+            const field = String(item?.field ?? "").trim();
+            if (clientKey && field) {
+                acceptedCellValues.set(cellKey(clientKey, field), cloneValue(item.value));
+            }
+        }
+
+        const acceptedRowStates = new Map();
+        for (const item of Array.isArray(acceptedValues?.rows) ? acceptedValues.rows : []) {
+            const clientKey = String(item?.clientKey ?? "").trim();
+            if (clientKey) {
+                acceptedRowStates.set(clientKey, normalizeRowState(item.state, "accepted row state"));
+            }
+        }
+
         // Server accepted exactly the snapshot sent by beginSave(). If a newer
         // browser edit exists, it remains current and therefore remains Dirty.
         for (const saved of accepted.cells) {
@@ -685,31 +732,40 @@ export function createRevoGridChangeEngine(options = {}) {
             let tracked = trackedCells.get(key);
 
             if (!tracked) {
+                const acceptedValue = acceptedCellValues.has(key) ? acceptedCellValues.get(key) : saved.value;
                 tracked = {
                     clientKey: saved.clientKey,
                     field: saved.field,
-                    baseline: cloneValue(saved.value),
+                    baseline: cloneValue(acceptedValue),
                     current: cloneValue(saved.value)
                 };
                 trackedCells.set(key, tracked);
             } else {
-                tracked.baseline = cloneValue(saved.value);
+                const acceptedValue = acceptedCellValues.has(key) ? acceptedCellValues.get(key) : saved.value;
+                if (equals(tracked.current, saved.value)) {
+                    tracked.current = cloneValue(acceptedValue);
+                }
+                tracked.baseline = cloneValue(acceptedValue);
             }
 
             refreshDirtyForKey(key);
         }
 
         for (const saved of accepted.rows ?? []) {
+            const acceptedState = acceptedRowStates.get(saved.clientKey) ?? saved.state;
             let tracked = trackedRows.get(saved.clientKey);
             if (!tracked) {
                 tracked = {
                     clientKey: saved.clientKey,
-                    baseline: cloneValue(saved.state),
+                    baseline: cloneValue(acceptedState),
                     current: cloneValue(saved.state)
                 };
                 trackedRows.set(saved.clientKey, tracked);
             } else {
-                tracked.baseline = cloneValue(saved.state);
+                if (rowStatesEqual(tracked.current, saved.state)) {
+                    tracked.current = cloneValue(acceptedState);
+                }
+                tracked.baseline = cloneValue(acceptedState);
             }
             refreshDirtyForRow(saved.clientKey);
         }

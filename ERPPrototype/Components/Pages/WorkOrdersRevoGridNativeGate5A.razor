@@ -16,13 +16,15 @@
 @inject IJSRuntime JSRuntime
 @inject ILogger<WorkOrdersRevoGridNativeGate5A> Logger
 
-<PageTitle>@(EnableSaveHandshake ? "RevoGrid Gate 5B-11" : EnableHeaderMultiSelection ? "RevoGrid Gate 5B-10" : EnableStructureWorkspace ? "RevoGrid Gate 5B-9" : EnableSelectionContext ? "RevoGrid Gate 5B-8" : EnablePersistenceIdentity ? "RevoGrid Gate 5B-7" : EnableUnifiedValidation ? "RevoGrid Gate 5B-6" : EnableRowStructure ? "RevoGrid Gate 5B-5" : EnableHeaderActions ? "RevoGrid Gate 5B-4" : EnableExcelFilter ? "RevoGrid Gate 5B-3" : EnablePaste ? "RevoGrid Gate 5B-2" : EnableChangeEngine ? "RevoGrid Gate 5B-1" : "RevoGrid Native Gate 5A")</PageTitle>
+<PageTitle>@(EnableRealDbSave ? "RevoGrid Gate 5B-12" : EnableSaveHandshake ? "RevoGrid Gate 5B-11" : EnableHeaderMultiSelection ? "RevoGrid Gate 5B-10" : EnableStructureWorkspace ? "RevoGrid Gate 5B-9" : EnableSelectionContext ? "RevoGrid Gate 5B-8" : EnablePersistenceIdentity ? "RevoGrid Gate 5B-7" : EnableUnifiedValidation ? "RevoGrid Gate 5B-6" : EnableRowStructure ? "RevoGrid Gate 5B-5" : EnableHeaderActions ? "RevoGrid Gate 5B-4" : EnableExcelFilter ? "RevoGrid Gate 5B-3" : EnablePaste ? "RevoGrid Gate 5B-2" : EnableChangeEngine ? "RevoGrid Gate 5B-1" : "RevoGrid Native Gate 5A")</PageTitle>
 
 <div class="native-gate5a" data-testid="revogrid-native-gate5a">
     <header class="native-gate5a__header">
         <div class="native-gate5a__identity">
             <strong>RevoGrid Community 4.25.2</strong>
-            <span>@(EnableSaveHandshake
+            <span>@(EnableRealDbSave
+                ? "Gate 5B-12 — real database Save over the accepted Gate 5B-11 snapshot contract"
+                : EnableSaveHandshake
                 ? "Gate 5B-11 — snapshot-safe row Save handshake over the accepted Gate 5B-10 behavior"
                 : EnableHeaderMultiSelection
                 ? "Gate 5B-10 — Ctrl/Shift whole-row/whole-column selection over the stable Gate 5B-9 behavior"
@@ -82,7 +84,7 @@
     else
     {
         <div class="native-gate5a__statusbar">
-            <span><b id="@RowCountElementId">@Rows.Count.ToString("N0")</b> صف</span>
+            <span><b id="@RowCountElementId">@DisplayedRowCount.ToString("N0")</b> صف</span>
             <span>Server <b>@FormatMilliseconds(ServerLoadMilliseconds)</b></span>
 
             @if (Diagnostics is not null)
@@ -120,16 +122,19 @@
                     <button id="@SaveButtonId"
                             type="button"
                             @onclick="HandleSaveHandshakeAsync">
-                        Save handshake
+                        @(EnableRealDbSave ? "Save" : "Save handshake")
                     </button>
                     <span id="@SaveStatusElementId">No row changes</span>
-                    <label>
-                        <input type="checkbox"
-                               @bind="SimulateSaveHandshakeFailure"
-                               disabled="@IsSaveHandshakeInFlight"
-                               data-testid="gate5b11-reject-toggle" />
-                        Reject next handshake
-                    </label>
+                    @if (!EnableRealDbSave)
+                    {
+                        <label>
+                            <input type="checkbox"
+                                   @bind="SimulateSaveHandshakeFailure"
+                                   disabled="@IsSaveHandshakeInFlight"
+                                   data-testid="gate5b11-reject-toggle" />
+                            Reject next handshake
+                        </label>
+                    }
                 </span>
             }
 
@@ -154,7 +159,11 @@
         </main>
 
         <footer class="native-gate5a__note">
-            @if (EnableSaveHandshake)
+            @if (EnableRealDbSave)
+            {
+                <span>Gate 5B-12 connects the accepted B11 Save snapshot to the existing WorkOrderService and SQL Server. B11 remains the reference route.</span>
+            }
+            else if (EnableSaveHandshake)
             {
                 <span>Gate 5B-11 proves the row Save handshake only: exact snapshot generation, accept/reject, edits during Save staying Dirty, and native Revo editor commit-on-close. It does not write to the database.</span>
             }
@@ -205,3 +214,4 @@
         </footer>
     }
 </div>
+

@@ -1,5 +1,6 @@
 using ERPPrototype.Data.Entities;
 using System.Diagnostics;
+using System.Text.Json;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 
@@ -343,27 +344,79 @@ public sealed class WorkOrderService(
 
             if (identityCheckRecords.Count > 0)
             {
-                var incomingNumbers = identityCheckRecords
-                    .Select(workOrder => workOrder.WorkOrderNumber)
-                    .Distinct()
-                    .ToList();
+                /*
+                 * Query exact incoming identity PAIRS, not every database row
+                 * that merely shares a Work Order Number.
+                 *
+                 * This matters for large WorkTypeCode edits: a company can
+                 * legitimately have the same WorkOrderNumber under several
+                 * different WorkTypeCodes. The previous number-only lookup
+                 * could therefore materialize almost one unrelated row for
+                 * every changed row before rejecting/accepting exact pairs in
+                 * memory. OPENJSON turns the incoming pair set into one
+                 * parameterized, set-based SQL source that can seek the
+                 * existing unique (WorkOrderNumber, WorkTypeCode) index.
+                 *
+                 * Rows whose identity is changing, plus rows deleted in the
+                 * same Save, remain excluded exactly as before. The unique
+                 * index is still the final race-condition backstop.
+                 */
+                var incomingIdentityJson = JsonSerializer.Serialize(
+                    identityCheckRecords
+                        .Select(workOrder => new
+                        {
+                            workOrder.WorkOrderNumber,
+                            workOrder.WorkTypeCode
+                        })
+                        .Distinct()
+                        .ToList());
+
+                var excludedIdsJson = JsonSerializer.Serialize(
+                    identityChangedIds
+                        .Concat(deletedIds)
+                        .Distinct()
+                        .ToList());
 
                 var duplicateQueryStartedAt = Stopwatch.GetTimestamp();
 
-                var possibleConflicts = await dbContext.WorkOrders
-                    .AsNoTracking()
-                    .Where(workOrder =>
-                        incomingNumbers.Contains(workOrder.WorkOrderNumber) &&
-                        !identityChangedIds.Contains(workOrder.Id) &&
-                        !deletedIds.Contains(workOrder.Id))
-                    .Select(workOrder => new
-                    {
-                        workOrder.WorkOrderNumber,
-                        workOrder.WorkTypeCode,
-                        workOrder.WorkYear,
-                        workOrder.DepartmentId,
-                        DepartmentName = workOrder.Department.DepartmentType.Name
-                    })
+                var possibleConflicts = await dbContext.Database
+                    .SqlQuery<WorkOrderDuplicateLookupRow>($"""
+                        WITH [IncomingIdentity] AS
+                        (
+                            SELECT DISTINCT
+                                [identity].[WorkOrderNumber],
+                                [identity].[WorkTypeCode]
+                            FROM OPENJSON({incomingIdentityJson})
+                            WITH
+                            (
+                                [WorkOrderNumber] varchar(9) '$.WorkOrderNumber',
+                                [WorkTypeCode] varchar(3) '$.WorkTypeCode'
+                            ) AS [identity]
+                        ),
+                        [ExcludedWorkOrders] AS
+                        (
+                            SELECT CAST([value] AS int) AS [Id]
+                            FROM OPENJSON({excludedIdsJson})
+                        )
+                        SELECT
+                            [workOrder].[WorkOrderNumber],
+                            [workOrder].[WorkTypeCode],
+                            [workOrder].[WorkYear],
+                            [workOrder].[DepartmentId],
+                            [departmentType].[Name] AS [DepartmentName]
+                        FROM [IncomingIdentity] AS [incoming]
+                        INNER JOIN [WorkOrders] AS [workOrder]
+                            ON
+                                [workOrder].[WorkOrderNumber] = [incoming].[WorkOrderNumber] AND
+                                [workOrder].[WorkTypeCode] = [incoming].[WorkTypeCode]
+                        INNER JOIN [Departments] AS [department]
+                            ON [department].[Id] = [workOrder].[DepartmentId]
+                        INNER JOIN [DepartmentTypes] AS [departmentType]
+                            ON [departmentType].[Id] = [department].[DepartmentTypeId]
+                        LEFT JOIN [ExcludedWorkOrders] AS [excluded]
+                            ON [excluded].[Id] = [workOrder].[Id]
+                        WHERE [excluded].[Id] IS NULL
+                        """)
                     .ToListAsync(cancellationToken);
 
                 RecordPerformanceStage(
@@ -372,11 +425,26 @@ public sealed class WorkOrderService(
                     duplicateQueryStartedAt,
                     new
                     {
-                        IncomingNumbers = incomingNumbers.Count,
-                        PossibleConflicts = possibleConflicts.Count
+                        IncomingPairs = identityCheckRecords
+                            .Select(workOrder => CreateDuplicateKey(
+                                workOrder.WorkOrderNumber,
+                                workOrder.WorkTypeCode))
+                            .Distinct(StringComparer.Ordinal)
+                            .Count(),
+                        PossibleConflicts = possibleConflicts.Count,
+                        Strategy = "exact-pair-openjson"
                     });
 
                 var duplicateEvaluationStartedAt = Stopwatch.GetTimestamp();
+
+                var possibleConflictsByKey = possibleConflicts
+                    .GroupBy(workOrder => CreateDuplicateKey(
+                        workOrder.WorkOrderNumber,
+                        workOrder.WorkTypeCode))
+                    .ToDictionary(
+                        group => group.Key,
+                        group => group.First(),
+                        StringComparer.Ordinal);
 
                 foreach (var incomingRecord in identityCheckRecords)
                 {
@@ -384,13 +452,9 @@ public sealed class WorkOrderService(
                         incomingRecord.WorkOrderNumber,
                         incomingRecord.WorkTypeCode);
 
-                    var existingConflict = possibleConflicts
-                        .FirstOrDefault(workOrder =>
-                            CreateDuplicateKey(
-                                workOrder.WorkOrderNumber,
-                                workOrder.WorkTypeCode) == incomingKey);
-
-                    if (existingConflict is null)
+                    if (!possibleConflictsByKey.TryGetValue(
+                        incomingKey,
+                        out var existingConflict))
                     {
                         continue;
                     }
@@ -606,10 +670,20 @@ public sealed class WorkOrderService(
             {
                 var loadUpdatesStartedAt = Stopwatch.GetTimestamp();
 
+                var changedIdsJson = JsonSerializer.Serialize(changedIds);
+
                 var entitiesToUpdate = await dbContext.WorkOrders
-                    .Where(workOrder =>
-                        workOrder.DepartmentId == departmentId &&
-                        changedIds.Contains(workOrder.Id))
+                    .FromSqlInterpolated($"""
+                        SELECT [workOrder].*
+                        FROM [WorkOrders] AS [workOrder]
+                        INNER JOIN
+                        (
+                            SELECT CAST([value] AS int) AS [Id]
+                            FROM OPENJSON({changedIdsJson})
+                        ) AS [incoming]
+                            ON [incoming].[Id] = [workOrder].[Id]
+                        WHERE [workOrder].[DepartmentId] = {departmentId}
+                        """)
                     .ToListAsync(cancellationToken);
 
                 RecordPerformanceStage(
@@ -619,7 +693,8 @@ public sealed class WorkOrderService(
                     new
                     {
                         RequestedRows = changedIds.Count,
-                        LoadedRows = entitiesToUpdate.Count
+                        LoadedRows = entitiesToUpdate.Count,
+                        Strategy = "exact-ids-openjson"
                     });
 
                 var prepareUpdatesStartedAt = Stopwatch.GetTimestamp();
@@ -1110,6 +1185,19 @@ public sealed record WorkOrderDuplicateConflict(
     string WorkTypeCode,
     int? ExistingWorkYear = null,
     string? ExistingDepartmentName = null);
+
+internal sealed class WorkOrderDuplicateLookupRow
+{
+    public string WorkOrderNumber { get; set; } = string.Empty;
+
+    public string WorkTypeCode { get; set; } = string.Empty;
+
+    public int WorkYear { get; set; }
+
+    public int DepartmentId { get; set; }
+
+    public string DepartmentName { get; set; } = string.Empty;
+}
 
 public sealed record WorkOrderServicePerformanceStage(
     string Name,

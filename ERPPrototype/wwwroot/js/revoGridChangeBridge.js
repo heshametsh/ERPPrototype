@@ -851,8 +851,8 @@ export function createRevoGridChangeBridge(options) {
         return snapshot;
     }
 
-    function acceptSave(saveId) {
-        const accepted = engine.acceptSave(saveId);
+    function acceptSave(saveId, acceptedValues = null) {
+        const accepted = engine.acceptSave(saveId, acceptedValues);
         notifyState();
         return accepted;
     }

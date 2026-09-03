@@ -1,4 +1,4 @@
-namespace ERPPrototype.E2ETests;
+﻿namespace ERPPrototype.E2ETests;
 
 internal static class Program
 {
@@ -100,6 +100,16 @@ internal static class Program
                 argument =>
                     string.Equals(
                         argument,
+                        "--revo-gate5b12-real-db",
+                        StringComparison.OrdinalIgnoreCase)))
+        {
+            return await Gate5B12RealDbSaveRunner.RunAsync();
+        }
+
+        if (args.Any(
+                argument =>
+                    string.Equals(
+                        argument,
                         "--revo-gate5b6-validation",
                         StringComparison.OrdinalIgnoreCase)))
         {
@@ -128,6 +138,16 @@ internal static class Program
             return await RevoGridCommunityAutomationRunner.RunAsync();
         }
 
+        if (args.Any(
+                argument =>
+                    string.Equals(
+                        argument,
+                        "--revo-employee-real-workday",
+                        StringComparison.OrdinalIgnoreCase)))
+        {
+            return await EmployeeRealWorkdayRunner.RunAsync();
+        }
         return await Phase9FoundationRunner.RunAsync(args);
     }
 }
+

@@ -1,0 +1,35 @@
+@page "/work-orders-revogrid-gate5c1"
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+
+<PageTitle>RevoGrid Gate 5C-1</PageTitle>
+
+<section class="gate5c1-summary"
+         aria-label="إجماليات الصفوف الظاهرة">
+    <div class="gate5c1-summary__title">
+        إجمالي الظاهر
+    </div>
+
+    <div id="revogrid-gate5c1-visible-aggregates"
+         class="gate5c1-summary__values"
+         data-testid="gate5c1-visible-aggregates"
+         data-aggregate-ready="false"
+         aria-live="polite">
+        جاري الحساب…
+    </div>
+</section>
+
+<WorkOrdersRevoGridNativeGate5A EnableChangeEngine="true"
+                                  EnablePaste="true"
+                                  EnableRangeClear="true"
+                                  EnableExcelFilter="true"
+                                  EnableHeaderActions="true"
+                                  EnableRowStructure="true"
+                                  EnableUnifiedValidation="true"
+                                  EnablePersistenceIdentity="true"
+                                  EnableSelectionContext="true"
+                                  EnableStructureWorkspace="true"
+                                  EnableHeaderMultiSelection="true"
+                                  EnableClipboardRangeFill="true"
+                                  EnableSaveHandshake="true"
+                                  EnableRealDbSave="true"
+                                  EnableVisibleAggregates="true" />
