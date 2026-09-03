@@ -63,3 +63,7 @@ When documents disagree, use this order:
 - older Gate/lab/event-probe pages are evidence/diagnostics unless current implementation says otherwise.
 
 Do not treat historical/lab artifacts as current production architecture merely because they remain in the repository.
+
+## Latest Accepted Checkpoint
+
+- `50_B12_GATE5C1_ACCEPTANCE_2026-09-03.md` — Accepted B12 Real DB Save + Gate 5C-1 Visible Aggregates official checkpoint.
