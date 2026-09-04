@@ -164,3 +164,34 @@ The current remaining Revo/cutover work is:
 ## Cleanup Rule
 
 The 23 root Gate/Lab manifest and README files may be retired only after this durable history and the current roadmap/release overrides are committed. Git remains the exact archive for their original byte-for-byte historical contents.
+
+## Grid Shootout Lessons Preserved Before Lab Cleanup
+
+Historical isolated Grid Shootout labs were reviewed before retiring obsolete pages.
+
+### Stable identity during Paste verification after Sort
+
+- Visual/source row position is not a durable identity after Sort.
+- Paste and end-of-sheet verification must follow stable row identity rather than assuming the edited row remains at the same index.
+- Test payloads should avoid changing the active Sort key when the goal is to verify Paste correctness independently from reordering.
+
+### External controls can steal grid focus before selection is observed
+
+- An external Split/Full button can move browser focus before its click handler reads the Revo selected range.
+- A null range observed after that focus transfer does not prove that resize or layout destroyed the selection.
+- Durable selection state should be captured before the external control takes focus, such as from the verified logical selection or pointerdown boundary.
+
+### Structural column changes are different from repaint
+
+- Historical labs used the public grid.columns assignment when actually adding or removing columns.
+- That does not justify replacing the full grid.columns collection merely to force a header repaint.
+- Current accepted runtime uses the narrower public updateColumns(...) path for repaint-sensitive header changes.
+
+### Community filter panel registration
+
+- The isolated RevoGrid Community Gate 2.2 requires explicit registration of the standalone revogr-filter-panel custom element.
+- Gate 2.2 remains retained while the current E2E Community qualification runner depends on it.
+
+### Already preserved elsewhere
+
+The accepted documentation already preserves the major Shootout decisions covering the Univer end-of-sheet failure, Revo 100k qualification, Arabic keyboard shortcuts, Header Selection ownership, Split behavior and browser Zoom selection preservation.
