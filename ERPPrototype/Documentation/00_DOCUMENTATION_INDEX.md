@@ -64,7 +64,7 @@ When documents disagree, use this order:
 | `../START_HERE_ERP_PROTOTYPE.md` | current engineering handoff and next step |
 | `15_BUSINESS_DOMAIN_AND_PERMISSIONS.md` | **business source of truth** |
 | `46_FINAL_LEAD_REVIEW_2026-08-26.md` | **long-term product/architecture synthesis** from 14 independent reviews |
-| `47_GATE5B10_ACCEPTANCE_2026-08-30.md` | Gate 5B-10 implementation/acceptance evidence and exact next boundary |
+| `Archive/Project-History/Acceptance-History/47_GATE5B10_ACCEPTANCE_2026-08-30.md` | Gate 5B-10 implementation/acceptance evidence and exact next boundary |
 | `03_CURRENT_IMPLEMENTATION.md` | what exists in current baseline |
 | `05_WORK_ORDERS_GRID_BEHAVIOUR.md` | Work Orders behavior independent of Tabulator/Revo |
 | `06_REGRESSION_TEST_CHECKLIST.md` | mandatory regression and real-browser acceptance |
