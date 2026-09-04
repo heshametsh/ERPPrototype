@@ -1,3 +1,29 @@
+# CURRENT HANDOFF - 2026-09-04 - POST B12 / GATE 5C-1
+
+**Official development source:** the Git repository
+**Accepted product checkpoint:** `bdc37fe`
+**Live `/work-orders`:** Tabulator until controlled Revo cutover
+**Accepted Revo references:** `/work-orders-revogrid-gate5b12` and `/work-orders-revogrid-gate5c1`
+
+Current accepted foundation includes B11 snapshot-safe Save, B12 real database Save, Selection Core V4R3, RowVersion rejection, edit-while-Save preservation, persisted Delete/re-add identity, cross-year transactional Save and Gate 5C-1 visible aggregates.
+
+Current work is production parity and qualification: remaining Custom Column persistence parity, employee parity, pinned Revo assets/license evidence, recovery qualification, target browsers, 10k acceptance and controlled cutover.
+
+Read current state from:
+
+1. `Documentation/00_DOCUMENTATION_INDEX.md`
+2. `Documentation/03_CURRENT_IMPLEMENTATION.md`
+3. `Documentation/07_KNOWN_ISSUES_AND_TECHNICAL_DEBT.md`
+4. `Documentation/08_DECISIONS_LOG.md`
+5. `Documentation/09_REFACTOR_ROADMAP.md`
+6. `Documentation/10_RELEASE_READINESS_PLAN.md`
+7. `Documentation/50_B12_GATE5C1_ACCEPTANCE_2026-09-03.md`
+8. `Documentation/51_REVO_GATE_BUG_HISTORY_2026-09-04.md`
+
+Older handoff sections below are historical snapshots.
+
+---
+
 # CURRENT HANDOFF — 2026-08-30 — POST V4R3
 
 This is the newest handoff. Older handoffs remain historical when they conflict.

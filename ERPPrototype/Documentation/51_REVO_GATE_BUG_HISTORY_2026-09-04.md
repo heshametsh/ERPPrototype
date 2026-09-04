@@ -1,3 +1,13 @@
+# CLEANUP COMPLETION RECORD - 2026-09-04
+
+- 23 historical root Gate/Lab files were retired in commit `80a91b7` after their durable lessons were preserved.
+- 85 obsolete Grid Shootout lab files were retired in commit `8d44065` after review and preservation of useful lessons.
+- the 10 Grid Shootout files with a current evidence/test role were retained.
+- recovery tags preserve pre-cleanup checkpoints.
+- `Documentation/Review` and `Documentation/Archive/AI-Team-V3` remain retained evidence areas.
+
+---
+
 # Revo Gate Bug History and Retired Root Evidence - 2026-09-04
 
 ## Purpose

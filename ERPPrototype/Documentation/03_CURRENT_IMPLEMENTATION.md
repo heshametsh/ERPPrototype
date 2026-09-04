@@ -1,3 +1,11 @@
+# DOCUMENTATION STATUS - 2026-09-04
+
+The B12/5C-1 section immediately below is the current implementation authority. Older dated sections remain historical evidence only.
+
+Acceptance evidence: `50_B12_GATE5C1_ACCEPTANCE_2026-09-03.md`.
+
+---
+
 # CURRENT IMPLEMENTATION OVERRIDE - 2026-09-04 - B12 + GATE 5C-1
 
 **Accepted product checkpoint:** `bdc37fe`

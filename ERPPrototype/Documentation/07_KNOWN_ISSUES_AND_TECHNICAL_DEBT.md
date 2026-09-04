@@ -1,3 +1,21 @@
+# CURRENT ACTIVE REGISTER - 2026-09-04
+
+Open work:
+
+1. Custom Column definition/layout persistence parity where still missing;
+2. remaining high-value employee parity and production messaging;
+3. pinned/self-hosted Revo assets with license evidence;
+4. reconnect/lost-response/recovery qualification;
+5. target Edge/Chrome and office-class 10k qualification;
+6. controlled `/work-orders` cutover;
+7. Tabulator retirement after a separate post-cutover checkpoint.
+
+B11 Save foundation, B12 real database Save, RowVersion rejection, edit-while-Save preservation, persisted Delete/re-add identity, cross-year Save, Selection Core V4R3 and Gate 5C-1 aggregates are accepted foundations, not open issues.
+
+Older issue sections below remain historical evidence unless current runtime evidence reopens them.
+
+---
+
 # CURRENT PRIORITY OVERRIDE — 2026-08-30
 
 > Accepted Revo code checkpoint: `86eb2ff3ce51addc2046133c820dd5dc75bfd08f` / Gate 5B-10.

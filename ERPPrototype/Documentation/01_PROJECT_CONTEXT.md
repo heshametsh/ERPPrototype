@@ -1,3 +1,13 @@
+# CURRENT-STATE POINTER - 2026-09-04
+
+This document remains authoritative for its own subject area.
+
+For the latest implementation checkpoint, active issues and execution sequence use `03_CURRENT_IMPLEMENTATION.md`, `07_KNOWN_ISSUES_AND_TECHNICAL_DEBT.md`, `09_REFACTOR_ROADMAP.md` and `10_RELEASE_READINESS_PLAN.md`.
+
+Only older statements that describe Gate 5A/B10/B11 or Real DB Save as the current next step are historical.
+
+---
+
 # 01 — ERP Prototype Project Context
 
 **Version:** 4.2

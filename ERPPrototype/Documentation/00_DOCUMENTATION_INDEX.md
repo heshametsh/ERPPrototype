@@ -1,3 +1,22 @@
+# CURRENT DOCUMENTATION GUIDE - 2026-09-04
+
+**Accepted product checkpoint:** `bdc37fe`
+**Official source of truth:** current Git repository
+
+Current-state documents:
+
+1. `03_CURRENT_IMPLEMENTATION.md`
+2. `07_KNOWN_ISSUES_AND_TECHNICAL_DEBT.md`
+3. `08_DECISIONS_LOG.md`
+4. `09_REFACTOR_ROADMAP.md`
+5. `10_RELEASE_READINESS_PLAN.md`
+6. `50_B12_GATE5C1_ACCEPTANCE_2026-09-03.md`
+7. `51_REVO_GATE_BUG_HISTORY_2026-09-04.md`
+
+Older change summaries, handoffs and audits are historical evidence. They must not override the current B12/5C-1 state when they describe B10/B11, Gate 5A or Real DB Save as future work.
+
+---
+
 # CURRENT DOCUMENTATION CHECKPOINT OVERRIDE - 2026-09-04
 
 **Accepted product checkpoint:** `bdc37fe`

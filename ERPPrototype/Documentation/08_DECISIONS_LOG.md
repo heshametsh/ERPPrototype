@@ -1,3 +1,39 @@
+# ACCEPTED DECISIONS - B11 THROUGH GATE 5C-1
+
+## DEC-066 - Gate 5C-1 visible aggregates use the current visible Revo snapshot
+
+- **Status:** Accepted.
+- aggregates use current visible Revo rows;
+- core Money and Custom Money participate;
+- Filter working-snapshot semantics remain unchanged until explicit Apply/Clear.
+
+## DEC-065 - Gate 5B-12 reuses the existing service/SQL persistence path
+
+- **Status:** Accepted.
+- no second Save engine;
+- B11 snapshot capture remains the Save foundation;
+- Add/Update/Delete use the existing `WorkOrderService` and SQL path;
+- results reconcile by `ClientKey`;
+- stale `RowVersion` rejects transactionally while newer employee work remains Dirty.
+
+## DEC-064 - Selection Core V4R3 preserves Revo native ownership
+
+- **Status:** Accepted.
+- row identity uses `ClientKey`;
+- column identity uses `prop`;
+- Revo retains native focus/range/editing ownership;
+- Filter, Sort, Scroll and right-click preserve semantic selection identity.
+
+## DEC-063 - Gate 5B-11 snapshot-safe Save is the persistence handshake foundation
+
+- **Status:** Accepted.
+- Save captures one generation;
+- accepted results advance only that Baseline;
+- newer edits remain Dirty;
+- failed Save preserves Baseline, Dirty and History.
+
+---
+
 # CURRENT GRID DECISION OVERRIDE - 2026-09-04
 
 ## DEC-062 - Retire root Gate/Lab manifests only after preserving durable engineering history

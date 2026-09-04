@@ -1,3 +1,11 @@
+# CURRENT-STATE POINTER - 2026-09-04
+
+This document remains useful for its subject/history. For current implementation, active issues and roadmap use `03_CURRENT_IMPLEMENTATION.md`, `07_KNOWN_ISSUES_AND_TECHNICAL_DEBT.md`, `09_REFACTOR_ROADMAP.md` and `10_RELEASE_READINESS_PLAN.md`.
+
+Older statements in this document that describe Gate 5A/B10/B11 or Real DB Save as the current next step are historical.
+
+---
+
 # 46 — Final Lead Review and Long-Term Product Direction — 2026-08-26
 
 ## Post-review execution status — updated 2026-08-30

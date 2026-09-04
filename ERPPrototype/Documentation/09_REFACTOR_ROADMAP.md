@@ -1,3 +1,9 @@
+# ROADMAP STATUS - 2026-09-04
+
+The POST B12 / GATE 5C-1 roadmap immediately below is current. Older roadmap sections are historical sequencing evidence only.
+
+---
+
 # CURRENT REVO ROADMAP OVERRIDE - 2026-09-04 - POST B12 / GATE 5C-1
 
 **Accepted product checkpoint:** `bdc37fe`
