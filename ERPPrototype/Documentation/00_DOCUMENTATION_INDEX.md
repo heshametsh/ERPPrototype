@@ -1,3 +1,19 @@
+# CURRENT DOCUMENTATION CHECKPOINT OVERRIDE - 2026-09-04
+
+**Accepted product checkpoint:** `bdc37fe`
+**Accepted documentation checkpoint:** `66a3f03`
+**Accepted Revo reference routes:** `/work-orders-revogrid-gate5b12` and `/work-orders-revogrid-gate5c1`
+
+The official Git repository is the source of truth. `ERPPrototype_B12_TEST` is historical review material, not a development source.
+
+Current accepted behavior includes B11 snapshot-safe Save, B12 real DB Save, RowVersion concurrency rejection, edit-while-Save preservation, persisted Delete/re-add identity, cross-year transactional Save, Selection Core V4R3 and Gate 5C-1 visible aggregates.
+
+`51_REVO_GATE_BUG_HISTORY_2026-09-04.md` is the durable problem/root-cause/fix history created before retiring old root Gate/Lab manifest files. Exact original artifacts remain recoverable from Git history.
+
+Older "Current State" sections below that describe B10/B11 as the latest state or Real DB Save as future work are historical.
+
+---
+
 # 00 — Documentation Index
 
 **Status:** Current / Approved

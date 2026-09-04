@@ -1,3 +1,40 @@
+# CURRENT IMPLEMENTATION OVERRIDE - 2026-09-04 - B12 + GATE 5C-1
+
+**Accepted product checkpoint:** `bdc37fe`
+**Documentation checkpoint:** `66a3f03`
+**Live `/work-orders`:** Tabulator remains live until an accepted Revo cutover.
+**Accepted Revo reference routes:** `/work-orders-revogrid-gate5b12` and `/work-orders-revogrid-gate5c1`.
+
+## Accepted Revo State
+
+- Gate 5B-11 snapshot/accept/reject semantics remain the Save foundation.
+- Gate 5B-12 persists Add/Update/Delete through the existing `WorkOrderService` and SQL path.
+- server results reconcile to the same browser `ClientKey`.
+- accepted Save advances only the captured generation; newer edits remain Dirty.
+- new rows receive database `Id` and `RowVersion` after Save.
+- persisted Delete, in-flight Undo and fresh re-add preserve identity correctly.
+- stale `RowVersion` is rejected transactionally while the employee edit remains Dirty.
+- cross-year Save requires confirmation and moves the row transactionally.
+- Gate 5C-1 calculates visible aggregates from Revo's current visible rows for core Money and Custom Money.
+- Filter working-snapshot semantics remain unchanged; explicit Apply/Clear changes visible membership.
+- Employee Real Workday Master scenarios 00-17 passed on the official branch.
+
+## Still Open Before Cutover
+
+- database-connected Custom Column definition/layout persistence parity where still missing;
+- remaining high-value employee parity not yet covered by the accepted candidate;
+- exact pinned/self-hosted Revo assets and license evidence;
+- reconnect/lost-response/recovery qualification beyond accepted Save/concurrency cases;
+- target Edge/Chrome and office-class 10k acceptance;
+- side-by-side release candidate and controlled `/work-orders` cutover;
+- Tabulator retirement only after a separate post-cutover checkpoint.
+
+## Historical Evidence Rule
+
+Old root Gate/Lab manifests are not current runtime dependencies. Their durable bug/root-cause/fix history is preserved in `51_REVO_GATE_BUG_HISTORY_2026-09-04.md`; exact originals remain in Git history.
+
+---
+
 # CURRENT IMPLEMENTATION OVERRIDE — 2026-08-30 — POST V4R3
 
 **Accepted Revo checkpoint:** `0e7a6be512f92fe076f21261b86da5079897d48e`

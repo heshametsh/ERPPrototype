@@ -1,3 +1,38 @@
+# CURRENT RELEASE READINESS OVERRIDE - 2026-09-04 - POST B12 / GATE 5C-1
+
+## Gate R0 - Revo Production Candidate - OPEN
+
+Completed foundation at the accepted official checkpoint:
+
+- Unified Validation.
+- persistence identity through `ClientKey` / `Id` / `RowVersion`.
+- Selection Context, Structure Workspace and Header Selection.
+- Gate 5B-11 snapshot-safe Save handshake.
+- Gate 5B-12 real Add/Update/Delete database Save through the existing service/SQL path.
+- edit-while-Save generation preservation.
+- new-row database identity reconciliation.
+- persisted Delete / in-flight Undo / fresh re-add identity behavior.
+- stale RowVersion transactional rejection with employee changes remaining Dirty.
+- cross-year confirmation and transactional move behavior.
+- Gate 5C-1 visible aggregates for core Money and Custom Money.
+- Employee Real Workday Master scenarios 00-17 on the official branch, including a 1,200-real-edit streamed Save scenario.
+
+Still required before `/work-orders` cutover:
+
+- database-connected Custom Column definition/layout persistence parity where still missing;
+- remaining high-value employee parity and production messaging;
+- exact Revo assets pinned/self-hosted with MIT/license evidence;
+- reconnect/lost-response/recovery qualification beyond the accepted Save/concurrency journeys;
+- target Edge/Chrome qualification;
+- office-class 10k acceptance; the accepted 1,200-edit Save scenario is not a substitute for 10k qualification;
+- side-by-side release candidate and controlled cutover;
+- rollback checkpoint retained;
+- Tabulator retirement only in a separate post-cutover checkpoint.
+
+Older release sections that list snapshot-safe Save, Real DB Save, RowVersion concurrency, edit-while-Save or cross-year Save as future work are historical and are superseded by this override.
+
+---
+
 # CURRENT RELEASE READINESS OVERRIDE — 2026-08-30
 
 ## Gate R0 — Revo Production Candidate — OPEN

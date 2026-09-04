@@ -1,3 +1,16 @@
+# CURRENT GRID DECISION OVERRIDE - 2026-09-04
+
+## DEC-062 - Retire root Gate/Lab manifests only after preserving durable engineering history
+
+- **Status:** Accepted documentation/cleanup rule.
+- the root Gate 5A-5B manifest and lab README files are historical evidence, not runtime dependencies or current architecture contracts.
+- before retirement, durable problem symptoms, root causes, fixes and regression clues are preserved in `51_REVO_GATE_BUG_HISTORY_2026-09-04.md`.
+- current implementation, regression, roadmap and release documents receive newer overrides so old "future" statements do not incorrectly reopen already accepted B12/5C-1 work.
+- exact original manifest contents, old baseline commits, touched-file lists and historical test counts remain recoverable from Git history.
+- cleanup must not delete the root evidence files until the preservation documentation is reviewed and committed.
+
+---
+
 # CURRENT GRID DECISION OVERRIDE — 2026-08-30
 
 ## DEC-061 — Gate 5B-10 Header Selection is accepted without replacing Revo native selection ownership

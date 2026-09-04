@@ -1,3 +1,43 @@
+# CURRENT REVO ROADMAP OVERRIDE - 2026-09-04 - POST B12 / GATE 5C-1
+
+**Accepted product checkpoint:** `bdc37fe`
+**Documentation checkpoint:** `66a3f03`
+
+Completed:
+
+1. Gate 5B-6 Unified Validation.
+2. Gate 5B-7 Persistence Identity.
+3. Gate 5B-8 Selection Context.
+4. Gate 5B-9 Structure Workspace.
+5. Gate 5B-10 Header Selection.
+6. Gate 5B-11 Snapshot-safe Save.
+7. Selection Core V4R3 hardening.
+8. Gate 5B-12 Real DB Save through the existing service/SQL path.
+9. RowVersion concurrency rejection, edit-while-Save preservation and cross-year transactional Save behavior covered by the accepted workday checkpoint.
+10. Gate 5C-1 visible aggregates for core Money and Custom Money.
+
+Current mission: finish parity and production qualification without reopening the accepted Save architecture.
+
+Remaining ordered work:
+
+11. database-connected Custom Column definition/layout persistence parity where still missing.
+12. remaining high-value employee parity such as quick search, Basket/KPI/selection summary and production messaging where not already covered.
+13. exact Revo assets pinned/self-hosted with license evidence.
+14. reconnect, lost-response and recovery qualification beyond accepted Save/concurrency cases.
+15. target Edge/Chrome and office-class 10k qualification.
+16. side-by-side release candidate.
+17. controlled `/work-orders` cutover.
+18. separate post-cutover Tabulator retirement checkpoint.
+
+Stop rules:
+
+- B12 must continue to reuse the accepted B11 snapshot handshake; do not create a second Save engine.
+- do not reopen accepted Selection/Filter/History ownership without regression evidence.
+- do not retire Tabulator before the accepted cutover checkpoint.
+- old root Gate/Lab manifests are historical evidence; durable lessons are preserved in `51_REVO_GATE_BUG_HISTORY_2026-09-04.md`.
+
+---
+
 # CURRENT REVO ROADMAP OVERRIDE — POST V4R3
 
 Accepted checkpoint: `0e7a6be512f92fe076f21261b86da5079897d48e`.

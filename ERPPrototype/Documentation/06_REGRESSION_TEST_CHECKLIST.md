@@ -1,3 +1,28 @@
+# ACCEPTANCE / REGRESSION OVERRIDE - 2026-09-04 - B12 + GATE 5C-1
+
+**Accepted product checkpoint:** `bdc37fe`
+
+The Employee Real Workday Master passed scenarios 00-17 on the official branch, including Selection, Sort/Filter identity, Clipboard/History, Structure, visible aggregates, Custom Money, validation, SQL Save, snapshot isolation, new-row Save, persisted Delete, cross-year Save, 1,200 real range edits, concurrency rejection and Arabic UI corruption guard.
+
+## Permanent regression guards preserved from retired Gate manifests
+
+When the related modules are changed, keep these historical failure modes explicitly protected:
+
+- Arabic keyboard layout must not break Ctrl+Z/Ctrl+Y; physical `KeyZ`/`KeyY` recognition remains layout-independent.
+- one physical Ctrl+Z/Ctrl+Y must replay at most one History transaction even when Revo renders multiple selection overlays.
+- Undo/Redo must not scroll when the target is already visible; off-screen reveal uses minimum movement only.
+- filter-popup typing must stay inside the popup and must not navigate/edit the grid underneath it.
+- header-body selection, Filter and Sort remain separate interactions; hidden rows are excluded from whole-column selection.
+- Sort must not auto-scroll after a selected Work Order that moves outside the viewport.
+- re-applying unchanged Filter criteria must re-evaluate a changed working snapshot and create History only when visible membership changes.
+- Filter Search changes pending checkbox selection only; no-match Search disables Apply and typing alone does not filter the grid.
+- Insert/Delete must resolve stable `ClientKey` identities and preserve explicit multi-row command semantics.
+- Remaining Amount remains derived/readonly and never creates a separate Dirty/History/Save field.
+
+Root-cause and fix details are preserved in `51_REVO_GATE_BUG_HISTORY_2026-09-04.md`.
+
+---
+
 # ACCEPTANCE OVERRIDE — 2026-08-30
 
 ## Gate 5B-10 accepted Revo checkpoint
