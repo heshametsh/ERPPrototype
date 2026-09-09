@@ -765,7 +765,7 @@
 ## DEC-067 — Custom Column definitions are owned by Department + Work Year
 
 - **Date:** 2026-09-06
-- **Status:** Approved and server/data-evidenced; real DB migration and core Revo manual smoke passed. Visible Revo Custom Column persistence acceptance remains pending the preserved persistence/history reconnect, then user-manual-first validation followed by automated closure regression.
+- **Status:** Approved and recovered-closure evidenced. Real DB migration/manual Revo validation passed; SQL Core 34/34 PASS; Gate5B12 FULL PASS; Employee Real Workday 00-17 PASS. Rename/current column-menu parity is a separate deferred review and is not implied by this status.
 - **Definition ownership:** each Work Year owns an independent Custom Column catalogue inside the employee's department. Add, Rename, and Delete affect the current year only.
 - **Move rule:** moving a Work Order to another year preserves every non-empty custom value. Reuse a destination definition when name + type match; create a missing definition automatically; if the same name exists with another type, create one safe unique destination name and reuse it for the batch.
 - **Blank rule:** blank custom values do not create destination definitions.

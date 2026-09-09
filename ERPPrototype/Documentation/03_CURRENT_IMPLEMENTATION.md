@@ -1,3 +1,23 @@
+# CURRENT SNAPSHOT REVIEW OVERRIDE - 2026-09-09
+
+**Reviewed baseline:** `recovery-last-known-20260908` @ `008c293` with clean worktree.
+
+The clean-machine recovery evidence supersedes older sections that describe Gate5B12 or Employee Real Workday as pending: Build PASS, SQL Core 34/34 PASS, Gate5B12 FULL PASS, and Employee Real Workday 00-17 FULL PASS.
+
+Review-only implementation observations (not fixes):
+
+- Work Orders query/save server authorization correctly requires an active Employee whose temporary password has already been changed.
+- Admin mutation authorization is weaker than that Work Orders invariant: `UserManagementService` checks active Admin role but not `MustChangePassword`, and `AdminPanel.razor` still performs some branch mutations directly through the DbContext.
+- `ApplicationSeeder` currently forces the single initial Admin back to `IsActive = true` at startup if it was disabled.
+- The documented "minimum 8 simple characters; no forced complex mixture" temporary-password rule is not explicitly configured in the current `AddIdentityCore` options.
+- Later Revo Gate route wrappers are inconsistent about route-level `[Authorize(Roles = Employee)]`; the real Work Orders query/save services still perform server-side role/active/password/department checks.
+- Revo calculates the opening business year from Saudi UTC+3, while legacy/service defaults still call `DateTime.Now.Year`.
+- Revo 4.25.2 assets are still imported from jsDelivr CDN; production self-host/license closure remains separate.
+
+These items are current review evidence only. No product change is authorized by this section.
+
+---
+
 # DOCUMENTATION STATUS - 2026-09-04
 
 The B12/5C-1 section immediately below is the current implementation authority. Older dated sections remain historical evidence only.

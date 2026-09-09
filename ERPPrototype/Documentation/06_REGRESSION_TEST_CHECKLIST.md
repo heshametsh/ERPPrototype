@@ -1144,18 +1144,6 @@ Browser closure execution note — 2026-09-07:
 ### RECOVERY-CLOSURE-20260909
 
 - [x] Build PASS on recovered clean environment.
-- [x] SQL Integration **34/34 PASS**.
-- [x] Phase 9.3D legacy-column removal gate PASS.
-- [x] Gate5B12 [00-runtime-module] through [07-concurrency] PASS.
-- [x] [01e-custom-year-view] validates Text Filter + Money Sort ownership per Work Year.
-- [x] 1,200-edit large Save PASS.
-- [x] Browser trace/screenshot evidence captured.
-- [ ] Employee Real Workday 00-17 rerun on the rebuilt machine remains pending.
-- [ ] Rename/current column-menu parity remains outside this recovery closure.
-
-### RECOVERY-CLOSURE-20260909
-
-- [x] Build PASS on recovered clean environment.
 - [x] SQL Integration 34/34 PASS.
 - [x] Phase 9.3D legacy-column removal gate PASS.
 - [x] Gate5B12 [00-runtime-module] through [07-concurrency] PASS.
@@ -1164,3 +1152,17 @@ Browser closure execution note — 2026-09-07:
 - [x] Browser trace/screenshot evidence captured.
 - [x] Employee Real Workday 00-17 rerun on rebuilt machine PASS through [00]-[17].
 - [ ] Rename/current column-menu parity remains outside this recovery closure.
+
+### REVIEW-ONLY AUDIT — 2026-09-09 — security/account/memory gaps
+
+Current recovery baseline remains green; these checks are **not yet executed** and must not be inferred from Work Orders PASS evidence:
+
+- [ ] Temporary-password Admin cannot perform any privileged mutation before changing password.
+- [ ] Disabled initial Admin remains disabled after application restart/seeding.
+- [ ] User creation/change-password behavior matches the approved password rule explicitly, not framework defaults by accident.
+- [ ] Unauthorized/non-Employee direct navigation to every accepted Revo Gate route is rejected at the route/security boundary.
+- [ ] Current business year is consistent at the Saudi New Year boundary across Revo and service/legacy default entry points.
+- [ ] Production Revo asset path is self-hosted/pinned with license evidence; CDN availability is not a runtime dependency.
+- [ ] Backup/restore rollback procedure is tested for the forward-only year-scoped Custom Column migration.
+
+No product or test-runtime change is authorized by this checklist addition; it records review gaps only.

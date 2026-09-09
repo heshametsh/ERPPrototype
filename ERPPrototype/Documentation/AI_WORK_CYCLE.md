@@ -139,6 +139,7 @@ Apply these before creating diagnostic helpers or interpreting a red suite:
 - Do not rerun an unchanged failing suite unless a material input changed (code, migration, build artifact, database state, configuration, or test harness).
 - Generated execution scripts must be parse-checked with the target shell/runtime when available. If the target shell is unavailable in the assistant environment, prefer short direct commands and simple packages over complex generated diagnostic scripts.
 - Patch-package integrity gate: before handoff, verify that the expected source hash was computed from the exact reviewed source file and that the replacement payload was derived from that same source version. Never ship a package whose safety hash and reviewed source differ.
+- **Cross-platform package identity gate:** for tracked text, prefer Git logical/object identity when line endings may differ between archive/Linux/Windows checkouts; do not treat LF↔CRLF alone as a source change. Normalize Git path comparisons to one separator before scope/allowlist checks.
 - A shared integration database is shared mutable state. Tests must either use unique years/field keys/departments, or load and merge the current configuration they do not own. Do not assert exact global counts unless the test created/reset all counted state itself.
 - When a test fails only because prior tests left valid state, repair test isolation first; do not change production behavior to satisfy an order-dependent test.
 - **Manual runtime freshness gate:** after source changes, user hands-on ERP runs must not use `--no-build`. Resolve the real Git root/project, stop the active listener, remove the app `bin`/`obj`, run a fresh `dotnet build`, abort if it fails, then `dotnet run` without `--no-build`. Open a new browser tab after restart. For versioned JavaScript/Razor changes, verify the loaded resource version before accepting or rejecting behavior.
@@ -167,6 +168,8 @@ There are two levels of synchronization:
 
 **Event sync — immediately after every material event**
 
+- A user-run command/package/test result is a first-class material event. Do not build the next modifying candidate from the previous planned state. Re-anchor from the actual result + current Git first, and make the next candidate carry that receipt forward.
+- After two consecutive tooling/package failures, do not issue a third modifying candidate until an exact current `git status`/diff or small current-state snapshot has re-established reality.
 - rewrite/prune `AI_CURRENT_STATE.md` so it contains current truth only;
 - append the chronological receipt to `AI_WORK_LOG.md`;
 - route the event to the canonical owner when applicable:
@@ -321,3 +324,23 @@ At checkpoint boundaries, prune the compact state. Do not prune the chronologica
 - Automated PASS evidence never substitutes for the user's hands-on result.
 - When manual testing uses the real local database, first distinguish code/runtime failure from database schema drift. Never apply a pending migration to the real database before read-only inspection, a verified backup, and review of the migration effect.
 - After two consecutive tooling/documentation patch failures, stop patch chaining, re-establish current truth from an exact project snapshot, and prefer one consolidated cleanup.
+
+## Memory closure discipline — 2026-09-09 retrospective
+
+The September recovery proved that event logging alone is not enough. Treat memory quality as three separate outcomes:
+
+1. **Continuity:** `AI_WORK_LOG.md` can reconstruct what happened and why.
+2. **Current truth:** `AI_CURRENT_STATE.md` contains only the current mission, accepted behavior, current evidence, open/unproven risks, protected WIP, and next action.
+3. **Learning:** `AI_WORK_METRICS.csv` has a factual row before a completed mission is considered memory-closed.
+
+Checkpoint rules:
+
+- Rebuild the compact Current State from current truth at checkpoint; do not append another chronological “latest run” section.
+- Dated receipts, superseded blockers, expected test counts, and old next actions are Work Log content only.
+- A completed mission without a metrics row is a **memory-closure failure**. Do not fabricate missing historical counts later; record the omission and measure prospectively.
+- The final checkpoint/commit receipt must record the memory-consistency result after the final evidence, not a PASS from an earlier candidate.
+- Current State must expose structured live Git truth (branch, HEAD, and CLEAN/DIRTY). The memory checker must compare those fields to the repository instead of trusting narrative wording.
+- A completed Current State mission must have exactly one factual metrics row for the same MissionId with CompletedDate and `RequiredEvidenceComplete=YES`.
+- If Current State and a later authoritative closure disagree, closure is not complete until Current State and canonical owners are rewritten to the closure truth.
+- Keep permanent rules at root-cause level. When a new failure is already covered by an existing class (tooling, stale build, harness ownership, state drift), strengthen/consolidate that rule instead of creating another one-off rule.
+- The five-mission retrospective is blocked if the metrics table has insufficient completed rows; fix measurement first rather than pretending to compare trends.

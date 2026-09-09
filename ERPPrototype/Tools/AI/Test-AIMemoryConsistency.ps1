@@ -4,7 +4,7 @@
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
-$MemoryGateVersion = 'V7.3'
+$MemoryGateVersion = 'V8.0'
 
 $RepoRoot = (Resolve-Path $RepoRoot).Path
 
@@ -30,6 +30,26 @@ function Add-Error([string]$message) {
 
 function Add-Warning([string]$message) {
     $warnings.Add($message)
+}
+
+function Invoke-GitChecked([string[]]$Arguments) {
+    $oldPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        $output = @(& git -C $RepoRoot @Arguments 2>&1)
+        $code = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $oldPreference
+    }
+
+    if ($code -ne 0) {
+        $detail = ($output | ForEach-Object { $_.ToString() }) -join ' | '
+        Add-Error "Git command failed: git $($Arguments -join ' ') :: $detail"
+        return @()
+    }
+
+    return @($output)
 }
 
 foreach ($key in $paths.Keys) {
@@ -73,10 +93,63 @@ $protocol = Read-Utf8Text $protocolPath
 $metrics = Read-Utf8Text $metricsPath
 $cycle = Read-Utf8Text $cyclePath
 
+# Live Git truth: compact state must describe the repository that is actually open.
+$gitRootOutput = @(Invoke-GitChecked @('rev-parse','--show-toplevel'))
+$gitBranchOutput = @(Invoke-GitChecked @('rev-parse','--abbrev-ref','HEAD'))
+$gitHeadOutput = @(Invoke-GitChecked @('rev-parse','HEAD'))
+$gitStatusOutput = @(Invoke-GitChecked @('status','--porcelain','--untracked-files=all'))
+
+$actualGitRoot = if ($gitRootOutput.Count -gt 0) { $gitRootOutput[-1].ToString().Trim() } else { '' }
+$actualBranch = if ($gitBranchOutput.Count -gt 0) { $gitBranchOutput[-1].ToString().Trim() } else { '' }
+$actualHead = if ($gitHeadOutput.Count -gt 0) { $gitHeadOutput[-1].ToString().Trim().ToLowerInvariant() } else { '' }
+$actualWorkingTree = if ($gitStatusOutput.Count -gt 0) { 'DIRTY' } else { 'CLEAN' }
+
+if ($actualGitRoot -ne '') {
+    try {
+        $resolvedGitRoot = (Resolve-Path -LiteralPath $actualGitRoot).Path
+        if ($resolvedGitRoot -ne $RepoRoot) {
+            Add-Error "RepoRoot does not match Git root. RepoRoot=$RepoRoot GitRoot=$resolvedGitRoot"
+        }
+    }
+    catch {
+        Add-Error "Could not resolve Git root returned by git: $actualGitRoot"
+    }
+}
+
+$stateBranchMatch = [regex]::Match($state, '(?m)^- Branch:\s*`([^`]+)`\.\s*$')
+$stateHeadMatch = [regex]::Match($state, '(?m)^- HEAD:\s*`([0-9a-fA-F]{40})`\.\s*$')
+$stateWorkingTreeMatch = [regex]::Match($state, '(?m)^- Working tree:\s*\*\*(CLEAN|DIRTY)\*\*')
+
+if (-not $stateBranchMatch.Success) {
+    Add-Error "AI_CURRENT_STATE.md is missing structured live Git branch: - Branch: `...`."
+}
+elseif ($actualBranch -ne '' -and $stateBranchMatch.Groups[1].Value -ne $actualBranch) {
+    Add-Error "Live Git branch drift: Current State=$($stateBranchMatch.Groups[1].Value), Git=$actualBranch."
+}
+
+if (-not $stateHeadMatch.Success) {
+    Add-Error "AI_CURRENT_STATE.md is missing structured live Git HEAD: - HEAD: `<40-char-sha>`."
+}
+elseif ($actualHead -ne '' -and $stateHeadMatch.Groups[1].Value.ToLowerInvariant() -ne $actualHead) {
+    Add-Error "Live Git HEAD drift: Current State=$($stateHeadMatch.Groups[1].Value), Git=$actualHead."
+}
+
+if (-not $stateWorkingTreeMatch.Success) {
+    Add-Error "AI_CURRENT_STATE.md is missing structured working-tree state: - Working tree: **CLEAN|DIRTY**"
+}
+elseif ($stateWorkingTreeMatch.Groups[1].Value -ne $actualWorkingTree) {
+    Add-Error "Live Git working-tree drift: Current State=$($stateWorkingTreeMatch.Groups[1].Value), Git=$actualWorkingTree."
+}
+
 # Compact state shape.
 $missionMatches = [regex]::Matches($state, '(?m)^Mission:\s*(\S+)\s*$')
 if ($missionMatches.Count -ne 1) {
     Add-Error "AI_CURRENT_STATE.md must contain exactly one 'Mission:' line."
+}
+
+$missionStatusMatches = [regex]::Matches($state, '(?m)^Mission status:\s*\*\*(OPEN|COMPLETE)\*\*\s*$')
+if ($missionStatusMatches.Count -ne 1) {
+    Add-Error "AI_CURRENT_STATE.md must contain exactly one 'Mission status: **OPEN|COMPLETE**' line."
 }
 
 $nextMatches = [regex]::Matches($state, '(?m)^## Next action\s*$')
@@ -276,6 +349,38 @@ if ($metricLines.Count -ge 2 -and $metricLines[0] -eq $metricLines[1]) {
     Add-Error "AI_WORK_METRICS.csv contains a duplicated header row."
 }
 
+# A completed mission is not memory-closed without one factual metrics row for the same MissionId.
+if ($missionMatches.Count -eq 1 -and $missionStatusMatches.Count -eq 1 -and
+    $missionStatusMatches[0].Groups[1].Value -eq 'COMPLETE') {
+    try {
+        $metricRows = @($metrics | ConvertFrom-Csv)
+        $missionId = $missionMatches[0].Groups[1].Value
+        $matchingMetricRows = @($metricRows | Where-Object { $_.MissionId -eq $missionId })
+
+        if ($matchingMetricRows.Count -ne 1) {
+            Add-Error "Completed mission must have exactly one metrics row for MissionId=$missionId; found $($matchingMetricRows.Count)."
+        }
+        else {
+            $metricRow = $matchingMetricRows[0]
+            if ([string]::IsNullOrWhiteSpace($metricRow.CompletedDate)) {
+                Add-Error "Completed mission metrics row is missing CompletedDate for MissionId=$missionId."
+            }
+            if ($metricRow.RequiredEvidenceComplete -ne 'YES') {
+                Add-Error "Completed mission metrics row must set RequiredEvidenceComplete=YES for MissionId=$missionId."
+            }
+
+            foreach ($field in @('CommunicationCorrectionTurns','ReworkLoops','ScopeDriftEvents','EnvironmentFailures','StateSyncMisses','StaleStateCorrections')) {
+                if ([string]::IsNullOrWhiteSpace($metricRow.$field)) {
+                    Add-Error "Completed mission metrics row has blank factual field: $field"
+                }
+            }
+        }
+    }
+    catch {
+        Add-Error "AI_WORK_METRICS.csv could not be parsed for mission-closure validation: $($_.Exception.Message)"
+    }
+}
+
 if ($missionMatches.Count -eq 1 -and $missionMatches[0].Groups[1].Value -eq 'CC-YEAR-001') {
     if ($state -match 'user has \*\*not given hands-on manual acceptance yet\*\*' -or
         $state -match 'Memory Gate V7\.2 must PASS') {
@@ -302,6 +407,10 @@ if ($errors.Count -gt 0) {
 
 Write-Host "AI memory consistency: PASS ($MemoryGateVersion)"
 Write-Host "Mission: $($missionMatches[0].Groups[1].Value)"
+Write-Host "Git truth synchronized: branch=$actualBranch head=$actualHead working-tree=$actualWorkingTree"
+if ($missionStatusMatches.Count -eq 1 -and $missionStatusMatches[0].Groups[1].Value -eq 'COMPLETE') {
+    Write-Host 'Mission metrics closure: PASS'
+}
 if ($stateSql.Success) {
     Write-Host "SQL evidence synchronized: $($stateSql.Groups['pass'].Value)/$($stateSql.Groups['total'].Value) PASS"
 }

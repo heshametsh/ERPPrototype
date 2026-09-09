@@ -40,7 +40,9 @@ For every ERP-project response or action, do not rely on conversational memory a
 
 After every material event — approved behavior, implementation result, test result, rollback, discovered risk, scope change, or checkpoint — update the compact state and append a work-log receipt. When the event changes a canonical behavior/decision/test/reference/workflow truth, update that owning document in the same step. At checkpoint boundaries, prune superseded detail from the compact state.
 
-At major evidence milestones, before a handoff/context export, and before any checkpoint/mission closure, run `ERPPrototype/Tools/AI/Test-AIMemoryConsistency.ps1`. A documentation-integrity `FAIL` is a stop condition: repair the drift before continuing engineering work.
+User-run command/package/test output is itself a material event. Do not issue the next modifying candidate from the previous planned state: re-anchor from the actual result + current Git and carry the receipt forward. After two consecutive tooling/package failures, obtain an exact current status/diff or small snapshot before a third modifying candidate.
+
+At major evidence milestones, before a handoff/context export, and before any checkpoint/mission closure, run `ERPPrototype/Tools/AI/Test-AIMemoryConsistency.ps1`. A documentation-integrity `FAIL` is a stop condition: repair the drift before continuing engineering work. Before closure, also require a pruned final Current State and a factual mission metrics row; missing historical metrics must not be guessed. The checker must also bind Current State branch/HEAD/CLEAN-or-DIRTY to live Git and, for a COMPLETE mission, require the matching factual metrics row.
 
 This is a hard workflow gate, not a reminder. The purpose is to make the file-backed live state the working memory during the same chat, so the assistant does not depend on remembering dozens of prior turns.
 
@@ -80,6 +82,8 @@ For important Grid behavior, Save, validation, data integrity, permissions, conc
 3. capture evidence on failure instead of guessing;
 4. give the user a short manual browser test and require user acceptance before final closure;
 5. commit/push only after the accepted candidate is stable.
+
+Automated PASS evidence never implies user manual acceptance.
 
 For **user hands-on/manual ERP runs after source changes**, enforce runtime freshness before interpreting behavior: resolve the real Git root/project, stop the current listener, remove the app `bin`/`obj`, build the real project, do not start if Build fails, run without `--no-build`, open a new browser tab, and verify the loaded module version when JavaScript/Razor cache keys changed. `--no-build` remains acceptable only inside a controlled automated harness after its matching build-configuration gate has passed.
 

@@ -1,3 +1,25 @@
+# CURRENT SNAPSHOT AUDIT ADDENDUM - 2026-09-09
+
+**Exact reviewed baseline:** branch `recovery-last-known-20260908`, HEAD `008c293`, clean worktree. Recovery evidence is Build PASS + SQL 34/34 PASS + Gate5B12 FULL PASS + Employee Real Workday 00-17 FULL PASS.
+
+This review intentionally made no product/test runtime change.
+
+## Findings re-verified against current source
+
+1. **The audit memory was directionally correct on Admin security.** This report already recorded `SEC-001` (temporary Admin password must block privileged mutations) and the rule that restart must never silently reactivate a disabled Admin. Current code review proves both still need closure: Work Orders correctly requires `!MustChangePassword`, but Admin mutations do not uniformly do so; `ApplicationSeeder` explicitly reactivates an inactive initial Admin.
+2. **Password contract drift remains possible.** The documented product rule is minimum 8 simple characters without a forced complexity mixture, while current Identity setup does not explicitly configure that password rule.
+3. **Revo authorization is defense-in-depth inconsistent.** Several later Gate route wrappers lack the explicit Employee `[Authorize]` present on earlier surfaces. Server query/save paths still enforce active Employee + changed-password + department scope, so this review does not claim a data leak; route-level authorization still needs explicit security closure.
+4. **Business-year calculation has two clocks.** Accepted Revo opens on Saudi UTC+3 business year; service/legacy defaults still use `DateTime.Now.Year`. This is a narrow year-boundary risk, not evidence of a current mid-year defect.
+5. **External Revo asset dependency remains.** Exact 4.25.2 is pinned in URL but loaded from jsDelivr; production self-host/license closure remains required.
+6. **Migration rollback is intentionally operational.** `ScopeCustomColumnsByWorkYear.Down()` throws because independent year catalogues cannot be safely collapsed. Production rollback therefore requires verified backup/restore.
+7. **Security coverage is the major evidence imbalance.** Work Orders has deep SQL/browser evidence; Admin/Login/Security does not have an equivalent focused suite for the findings above.
+
+## Review conclusion
+
+The Work Orders foundation is strongly evidenced. The largest current review risk is not another Grid feature; it is security/account lifecycle evidence and keeping project memory truthful at closure. No fix is authorized in the current review-only mission.
+
+---
+
 # CURRENT-STATE POINTER - 2026-09-04
 
 This document remains useful for its subject/history. For current implementation, active issues and roadmap use `03_CURRENT_IMPLEMENTATION.md`, `07_KNOWN_ISSUES_AND_TECHNICAL_DEBT.md`, `09_REFACTOR_ROADMAP.md` and `10_RELEASE_READINESS_PLAN.md`.

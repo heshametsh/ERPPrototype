@@ -570,3 +570,53 @@ Purpose: chronological receipt of material work. This file is append-only during
 - Covered Selection, Sort/Filter, Clipboard, History, Structure, Aggregates, Validation, SQL Save, snapshot semantics, new-row identity, persisted Delete, cross-year move, 1,200-edit Save, concurrency rejection, and Arabic UI.
 - Final evidence: ERP_REVO_EMPLOYEE_REAL_WORKDAY_TRACE_20260909-221507.zip.
 - Clean-machine recovery is now fully evidenced together with Build PASS, SQL Integration 34/34 PASS, Phase 9.3D PASS, and Gate5B12 FULL PASS.
+
+## 2026-09-09 — REVIEW-ONLY exact-snapshot engineering audit
+
+- Reviewed the uploaded clean snapshot at `recovery-last-known-20260908` / `008c293`; no product/test runtime change was authorized or made.
+- Recovery baseline remains Build PASS, SQL Core 34/34 PASS, Phase 9.3D PASS, Gate5B12 FULL PASS, and Employee Real Workday 00-17 FULL PASS.
+- Re-verified open security/account risks in current code: forced temporary-password invariant is not uniform across Admin mutations; startup seeding reactivates a disabled initial Admin; the documented 8-simple-character password rule is not explicitly configured in Identity options.
+- Revo later Gate wrappers are inconsistent about route-level Employee authorization, although Work Orders query/save services continue to enforce active Employee + changed-password + department scope server-side. Classified as defense-in-depth review, not proven data exposure.
+- Revo current-year logic uses Saudi UTC+3 while legacy/service defaults still use `DateTime.Now.Year`; record a year-boundary ownership risk.
+- External jsDelivr Revo 4.25.2 dependency and forward-only Custom Column migration rollback remain known production/operations gates.
+- Security/Admin/Login test coverage is materially thinner than the Work Orders SQL/browser evidence.
+
+## 2026-09-09 — Project-memory effectiveness retrospective
+
+- **What worked:** the Work Log preserved failure classification and cause/effect well enough to reconstruct why prior red runs were PRODUCT vs TEST/HARNESS vs BUILD/STALE-ARTIFACT vs TOOLING; it also preserved the user correction that test hardening must not silently add product behavior.
+- **What worked:** workflow rules were not theoretical only. Earlier memory audits caught stale acceptance wording, duplicate decision IDs, chronology leakage into Current State, mojibake, stale harness selection, and checker defects. These findings changed the Work Cycle with active-surface-first, existing-harness-first, schema-to-fixture, runtime-freshness, PowerShell-compatibility, and package-atomicity guards.
+- **What failed:** the final recovery closure was committed while `AI_CURRENT_STATE.md` still contained dated chronology and superseded pending browser sections; its `Updated` date was older than the latest Work Log. The compact-state pruning rule therefore existed but was not obeyed at closure.
+- **What failed:** `AI_WORK_METRICS.csv` contained only the header. The designed five-mission retrospective could not operate because mission metrics were never actually written. Do not invent historical numeric counts after the fact.
+- **What failed:** the existing memory checker checks structure/staleness, but the final closure did not record a post-closure memory-gate PASS and the checker does not currently enforce completed-mission metric-row presence.
+- **Learning decision:** separate memory quality into three gates: **continuity** (Work Log can reconstruct what happened), **current truth** (Current State is rebuilt/pruned at checkpoint), and **learning** (Metrics row exists before closure). A mission is not memory-closed unless all three are satisfied.
+- **Learning decision:** at checkpoint, rebuild `AI_CURRENT_STATE.md` from the seven current-truth questions instead of appending another “latest run” section. Chronology always stays in Work Log.
+- **Learning decision:** missing historical metric counts are recorded as a measurement failure, not guessed. Start prospective metrics with this memory-audit mission.
+- **Learning decision:** avoid rule explosion. New permanent workflow rules should represent repeated/root-cause classes and should consolidate overlapping rules instead of adding one rule per unique failure.
+- Current mission becomes review-only (`PROJECT-REVIEW-20260909`); no Rename, parity, feature, product, or test-runtime change is authorized.
+
+## 2026-09-09 — Memory audit live-execution receipts (V1 → V3)
+
+- Memory/Review Doc Sync **V1** stopped in preflight before file copy. Cause: the package compared raw file SHA256 from Git-archive LF bytes against the Windows working-tree CRLF bytes. The content was logically unchanged; the safety check was too byte-specific. Classification: **TOOLING / EOL NORMALIZATION**. No project file changed.
+- Memory/Review Doc Sync **V2** passed preflight and copied the reviewed documentation payload, then its scope guard treated intended `ERPPrototype/Documentation/...` paths as unexpected because the allowlist used `/` while the comparison normalized Git paths to `\`. The automatic backup restore ran. Classification: **TOOLING / PATH NORMALIZATION**. No V2 change remained.
+- Memory/Review Doc Sync **V3** fixed both guards, applied the intended 12 documentation/memory files, passed `git diff --check`, and Memory Gate V7.3 reported PASS. Product runtime, test runtime, and migrations stayed unchanged.
+- Workflow miss recorded explicitly: after the two consecutive V1/V2 tooling failures, the existing Work Cycle required a fresh exact-state re-anchor before another modifying candidate. V3 was produced directly instead. It succeeded, but success does not erase the process violation. The exact current audit snapshot uploaded after V3 is the re-anchor used for the next correction.
+
+## 2026-09-09 — Memory semantic audit after V3 PASS
+
+- Treating V7.3 PASS as sufficient was rejected by the semantic audit. Cross-document agreement did not prove that the documents described the **live** working tree.
+- `AI_CURRENT_STATE.md` still described the uploaded clean recovery snapshot while the real working tree was now DIRTY with uncommitted documentation/memory changes. The wording was historical but ambiguous enough to mislead a new chat about present Git state.
+- V1/V2/V3 execution receipts were absent from Work Log, so a new chat would lose the latest tooling lessons even though those lessons had just affected the workflow.
+- The first metrics row was premature/optimistic: it recorded zero communication correction, zero rework, and zero environment/tooling failures despite the observed session. It is replaced with factual counts rather than preserved for appearance.
+- User communication correction is counted once: the user explicitly stated that the technical work was right but the explanation style was not helping him understand. The communication contract remains cause/effect first, natural Egyptian Arabic, with technical detail surfaced only when needed.
+- Earlier in this review cycle the assistant tried to pivot toward a new Rename/column-menu topic; the user explicitly required review-only scope. Count one `ScopeDriftEvents` correction for the mission.
+- Metrics classification for this mission: V1/V2 are `EnvironmentFailures=2` (tooling/package failures), while the V3→V4 semantic memory-design correction is `ReworkLoops=1`; these are deliberately not double-counted.
+- State-sync misses remain `0` under the existing metric definition because the user did not have to remind the assistant of an already-approved active fact omitted from Current State; the stale compact-state correction is instead captured under `StaleStateCorrections`.
+
+## 2026-09-09 — Memory Gate V8 design correction
+
+- Memory quality is now checked as three independent outcomes: continuity, current truth, and learning.
+- V8 adds **live Git truth** checks: Current State branch, HEAD, and CLEAN/DIRTY working-tree status must match the actual repository at gate execution.
+- V8 adds a **mission-closure metrics** check: when Current State says `Mission status: COMPLETE`, `AI_WORK_METRICS.csv` must contain exactly one row for that MissionId, with CompletedDate present and `RequiredEvidenceComplete=YES`.
+- User-run output is a first-class material event. Before another modifying package is prepared, the result must be re-anchored into the next Current State/Work Log view; after two consecutive tooling/package failures, an exact status/snapshot is mandatory before a third candidate.
+- Package source guards must distinguish Git logical content from platform line endings and compare Git paths in one canonical separator before allowlist decisions.
+- This V8 correction changes project memory/workflow tooling only. It does not change ERP runtime, E2E/runtime tests, migrations, or product behavior.

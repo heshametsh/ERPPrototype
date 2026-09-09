@@ -46,6 +46,8 @@ If a referenced live file is genuinely unavailable, say exactly which file is un
 
 After every material event — approved behavior, code change, test result, rollback, blocker, scope change, accepted checkpoint, or change in next action — update `AI_CURRENT_STATE.md` and append the material receipt to `AI_WORK_LOG.md`.
 
+A user-run command/package/test output is a material event too. Before issuing another modifying package, re-anchor from that actual result and current Git; after two consecutive tooling/package failures, require an exact current status/diff or small snapshot before a third candidate.
+
 Do not treat that two-file update as sufficient when the event changes a canonical project truth. Route the same event to the owning document:
 
 - behavior/business rule → `15_BUSINESS_DOMAIN_AND_PERMISSIONS.md` and/or `05_WORK_ORDERS_GRID_BEHAVIOUR.md`;
@@ -64,7 +66,9 @@ At every major evidence milestone, handoff/context export, and before any checkp
 1. synchronize all affected canonical documents;
 2. run `ERPPrototype/Tools/AI/Test-AIMemoryConsistency.ps1`;
 3. if it reports `FAIL`, stop and repair documentation drift before advancing;
-4. only a `PASS` allows the workflow to continue.
+4. only a `PASS` allows the workflow to continue;
+5. before declaring a mission/checkpoint memory-closed, verify that Current State was rebuilt/pruned to final truth and `AI_WORK_METRICS.csv` contains a factual row for the completed mission. Never backfill missing historical counts by guess.
+6. require the memory gate to verify Current State branch, HEAD, and CLEAN/DIRTY against live Git; if `Mission status: COMPLETE`, require a metrics row for the same MissionId.
 
 `AI_CURRENT_STATE.md` is a live snapshot, not chronology. Dated receipts, superseded `PENDING` statements, and old expected test counts belong only in `AI_WORK_LOG.md`.
 
@@ -81,6 +85,10 @@ Answer from the refreshed live state, not from chat recall. Summarize only:
 - next action.
 
 Keep the answer concise, logical, understandable to a non-programmer, and use a few fuller paragraphs rather than many short stacked lines.
+
+## Manual-first acceptance rule
+
+Automated PASS evidence never implies user manual acceptance; user-visible acceptance remains manual-first unless an earlier safety/read-only gate is required to protect data.
 
 ## Communication reminder
 

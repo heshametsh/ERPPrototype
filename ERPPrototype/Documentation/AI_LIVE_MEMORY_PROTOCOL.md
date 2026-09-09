@@ -31,6 +31,8 @@ Material truth also has canonical owners:
 
 Update `AI_CURRENT_STATE.md` and append `AI_WORK_LOG.md`.
 
+User-run command/package/test output is a material event. Re-anchor from that actual output + current Git before preparing another modifying candidate. After two consecutive tooling/package failures, require an exact current status/diff or small snapshot before a third candidate.
+
 When the event changes a canonical behavior/decision/test/reference/workflow truth, update the owning document in the same step.
 
 ## Manual-first acceptance
@@ -46,6 +48,8 @@ After a major evidence milestone, before handoff/context export, and before chec
 3. stop on `FAIL`;
 4. even after structural `PASS`, perform a semantic scan for contradictory active acceptance surfaces, superseded pending gates, and encoding corruption;
 5. corruption detection must ignore historical examples inside Markdown code spans/blocks while still rejecting the same corruption in live prose.
+6. compare Current State branch, HEAD, and CLEAN/DIRTY with live Git; do not accept a mutually consistent document set that describes stale repository state.
+7. when Current State says `Mission status: COMPLETE`, require one factual metrics row for the same MissionId with completion date and required evidence complete.
 
 ## Pruning
 

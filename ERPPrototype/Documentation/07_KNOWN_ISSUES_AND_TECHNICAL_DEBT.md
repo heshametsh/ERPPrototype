@@ -1,3 +1,24 @@
+# CURRENT REVIEW REGISTER OVERRIDE - 2026-09-09
+
+**Baseline:** `recovery-last-known-20260908` @ `008c293`; Build PASS, SQL 34/34 PASS, Gate5B12 FULL PASS, Employee Real Workday 00-17 FULL PASS.
+
+The items below were re-verified by static review of the recovered current source. They are **open review/debt**, not authorization to patch product code in the current review-only mission.
+
+| ID | Priority | Current finding | Current evidence / consequence | Closure evidence required |
+|---|---:|---|---|---|
+| SEC-001 | P1 | Forced temporary-password invariant is incomplete outside Work Orders | Login redirects to Change Password and Work Orders service/query require `!MustChangePassword`, but Admin mutation paths do not uniformly enforce it | Server-side privileged-mutation tests + browser/manual proof |
+| AUTH-004 | P1 | Startup can silently reactivate a disabled initial Admin | `ApplicationSeeder` sets `IsActive = true` when the single Admin is inactive, conflicting with the recorded final Admin-restart rule | Seeder/security test proving restart preserves explicit deactivation |
+| AUTH-005 | P1 | Password-policy code does not explicitly encode the approved 8-simple-character rule | `AddIdentityCore` configures sign-in/lockout but no ERP password options; documented contract and effective runtime policy can drift | Explicit Identity options + focused create/change-password tests |
+| AUTH-006 | P1 | Revo Gate route authorization is inconsistent | early Gate wrappers/components use explicit Employee authorization; several later Gate wrappers do not. Data query/save services still enforce server scope, so this is defense-in-depth rather than proven exposure | Unauthorized-route/browser test + route policy review |
+| YEAR-001 | P2 | Current-business-year clock has two owners | Revo uses Saudi UTC+3; legacy/service defaults use `DateTime.Now.Year` | One shared business-clock rule + year-boundary tests |
+| TEST-SEC-001 | P1 | Admin/Login/Security regression coverage is much thinner than Work Orders | current 34/34 + Revo master evidence is Work Orders-focused; no comparable direct suite for forced password, Admin restart, password policy, and late-Gate unauthorized routing | Focused security integration/E2E suite |
+
+Existing `GRID-LIC-001` remains open: the accepted Revo runtime still imports exact 4.25.2 assets from jsDelivr; production must pin/self-host the exact package and retain license evidence.
+
+The year-scoped Custom Column migration's unsupported `Down()` is intentional, not a newly discovered defect. Operational rollback must use a verified database backup/restore path.
+
+---
+
 # CURRENT ACTIVE REGISTER - 2026-09-04
 
 Open work:
