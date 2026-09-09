@@ -201,6 +201,6 @@ Explain program behavior and cause/effect first in concise Egyptian Arabic. Avoi
 - Browser evidence: ERP_REVO_GATE5B12_TRACE_20260909-215933.zip.
 - Clean E2E rebuild was required once because recovered source timestamps caused stale build output to be reused.
 - Rename/current column-menu parity remains deferred pending its dedicated reference pass and user approval.
-- Employee Real Workday 00-17 has not yet been rerun on the rebuilt machine.
+- Employee Real Workday 00-17 rerun on the rebuilt machine: FULL PASS through [00-login]-[17-arabic-ui]. Final evidence: ERP_REVO_EMPLOYEE_REAL_WORKDAY_TRACE_20260909-221507.zip.
 
 This section supersedes earlier browser-closure entries that describe Gate5B12 as open.

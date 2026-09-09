@@ -1162,5 +1162,5 @@ Browser closure execution note — 2026-09-07:
 - [x] [01e-custom-year-view] validates Text Filter + Money Sort ownership per Work Year.
 - [x] 1,200-edit large Save PASS.
 - [x] Browser trace/screenshot evidence captured.
-- [ ] Employee Real Workday 00-17 rerun on rebuilt machine remains pending.
+- [x] Employee Real Workday 00-17 rerun on rebuilt machine PASS through [00]-[17].
 - [ ] Rename/current column-menu parity remains outside this recovery closure.

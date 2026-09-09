@@ -562,3 +562,11 @@ Purpose: chronological receipt of material work. This file is append-only during
 - Final [01e] blocker was a test contract defect: Text owns Filter; Money owns Sort.
 - Forced clean E2E rebuild removed stale compiled test output.
 - Final evidence archive: ERP_REVO_GATE5B12_TRACE_20260909-215933.zip.
+
+## 2026-09-09 — CLEAN-MACHINE-RECOVERY-FULL-CLOSURE
+
+- Employee Real Workday master rerun on the rebuilt machine: FULL PASS.
+- Passed [00-login] through [17-arabic-ui].
+- Covered Selection, Sort/Filter, Clipboard, History, Structure, Aggregates, Validation, SQL Save, snapshot semantics, new-row identity, persisted Delete, cross-year move, 1,200-edit Save, concurrency rejection, and Arabic UI.
+- Final evidence: ERP_REVO_EMPLOYEE_REAL_WORKDAY_TRACE_20260909-221507.zip.
+- Clean-machine recovery is now fully evidenced together with Build PASS, SQL Integration 34/34 PASS, Phase 9.3D PASS, and Gate5B12 FULL PASS.
