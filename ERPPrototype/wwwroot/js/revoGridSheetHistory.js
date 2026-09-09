@@ -287,6 +287,30 @@ export function createRevoGridSheetHistory(options = {}) {
         };
     }
 
+    function discardWhere(predicate) {
+        if (pendingReplay) {
+            throw new RevoGridSheetHistoryError(
+                "REPLAY_ACTIVE",
+                "History cannot be reconciled while Undo/Redo replay is active."
+            );
+        }
+        if (typeof predicate !== "function") {
+            throw new RevoGridSheetHistoryError("INVALID_ARGUMENT", "predicate is required.");
+        }
+
+        const discard = stack => {
+            for (let index = stack.length - 1; index >= 0; index -= 1) {
+                if (!predicate(cloneValue(stack[index]))) continue;
+                removeBytes(stack[index]);
+                stack.splice(index, 1);
+            }
+        };
+        discard(undoStack);
+        discard(redoStack);
+        revision += 1;
+        return getState();
+    }
+
     return Object.freeze({
         record,
         planUndo,
@@ -295,6 +319,7 @@ export function createRevoGridSheetHistory(options = {}) {
         cancelReplay,
         resetDataset,
         getState,
-        getSnapshot
+        getSnapshot,
+        discardWhere
     });
 }

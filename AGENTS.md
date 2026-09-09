@@ -1,15 +1,10 @@
-# CURRENT REVO CHECKPOINT — 2026-08-30
+﻿# ERP AI BOOTSTRAP
 
-Accepted code checkpoint: `0e7a6be512f92fe076f21261b86da5079897d48e`.
+If `AI_CONTROL_CENTER.md` is present or re-uploaded, treat it as the mandatory refresh router and follow its read order before the ERP response/action. Otherwise, before substantial work, read `AI_CURRENT_STATE.md` first. For Grid missions, also read the relevant rows in `ERPPrototype/Documentation/AI_GRID_REFERENCE_MATRIX.md`.
 
-Current isolated Revo route: `/work-orders-revogrid-gate5b11`.
+`AI_CURRENT_STATE.md` holds the active mission and approved current behavior. It is not proof of implementation: current Git/worktree, current code, and executed test evidence override stale narrative state.
 
-Gate 5B-11 Snapshot-safe Save is accepted.
-Selection Core V4R3 is accepted as post-B11 hardening.
-
-The next bounded mission is Real DB Save using the existing B11 snapshot handshake.
-
-Do not reopen Selection architecture unless new regression evidence proves a real defect.
+Do not hardcode a changing Revo checkpoint or next mission in this file. Keep this file as the stable engineering contract and keep changing mission state in `AI_CURRENT_STATE.md`.
 
 ---
 
@@ -19,12 +14,10 @@ Do not reopen Selection architecture unless new regression evidence proves a rea
 
 Current repository engineering contract.
 
-The current code, migrations, tests, and checked-out Git snapshot are the authority for implemented reality.
+Active mission/checkpoint state lives only in root `AI_CURRENT_STATE.md`; do not duplicate changing checkpoint facts here.
+The current code, migrations, tests, and checked-out Git/worktree snapshot are the authority for implemented reality.
 Business rules are canonical in `ERPPrototype/Documentation/15_BUSINESS_DOMAIN_AND_PERMISSIONS.md`.
 Chronological accepted decisions are recorded in `ERPPrototype/Documentation/08_DECISIONS_LOG.md`.
-
-Current stable Revo code checkpoint: `86eb2ff3ce51addc2046133c820dd5dc75bfd08f` / `/work-orders-revogrid-gate5b10`.
-Gate 5B-10 Header Selection is accepted after real-browser regression and user manual verification. The next bounded Revo mission is the snapshot-safe Save contract, followed by real DB Save and concurrency/recovery.
 
 ## Current working model
 
@@ -32,6 +25,30 @@ Engineering judgment stays with the main AI/engineer reviewing the real reposito
 Local scripts, Git, Build, tests, browser automation, and diagnostics are execution/evidence tools; they do not replace engineering judgment.
 
 The former Native V1 / AI-Team workflow is historical only. Its receipts, prompts, tools, and archived infrastructure may remain for evidence, but they are not mandatory gates and must not be revived as the default workflow.
+
+
+## HARD SAME-CHAT STATE GATE
+
+For every ERP-project response or action, do not rely on conversational memory alone. Before reasoning from project state:
+
+1. if root `AI_CONTROL_CENTER.md` is available, read/follow it first;
+2. read root `AI_CURRENT_STATE.md`;
+3. read the latest relevant entries in `ERPPrototype/Documentation/AI_WORK_LOG.md`;
+4. treat the newest user message as the newest approved source for behavior;
+5. if the newest turn changes a decision, test result, code state, blocker, scope, or next action, synchronize the compact state before continuing;
+6. if a fact is missing from the compact state but matters to the answer, recover it from current code/Git/test evidence or the work log instead of guessing.
+
+After every material event — approved behavior, implementation result, test result, rollback, discovered risk, scope change, or checkpoint — update the compact state and append a work-log receipt. When the event changes a canonical behavior/decision/test/reference/workflow truth, update that owning document in the same step. At checkpoint boundaries, prune superseded detail from the compact state.
+
+At major evidence milestones, before a handoff/context export, and before any checkpoint/mission closure, run `ERPPrototype/Tools/AI/Test-AIMemoryConsistency.ps1`. A documentation-integrity `FAIL` is a stop condition: repair the drift before continuing engineering work.
+
+This is a hard workflow gate, not a reminder. The purpose is to make the file-backed live state the working memory during the same chat, so the assistant does not depend on remembering dozens of prior turns.
+
+If the assistant cannot access the live state file in the current environment, it must say that continuity is degraded and reconstruct the minimum current state from available evidence before making a material project decision.
+
+## Live continuity
+
+During the same chat, do not rely on conversation context alone. Keep root `AI_CURRENT_STATE.md` current after material decisions/tests/code changes, append chronological receipts to `ERPPrototype/Documentation/AI_WORK_LOG.md`, and prune superseded detail from the compact state at checkpoint boundaries.
 
 ## Before substantial work
 
@@ -64,6 +81,25 @@ For important Grid behavior, Save, validation, data integrity, permissions, conc
 4. give the user a short manual browser test and require user acceptance before final closure;
 5. commit/push only after the accepted candidate is stable.
 
+For **user hands-on/manual ERP runs after source changes**, enforce runtime freshness before interpreting behavior: resolve the real Git root/project, stop the current listener, remove the app `bin`/`obj`, build the real project, do not start if Build fails, run without `--no-build`, open a new browser tab, and verify the loaded module version when JavaScript/Razor cache keys changed. `--no-build` remains acceptable only inside a controlled automated harness after its matching build-configuration gate has passed.
+
+Generated project PowerShell must be compatible with the user's Windows PowerShell 5.1 environment unless a newer runtime is explicitly verified. Installers must preflight shell/runtime/path/hash requirements before copying product files so a tooling failure cannot leave an unplanned partial apply.
+
+## Test-hardening scope guard
+
+A verification/closure pass is allowed to improve tests, diagnostics, fixtures, and documentation. It must **not silently add, remove, or redesign employee-visible product behavior**.
+
+If reviewing tests reveals that an approved capability is missing from the current Revo surface:
+
+1. stop the test-hardening implementation at that boundary;
+2. classify the finding as a product/parity gap rather than “just another test”;
+3. when the capability exists or is likely to exist in legacy Tabulator, inspect that exact Tabulator behavior/code/tests first, then inspect the current Revo Community mechanics/integration and relevant official evidence;
+4. explain the recovered behavior and any material differences to the user;
+5. obtain user approval before changing product runtime code;
+6. only then implement the smallest parity slice and return to test hardening.
+
+For existing Work Orders features being migrated from Tabulator to Revo, Tabulator is the mandatory **behavior reference** even though its architecture is not automatically copied.
+
 ## Review rule
 
 Review at candidate boundaries, not after every edit.
@@ -95,6 +131,8 @@ Unless an approved mission explicitly changes it, preserve:
 - Filter-pruned rows leave row selection and must not be silently targeted by new row/cell mutations;
 - dirty changes made before a later Filter hides a row remain eligible for Save.
 
+For Grid behavior/architecture changes, run the Grid Reference Pass first: compare current Tabulator behavior/code/tests, current installed RevoGrid Community integration plus official source/docs/examples, and relevant RevoGrid Pro docs/examples/source when actual access exists. Never claim Pro source-level evidence from docs alone.
+
 RevoGrid Community owns native cell range/focus/keyboard/edit/virtualization mechanics where practical.
 ERP may add only the missing semantic whole-row/whole-column Ctrl/Shift selection needed by the product; do not create a second full selection engine or DOM-scanning selection painter.
 ERP owns business semantics, validation, financial rules, Dirty/Save meaning, permissions, persistence identity, business history, and specialist workflows.
@@ -110,41 +148,28 @@ Important outcomes must be explained briefly in Arabic using the Work Orders beh
 
 ## USER COMMUNICATION STYLE — ERP PROTOTYPE
 
-When communicating with the user about ERP Prototype:
+When communicating with the user about ERP Prototype, aim for **مختصر مفيد**: keep every important fact needed to understand the logic and decision, but remove repetition, implementation noise, and history that does not affect the current question.
 
-1. Start with what actually happens in the ERP or what the problem is.
-2. Explain the practical effect on the employee, manager, data, or workflow.
-3. Give the decision/recommendation and explain why.
-4. Give one practical ERP example when it improves understanding.
-5. Technical/code details come only after the logic, and only when they affect the decision or execution.
+The user is not a programmer but understands logic well. Explain the program as a sequence of cause and effect before technical detail: what happens inside the program, why it matters, what decision follows, and a practical ERP example when it makes the behavior easier to understand.
 
-The user understands logic well but is not a programmer.
+Use natural Egyptian Arabic by default. Review and understand the implementation at full technical depth internally, but explain it to the user at the program/ERP logic level first. Mention class names, function names, file names, or low-level implementation detail only when they are necessary to understand a concrete risk/decision, to diagnose a specific issue, or when the user explicitly asks for code-level detail.
 
-Required style:
-- concise but sufficiently explained
-- logic-first
-- practical ERP examples
-- no superficial summaries
-- no long technical essays
-- no unnecessary architecture diagrams
-- no repeating the same point in different words
-- do not sacrifice clarity just to make the response shorter
+Do not use fixed word counts, paragraph counts, or artificial limits on examples. Let the complexity of the decision determine the length. The default presentation should use **a small number of fuller paragraphs rather than many short stacked lines or long bullet lists**. Use bullets only when they genuinely make several distinct options, states, or steps easier to compare.
 
-Preferred response shape:
+Communication rules:
 
-Problem:
-<what is actually happening>
+- answer the user's current question first and stay on the current decision;
+- keep all material information that changes the user's understanding, risk, or next action;
+- do not replay settled project history unless it is needed to explain the current result;
+- prefer concrete ERP examples over abstract programming terminology;
+- introduce technical terms only when they help explain the decision, and explain them in plain language;
+- distinguish **exists now**, **proposed**, **tested**, and **inferred** when that distinction matters;
+- do not repeat the same conclusion in different wording;
+- do not compress so aggressively that the user loses the reason or consequence;
+- when the user asks for a deep review, do the deep reasoning internally and return the important findings, risks, and decision in an understandable form rather than dumping the investigation.
 
-Effect:
-<what this means inside the ERP>
+Preferred logical flow (labels are optional):
 
-Decision:
-<what we should do and why>
+**What happens? → Why does it matter? → What do we recommend and why? → Example if useful.**
 
-Example:
-<one practical example if useful>
-
-Technical details:
-<only when necessary>
-
-If a response becomes long, prioritize the decision and one clear example, then provide additional technical detail only when it is needed.
+Before sending a substantial reply, remove repeated facts, unnecessary code-level detail, and fragmented formatting. Keep the cause/effect logic and the information the user needs to make or understand the decision.

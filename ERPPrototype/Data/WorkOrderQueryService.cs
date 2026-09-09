@@ -138,6 +138,7 @@ public sealed class WorkOrderQueryService(
         var customColumns = await CustomColumnService.LoadDefinitionsAsync(
             dbContext,
             userScope.DepartmentId,
+            workYear,
             cancellationToken);
 
         RecordPerformanceStage(

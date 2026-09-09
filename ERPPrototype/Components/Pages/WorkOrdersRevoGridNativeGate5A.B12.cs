@@ -31,10 +31,20 @@ public partial class WorkOrdersRevoGridNativeGate5A
             return;
         }
 
-        if (!string.IsNullOrWhiteSpace(PendingCommittedB12SaveId) &&
-            PendingCommittedB12Reconcile is not null)
+        if (!string.IsNullOrWhiteSpace(PendingCommittedB12SaveId))
         {
-            await RetryCommittedB12ReconcileAsync();
+            if (PendingCommittedB12Reconcile is not null)
+            {
+                await RetryCommittedB12ReconcileAsync();
+            }
+            else
+            {
+                // SQL already committed, but the local reconcile payload could
+                // not be constructed. Never execute this Save generation again.
+                OperationMessage =
+                    "تم الحفظ في قاعدة البيانات، لكن تعذر تجهيز تحديث الشيت محليًا. أعد تحميل الصفحة؛ لن يتم إرسال SQL مرة أخرى.";
+                StateHasChanged();
+            }
             return;
         }
 
@@ -65,7 +75,7 @@ public partial class WorkOrdersRevoGridNativeGate5A
                 {
                     "clean" => "لا توجد تغييرات للحفظ.",
                     "validation" => "تعذر الحفظ: أصلح الخلايا غير الصحيحة أولًا.",
-                    "custom-columns-pending" => "احفظ/ألغِ تغييرات الأعمدة المخصصة قبل حفظ الصفوف.",
+                    "custom-columns-pending" => "تعذر التقاط تغييرات الأعمدة المخصصة مؤقتًا.",
                     "save-active" => "عملية حفظ أخرى ما زالت جارية.",
                     _ => "الحفظ غير متاح مؤقتًا أثناء انشغال الشيت."
                 };
@@ -133,7 +143,7 @@ public partial class WorkOrdersRevoGridNativeGate5A
                 throw;
             }
 
-            if (contract.SchemaVersion != 1)
+            if (contract.SchemaVersion != 2)
             {
                 throw new InvalidOperationException(
                     $"Unsupported B12 persistence schema version {contract.SchemaVersion}.");
@@ -216,6 +226,8 @@ public partial class WorkOrdersRevoGridNativeGate5A
                 preparation.AddedWorkOrders,
                 preparation.ChangedWorkOrders,
                 preparation.DeletedWorkOrders,
+                contract.CustomColumns,
+                contract.CustomColumnsChanged,
                 performanceStages: serviceStages);
             Logger.LogInformation(
                 "[B12-PERF] phase=work-order-service elapsedMs={ElapsedMs:F1} succeeded={Succeeded} stages={StageCount}",
@@ -238,6 +250,13 @@ public partial class WorkOrdersRevoGridNativeGate5A
                 return;
             }
 
+            // SaveChangesAsync returns success only after the transaction has
+            // committed. Mark that boundary before any browser-reconcile work
+            // so a later local exception can never cause the same SQL Save to
+            // run again.
+            PendingCommittedB12SaveId = decision.SaveId;
+            PendingCommittedB12MovedCount = preparation.MovedToOtherYearsCount;
+
             var reconcileStartedAt = Stopwatch.GetTimestamp();
             var reconcile = BuildB12ReconcileResult(result, preparation);
             Logger.LogInformation(
@@ -245,9 +264,7 @@ public partial class WorkOrdersRevoGridNativeGate5A
                 ElapsedB12Ms(reconcileStartedAt),
                 reconcile.SavedRows.Count,
                 reconcile.RemovedClientKeys.Count);
-            PendingCommittedB12SaveId = decision.SaveId;
             PendingCommittedB12Reconcile = reconcile;
-            PendingCommittedB12MovedCount = preparation.MovedToOtherYearsCount;
 
             var acceptStartedAt = Stopwatch.GetTimestamp();
             var accepted =
@@ -284,15 +301,15 @@ public partial class WorkOrdersRevoGridNativeGate5A
         {
             Logger.LogError(exception, "Gate 5B-12 real database Save failed.");
 
-            if (!string.IsNullOrWhiteSpace(PendingCommittedB12SaveId) &&
-                PendingCommittedB12Reconcile is not null)
+            if (!string.IsNullOrWhiteSpace(PendingCommittedB12SaveId))
             {
-                // SQL commit is already known to have succeeded. Keep the
-                // accepted server result locally and never execute SQL again
-                // for this Save generation. The next Save click retries only
-                // browser reconciliation.
-                OperationMessage =
-                    "تم الحفظ في قاعدة البيانات، لكن تعذر تحديث الشيت محليًا. اضغط Save لإعادة تطبيق نتيجة الحفظ فقط؛ لن يتم إرسال SQL مرة أخرى.";
+                // SQL commit is already known to have succeeded. Never reject
+                // this generation back into a fresh SQL Save. If the reconcile
+                // payload exists, Save retries browser reconciliation only; if
+                // payload construction failed, a page reload is the safe path.
+                OperationMessage = PendingCommittedB12Reconcile is not null
+                    ? "تم الحفظ في قاعدة البيانات، لكن تعذر تحديث الشيت محليًا. اضغط Save لإعادة تطبيق نتيجة الحفظ فقط؛ لن يتم إرسال SQL مرة أخرى."
+                    : "تم الحفظ في قاعدة البيانات، لكن تعذر تجهيز تحديث الشيت محليًا. أعد تحميل الصفحة؛ لن يتم إرسال SQL مرة أخرى.";
             }
             else
             {
@@ -497,7 +514,9 @@ public partial class WorkOrdersRevoGridNativeGate5A
                 WorkOrderValue = workOrderValue,
                 PartialAmount = partialAmount,
                 Busket = row.Basket ?? string.Empty,
-                CustomValuesJson = BuildB12CustomValuesJson(row)
+                CustomValuesJson = BuildB12CustomValuesJson(
+                    row,
+                    contract.CustomColumns)
             };
 
             var clientKey = changed.ClientKey?.Trim() ?? string.Empty;
@@ -553,24 +572,37 @@ public partial class WorkOrdersRevoGridNativeGate5A
         }
 
         var reconcile = new NativeGate5B12ReconcileResult();
+        reconcile.SavedCustomColumns = (result.SavedCustomColumns ?? []).ToList();
 
         foreach (var saved in result.SavedRecords ?? [])
         {
-            if (!preparation.ClientKeyByDatabaseId.TryGetValue(saved.Id, out var clientKey))
-            {
-                throw new InvalidOperationException(
-                    $"Could not resolve ClientKey for saved Work Order {saved.Id}.");
-            }
+            var hasClientKey =
+                preparation.ClientKeyByDatabaseId.TryGetValue(
+                    saved.Id,
+                    out var clientKey);
 
             if (saved.WorkYear != SelectedWorkYear)
             {
-                reconcile.RemovedClientKeys.Add(clientKey);
+                // Cross-year moves originate from an explicit browser row, so
+                // the browser-owned ClientKey must already be known here.
+                if (!hasClientKey)
+                {
+                    throw new InvalidOperationException(
+                        $"Could not resolve ClientKey for moved Work Order {saved.Id}.");
+                }
+
+                reconcile.RemovedClientKeys.Add(clientKey!);
                 continue;
             }
 
+            // Deleting a persisted Custom Column can update Work Orders that
+            // were not directly edited in the browser because their JSON values
+            // must be removed and their SQL RowVersion advances. Those rows do
+            // not exist in the compact browser Save projection, so let the
+            // browser resolve its own ClientKey from the returned database Id.
             var row = new NativeGate5ARow
             {
-                ClientKey = clientKey,
+                ClientKey = hasClientKey ? clientKey! : string.Empty,
                 Id = saved.Id,
                 DisplayOrder = saved.DisplayOrder,
                 WorkOrderNumber = saved.WorkOrderNumber,
@@ -610,10 +642,13 @@ public partial class WorkOrdersRevoGridNativeGate5A
         return reconcile;
     }
 
-    private string BuildB12CustomValuesJson(NativeGate5B12InputRow row)
+    private static string BuildB12CustomValuesJson(
+        NativeGate5B12InputRow row,
+        IReadOnlyCollection<CustomColumnDefinitionInput> snapshotColumns)
     {
         var values = new Dictionary<string, string>(StringComparer.Ordinal);
-        var allowedKeys = CustomColumns
+        var allowedKeys = snapshotColumns
+            .Where(column => !column.IsDeleted)
             .Select(column => column.FieldKey)
             .ToHashSet(StringComparer.Ordinal);
 
@@ -797,6 +832,8 @@ public partial class WorkOrdersRevoGridNativeGate5A
         public string Id { get; set; } = string.Empty;
         public string DatasetKey { get; set; } = string.Empty;
         public long Revision { get; set; }
+        public bool CustomColumnsChanged { get; set; }
+        public List<CustomColumnDefinitionInput> CustomColumns { get; set; } = [];
         public List<NativeGate5B12ChangedRecord> ChangedRecords { get; set; } = [];
         public List<NativeGate5B12DeletedRecord> DeletedRecords { get; set; } = [];
     }
@@ -871,5 +908,6 @@ public partial class WorkOrdersRevoGridNativeGate5A
     {
         public List<NativeGate5ARow> SavedRows { get; set; } = [];
         public List<string> RemovedClientKeys { get; set; } = [];
+        public List<CustomColumnDefinitionData> SavedCustomColumns { get; set; } = [];
     }
 }

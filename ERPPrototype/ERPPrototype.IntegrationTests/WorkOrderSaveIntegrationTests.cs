@@ -675,9 +675,9 @@ internal sealed class WorkOrderSaveIntegrationTests(
             "The other-year sheet could not be loaded.");
 
         TestAssert.Equal(
-            4,
+            0,
             sameDepartmentOtherYear!.CustomColumns.Count,
-            "Custom columns did not remain available across years in the same department.");
+            "A 2026 custom column leaked into the 2025 sheet.");
 
         var otherDepartmentSheet =
             await database.Service.LoadSheetAsync(
@@ -974,12 +974,9 @@ internal sealed class WorkOrderSaveIntegrationTests(
             otherYear,
             "The other-year sheet could not be loaded after the custom column rename.");
 
-        TestAssert.True(
-            otherYear!.CustomColumns.Any(column =>
-                column.FieldKey == fieldKey &&
-                column.Name == "Permit Reference Renamed" &&
-                column.DataType == "Text"),
-            "The renamed custom column did not remain consistent across years.");
+        TestAssert.False(
+            otherYear!.CustomColumns.Any(column => column.FieldKey == fieldKey),
+            "Renaming a 2026 custom column changed the 2025 catalogue.");
     }
 
     public async Task CustomColumnTypeIsImmutableAfterCreationAsync()
@@ -1163,8 +1160,14 @@ internal sealed class WorkOrderSaveIntegrationTests(
             deletedRecords: [],
             customColumns: previousSheet!.CustomColumns
                 .Select(ToCustomColumnInput)
+                .Append(new CustomColumnDefinitionInput(
+                    0,
+                    fieldKey,
+                    "Temporary Across Years",
+                    "Text",
+                    5_500_000_000_000L))
                 .ToList(),
-            customColumnsChanged: false,
+            customColumnsChanged: true,
             columnLayouts: previousSheet.ColumnLayouts
                 .Select(layout => new DepartmentColumnLayoutInput(
                     layout.Id,
@@ -1209,10 +1212,10 @@ internal sealed class WorkOrderSaveIntegrationTests(
                 column.FieldKey == fieldKey),
             "The deleted custom-column definition remained in the save result.");
 
-        TestAssert.False(
+        TestAssert.True(
             deleteResult.SavedColumnLayouts!.Any(layout =>
                 layout.FieldKey == fieldKey),
-            "The deleted custom column retained a saved width layout.");
+            "The 2025 column lost its shared layout when 2026 was deleted.");
 
         var storedCurrent = await database.ReadWorkOrderAsync(
             currentYearOrder.Id);
@@ -1225,11 +1228,11 @@ internal sealed class WorkOrderSaveIntegrationTests(
                 .ContainsKey(fieldKey),
             "Deleting the custom column did not remove its current-year value.");
 
-        TestAssert.False(
+        TestAssert.Equal(
+            "previous",
             CustomColumnService.DeserializeValues(
-                storedPrevious!.CustomValuesJson)
-                .ContainsKey(fieldKey),
-            "Deleting the custom column did not remove its previous-year value.");
+                storedPrevious!.CustomValuesJson)[fieldKey],
+            "Deleting the 2026 custom column removed a 2025 value.");
 
         var currentAfterDelete = await database.Service.LoadSheetAsync(
             database.EmployeeAId,
@@ -1243,10 +1246,399 @@ internal sealed class WorkOrderSaveIntegrationTests(
                 column.FieldKey == fieldKey),
             "The deleted custom column remained in the current-year sheet.");
 
-        TestAssert.False(
+        TestAssert.True(
             previousAfterDelete!.CustomColumns.Any(column =>
                 column.FieldKey == fieldKey),
-            "The deleted custom column remained in the previous-year sheet.");
+            "Deleting the 2026 definition removed the 2025 definition.");
+    }
+
+
+    public async Task DeletingTwoValuedCustomColumnsReturnsImplicitlyAffectedRowAsync()
+    {
+        const int workYear = 2088;
+        const string firstFieldKey = "custom_44444444444444444444444444444444";
+        const string secondFieldKey = "custom_55555555555555555555555555555555";
+
+        var workOrder = await database.SeedWorkOrderAsync(
+            database.DepartmentAId,
+            database.EmployeeAId,
+            "810000888",
+            "888",
+            workYear,
+            "two-valued-custom-column-delete");
+
+        var withValues = IntegrationTestDatabase.Clone(workOrder);
+        withValues.CustomValuesJson = JsonSerializer.Serialize(
+            new Dictionary<string, string>
+            {
+                [firstFieldKey] = "first-delete-value",
+                [secondFieldKey] = "second-delete-value"
+            });
+
+        var prepared = await database.Service.SaveChangesAsync(
+            database.EmployeeAId,
+            workYear,
+            [],
+            [new WorkOrderChangeSet(withValues, CustomValuesOnly)],
+            [],
+            [
+                new CustomColumnDefinitionInput(
+                    0,
+                    firstFieldKey,
+                    "Delete Pair First",
+                    "Text",
+                    8_880_000_000_000L),
+                new CustomColumnDefinitionInput(
+                    0,
+                    secondFieldKey,
+                    "Delete Pair Second",
+                    "Text",
+                    8_890_000_000_000L)
+            ],
+            true);
+
+        TestAssert.True(
+            prepared.Succeeded,
+            $"Preparing the two-valued delete fixture failed: {prepared.ErrorMessage}");
+
+        var persistedBeforeDelete = await database.ReadWorkOrderAsync(workOrder.Id);
+        TestAssert.NotNull(
+            persistedBeforeDelete,
+            "The two-valued delete fixture Work Order disappeared before Delete.");
+
+        var deleteInputs = prepared.SavedCustomColumns!
+            .Select(column => new CustomColumnDefinitionInput(
+                column.Id,
+                column.FieldKey,
+                column.Name,
+                column.DataType,
+                column.LayoutOrder,
+                column.RowVersion,
+                IsDeleted: column.FieldKey == firstFieldKey ||
+                    column.FieldKey == secondFieldKey))
+            .ToList();
+
+        var deleted = await database.Service.SaveChangesAsync(
+            database.EmployeeAId,
+            workYear,
+            addedRecords: [],
+            changedRecords: Array.Empty<WorkOrderChangeSet>(),
+            deletedRecords: [],
+            customColumns: deleteInputs,
+            customColumnsChanged: true,
+            columnLayouts: [],
+            columnLayoutsChanged: false);
+
+        TestAssert.True(
+            deleted.Succeeded,
+            $"Deleting two valued Custom Columns failed: {deleted.ErrorMessage}");
+
+        TestAssert.False(
+            deleted.SavedCustomColumns!.Any(column =>
+                column.FieldKey == firstFieldKey ||
+                column.FieldKey == secondFieldKey),
+            "One of the deleted Custom Column definitions remained in the Save result.");
+
+        var returnedAffectedRow = deleted.SavedRecords!
+            .Single(record => record.Id == workOrder.Id);
+        var returnedValues = CustomColumnService.DeserializeValues(
+            returnedAffectedRow.CustomValuesJson);
+
+        TestAssert.False(
+            returnedValues.ContainsKey(firstFieldKey) ||
+            returnedValues.ContainsKey(secondFieldKey),
+            "The Save result returned stale values for a row implicitly changed by Custom Column cleanup.");
+
+        var storedAfterDelete = await database.ReadWorkOrderAsync(workOrder.Id);
+        TestAssert.NotNull(
+            storedAfterDelete,
+            "Deleting Custom Columns unexpectedly deleted the owning Work Order.");
+
+        var storedValues = CustomColumnService.DeserializeValues(
+            storedAfterDelete!.CustomValuesJson);
+        TestAssert.False(
+            storedValues.ContainsKey(firstFieldKey) ||
+            storedValues.ContainsKey(secondFieldKey),
+            "SQL retained a value from one of the two deleted Custom Columns.");
+
+        TestAssert.True(
+            !storedAfterDelete.RowVersion.SequenceEqual(
+                persistedBeforeDelete!.RowVersion),
+            "Deleting two valued Custom Columns did not advance the affected Work Order RowVersion.");
+        TestAssert.True(
+            returnedAffectedRow.RowVersion.SequenceEqual(
+                storedAfterDelete.RowVersion),
+            "The Save result did not return the authoritative RowVersion for the implicitly affected Work Order.");
+    }
+
+
+    public async Task MovedWorkOrderCreatesDestinationColumnsAndRemapsValuesAsync()
+    {
+        const string fieldKey = "custom_99999999999999999999999999999999";
+        const string columnName = "Move Permit Reference 810000099";
+        var source = await database.SeedWorkOrderAsync(
+            database.DepartmentAId, database.EmployeeAId,
+            "810000099", "499", 2026, "custom-column-move");
+        var sourceColumn = new CustomColumnDefinitionInput(
+            0, fieldKey, columnName, "Text", 8_000_000_000_000L);
+        var sourceSheet = await database.Service.LoadSheetAsync(
+            database.EmployeeAId,
+            2026);
+
+        TestAssert.NotNull(
+            sourceSheet,
+            "The source-year sheet could not be loaded before preparing the move.");
+
+        var sourceColumns = sourceSheet!.CustomColumns
+            .Select(ToCustomColumnInput)
+            .Append(sourceColumn)
+            .ToList();
+        var withValue = IntegrationTestDatabase.Clone(source);
+        withValue.CustomValuesJson = JsonSerializer.Serialize(
+            new Dictionary<string, string> { [fieldKey] = "permit-99" });
+
+        var created = await database.Service.SaveChangesAsync(
+            database.EmployeeAId, 2026, [],
+            [new WorkOrderChangeSet(withValue, CustomValuesOnly)], [],
+            sourceColumns, true);
+        TestAssert.True(created.Succeeded, $"Source custom value failed: {created.ErrorMessage}");
+
+        var move = IntegrationTestDatabase.Clone((await database.ReadWorkOrderAsync(source.Id))!);
+        move.AssignmentDate = new DateTime(2025, 3, 1);
+        var moved = await database.Service.SaveChangesAsync(
+            database.EmployeeAId, 2026, [],
+            [new WorkOrderChangeSet(move, AssignmentDateOnly)], []);
+        TestAssert.True(moved.Succeeded, $"Moving custom value failed: {moved.ErrorMessage}");
+
+        var destination = await database.Service.LoadSheetAsync(database.EmployeeAId, 2025);
+        TestAssert.True(destination!.CustomColumns.Any(column =>
+            column.Name == columnName && column.DataType == "Text"),
+            "The destination custom column was not created.");
+        var stored = await database.ReadWorkOrderAsync(source.Id);
+        var destinationFieldKey = destination.CustomColumns.Single(column =>
+            column.Name == columnName && column.DataType == "Text").FieldKey;
+        TestAssert.Equal("permit-99", CustomColumnService.DeserializeValues(
+            stored!.CustomValuesJson)[destinationFieldKey],
+            "The moved custom value was not remapped to the destination field.");
+    }
+
+    public async Task MovedWorkOrderCreatesColumnWhenDestinationYearHasNoCustomDefinitionsAsync()
+    {
+        const int sourceYear = 2099;
+        const int destinationYear = 2098;
+        const string fieldKey = "custom_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+
+        var source = await database.SeedWorkOrderAsync(
+            database.DepartmentAId,
+            database.EmployeeAId,
+            "810000199",
+            "599",
+            sourceYear,
+            "custom-column-empty-destination");
+
+        var sourceColumn = new CustomColumnDefinitionInput(
+            0,
+            fieldKey,
+            "Empty Destination Permit",
+            "Text",
+            8_100_000_000_000L);
+
+        var withValue = IntegrationTestDatabase.Clone(source);
+        withValue.CustomValuesJson = JsonSerializer.Serialize(
+            new Dictionary<string, string>
+            {
+                [fieldKey] = "permit-empty-year"
+            });
+
+        var created = await database.Service.SaveChangesAsync(
+            database.EmployeeAId,
+            sourceYear,
+            [],
+            [new WorkOrderChangeSet(withValue, CustomValuesOnly)],
+            [],
+            [sourceColumn],
+            true);
+
+        TestAssert.True(
+            created.Succeeded,
+            $"Preparing the empty-destination move failed: {created.ErrorMessage}");
+
+        var destinationBeforeMove = await database.Service.LoadSheetAsync(
+            database.EmployeeAId,
+            destinationYear);
+
+        TestAssert.Equal(
+            0,
+            destinationBeforeMove!.CustomColumns.Count,
+            "The break test requires a destination year with no custom definitions.");
+
+        var move = IntegrationTestDatabase.Clone(
+            (await database.ReadWorkOrderAsync(source.Id))!);
+        move.AssignmentDate = new DateTime(destinationYear, 3, 1);
+
+        var moved = await database.Service.SaveChangesAsync(
+            database.EmployeeAId,
+            sourceYear,
+            [],
+            [new WorkOrderChangeSet(move, AssignmentDateOnly)],
+            []);
+
+        TestAssert.True(
+            moved.Succeeded,
+            $"Moving into a year with no custom definitions failed: {moved.ErrorMessage}");
+
+        var destinationAfterMove = await database.Service.LoadSheetAsync(
+            database.EmployeeAId,
+            destinationYear);
+        var destinationColumn = destinationAfterMove!.CustomColumns.Single(column =>
+            column.Name == "Empty Destination Permit" &&
+            column.DataType == "Text");
+        var stored = await database.ReadWorkOrderAsync(source.Id);
+
+        TestAssert.Equal(
+            sourceColumn.LayoutOrder,
+            destinationColumn.LayoutOrder,
+            "A column auto-created in an empty destination year did not preserve its source-year position.");
+
+        TestAssert.Equal(
+            "permit-empty-year",
+            CustomColumnService.DeserializeValues(
+                stored!.CustomValuesJson)[destinationColumn.FieldKey],
+            "The value was not preserved when the destination year started with no custom definitions.");
+    }
+
+    public async Task MovedRowsReuseSingleDestinationColumnWhenNameTypeConflictsAsync()
+    {
+        const int sourceYear = 2097;
+        const int destinationYear = 2096;
+        const string sourceFieldKey = "custom_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+        const string conflictFieldKey = "custom_cccccccccccccccccccccccccccccccc";
+
+        var destinationConflict = new CustomColumnDefinitionInput(
+            0,
+            conflictFieldKey,
+            "Permit Reference",
+            "Money",
+            8_200_000_000_000L);
+
+        var conflictCreated = await database.Service.SaveChangesAsync(
+            database.EmployeeAId,
+            destinationYear,
+            [],
+            [],
+            [],
+            [destinationConflict],
+            true);
+
+        TestAssert.True(
+            conflictCreated.Succeeded,
+            $"Preparing the destination type conflict failed: {conflictCreated.ErrorMessage}");
+
+        var first = await database.SeedWorkOrderAsync(
+            database.DepartmentAId,
+            database.EmployeeAId,
+            "810000297",
+            "697",
+            sourceYear,
+            "custom-column-conflict-batch-1");
+        var second = await database.SeedWorkOrderAsync(
+            database.DepartmentAId,
+            database.EmployeeAId,
+            "810000397",
+            "797",
+            sourceYear,
+            "custom-column-conflict-batch-2");
+
+        var sourceColumn = new CustomColumnDefinitionInput(
+            0,
+            sourceFieldKey,
+            "Permit Reference",
+            "Text",
+            8_300_000_000_000L);
+        var firstWithValue = IntegrationTestDatabase.Clone(first);
+        firstWithValue.CustomValuesJson = JsonSerializer.Serialize(
+            new Dictionary<string, string>
+            {
+                [sourceFieldKey] = "permit-first"
+            });
+        var secondWithValue = IntegrationTestDatabase.Clone(second);
+        secondWithValue.CustomValuesJson = JsonSerializer.Serialize(
+            new Dictionary<string, string>
+            {
+                [sourceFieldKey] = "permit-second"
+            });
+
+        var sourcePrepared = await database.Service.SaveChangesAsync(
+            database.EmployeeAId,
+            sourceYear,
+            [],
+            [
+                new WorkOrderChangeSet(firstWithValue, CustomValuesOnly),
+                new WorkOrderChangeSet(secondWithValue, CustomValuesOnly)
+            ],
+            [],
+            [sourceColumn],
+            true);
+
+        TestAssert.True(
+            sourcePrepared.Succeeded,
+            $"Preparing the source batch failed: {sourcePrepared.ErrorMessage}");
+
+        var firstMove = IntegrationTestDatabase.Clone(
+            (await database.ReadWorkOrderAsync(first.Id))!);
+        firstMove.AssignmentDate = new DateTime(destinationYear, 4, 1);
+        var secondMove = IntegrationTestDatabase.Clone(
+            (await database.ReadWorkOrderAsync(second.Id))!);
+        secondMove.AssignmentDate = new DateTime(destinationYear, 4, 2);
+
+        var moved = await database.Service.SaveChangesAsync(
+            database.EmployeeAId,
+            sourceYear,
+            [],
+            [
+                new WorkOrderChangeSet(firstMove, AssignmentDateOnly),
+                new WorkOrderChangeSet(secondMove, AssignmentDateOnly)
+            ],
+            []);
+
+        TestAssert.True(
+            moved.Succeeded,
+            $"Moving the conflicting batch failed: {moved.ErrorMessage}");
+
+        var destination = await database.Service.LoadSheetAsync(
+            database.EmployeeAId,
+            destinationYear);
+        var safeTextColumns = destination!.CustomColumns
+            .Where(column =>
+                column.DataType == "Text" &&
+                column.Name.StartsWith(
+                    $"Permit Reference ({sourceYear})",
+                    StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        TestAssert.Equal(
+            1,
+            safeTextColumns.Count,
+            "A multi-row move resolved the same destination column more than once.");
+        TestAssert.Equal(
+            sourceColumn.LayoutOrder,
+            safeTextColumns.Single().LayoutOrder,
+            "A name/type conflict changed the source column's layout position even though that position was free.");
+
+        var sharedFieldKey = safeTextColumns.Single().FieldKey;
+        var storedFirst = await database.ReadWorkOrderAsync(first.Id);
+        var storedSecond = await database.ReadWorkOrderAsync(second.Id);
+
+        TestAssert.Equal(
+            "permit-first",
+            CustomColumnService.DeserializeValues(
+                storedFirst!.CustomValuesJson)[sharedFieldKey],
+            "The first moved row did not use the shared destination column.");
+        TestAssert.Equal(
+            "permit-second",
+            CustomColumnService.DeserializeValues(
+                storedSecond!.CustomValuesJson)[sharedFieldKey],
+            "The second moved row did not use the shared destination column.");
     }
 
     private static CustomColumnDefinitionInput ToCustomColumnInput(
@@ -1259,6 +1651,329 @@ internal sealed class WorkOrderSaveIntegrationTests(
             column.LayoutOrder,
             column.RowVersion);
 
+    public async Task MovedWorkOrderReusesCompatibleDestinationColumnAsync()
+    {
+        const int sourceYear = 2095;
+        const int destinationYear = 2094;
+        const string sourceFieldKey = "custom_dddddddddddddddddddddddddddddddd";
+        const string destinationFieldKey = "custom_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+        const string columnName = "Reusable Permit Reference";
+
+        var destinationCreated = await database.Service.SaveChangesAsync(
+            database.EmployeeAId,
+            destinationYear,
+            [],
+            [],
+            [],
+            [
+                new CustomColumnDefinitionInput(
+                    0,
+                    destinationFieldKey,
+                    columnName,
+                    "Text",
+                    8_400_000_000_000L)
+            ],
+            true);
+
+        TestAssert.True(
+            destinationCreated.Succeeded,
+            $"Preparing the compatible destination column failed: {destinationCreated.ErrorMessage}");
+
+        var source = await database.SeedWorkOrderAsync(
+            database.DepartmentAId,
+            database.EmployeeAId,
+            "810000495",
+            "895",
+            sourceYear,
+            "custom-column-compatible-reuse");
+
+        var withValue = IntegrationTestDatabase.Clone(source);
+        withValue.CustomValuesJson = JsonSerializer.Serialize(
+            new Dictionary<string, string>
+            {
+                [sourceFieldKey] = "permit-reused"
+            });
+
+        var sourcePrepared = await database.Service.SaveChangesAsync(
+            database.EmployeeAId,
+            sourceYear,
+            [],
+            [new WorkOrderChangeSet(withValue, CustomValuesOnly)],
+            [],
+            [
+                new CustomColumnDefinitionInput(
+                    0,
+                    sourceFieldKey,
+                    columnName,
+                    "Text",
+                    8_500_000_000_000L)
+            ],
+            true);
+
+        TestAssert.True(
+            sourcePrepared.Succeeded,
+            $"Preparing the source compatible column failed: {sourcePrepared.ErrorMessage}");
+
+        var move = IntegrationTestDatabase.Clone(
+            (await database.ReadWorkOrderAsync(source.Id))!);
+        move.AssignmentDate = new DateTime(destinationYear, 5, 1);
+
+        var moved = await database.Service.SaveChangesAsync(
+            database.EmployeeAId,
+            sourceYear,
+            [],
+            [new WorkOrderChangeSet(move, AssignmentDateOnly)],
+            []);
+
+        TestAssert.True(
+            moved.Succeeded,
+            $"Moving into a compatible destination column failed: {moved.ErrorMessage}");
+
+        var destination = await database.Service.LoadSheetAsync(
+            database.EmployeeAId,
+            destinationYear);
+        var compatibleColumns = destination!.CustomColumns
+            .Where(column =>
+                column.Name == columnName &&
+                column.DataType == "Text")
+            .ToList();
+
+        TestAssert.Equal(
+            1,
+            compatibleColumns.Count,
+            "The move created a duplicate instead of reusing the compatible destination column.");
+        TestAssert.Equal(
+            destinationFieldKey,
+            compatibleColumns.Single().FieldKey,
+            "The move did not reuse the existing compatible destination field.");
+        TestAssert.Equal(
+            8_400_000_000_000L,
+            compatibleColumns.Single().LayoutOrder,
+            "Reusing a compatible destination column unexpectedly moved its existing layout position.");
+
+        var stored = await database.ReadWorkOrderAsync(source.Id);
+        var values = CustomColumnService.DeserializeValues(
+            stored!.CustomValuesJson);
+
+        TestAssert.Equal(
+            "permit-reused",
+            values[destinationFieldKey],
+            "The moved value was not remapped into the compatible destination column.");
+        TestAssert.False(
+            values.ContainsKey(sourceFieldKey),
+            "The moved row retained the source-year field key after compatible reuse.");
+    }
+
+    public async Task MovedCustomColumnsPreserveRelativeOrderWhenDestinationPositionIsOccupiedAsync()
+    {
+        const int sourceYear = 2091;
+        const int destinationYear = 2090;
+        const long firstSourceOrder = 8_700_000_000_000L;
+        const long secondSourceOrder = 8_800_000_000_000L;
+        const string firstSourceFieldKey = "custom_11111111111111111111111111111111";
+        const string secondSourceFieldKey = "custom_22222222222222222222222222222222";
+        const string blockingFieldKey = "custom_33333333333333333333333333333333";
+        const string firstColumnName = "Moved Layout First";
+        const string secondColumnName = "Moved Layout Second";
+        const string blockingColumnName = "Destination Existing Slot";
+
+        var destinationPrepared = await database.Service.SaveChangesAsync(
+            database.EmployeeAId,
+            destinationYear,
+            [],
+            [],
+            [],
+            [
+                new CustomColumnDefinitionInput(
+                    0,
+                    blockingFieldKey,
+                    blockingColumnName,
+                    "Text",
+                    firstSourceOrder)
+            ],
+            true);
+
+        TestAssert.True(
+            destinationPrepared.Succeeded,
+            $"Preparing the occupied destination position failed: {destinationPrepared.ErrorMessage}");
+
+        var source = await database.SeedWorkOrderAsync(
+            database.DepartmentAId,
+            database.EmployeeAId,
+            "810000691",
+            "091",
+            sourceYear,
+            "custom-column-layout-order-collision");
+
+        var sourceWithValues = IntegrationTestDatabase.Clone(source);
+        sourceWithValues.CustomValuesJson = JsonSerializer.Serialize(
+            new Dictionary<string, string>
+            {
+                [firstSourceFieldKey] = "first-layout-value",
+                [secondSourceFieldKey] = "second-layout-value"
+            });
+
+        var sourcePrepared = await database.Service.SaveChangesAsync(
+            database.EmployeeAId,
+            sourceYear,
+            [],
+            [new WorkOrderChangeSet(sourceWithValues, CustomValuesOnly)],
+            [],
+            [
+                new CustomColumnDefinitionInput(
+                    0,
+                    firstSourceFieldKey,
+                    firstColumnName,
+                    "Text",
+                    firstSourceOrder),
+                new CustomColumnDefinitionInput(
+                    0,
+                    secondSourceFieldKey,
+                    secondColumnName,
+                    "Text",
+                    secondSourceOrder)
+            ],
+            true);
+
+        TestAssert.True(
+            sourcePrepared.Succeeded,
+            $"Preparing the source layout-order move failed: {sourcePrepared.ErrorMessage}");
+
+        var move = IntegrationTestDatabase.Clone(
+            (await database.ReadWorkOrderAsync(source.Id))!);
+        move.AssignmentDate = new DateTime(destinationYear, 7, 1);
+
+        var moved = await database.Service.SaveChangesAsync(
+            database.EmployeeAId,
+            sourceYear,
+            [],
+            [new WorkOrderChangeSet(move, AssignmentDateOnly)],
+            []);
+
+        TestAssert.True(
+            moved.Succeeded,
+            $"Moving custom columns into an occupied destination position failed: {moved.ErrorMessage}");
+
+        var destination = await database.Service.LoadSheetAsync(
+            database.EmployeeAId,
+            destinationYear);
+        var blockingColumn = destination!.CustomColumns.Single(column =>
+            column.Name == blockingColumnName);
+        var firstMovedColumn = destination.CustomColumns.Single(column =>
+            column.Name == firstColumnName);
+        var secondMovedColumn = destination.CustomColumns.Single(column =>
+            column.Name == secondColumnName);
+
+        TestAssert.Equal(
+            firstSourceOrder,
+            blockingColumn.LayoutOrder,
+            "Resolving a moved-column position changed the existing destination column.");
+        TestAssert.True(
+            firstMovedColumn.LayoutOrder != firstSourceOrder,
+            "The moved column reused an occupied destination layout position.");
+        TestAssert.Equal(
+            secondSourceOrder,
+            secondMovedColumn.LayoutOrder,
+            "The second moved column did not preserve its free source-year position.");
+        TestAssert.True(
+            firstMovedColumn.LayoutOrder < secondMovedColumn.LayoutOrder,
+            "Two auto-created moved columns did not preserve their source-year relative order.");
+
+        var stored = await database.ReadWorkOrderAsync(source.Id);
+        var storedValues = CustomColumnService.DeserializeValues(
+            stored!.CustomValuesJson);
+
+        TestAssert.Equal(
+            "first-layout-value",
+            storedValues[firstMovedColumn.FieldKey],
+            "The first moved value was not remapped after resolving the occupied layout position.");
+        TestAssert.Equal(
+            "second-layout-value",
+            storedValues[secondMovedColumn.FieldKey],
+            "The second moved value was not remapped after resolving the occupied layout position.");
+    }
+
+    public async Task BlankMovedCustomValueDoesNotCreateDestinationColumnAsync()
+    {
+        const int sourceYear = 2093;
+        const int destinationYear = 2092;
+        const string fieldKey = "custom_ffffffffffffffffffffffffffffffff";
+        const string columnName = "Blank Move Permit";
+
+        var source = await database.SeedWorkOrderAsync(
+            database.DepartmentAId,
+            database.EmployeeAId,
+            "810000593",
+            "993",
+            sourceYear,
+            "custom-column-blank-move");
+
+        var sourceColumnCreated = await database.Service.SaveChangesAsync(
+            database.EmployeeAId,
+            sourceYear,
+            [],
+            [],
+            [],
+            [
+                new CustomColumnDefinitionInput(
+                    0,
+                    fieldKey,
+                    columnName,
+                    "Text",
+                    8_600_000_000_000L)
+            ],
+            true);
+
+        TestAssert.True(
+            sourceColumnCreated.Succeeded,
+            $"Preparing the blank-value source column failed: {sourceColumnCreated.ErrorMessage}");
+
+        var destinationBeforeMove = await database.Service.LoadSheetAsync(
+            database.EmployeeAId,
+            destinationYear);
+
+        TestAssert.Equal(
+            0,
+            destinationBeforeMove!.CustomColumns.Count,
+            "The blank-value break test requires an empty destination catalogue.");
+
+        var move = IntegrationTestDatabase.Clone(
+            (await database.ReadWorkOrderAsync(source.Id))!);
+        move.AssignmentDate = new DateTime(destinationYear, 6, 1);
+
+        var moved = await database.Service.SaveChangesAsync(
+            database.EmployeeAId,
+            sourceYear,
+            [],
+            [new WorkOrderChangeSet(move, AssignmentDateOnly)],
+            []);
+
+        TestAssert.True(
+            moved.Succeeded,
+            $"Moving a row with blank custom values failed: {moved.ErrorMessage}");
+
+        var destinationAfterMove = await database.Service.LoadSheetAsync(
+            database.EmployeeAId,
+            destinationYear);
+
+        TestAssert.False(
+            destinationAfterMove!.CustomColumns.Any(column =>
+                column.Name == columnName ||
+                column.FieldKey == fieldKey),
+            "A blank custom value created an unnecessary destination column.");
+
+        var stored = await database.ReadWorkOrderAsync(source.Id);
+
+        TestAssert.Equal(
+            destinationYear,
+            stored!.WorkYear,
+            "The blank-value row did not move to the destination year.");
+        TestAssert.Equal(
+            0,
+            CustomColumnService.DeserializeValues(
+                stored.CustomValuesJson).Count,
+            "The blank-value row gained custom data during the move.");
+    }
     public async Task ColumnLayoutPersistsAcrossYearsAndRemainsDepartmentScopedAsync()
     {
         const int workYear = 2026;
@@ -1289,16 +2004,22 @@ internal sealed class WorkOrderSaveIntegrationTests(
             result.Succeeded,
             $"Saving column layout failed: {result.ErrorMessage}");
 
+        var targetedLayouts = result.SavedColumnLayouts!
+            .Where(layout =>
+                layout.FieldKey == "workOrderNumber" ||
+                layout.FieldKey == "basket")
+            .ToList();
+
         TestAssert.Equal(
             2,
-            result.SavedColumnLayouts?.Count ?? 0,
-            "The save result did not return both column layouts.");
+            targetedLayouts.Count,
+            "The save result did not return both layouts owned by this test.");
 
         TestAssert.True(
-            result.SavedColumnLayouts!.All(layout =>
+            targetedLayouts.All(layout =>
                 layout.Id > 0 &&
                 !string.IsNullOrWhiteSpace(layout.RowVersion)),
-            "Saved column layouts are missing database identities or RowVersions.");
+            "The layouts owned by this test are missing database identities or RowVersions.");
 
         TestAssert.True(
             result.SavedColumnLayouts!.Single(layout =>
@@ -1346,7 +2067,24 @@ internal sealed class WorkOrderSaveIntegrationTests(
             otherDepartmentSheet!.ColumnLayouts.Count,
             "Column layout leaked into another department.");
 
+        var currentYearFieldKeys = new HashSet<string>(
+            new[]
+            {
+                "workOrderNumber",
+                "workTypeCode",
+                "assignmentDate",
+                "workOrderValue",
+                "partialAmount",
+                "remainingAmount",
+                "basket"
+            },
+            StringComparer.Ordinal);
+        currentYearFieldKeys.UnionWith(
+            result.SavedCustomColumns!
+                .Select(column => column.FieldKey));
+
         var unhiddenLayouts = result.SavedColumnLayouts!
+            .Where(layout => currentYearFieldKeys.Contains(layout.FieldKey))
             .Select(layout => new DepartmentColumnLayoutInput(
                 layout.Id,
                 layout.FieldKey,

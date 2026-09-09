@@ -1137,7 +1137,7 @@
 
             const confirmed = window.confirm(
                 `Delete custom column "${column.name}" and all its values ` +
-                "from every year in this department? " +
+                "from this work year? " +
                 "The deletion will not be permanent until you press Save."
             );
 

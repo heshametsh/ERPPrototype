@@ -192,6 +192,7 @@ public sealed class WorkOrderService(
                 await CustomColumnService.PrepareDefinitionsAsync(
                     dbContext,
                     departmentId,
+                    workYear,
                     userId,
                     customColumns,
                     customColumnsChanged,
@@ -840,6 +841,21 @@ public sealed class WorkOrderService(
                     Rows = newRecords.Count
                 });
 
+            var movedValuesError =
+                await CustomColumnService.RemapMovedWorkOrderValuesAsync(
+                    dbContext,
+                    departmentId,
+                    workYear,
+                    userId,
+                    customColumnDefinitions,
+                    savedEntities,
+                    cancellationToken);
+
+            if (!string.IsNullOrWhiteSpace(movedValuesError))
+            {
+                return WorkOrderSaveResult.ValidationFailure(movedValuesError);
+            }
+
             var saveChangesStartedAt = Stopwatch.GetTimestamp();
 
             await dbContext.SaveChangesAsync(cancellationToken);
@@ -977,7 +993,7 @@ public sealed class WorkOrderService(
                     entry.Entity is CustomColumnDefinition))
                 {
                     return WorkOrderSaveResult.ValidationFailure(
-                        "A custom column with the same name or position already exists in this department. Refresh the sheet and try again.");
+                        "A custom column with the same name or position already exists in this work year. Refresh the sheet and try again.");
                 }
 
                 if (exception.Entries.Any(entry =>

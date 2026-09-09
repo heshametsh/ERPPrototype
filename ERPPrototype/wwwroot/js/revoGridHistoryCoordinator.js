@@ -96,6 +96,12 @@ export function createRevoGridHistoryCoordinator(options) {
             return false;
         }
 
+        if (typeof options?.canReplay === "function" && !options.canReplay(plan.entry)) {
+            history.cancelReplay(plan.replayId);
+            notifyState();
+            return false;
+        }
+
         // Disable repeat Undo/Redo input while this one action is replaying.
         notifyState();
 
@@ -173,6 +179,12 @@ export function createRevoGridHistoryCoordinator(options) {
         return history.getState();
     }
 
+    function discardWhere(predicate) {
+        const result = history.discardWhere(predicate);
+        notifyState();
+        return result;
+    }
+
     function destroy() {
         if (destroyed) {
             return;
@@ -189,6 +201,7 @@ export function createRevoGridHistoryCoordinator(options) {
         redo,
         resetDataset,
         getState,
+        discardWhere,
         destroy
     });
 }

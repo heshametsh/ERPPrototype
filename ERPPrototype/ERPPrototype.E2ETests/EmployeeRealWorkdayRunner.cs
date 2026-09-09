@@ -1515,9 +1515,9 @@ internal static class EmployeeRealWorkdayRunner
             command.CommandText =
                 """
                 INSERT INTO [CustomColumnDefinitions]
-                    ([DepartmentId], [FieldKey], [Name], [DataType], [LayoutOrder], [CreatedAt], [CreatedBy])
+                    ([DepartmentId], [WorkYear], [FieldKey], [Name], [DataType], [LayoutOrder], [CreatedAt], [CreatedBy])
                 SELECT TOP (1)
-                    [DepartmentId], @FieldKey, @Name, 1, @LayoutOrder, SYSUTCDATETIME(), [CreatedBy]
+                    [DepartmentId], [WorkYear], @FieldKey, @Name, 1, @LayoutOrder, SYSUTCDATETIME(), [CreatedBy]
                 FROM [WorkOrders]
                 WHERE [WorkYear] = @Year
                 ORDER BY [DisplayOrder], [Id];

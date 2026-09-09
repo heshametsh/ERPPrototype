@@ -1,3 +1,5 @@
+﻿> **Active mission state:** follow root `AI_CONTROL_CENTER.md`, then read root `AI_CURRENT_STATE.md`. This document remains the broader engineering handoff/history.
+
 # CURRENT HANDOFF - 2026-09-04 - POST B12 / GATE 5C-1
 
 **Official development source:** the Git repository

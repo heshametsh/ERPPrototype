@@ -145,6 +145,9 @@ public class ApplicationDbContext(
                 .HasMaxLength(40)
                 .IsRequired();
 
+            entity.Property(column => column.WorkYear)
+                .IsRequired();
+
             entity.Property(column => column.Name)
                 .HasMaxLength(150)
                 .IsRequired();
@@ -170,6 +173,7 @@ public class ApplicationDbContext(
             entity.HasIndex(column => new
             {
                 column.DepartmentId,
+                column.WorkYear,
                 column.FieldKey
             })
             .IsUnique();
@@ -177,6 +181,7 @@ public class ApplicationDbContext(
             entity.HasIndex(column => new
             {
                 column.DepartmentId,
+                column.WorkYear,
                 column.Name
             })
             .IsUnique();
@@ -184,6 +189,7 @@ public class ApplicationDbContext(
             entity.HasIndex(column => new
             {
                 column.DepartmentId,
+                column.WorkYear,
                 column.LayoutOrder
             })
             .IsUnique();

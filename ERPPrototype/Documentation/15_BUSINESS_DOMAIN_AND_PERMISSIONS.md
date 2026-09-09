@@ -503,11 +503,16 @@ Overflow: 3,800 not pasted
 
 Approved principles:
 
-- scoped to Department.
+- definitions are scoped to `Department + WorkYear`; each Work Year owns an independent Custom Column catalogue.
+- Add, Rename, and Delete affect the currently open Work Year only.
 - supported types: Text, Money, Date, Number.
 - optional.
 - core fields stay protected.
 - type changes are restricted once data exists / current server contract keeps type effectively immutable after creation.
+- when a Work Order moves to another year, non-empty custom values move with it: reuse the destination column when name + type match, create a missing destination column automatically, and create a safe unique name when the same name has a different type.
+- blank custom values do not create destination definitions.
+- destination-definition creation, value remapping, and Work Order movement share the same Save transaction.
+- column width/visibility layout remains a separate department-scoped concern (`DepartmentId + FieldKey`) and may therefore remain shared across years.
 - Custom Columns are for flexible department-specific data.
 
 **Architecture boundary:** do not use Custom Columns as a substitute for real domain modules such as Municipality, Execution, Invoices, HSE, or Materials.

@@ -14,6 +14,8 @@ public sealed class CustomColumnDefinition
 
     public int DepartmentId { get; set; }
 
+    public int WorkYear { get; set; }
+
     public Department Department { get; set; } = null!;
 
     public string FieldKey { get; set; } = string.Empty;

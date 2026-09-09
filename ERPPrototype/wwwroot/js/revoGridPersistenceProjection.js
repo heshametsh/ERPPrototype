@@ -1,4 +1,4 @@
-export const REVO_GRID_PERSISTENCE_SCHEMA_VERSION = 1;
+export const REVO_GRID_PERSISTENCE_SCHEMA_VERSION = 2;
 
 const IDENTITY_FIELDS = new Set(["workOrderNumber", "workTypeCode"]);
 const FINANCIAL_FIELDS = new Set(["workOrderValue", "partialAmount"]);
@@ -127,6 +127,8 @@ export function buildRevoGridPersistenceProjection(contract) {
         id: String(contract.id),
         datasetKey: String(contract.datasetKey ?? ""),
         revision: Number(contract.revision ?? 0),
+        customColumnsChanged: contract.customColumnsChanged === true,
+        customColumns: cloneValue(contract.customColumns ?? []),
         changedRecords: (Array.isArray(contract.changedRecords)
             ? contract.changedRecords
             : []).map(record => ({

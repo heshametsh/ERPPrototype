@@ -993,3 +993,174 @@ Include:
 **Acceptance evidence:** `ERP_REVO_GATE5B5_TRACE_20260826-170911.zip` completed the real browser journey successfully. The browser harness preserves timeline, screenshot, Playwright trace, console/network diagnostics, loaded module URLs, and range-event evidence for any future failure.
 
 **Regression rule:** for employee-visible Grid behavior such as selection, edit, Paste, Range Clear, Undo/Redo, Filter, Sort, structural rows, validation, and Save, an isolated JavaScript/self-test is supporting evidence only. Acceptance requires the relevant real-browser journey to pass.
+
+## CC-YEAR-001 — Year-scoped Custom Columns current acceptance
+
+Server / SQL:
+
+- [x] Definitions are isolated by Department + Work Year.
+- [x] Add/Rename/Delete server behavior is current-year scoped.
+- [x] Moving into an empty destination year creates the required definition and preserves a non-empty value.
+- [x] Same-name/same-type destination reuse is asserted.
+- [x] Same-name/different-type batch conflict creates one safe destination definition.
+- [x] Blank moved values do not create destination definitions.
+- [x] Populated legacy migration preserves definitions and `CustomValuesJson`.
+- [x] SQL Core **34/34 PASS** after test-hardening V2.
+- [x] Two-valued Custom Column Delete returns the implicitly affected Work Order with authoritative new RowVersion.
+- [x] Moved Custom Columns preserve relative order when the destination position is occupied.
+
+Revo regression already executed:
+
+- [x] `EmployeeRealWorkdayRunner` scenarios **00-17 PASS**.
+- [x] `EMPLOYEE REAL WORKDAY MASTER: PASS`.
+- [x] Cross-year, Custom Values, aggregates, large Save, and concurrency stayed green.
+- [x] Revo fixture writers include `CustomColumnDefinitions.WorkYear`.
+
+Real local database safety/migration:
+
+- [x] Real DB inspected before migration: `CustomColumnDefinitions = 0`, `WorkOrders = 39043`.
+- [x] Real DB backup created.
+- [x] Backup verified with `RESTORE VERIFYONLY ... WITH CHECKSUM`.
+- [x] `20260905110000_ScopeCustomColumnsByWorkYear` applied successfully.
+- [x] Post-check: `WorkYear` exists; migration is recorded; null `WorkYear` definitions = 0.
+
+User manual evidence on current Revo slice:
+
+- [x] Edit + Save + Refresh.
+- [x] Switch year and return.
+- [x] Cross-year Cancel and Continue.
+- [x] Sort/Filter + Save.
+- [x] Undo/Redo.
+- [x] Add Custom Column structural action appears.
+- [x] Current known boundary confirmed: Save is unavailable while Custom Column structural changes are pending before persistence/history reconnect.
+
+Next acceptance order:
+
+- [ ] Reconnect preserved Revo Custom Column persistence/history with the Phase 1 `WorkYear` fixture change preserved.
+- [ ] User manually accepts Custom Column Add + Save + reload.
+- [ ] User manually accepts Rename + Save + reload.
+- [ ] User manually accepts Delete + Save without affecting another year.
+- [ ] User manually accepts year isolation between at least two Work Years.
+- [ ] User manually accepts cross-year valued move reuse/create/conflict behavior.
+- [ ] After user manual acceptance, run assistant/automated Revo + SQL closure regressions.
+- [ ] Run memory consistency + final diff review.
+- [ ] Append factual CC-YEAR-001 metrics.
+- [ ] Create final accepted checkpoint.
+
+Deployment safety:
+
+- [x] Real local DB migration was protected by a verified backup.
+- [ ] Any later production deployment keeps a backup/restore path because this migration is intentionally forward-only.
+### Revo reconnect manual acceptance — current state
+
+- [x] Manual-first testing reached the reconnect slice before automated closure tests.
+- [x] Initial year-isolation failure reproduced and root cause identified: year switch did not rebase the Revo Custom Column workspace.
+- [x] Corrected year-switch module was proven loaded in the browser.
+- [x] User manual PASS — Add Custom Column + value + Save.
+- [x] User manual PASS — column is absent in another Work Year and returns when switching back, without requiring Refresh, on the corrected year-switch module.
+- [ ] Rename + Save + reload remains pending.
+- [ ] Delete + Save acceptance remains pending. The first delete path exposed a separate post-commit reconcile problem.
+- [ ] V2 delete-reconcile candidate has **not yet received a valid manual test** because the later trace showed the browser was still running the older `cc-year-reconnect-1` module.
+- [ ] Before any further manual product result is accepted, prove runtime freshness: stop server, remove app bin/obj, Build the real project, abort on Build failure, Run without `--no-build`, open a new tab, and verify the intended module version.
+- [ ] Manual V2 acceptance — deleting one or multiple persisted valued Custom Columns must make Save Clean immediately and allow year switching without Refresh or false layout/session conflict.
+- [ ] Cross-year valued move reuse/create/conflict behavior remains pending manual acceptance.
+- [ ] Automated Revo/B12/SQL closure runs only after the user's manual acceptance.
+
+### CC-YEAR-001 — pre-closure test-design and parity gate (2026-09-07)
+
+Manual evidence already accepted before automated closure:
+
+- [x] Add Custom Column + value + Save + reload.
+- [x] Work-Year isolation and A→B→A switching.
+- [x] Persisted valued-column Delete + Save becomes usable without forced Refresh or false layout/session conflict.
+- [x] Cross-year moved custom values survive.
+- [x] Auto-created destination Custom Columns keep a sensible position/order instead of appearing before core columns.
+
+Test-design rules before running closure:
+
+- [ ] Review the existing Gate5B12 / Employee Real Workday / Integration scenarios against every manual defect that escaped the older green suite.
+- [ ] Extend the existing approved harnesses rather than creating parallel runners unless a documented incompatibility requires isolation.
+- [ ] Distinguish a **coverage gap** from a **missing product/parity feature**.
+- [ ] If test review exposes a missing employee-visible Custom Column command, do not implement it inside the test-hardening pass.
+- [ ] For existing migrated capabilities such as Rename and other legacy column-menu features, inspect the exact Tabulator behavior/code/tests first, then Revo Community mechanics/integration, then ERP ownership.
+- [ ] Present the recovered parity behavior to the user and obtain approval before runtime implementation.
+- [ ] The previously prepared Rename + closure-hardening candidate is not accepted product truth until that reference/approval gate passes.
+- [ ] Only after the behavior/test design is reviewed: run browser + SQL/integration + migration + master/stress/concurrency closure.
+
+### CC-YEAR-001 — test-only hardening candidate
+
+Reviewed before execution:
+
+- [x] Gate5B12 must run the accepted Gate 5C-1 route, not the historical Gate 5B-12 route.
+- [x] Gate5B12 must bind diagnostics to the exact Revo module loaded by the page; no hard-coded stale module import is accepted.
+- [x] Assert Gate 5C-1 visible aggregates are active before using the journey as closure evidence.
+- [x] Browser: delete **two persisted valued Custom Columns** in one Save; SQL values disappear, affected Work Order RowVersion advances, browser reconciles it, Save is Clean, and year can switch immediately without Refresh.
+- [x] Browser cross-year: missing destination auto-create + value remap + visual/core-region order.
+- [x] Browser cross-year: same name + same type reuses one existing destination field without moving it.
+- [x] Browser cross-year: same name + different type creates exactly one safe Text destination for a two-row batch; existing Money column is untouched.
+- [x] Browser cross-year: blank value does not create a destination definition or custom-value payload.
+- [x] Browser design: Custom **Text Filter** state and Custom **Money Sort** state do not leak into another Work Year and restore only when returning to the owning year; one column must not be expected to expose both controls.
+- [x] Browser: stale Custom Column RowVersion rejects structural Delete without partial SQL persistence; local structural work remains Dirty until authoritative reload.
+- [x] Integration: deleting two valued Custom Columns returns the implicitly affected Work Order and its authoritative new RowVersion.
+- [x] Rename/current column-menu parity intentionally excluded from this test-only candidate pending the later reference/user-approval pass.
+- [x] BUILD — E2E/Integration candidate compiles.
+- [ ] RUN — hardened Gate5B12 browser closure passes on Gate 5C-1.
+- [x] RUN — SQL Integration + populated migration pass after latest fixes — SQL Core **34/34 PASS**, Phase 9.3D PASS.
+- [ ] RUN — Employee Real Workday 00-17 remains green.
+- [ ] RUN — stress/concurrency closure remains green where applicable.
+
+Browser closure execution note — 2026-09-07:
+
+- [x] Gate5B12 resolved the accepted `cc-delete-reconcile-2` runtime module on Gate 5C-1.
+- [x] Gate 5C-1 visible aggregates were active.
+- [x] First real Update + Save persisted and returned Clean.
+- [x] First hardened run stopped on stale invalid Basket literal `مراجعة`; classification was TEST HARNESS CONTRACT FAIL, not product failure.
+- [x] Test-only Basket contract correction applied using product-owned `WorkOrderBuskets.All`; E2E rebuild PASS.
+- [x] Rerun progressed beyond Basket validation and again passed runtime module, accepted surface, and first real Update + Save.
+- [x] DB-reader correction applied (`GetInt32` -> product enum name); E2E rebuild PASS.
+- [x] Rerun passed `[01b-custom-columns]` and `[01c-custom-multi-delete]`, proving the earlier Basket/DB-reader blockers are closed and the hardened multi-delete browser contract is green.
+- [ ] Full hardened Gate5B12 journey remains open: the cross-year mapping scenario reached visible-source rows 30/31 but timed out waiting for row 30 in the virtualized DOM because the new scenario skipped the existing real-mouse `ScrollToRowAsync` helper.
+- [x] Trace classification: TEST HARNESS VIRTUALIZATION/SCROLL FAIL; source rows exist, browser diagnostics are clean, and no product runtime failure is evidenced.
+- [ ] Apply test-only explicit scrolling for the new mapping scenario's non-zero target rows (20, 25, 30, 31, 35), rebuild E2E, and rerun the same journey. No product runtime change is authorized by this failure.
+- [x] First Virtual-Scroll Fix V1 package apply was TOOLING BLOCKED only: `AI_WORK_LOG.md` payload had a blank line at EOF, `git diff --check` failed, and rollback restored all reviewed files.
+- [x] Corrected Virtual-Scroll Fix V2 applied cleanly; E2E rebuild PASS and product runtime unchanged.
+- [x] Rerun progressed beyond the row-30 virtualization blocker and successfully switched the destination dataset to Work Year 2025.
+- [x] New trace classification: TEST HARNESS YEAR-SWITCH/RENDER-BARRIER FAIL — `WaitForYearAsync` incorrectly required row 0 to be visible although Revo preserved the viewport near row 35 after the year switch.
+- [x] Apply test-only year-switch barrier correction: keep selector/loading/`Dataset {year}` checks, then wait for any rendered data cell rather than row 0; E2E rebuild PASS.
+- [x] Rerun after that correction advanced through `[01d-custom-cross-year]` PASS, proving the hardened cross-year missing/reuse/type-conflict/blank/order scenario is green.
+- [x] New `[01e-custom-year-view]` failure classified from trace as TEST HARNESS 2D VIEWPORT-NAVIGATION FAIL: the saved Custom Column resolved to visual column 3, but its virtualized Sort header was horizontally off-screen; diagnostics remained clean.
+- [x] Whole-test viewport-navigation V1 applied cleanly; product runtime unchanged and `git diff --check` PASS.
+- [x] Immediate rerun failure classified as TEST HARNESS VIEWPORT-SELECTOR / NAVIGATION-DESIGN FAIL: the helper required conditional `.scroll-rgCol`, while the real initial viewport was `.rgCol.hydrated`; the journey stopped before `[00-runtime-module]`.
+- [x] Whole-runner review completed: startup/reload readiness must not force row 0; navigation must use Revo public row/column positioning APIs instead of custom wheel/RTL heuristics; redundant scenario scrolls should be removed; editor targeting should use `revogr-edit input`.
+- [ ] Apply consolidated Gate5B12 viewport-navigation V2 from the exact current snapshot. Test-only — no product runtime/Rename/parity change.
+- [ ] Rebuild E2E and rerun the same Gate5B12 journey from the beginning.
+- [ ] After Gate5B12 PASS, rerun Employee Real Workday and review its separate column-0 mouse-wheel render assumption before final closure.
+- [x] Viewport-navigation V2 applied and rebuilt; rerun passed `[00]` through `[01d-custom-cross-year]`.
+- [x] Uploaded `[01e]` trace corrected the prior diagnosis: visual column 3 was already rendered and its Text header showed Filter only; the missing Sort button is the accepted capability split, not an off-screen header.
+- [x] Reclassify this stop as TEST HARNESS CAPABILITY-CONTRACT FAIL: the scenario created a Text custom column but waited for a Sort control that only Money columns own.
+- [ ] Apply the test-only `[01e]` correction: use separate Text(Filter) and Money(Sort) custom columns, rebuild E2E, and rerun Gate5B12 from the beginning.
+
+
+### RECOVERY-CLOSURE-20260909
+
+- [x] Build PASS on recovered clean environment.
+- [x] SQL Integration **34/34 PASS**.
+- [x] Phase 9.3D legacy-column removal gate PASS.
+- [x] Gate5B12 [00-runtime-module] through [07-concurrency] PASS.
+- [x] [01e-custom-year-view] validates Text Filter + Money Sort ownership per Work Year.
+- [x] 1,200-edit large Save PASS.
+- [x] Browser trace/screenshot evidence captured.
+- [ ] Employee Real Workday 00-17 rerun on the rebuilt machine remains pending.
+- [ ] Rename/current column-menu parity remains outside this recovery closure.
+
+### RECOVERY-CLOSURE-20260909
+
+- [x] Build PASS on recovered clean environment.
+- [x] SQL Integration 34/34 PASS.
+- [x] Phase 9.3D legacy-column removal gate PASS.
+- [x] Gate5B12 [00-runtime-module] through [07-concurrency] PASS.
+- [x] [01e-custom-year-view] validates Text Filter + Money Sort ownership per Work Year.
+- [x] 1,200-edit large Save PASS.
+- [x] Browser trace/screenshot evidence captured.
+- [ ] Employee Real Workday 00-17 rerun on rebuilt machine remains pending.
+- [ ] Rename/current column-menu parity remains outside this recovery closure.

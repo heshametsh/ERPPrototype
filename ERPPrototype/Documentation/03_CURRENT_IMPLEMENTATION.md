@@ -872,7 +872,7 @@ readiness. This removes the race where two years both contained 1,000 rows.
 
 - A Department Employee can insert a custom column before or after any data-column Header.
 - Types are exactly Text, Money, Date, and whole Number; there is no Dropdown type.
-- Definitions and positions belong to the department and appear in all its years.
+- Definitions and positions belong to `Department + WorkYear`; Add/Rename/Delete affect only the current year. Cross-year Work Order moves preserve non-empty custom values through destination-column reuse/creation in the same Save transaction.
 - Column widths are stored separately by DepartmentId + FieldKey and use the normal explicit Save action.
 - Width changes support mouse drag, Undo/Redo, Refresh, and year switching. There is no exact-width entry dialog.
 - Header text, filter, and sort controls remain adjacent; long titles ellipsize before pushing controls away.

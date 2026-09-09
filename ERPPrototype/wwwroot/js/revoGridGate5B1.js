@@ -1,4 +1,4 @@
-import * as nativeGate5A from "./revoGridNativeGate5A.js?v=20260829-gate5b10-header-selection-plugin-1";
+﻿import * as nativeGate5A from "./revoGridNativeGate5A.js?v=20260829-gate5b10-header-selection-plugin-1";
 import { createRevoGridChangeBridge } from "./revoGridChangeBridge.js?v=20260826-unified-validation-1";
 import { createRevoGridHistoryCoordinator } from "./revoGridHistoryCoordinator.js?v=20260821-minimal-reveal-1";
 import { createRevoGridHistoryFocus } from "./revoGridHistoryFocus.js?v=20260821-gate5b4-keyboard-sort-1";
@@ -10,7 +10,7 @@ import { createRevoGridSelectionContext } from "./revoGridSelectionContext.js?v=
 import { createRevoGridRowStructure } from "./revoGridRowStructure.js?v=20260829-gate5b10-header-selection-1";
 import { createRevoGridValidation } from "./revoGridValidation.js?v=20260826-unified-validation-1";
 import { createRevoGridPersistenceIdentity } from "./revoGridPersistenceIdentity.js?v=20260826-persistence-identity-1";
-import { createRevoGridColumnWorkspace } from "./revoGridColumnWorkspace.js?v=20260829-gate5b10-header-selection-1";
+import { createRevoGridColumnWorkspace } from "./revoGridColumnWorkspace.js?v=20260906-cc-year-reconnect-1";
 import { createRevoGridStructureMenu } from "./revoGridStructureMenu.js?v=20260828-context-menu-settle-1";
 import { createRevoGridStructureCommands } from "./revoGridStructureCommands.js?v=20260829-gate5b10-header-selection-1";
 import {
@@ -203,8 +203,7 @@ function renderState(state) {
             current.editLocked ||
             current.replayActive ||
             current.saveActive ||
-            invalidCells > 0 ||
-            columnDirty;
+            invalidCells > 0;
     }
 
     if (state.saveStatusElement) {
@@ -215,7 +214,7 @@ function renderState(state) {
         state.saveStatusElement.textContent = current.saveActive
             ? "Snapshot in flight"
             : columnDirty
-                ? "Row Save blocked by pending Custom Column changes"
+                ? "Ready — Custom Column changes included"
                 : invalidCells > 0
                     ? "Save blocked by validation"
                     : rowState.dirty
@@ -453,6 +452,8 @@ export async function initialize(elementId, rows, customColumns, options) {
     state.historyCoordinator = createRevoGridHistoryCoordinator({
         grid,
         datasetKey: activeDatasetKey,
+        canReplay: entry => !state.activeSaveContract ||
+            entry?.adapterKey !== "work-orders-column-workspace",
         focusTarget: target => historyFocus.focusTarget(target),
         onStateChange: () => renderState(state)
     });
@@ -567,6 +568,7 @@ export async function initialize(elementId, rows, customColumns, options) {
             selectionContext: state.selectionContext,
             excelFilter: state.excelFilter,
             sortController: state.sortController,
+            structureLocked: () => Boolean(state.activeSaveContract),
             replaceColumns: nextColumns =>
                 nativeGate5A.replaceCustomColumns(elementId, nextColumns),
             onStateChange: columnState => {
@@ -746,7 +748,7 @@ export function cancelDatasetSwitch(elementId) {
     renderState(state);
 }
 
-export async function replaceDataset(elementId, rows, workYear) {
+export async function replaceDataset(elementId, rows, customColumns, workYear) {
     const state = bindings.get(elementId);
     if (!state) {
         throw new Error(`Gate 5B-1 state '${elementId}' was not found.`);
@@ -775,6 +777,27 @@ export async function replaceDataset(elementId, rows, workYear) {
         }
 
         await nativeGate5A.replaceDataset(elementId, rows, workYear);
+
+        // A Work Year owns both its rows and its Custom Column definitions.
+        // The old reconnect path replaced rows only, leaving Column Workspace
+        // current/baseline on the previous year. That leaked one year's
+        // columns into another year and produced false RowVersion/layout
+        // conflicts on Delete/Save. Reset the year-owned column baseline
+        // before restoring the destination year's Filter/Sort view state.
+        if (state.columnWorkspace) {
+            await state.columnWorkspace.resetColumns(
+                customColumns,
+                { preserveViewState: false }
+            );
+        } else {
+            await nativeGate5A.replaceCustomColumns(elementId, customColumns);
+            state.excelFilter?.refreshColumns?.();
+            state.sortController?.refreshColumns?.();
+            if (state.validationOwner?.resetDataset) {
+                state.validationOwner.resetDataset(rows, customColumns);
+                await state.grid.refresh("rgRow");
+            }
+        }
 
         // Each year remains a separate History dataset. Filter view state is
         // independent: first visit starts clean, while returning to a year in
@@ -899,6 +922,10 @@ function buildSaveContractSnapshot(state, engineSnapshot, sourceRows) {
 
     const deletedRecords = state.persistenceIdentity?.getDeletedRecords?.(structuralRows) ?? [];
 
+    const columnSnapshot = state.columnWorkspace?.getSaveSnapshot?.() ?? {
+        customColumnsChanged: false,
+        customColumns: []
+    };
     return {
         id: engineSnapshot.id,
         datasetKey: engineSnapshot.datasetKey,
@@ -907,7 +934,9 @@ function buildSaveContractSnapshot(state, engineSnapshot, sourceRows) {
         cells: cloneValue(engineSnapshot.cells ?? []),
         rows: cloneValue(engineSnapshot.rows ?? []),
         changedRecords,
-        deletedRecords
+        deletedRecords,
+        customColumnsChanged: columnSnapshot.customColumnsChanged === true,
+        customColumns: cloneValue(columnSnapshot.customColumns ?? [])
     };
 }
 
@@ -937,10 +966,7 @@ export async function beginSaveHandshake(elementId) {
     if (Number(current.validationInvalidCellCount ?? 0) > 0) {
         return { allowed: false, reason: "validation" };
     }
-    if (current.customColumnsChanged === true) {
-        return { allowed: false, reason: "custom-columns-pending" };
-    }
-    if (!changeState.dirty) {
+    if (!changeState.dirty && current.customColumnsChanged !== true) {
         return { allowed: false, reason: "clean" };
     }
     if (!state.persistenceIdentity) {
@@ -1174,6 +1200,9 @@ export async function acceptRealDbSaveResult(elementId, saveId, result = {}) {
     }
 
     const contract = state.activeSaveContract;
+    const savedCustomColumns = Array.isArray(result.savedCustomColumns)
+        ? result.savedCustomColumns
+        : [];
     const savedRows = Array.isArray(result.savedRows) ? result.savedRows : [];
     const removedClientKeys = (Array.isArray(result.removedClientKeys) ? result.removedClientKeys : [])
         .map(key => String(key ?? "").trim())
@@ -1183,30 +1212,53 @@ export async function acceptRealDbSaveResult(elementId, saveId, result = {}) {
     );
 
     const source = await state.grid.getSource("rgRow");
+    const sourceRows = Array.isArray(source) ? source : [];
     const sourceByKey = new Map(
-        (Array.isArray(source) ? source : []).map(row => [String(row?.clientKey ?? "").trim(), row])
+        sourceRows.map(row => [String(row?.clientKey ?? "").trim(), row])
     );
+    const sourceByDatabaseId = new Map(
+        sourceRows
+            .map(row => [Number(row?.id ?? 0), row])
+            .filter(([id]) => Number.isInteger(id) && id > 0)
+    );
+
+    // The server owns database Id/RowVersion, while ClientKey is browser-owned.
+    // A Custom Column delete can update rows only because their custom JSON was
+    // cleaned. Those implicit rows are intentionally absent from the compact
+    // changedRecords projection, so resolve their ClientKey locally by Id.
+    const resolvedSavedRows = savedRows.map(saved => {
+        const id = Number(saved?.id ?? 0);
+        const clientKey = String(saved?.clientKey ?? "").trim() ||
+            String(sourceByDatabaseId.get(id)?.clientKey ?? "").trim();
+        if (!clientKey) {
+            throw new Error(`Could not resolve ClientKey for saved database row '${id}'.`);
+        }
+        return { ...saved, clientKey };
+    });
 
     const acceptedCells = [];
     const acceptedRows = [];
 
-    for (const saved of savedRows) {
-        const clientKey = String(saved?.clientKey ?? "").trim();
-        if (!clientKey) {
-            throw new Error("Every saved row requires ClientKey.");
-        }
+    for (const saved of resolvedSavedRows) {
+        const clientKey = saved.clientKey;
         const currentRow = sourceByKey.get(clientKey);
         const snapshotRow = changedByKey.get(clientKey)?.row;
-        if (!currentRow || !snapshotRow) {
+        if (!currentRow) {
             continue;
         }
 
         // Persistence identity is server-authoritative even when a newer edit
-        // happened while SQL was running. Business values are only replaced in
-        // the visible row when the employee has not changed that value since
-        // the captured Save snapshot.
+        // happened while SQL was running. This also advances RowVersion for a
+        // row changed implicitly by Custom Column value cleanup.
         currentRow.id = Number(saved.id ?? currentRow.id ?? 0);
         currentRow.rowVersion = String(saved.rowVersion ?? currentRow.rowVersion ?? "");
+
+        // Implicit server-side cleanup rows were not Dirty in this Save
+        // generation. Do not accept/overwrite their business cells; only their
+        // persistence identity needed reconciliation.
+        if (!snapshotRow) {
+            continue;
+        }
 
         const fields = new Set(changedByKey.get(clientKey)?.changedFields ?? []);
         fields.add("displayOrder");
@@ -1257,8 +1309,8 @@ export async function acceptRealDbSaveResult(elementId, saveId, result = {}) {
         .filter(id => Number.isInteger(id) && id > 0);
 
     state.persistenceIdentity?.acceptSaveResult?.({
-        savedRows,
-        savedRowMappings: savedRows
+        savedRows: resolvedSavedRows,
+        savedRowMappings: resolvedSavedRows
             .filter(row => Number(row?.id ?? 0) > 0)
             .map(row => ({ clientKey: row.clientKey, databaseId: row.id })),
         removedRowIds: removedDatabaseIds
@@ -1303,6 +1355,13 @@ export async function acceptRealDbSaveResult(elementId, saveId, result = {}) {
         await state.grid.refresh("rgRow");
     }
     await state.visibleAggregates?.refreshVisible?.("save-reconcile");
+
+    if (contract.customColumnsChanged === true) {
+        state.columnWorkspace?.acceptSavedColumns?.(savedCustomColumns);
+        state.historyCoordinator.discardWhere(entry =>
+            entry?.adapterKey === "work-orders-column-workspace"
+        );
+    }
 
     const accepted = state.changeBridge.acceptSave(saveId, {
         cells: acceptedCells,

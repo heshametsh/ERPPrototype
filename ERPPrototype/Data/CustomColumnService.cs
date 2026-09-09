@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 namespace ERPPrototype.Data;
 
 /// <summary>
-/// Owns department custom-column definitions and the typed values stored in
+/// Owns work-year custom-column definitions and the typed values stored in
 /// each WorkOrder.CustomValuesJson document. The service validates create,
 /// rename, immutable types, saved positions, and transactional deletion.
 /// </summary>
@@ -44,11 +44,14 @@ public static partial class CustomColumnService
         LoadDefinitionsAsync(
             ApplicationDbContext dbContext,
             int departmentId,
+            int workYear,
             CancellationToken cancellationToken = default)
     {
         var definitions = await dbContext.CustomColumnDefinitions
             .AsNoTracking()
-            .Where(column => column.DepartmentId == departmentId)
+            .Where(column =>
+                column.DepartmentId == departmentId &&
+                column.WorkYear == workYear)
             .OrderBy(column => column.LayoutOrder)
             .ThenBy(column => column.Id)
             .ToListAsync(cancellationToken);
@@ -62,13 +65,16 @@ public static partial class CustomColumnService
         PrepareDefinitionsAsync(
             ApplicationDbContext dbContext,
             int departmentId,
+            int workYear,
             string userId,
             IReadOnlyCollection<CustomColumnDefinitionInput>? incomingColumns,
             bool configurationChanged,
             CancellationToken cancellationToken = default)
     {
         var existing = await dbContext.CustomColumnDefinitions
-            .Where(column => column.DepartmentId == departmentId)
+            .Where(column =>
+                column.DepartmentId == departmentId &&
+                column.WorkYear == workYear)
             .OrderBy(column => column.LayoutOrder)
             .ThenBy(column => column.Id)
             .ToListAsync(cancellationToken);
@@ -234,6 +240,7 @@ public static partial class CustomColumnService
             var entity = new CustomColumnDefinition
             {
                 DepartmentId = departmentId,
+                WorkYear = workYear,
                 FieldKey = fieldKey,
                 Name = name,
                 DataType = dataType,
@@ -255,16 +262,26 @@ public static partial class CustomColumnService
             : await RemoveDeletedValuesAsync(
                 dbContext,
                 departmentId,
+                workYear,
                 userId,
                 deletedFieldKeys,
                 cancellationToken);
 
         if (deletedFieldKeys.Count > 0)
         {
+            var fieldKeysUsedByOtherYears = await dbContext.CustomColumnDefinitions
+                .Where(column =>
+                    column.DepartmentId == departmentId &&
+                    column.WorkYear != workYear &&
+                    deletedFieldKeys.Contains(column.FieldKey))
+                .Select(column => column.FieldKey)
+                .ToListAsync(cancellationToken);
+
             var layoutsToDelete = await dbContext.DepartmentColumnLayouts
                 .Where(layout =>
                     layout.DepartmentId == departmentId &&
-                    deletedFieldKeys.Contains(layout.FieldKey))
+                    deletedFieldKeys.Contains(layout.FieldKey) &&
+                    !fieldKeysUsedByOtherYears.Contains(layout.FieldKey))
                 .ToListAsync(cancellationToken);
 
             dbContext.DepartmentColumnLayouts.RemoveRange(layoutsToDelete);
@@ -301,7 +318,7 @@ public static partial class CustomColumnService
         if (!usedNames.Add(name))
         {
             errorMessage =
-                $"A column named '{name}' already exists in this department.";
+                $"A column named '{name}' already exists in this work year.";
             return false;
         }
 
@@ -311,6 +328,7 @@ public static partial class CustomColumnService
     private static async Task<List<WorkOrder>> RemoveDeletedValuesAsync(
         ApplicationDbContext dbContext,
         int departmentId,
+        int workYear,
         string userId,
         IReadOnlySet<string> deletedFieldKeys,
         CancellationToken cancellationToken)
@@ -318,6 +336,7 @@ public static partial class CustomColumnService
         var candidates = await dbContext.WorkOrders
             .Where(workOrder =>
                 workOrder.DepartmentId == departmentId &&
+                workOrder.WorkYear == workYear &&
                 workOrder.CustomValuesJson != "{}")
             .ToListAsync(cancellationToken);
         var affected = new List<WorkOrder>();
@@ -393,6 +412,229 @@ public static partial class CustomColumnService
         return null;
     }
 
+    /// <summary>
+    /// Moves non-empty custom values from one year's field namespace to the
+    /// destination year's namespace. Missing destination definitions are
+    /// created in the caller's transaction, so a row can never move without
+    /// the definitions required to read its values.
+    /// </summary>
+    public static async Task<string?> RemapMovedWorkOrderValuesAsync(
+        ApplicationDbContext dbContext,
+        int departmentId,
+        int sourceWorkYear,
+        string userId,
+        IReadOnlyCollection<CustomColumnDefinition> sourceDefinitions,
+        IEnumerable<WorkOrder> movedWorkOrders,
+        CancellationToken cancellationToken = default)
+    {
+        var moved = movedWorkOrders
+            .Where(workOrder => workOrder.WorkYear != sourceWorkYear)
+            .ToList();
+
+        if (moved.Count == 0)
+        {
+            return null;
+        }
+
+        var sourceByFieldKey = sourceDefinitions.ToDictionary(
+            column => column.FieldKey,
+            StringComparer.Ordinal);
+        var destinationYears = moved
+            .Select(workOrder => workOrder.WorkYear)
+            .Distinct()
+            .ToList();
+        var destinationDefinitions = await dbContext.CustomColumnDefinitions
+            .Where(column =>
+                column.DepartmentId == departmentId &&
+                destinationYears.Contains(column.WorkYear))
+            .OrderBy(column => column.LayoutOrder)
+            .ThenBy(column => column.Id)
+            .ToListAsync(cancellationToken);
+        var definitionsByYear = destinationYears.ToDictionary(
+            year => year,
+            year => destinationDefinitions
+                .Where(column => column.WorkYear == year)
+                .ToList());
+        var resolvedDestinations =
+            new Dictionary<(int WorkYear, string SourceFieldKey), CustomColumnDefinition>();
+        var utcNow = DateTime.UtcNow;
+
+        foreach (var workOrder in moved)
+        {
+            var values = DeserializeValues(workOrder.CustomValuesJson)
+                .Where(entry => !string.IsNullOrWhiteSpace(entry.Value))
+                .OrderBy(entry =>
+                    sourceByFieldKey.TryGetValue(entry.Key, out var source)
+                        ? source.LayoutOrder
+                        : long.MaxValue)
+                .ThenBy(entry => entry.Key, StringComparer.Ordinal)
+                .ToList();
+
+            if (values.Count == 0)
+            {
+                workOrder.CustomValuesJson = "{}";
+                continue;
+            }
+
+            var destinationColumns = definitionsByYear[workOrder.WorkYear];
+            var remapped = new SortedDictionary<string, string>(
+                StringComparer.Ordinal);
+
+            foreach (var (sourceFieldKey, value) in values)
+            {
+                if (!sourceByFieldKey.TryGetValue(sourceFieldKey, out var source))
+                {
+                    return "The moved work order contains a custom column that no longer belongs to its source year. Refresh the sheet and try again.";
+                }
+
+                var resolutionKey = (workOrder.WorkYear, sourceFieldKey);
+
+                if (!resolvedDestinations.TryGetValue(
+                        resolutionKey,
+                        out var destination))
+                {
+                    destination = destinationColumns.FirstOrDefault(column =>
+                        string.Equals(
+                            column.Name,
+                            source.Name,
+                            StringComparison.OrdinalIgnoreCase) &&
+                        column.DataType == source.DataType);
+
+                    if (destination is null)
+                    {
+                        var destinationName = ResolveDestinationName(
+                            source.Name,
+                            sourceWorkYear,
+                            destinationColumns);
+                        var destinationFieldKey = destinationColumns.Any(column =>
+                            string.Equals(
+                                column.FieldKey,
+                                source.FieldKey,
+                                StringComparison.Ordinal))
+                            ? $"custom_{Guid.NewGuid():N}"
+                            : source.FieldKey;
+
+                        destination = new CustomColumnDefinition
+                        {
+                            DepartmentId = departmentId,
+                            WorkYear = workOrder.WorkYear,
+                            FieldKey = destinationFieldKey,
+                            Name = destinationName,
+                            DataType = source.DataType,
+                            LayoutOrder = ResolveMovedLayoutOrder(
+                                source.LayoutOrder,
+                                destinationColumns),
+                            CreatedAt = utcNow,
+                            CreatedBy = userId
+                        };
+                        dbContext.CustomColumnDefinitions.Add(destination);
+                        destinationColumns.Add(destination);
+                    }
+
+                    resolvedDestinations[resolutionKey] = destination;
+                }
+
+                remapped[destination.FieldKey] = value;
+            }
+
+            workOrder.CustomValuesJson = JsonSerializer.Serialize(remapped);
+        }
+
+        return null;
+    }
+
+    private static string ResolveDestinationName(
+        string sourceName,
+        int sourceWorkYear,
+        IEnumerable<CustomColumnDefinition> destinationColumns)
+    {
+        var usedNames = destinationColumns
+            .Select(column => column.Name)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        if (!usedNames.Contains(sourceName))
+        {
+            return sourceName;
+        }
+
+        var yearSuffix = $" ({sourceWorkYear})";
+        var baseName = sourceName.Length + yearSuffix.Length <= MaximumNameLength
+            ? sourceName + yearSuffix
+            : sourceName[..(MaximumNameLength - yearSuffix.Length)] + yearSuffix;
+        var candidate = baseName;
+        var suffix = 2;
+        while (usedNames.Contains(candidate))
+        {
+            var numericSuffix = $" {suffix}";
+            candidate = baseName.Length + numericSuffix.Length <= MaximumNameLength
+                ? baseName + numericSuffix
+                : baseName[..(MaximumNameLength - numericSuffix.Length)] + numericSuffix;
+            suffix++;
+        }
+
+        return candidate;
+    }
+
+    private static long ResolveMovedLayoutOrder(
+        long sourceLayoutOrder,
+        IReadOnlyCollection<CustomColumnDefinition> destinationColumns)
+    {
+        var occupied = destinationColumns
+            .Select(column => column.LayoutOrder)
+            .ToHashSet();
+
+        foreach (var coreLayoutOrder in CoreLayoutOrders)
+        {
+            occupied.Add(coreLayoutOrder);
+        }
+
+        if (sourceLayoutOrder > 0 && !occupied.Contains(sourceLayoutOrder))
+        {
+            return sourceLayoutOrder;
+        }
+
+        var desiredOrder = Math.Max(sourceLayoutOrder, 1L);
+        var lowerCoreBoundary = CoreLayoutOrders
+            .Where(order => order < desiredOrder)
+            .DefaultIfEmpty(0)
+            .Max();
+        var upperCoreBoundary = CoreLayoutOrders
+            .Where(order => order > desiredOrder)
+            .DefaultIfEmpty(long.MaxValue)
+            .Min();
+        var maximumProbe = occupied.Count + 2;
+
+        for (var offset = 1; offset <= maximumProbe; offset++)
+        {
+            if (desiredOrder <= long.MaxValue - offset)
+            {
+                var upperCandidate = desiredOrder + offset;
+
+                if (
+                    upperCandidate < upperCoreBoundary &&
+                    !occupied.Contains(upperCandidate))
+                {
+                    return upperCandidate;
+                }
+            }
+
+            if (desiredOrder > offset)
+            {
+                var lowerCandidate = desiredOrder - offset;
+
+                if (
+                    lowerCandidate > lowerCoreBoundary &&
+                    !occupied.Contains(lowerCandidate))
+                {
+                    return lowerCandidate;
+                }
+            }
+        }
+
+        throw new InvalidOperationException(
+            "No safe custom-column position is available near the source-year position.");
+    }
+
     public static string NormalizeValuesJson(
         string? json,
         IReadOnlyCollection<CustomColumnDefinition> definitions,
@@ -426,7 +668,7 @@ public static partial class CustomColumnService
         if (!string.IsNullOrWhiteSpace(unknownField))
         {
             validationError =
-                "The sheet contains a custom column that no longer belongs to this department. Refresh the page.";
+                "The sheet contains a custom column that no longer belongs to this work year. Refresh the page.";
             return "{}";
         }
 

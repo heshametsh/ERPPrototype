@@ -153,6 +153,9 @@ namespace ERPPrototype.Migrations
                     b.Property<int>("DepartmentId")
                         .HasColumnType("int");
 
+                    b.Property<int>("WorkYear")
+                        .HasColumnType("int");
+
                     b.Property<string>("FieldKey")
                         .IsRequired()
                         .HasMaxLength(40)
@@ -175,13 +178,13 @@ namespace ERPPrototype.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("DepartmentId", "FieldKey")
+                    b.HasIndex("DepartmentId", "WorkYear", "FieldKey")
                         .IsUnique();
 
-                    b.HasIndex("DepartmentId", "LayoutOrder")
+                    b.HasIndex("DepartmentId", "WorkYear", "LayoutOrder")
                         .IsUnique();
 
-                    b.HasIndex("DepartmentId", "Name")
+                    b.HasIndex("DepartmentId", "WorkYear", "Name")
                         .IsUnique();
 
                     b.ToTable("CustomColumnDefinitions", null, t =>

@@ -1,4 +1,4 @@
-const HISTORY_ADAPTER_KEY = "work-orders-column-workspace";
+﻿const HISTORY_ADAPTER_KEY = "work-orders-column-workspace";
 const COLUMN_LAYOUT_STEP = 1_000_000_000_000;
 const MAX_INSERT_COLUMNS = 1000;
 const VALID_TYPES = new Set(["Text", "Money", "Date", "Number"]);
@@ -302,6 +302,7 @@ export function createRevoGridColumnWorkspace(options) {
     const excelFilter = options?.excelFilter ?? null;
     const sortController = options?.sortController ?? null;
     const replaceColumns = options?.replaceColumns;
+    const structureLocked = options?.structureLocked ?? (() => false);
 
     if (!grid || typeof grid.getColumns !== "function" || typeof grid.getSource !== "function") {
         throw new Error("A compatible RevoGrid element is required.");
@@ -346,15 +347,20 @@ export function createRevoGridColumnWorkspace(options) {
         return { filterState: nextFilter, sortState: nextSort };
     }
 
-    async function applyWorkspaceSnapshot(snapshot) {
+    async function applyWorkspaceSnapshot(
+        snapshot,
+        { restoreViewState = true } = {}
+    ) {
         const normalized = normalizeCustomColumns(snapshot?.columns ?? snapshot);
-        const desiredView = sanitizeViewState(
-            {
-                filterState: snapshot?.filterState ?? excelFilter?.getFilterState?.() ?? {},
-                sortState: snapshot?.sortState ?? sortController?.getSortState?.() ?? null
-            },
-            normalized
-        );
+        const desiredView = restoreViewState
+            ? sanitizeViewState(
+                {
+                    filterState: snapshot?.filterState ?? excelFilter?.getFilterState?.() ?? {},
+                    sortState: snapshot?.sortState ?? sortController?.getSortState?.() ?? null
+                },
+                normalized
+            )
+            : { filterState: {}, sortState: null };
 
         selectionContext?.clearExplicitSelection?.();
         await grid.clearFocus();
@@ -364,13 +370,13 @@ export function createRevoGridColumnWorkspace(options) {
         excelFilter?.refreshColumns?.();
         sortController?.refreshColumns?.();
 
-        if (excelFilter?.setFilterState) {
+        if (restoreViewState && excelFilter?.setFilterState) {
             await excelFilter.setFilterState(desiredView.filterState, {
                 remember: true,
                 preserveSelection: false
             });
         }
-        if (sortController?.setSortState) {
+        if (restoreViewState && sortController?.setSortState) {
             await sortController.setSortState(desiredView.sortState, {
                 remember: true,
                 preserveSelection: false
@@ -389,6 +395,9 @@ export function createRevoGridColumnWorkspace(options) {
         HISTORY_ADAPTER_KEY,
         {
             apply: async (entry, direction) => {
+                if (structureLocked()) {
+                    throw new Error("Custom-column structure cannot change while Save is in flight.");
+                }
                 const snapshot = direction === "undo"
                     ? entry?.payload?.before
                     : entry?.payload?.after;
@@ -408,7 +417,7 @@ export function createRevoGridColumnWorkspace(options) {
     );
 
     async function mutate(label, mutator) {
-        if (busy) {
+        if (busy || structureLocked()) {
             return false;
         }
 
@@ -600,22 +609,46 @@ export function createRevoGridColumnWorkspace(options) {
 
     function getSaveSnapshot() {
         const state = getState();
+        const currentKeys = new Set(state.customColumns.map(column => column.fieldKey));
+        const deleted = baseline
+            .filter(column => Number(column.id) > 0 && !currentKeys.has(column.fieldKey))
+            .map(column => ({ ...cloneValue(column), isDeleted: true }));
         return {
             customColumnsChanged: state.customColumnsChanged,
-            customColumns: state.customColumns
+            customColumns: [
+                ...state.customColumns.map(column => ({ ...column, isDeleted: false })),
+                ...deleted
+            ]
         };
     }
 
-    async function resetColumns(nextColumns) {
+    function acceptSavedColumns(savedColumns) {
+        const savedByField = new Map(
+            normalizeCustomColumns(savedColumns).map(column => [column.fieldKey, column])
+        );
+        current = current
+            .map(column => savedByField.get(column.fieldKey) ?? column)
+            .filter(column => savedByField.has(column.fieldKey));
+        baseline = cloneValue(current);
+        notifyState();
+    }
+
+    async function resetColumns(
+        nextColumns,
+        { preserveViewState = true } = {}
+    ) {
         busy = true;
         notifyState();
         try {
             current = normalizeCustomColumns(nextColumns);
             baseline = cloneValue(current);
-            await applyWorkspaceSnapshot({
-                columns: current,
-                ...getViewState()
-            });
+            await applyWorkspaceSnapshot(
+                {
+                    columns: current,
+                    ...(preserveViewState ? getViewState() : {})
+                },
+                { restoreViewState: preserveViewState }
+            );
         } finally {
             busy = false;
             notifyState();
@@ -640,6 +673,7 @@ export function createRevoGridColumnWorkspace(options) {
         getState,
         getOrderedProps,
         getSaveSnapshot,
+        acceptSavedColumns,
         resetColumns,
         destroy
     });

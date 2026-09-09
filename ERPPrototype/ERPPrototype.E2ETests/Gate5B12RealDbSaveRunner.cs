@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.IO.Compression;
 using System.Text.Json;
 using Microsoft.Data.SqlClient;
@@ -9,9 +9,9 @@ namespace ERPPrototype.E2ETests;
 internal static class Gate5B12RealDbSaveRunner
 {
     private const int FixedPort = 5265;
-    private const string GatePath = "/work-orders-revogrid-gate5b12";
+    private const string GatePath = "/work-orders-revogrid-gate5c1";
     private const string GridHostId = "revogrid-native-gate5a-grid";
-    private const string ModulePath = "/js/revoGridGate5B1.js?v=20260901-b12-final-1";
+    private const string ExpectedModuleVersionToken = "cc-delete-reconcile-2";
     private const string CustomFieldKey = "custom_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     private const string CustomFieldName = "B12 E2E Note";
     private const int LargeSaveRowCount = 1_200;
@@ -23,8 +23,8 @@ internal static class Gate5B12RealDbSaveRunner
         var artifactDirectory = E2EArtifactManager.CreateRunDirectory(projectRoot);
         Exception? failure = null;
 
-        Console.WriteLine("RevoGrid Gate 5B-12 Real DB Save real-user browser journey");
-        Console.WriteLine("The journey uses real Playwright mouse/keyboard actions and verifies SQL persistence, B11 snapshot semantics, new-row identity, DisplayOrder, Custom Values, cross-year confirmation, and concurrency rejection.");
+        Console.WriteLine("RevoGrid Gate 5C-1 / B12 Real DB Save real-user browser journey");
+        Console.WriteLine("The journey uses deterministic Revo viewport positioning plus real Playwright mouse/keyboard actions and verifies SQL persistence, B11 snapshot semantics, new-row identity, DisplayOrder, Custom Values, cross-year confirmation, and concurrency rejection.");
         Console.WriteLine($"Application port: {FixedPort}");
         Console.WriteLine($"Artifacts: {artifactDirectory}");
         Console.WriteLine();
@@ -72,10 +72,31 @@ internal static class Gate5B12RealDbSaveRunner
                     State = WaitForSelectorState.Visible,
                     Timeout = 45_000
                 });
-                await WaitForRenderedCellAsync(page, 0, 0);
+                await WaitForAnyRenderedDataCellAsync(page);
+
+                var activeModulePath = await ResolveActiveModulePathAsync(page);
+                Console.WriteLine($"[00-runtime-module] PASS — browser and E2E diagnostics share {activeModulePath}");
+
+                await AssertActiveSurfaceAsync(page);
+                Console.WriteLine("[00a-active-surface] PASS — closure runs on Revo Gate 5C-1 with visible aggregates active");
 
                 await AssertExistingUpdatePersistsAsync(page, database);
                 Console.WriteLine("[01-update] PASS — real cell edit + Save writes SQL, refreshes RowVersion, and returns Clean");
+
+                await AssertCustomColumnSaveFlowAsync(page, database);
+                Console.WriteLine("[01b-custom-columns] PASS — Add/Delete, mixed Save/reload, Work-Year isolation/switch-back, structural Undo/Redo, RowVersion identity, and post-Save row History");
+
+                await AssertMultipleValuedCustomColumnDeleteAsync(page, database);
+                Console.WriteLine("[01c-custom-multi-delete] PASS — two valued persisted Custom Columns delete in one Save, reconcile affected RowVersion, stay Clean, and allow immediate year switching");
+
+                await AssertCustomColumnCrossYearMappingAsync(page, database);
+                Console.WriteLine("[01d-custom-cross-year] PASS — missing destination, compatible reuse, type-conflict batch remap, blank-value no-create, and destination visual order");
+
+                await AssertCustomColumnViewStateIsolationAsync(page, database);
+                Console.WriteLine("[01e-custom-year-view] PASS — Custom Column Filter/Sort state is isolated per Work Year and restored only when returning to its owning year");
+
+                await AssertCustomColumnConcurrencyRejectsAsync(page, database);
+                Console.WriteLine("[01f-custom-concurrency] PASS — stale Custom Column RowVersion is rejected without partial persistence and employee structural work remains recoverable");
 
                 await AssertEditDuringSaveAndFilterSnapshotAsync(page, database);
                 Console.WriteLine("[02-snapshot] PASS — DB-blocked Save keeps the sent generation, newer edit stays Dirty, and Filter cannot drop the captured row");
@@ -116,11 +137,11 @@ internal static class Gate5B12RealDbSaveRunner
         Console.WriteLine();
         if (failure is null)
         {
-            Console.WriteLine("Gate 5B-12 Real DB Save real-user browser journey PASS.");
+            Console.WriteLine("Gate 5C-1 / B12 Real DB Save real-user browser journey PASS.");
         }
         else
         {
-            Console.Error.WriteLine("Gate 5B-12 Real DB Save real-user browser journey FAILED.");
+            Console.Error.WriteLine("Gate 5C-1 / B12 Real DB Save real-user browser journey FAILED.");
             Console.Error.WriteLine(failure);
         }
         Console.WriteLine();
@@ -178,6 +199,654 @@ internal static class Gate5B12RealDbSaveRunner
             "B12 Update remained Dirty after the accepted server result.");
     }
 
+    private static async Task AssertCustomColumnSaveFlowAsync(
+        IPage page,
+        E2ETestDatabase database)
+    {
+        const string undoneName = "B12 Unsaved Undo Column";
+        await InsertCustomColumnAsync(page, undoneName);
+        E2ETestAssert.True(await HasColumnNamedAsync(page, undoneName),
+            "Add custom column did not render before Undo.");
+        await page.Locator("#revogrid-gate5b1-undo").ClickAsync();
+        await page.WaitForFunctionAsync(
+            "name => !Array.from(document.querySelector('#revogrid-native-gate5a-grid revo-grid').columns ?? []).some(c => String(c?.name ?? '') === name)",
+            undoneName);
+
+        const string savedName = "B12 Saved Custom Column";
+        var row = await GetVisibleRowAsync(page, 0);
+        var rowId = row.GetProperty("id").GetInt32();
+        var oldBasket = row.GetProperty("basket").GetString() ?? string.Empty;
+        var newBasket = ERPPrototype.Data.WorkOrderBuskets.All
+            .First(value => !StringComparer.Ordinal.Equals(value, oldBasket));
+        await InsertCustomColumnAsync(page, savedName);
+        var savedProp = await GetColumnPropByNameAsync(page, savedName);
+        var savedColumn = await GetVisualColumnIndexAsync(page, savedProp);
+        var basketColumn = await GetVisualColumnIndexAsync(page, "basket");
+        await EditCellAsync(page, 0, savedColumn, "persisted custom value");
+        await EditCellAsync(page, 0, basketColumn, newBasket);
+        await SaveButton(page).ClickAsync();
+        await WaitForCleanSaveAsync(page);
+
+        var persistedDefinition = await GetDbCustomColumnAsync(
+            database.ConnectionString,
+            savedProp,
+            database.Seed.CurrentYear);
+        E2ETestAssert.True(persistedDefinition.Id > 0 && persistedDefinition.RowVersion.Length > 0,
+            "Successful Save did not persist custom-column Id/RowVersion.");
+        var savedRow = await GetDbRowAsync(database.ConnectionString, rowId);
+        E2ETestAssert.Equal("persisted custom value",
+            CustomColumnValue(savedRow.CustomValuesJson, savedProp),
+            "Mixed row + custom-column Save did not persist the custom value.");
+        E2ETestAssert.Equal(newBasket, savedRow.Busket,
+            "Mixed row + custom-column Save did not persist the ordinary row edit.");
+
+        // Saved structural History is removed, while a new ordinary row edit
+        // remains a normal one-step Undo/Redo action.
+        var postSaveBasket = oldBasket;
+        await EditCellAsync(page, 0, basketColumn, postSaveBasket);
+        await page.Locator("#revogrid-gate5b1-undo").ClickAsync();
+        E2ETestAssert.Equal(newBasket,
+            (await GetVisibleRowAsync(page, 0)).GetProperty("basket").GetString() ?? string.Empty,
+            "Ordinary row Undo stopped working after custom-column Save.");
+        await page.Locator("#revogrid-gate5b1-redo").ClickAsync();
+        E2ETestAssert.Equal(postSaveBasket,
+            (await GetVisibleRowAsync(page, 0)).GetProperty("basket").GetString() ?? string.Empty,
+            "Ordinary row Redo stopped working after custom-column Save.");
+        await page.Locator("#revogrid-gate5b1-undo").ClickAsync();
+        E2ETestAssert.True(await HasColumnNamedAsync(page, savedName),
+            "Post-Save History resurrected a temporary pre-save column identity.");
+
+        await ReloadGateAsync(page);
+        E2ETestAssert.True(await HasColumnNamedAsync(page, savedName),
+            "Saved custom column disappeared after reload.");
+        var reloadedProp = await GetColumnPropByNameAsync(page, savedName);
+        var reloadedRow = await GetVisibleRowAsync(page, 0);
+        E2ETestAssert.Equal("persisted custom value",
+            reloadedRow.GetProperty(reloadedProp).GetString() ?? string.Empty,
+            "Saved custom value disappeared after reload.");
+
+        // A Work Year owns its own Custom Column catalogue. This directly
+        // guards the reconnect bug where replaceDataset changed rows/year but
+        // left Column Workspace on the previous year's current/baseline.
+        await page.GetByTestId("gate5a-year-selector").SelectOptionAsync(
+            database.Seed.PreviousYear.ToString(CultureInfo.InvariantCulture));
+        await WaitForYearAsync(page, database.Seed.PreviousYear);
+        E2ETestAssert.True(!await HasColumnNamedAsync(page, savedName),
+            "Current-year custom column leaked into the previous Work Year after dataset switch.");
+        E2ETestAssert.True(
+            !await DbCustomColumnExistsAsync(
+                database.ConnectionString,
+                savedProp,
+                database.Seed.PreviousYear),
+            "Current-year custom column was persisted into the previous Work Year.");
+
+        await page.GetByTestId("gate5a-year-selector").SelectOptionAsync(
+            database.Seed.CurrentYear.ToString(CultureInfo.InvariantCulture));
+        await WaitForYearAsync(page, database.Seed.CurrentYear);
+        E2ETestAssert.True(await HasColumnNamedAsync(page, savedName),
+            "Saved current-year custom column did not return after switching back.");
+        var returnedProp = await GetColumnPropByNameAsync(page, savedName);
+        var returnedRow = await GetVisibleRowAsync(page, 0);
+        E2ETestAssert.Equal("persisted custom value",
+            returnedRow.GetProperty(returnedProp).GetString() ?? string.Empty,
+            "Saved current-year custom value did not return after switching back.");
+
+        var columnIndex = await GetVisualColumnIndexAsync(page, returnedProp);
+        await OpenStructureMenuAsync(page, 0, columnIndex);
+        await ClickStructureMenuAsync(page, "Delete Columns...");
+        var deleteDialog = VisibleDialog(page, "Delete Columns");
+        await deleteDialog.Locator("button:has-text(\"Cancel\")").ClickAsync();
+        E2ETestAssert.True(await HasColumnNamedAsync(page, savedName),
+            "Cancel deleted the persisted custom column.");
+
+        await OpenStructureMenuAsync(page, 0, columnIndex);
+        await ClickStructureMenuAsync(page, "Delete Columns...");
+        deleteDialog = VisibleDialog(page, "Delete Columns");
+        await deleteDialog.Locator("button:has-text(\"Delete\")").ClickAsync();
+        await page.Locator("#revogrid-gate5b1-undo").ClickAsync();
+        E2ETestAssert.True(await HasColumnNamedAsync(page, savedName),
+            "Undo did not restore the confirmed pre-Save column deletion.");
+        await page.Locator("#revogrid-gate5b1-redo").ClickAsync();
+        E2ETestAssert.True(!await HasColumnNamedAsync(page, savedName),
+            "Redo did not reapply the confirmed pre-Save column deletion.");
+        await SaveButton(page).ClickAsync();
+        await WaitForCleanSaveAsync(page);
+
+        E2ETestAssert.True(
+            !await DbCustomColumnExistsAsync(
+                database.ConnectionString,
+                returnedProp,
+                database.Seed.CurrentYear),
+            "Deleted persisted custom column still exists in the current Work Year after Save.");
+
+        var dbAfterColumnDelete = await GetDbRowAsync(database.ConnectionString, rowId);
+        E2ETestAssert.Equal(string.Empty,
+            CustomColumnValue(dbAfterColumnDelete.CustomValuesJson, returnedProp),
+            "Deleting the persisted custom column did not remove its saved row value.");
+        E2ETestAssert.True(
+            !dbAfterColumnDelete.RowVersion.SequenceEqual(savedRow.RowVersion),
+            "Deleting a valued custom column did not advance the affected Work Order RowVersion.");
+
+        var browserAfterColumnDelete = await GetSourceRowByIdAsync(page, rowId);
+        E2ETestAssert.Equal(
+            Convert.ToBase64String(dbAfterColumnDelete.RowVersion),
+            browserAfterColumnDelete.GetProperty("rowVersion").GetString() ?? string.Empty,
+            "Browser persistence identity did not reconcile the RowVersion advanced by custom-value cleanup.");
+
+        // The accepted delete must be fully Clean immediately. A refresh must
+        // not be required just to escape a stale Save generation or switch year.
+        await page.GetByTestId("gate5a-year-selector").SelectOptionAsync(
+            database.Seed.PreviousYear.ToString(CultureInfo.InvariantCulture));
+        await WaitForYearAsync(page, database.Seed.PreviousYear);
+        E2ETestAssert.True(!await HasColumnNamedAsync(page, savedName),
+            "Deleted current-year custom column leaked into the previous Work Year after Save.");
+
+        await page.GetByTestId("gate5a-year-selector").SelectOptionAsync(
+            database.Seed.CurrentYear.ToString(CultureInfo.InvariantCulture));
+        await WaitForYearAsync(page, database.Seed.CurrentYear);
+        E2ETestAssert.True(!await HasColumnNamedAsync(page, savedName),
+            "Deleted custom column returned after an in-session year round-trip.");
+
+        await ReloadGateAsync(page);
+        E2ETestAssert.True(!await HasColumnNamedAsync(page, savedName),
+            "Deleted persisted custom column returned after Save + reload.");
+    }
+
+
+    private static async Task AssertMultipleValuedCustomColumnDeleteAsync(
+        IPage page,
+        E2ETestDatabase database)
+    {
+        const string firstName = "B12 Multi Delete A";
+        const string secondName = "B12 Multi Delete B";
+        const string firstValue = "multi-delete-a";
+        const string secondValue = "multi-delete-b";
+
+        await SwitchYearAsync(page, database.Seed.CurrentYear);
+
+        var row = await GetVisibleRowAsync(page, 2);
+        var rowId = row.GetProperty("id").GetInt32();
+
+        await InsertCustomColumnAsync(page, firstName);
+        await InsertCustomColumnAsync(page, secondName);
+
+        var firstProp = await GetColumnPropByNameAsync(page, firstName);
+        var secondProp = await GetColumnPropByNameAsync(page, secondName);
+        E2ETestAssert.True(
+            !string.IsNullOrWhiteSpace(firstProp) &&
+            !string.IsNullOrWhiteSpace(secondProp) &&
+            firstProp != secondProp,
+            "The two Custom Columns did not receive distinct field identities.");
+
+        await EditCellAsync(
+            page,
+            2,
+            await GetVisualColumnIndexAsync(page, firstProp),
+            firstValue);
+        await EditCellAsync(
+            page,
+            2,
+            await GetVisualColumnIndexAsync(page, secondProp),
+            secondValue);
+
+        await SaveButton(page).ClickAsync();
+        await WaitForCleanSaveAsync(page);
+
+        var firstDefinition = await GetDbCustomColumnAsync(
+            database.ConnectionString,
+            firstProp,
+            database.Seed.CurrentYear);
+        var secondDefinition = await GetDbCustomColumnAsync(
+            database.ConnectionString,
+            secondProp,
+            database.Seed.CurrentYear);
+        E2ETestAssert.True(
+            firstDefinition.Id > 0 && secondDefinition.Id > 0,
+            "The multi-delete fixture columns were not persisted before Delete.");
+
+        var beforeDelete = await GetDbRowAsync(database.ConnectionString, rowId);
+        E2ETestAssert.Equal(
+            firstValue,
+            CustomColumnValue(beforeDelete.CustomValuesJson, firstProp),
+            "The first valued Custom Column was not persisted before multi-delete.");
+        E2ETestAssert.Equal(
+            secondValue,
+            CustomColumnValue(beforeDelete.CustomValuesJson, secondProp),
+            "The second valued Custom Column was not persisted before multi-delete.");
+
+        // Delete two persisted valued columns before one Save. This is the
+        // exact family that previously committed SQL but left the browser
+        // carrying stale RowVersions until Refresh.
+        await DeleteCustomColumnAsync(page, firstProp);
+        await DeleteCustomColumnAsync(page, secondProp);
+
+        await SaveButton(page).ClickAsync();
+        await WaitForCleanSaveAsync(page);
+
+        E2ETestAssert.True(
+            !await DbCustomColumnExistsAsync(
+                database.ConnectionString,
+                firstProp,
+                database.Seed.CurrentYear) &&
+            !await DbCustomColumnExistsAsync(
+                database.ConnectionString,
+                secondProp,
+                database.Seed.CurrentYear),
+            "One or both persisted Custom Columns remained in SQL after the combined Delete Save.");
+
+        var afterDelete = await GetDbRowAsync(database.ConnectionString, rowId);
+        E2ETestAssert.Equal(
+            string.Empty,
+            CustomColumnValue(afterDelete.CustomValuesJson, firstProp),
+            "The first deleted Custom Column value remained on the Work Order.");
+        E2ETestAssert.Equal(
+            string.Empty,
+            CustomColumnValue(afterDelete.CustomValuesJson, secondProp),
+            "The second deleted Custom Column value remained on the Work Order.");
+        E2ETestAssert.True(
+            !afterDelete.RowVersion.SequenceEqual(beforeDelete.RowVersion),
+            "Deleting two valued Custom Columns did not advance the affected Work Order RowVersion.");
+
+        var browserAfterDelete = await GetSourceRowByIdAsync(page, rowId);
+        E2ETestAssert.Equal(
+            Convert.ToBase64String(afterDelete.RowVersion),
+            browserAfterDelete.GetProperty("rowVersion").GetString() ?? string.Empty,
+            "The browser did not reconcile the RowVersion produced by multi-column value cleanup.");
+
+        // Clean means the employee can switch year immediately; Refresh is not
+        // allowed to hide a stale Save-generation defect.
+        await SwitchYearAsync(page, database.Seed.PreviousYear);
+        E2ETestAssert.True(
+            !await HasColumnNamedAsync(page, firstName) &&
+            !await HasColumnNamedAsync(page, secondName),
+            "A deleted current-year Custom Column leaked into the destination year.");
+
+        await SwitchYearAsync(page, database.Seed.CurrentYear);
+        E2ETestAssert.True(
+            !await HasColumnNamedAsync(page, firstName) &&
+            !await HasColumnNamedAsync(page, secondName),
+            "A deleted Custom Column returned after an in-session year round-trip.");
+    }
+
+    private static async Task AssertCustomColumnCrossYearMappingAsync(
+        IPage page,
+        E2ETestDatabase database)
+    {
+        var sourceYear = database.Seed.CurrentYear;
+        var destinationYear = database.Seed.PreviousYear;
+
+        // 1) Missing destination: two valued source columns must be created in
+        // the destination year, preserve their source region/order, and carry
+        // their values.
+        const string movedFirstName = "B12 Move Layout First";
+        const string movedSecondName = "B12 Move Layout Second";
+
+        await SwitchYearAsync(page, sourceYear);
+        await InsertCustomColumnAsync(page, movedFirstName);
+        await InsertCustomColumnAsync(page, movedSecondName);
+
+        var movedFirstSourceProp = await GetColumnPropByNameAsync(page, movedFirstName);
+        var movedSecondSourceProp = await GetColumnPropByNameAsync(page, movedSecondName);
+        var firstSourceRegion = await GetCoreNeighborSignatureAsync(page, movedFirstSourceProp);
+        var secondSourceRegion = await GetCoreNeighborSignatureAsync(page, movedSecondSourceProp);
+        var firstBeforeSecond = await GetLogicalColumnIndexAsync(page, movedFirstSourceProp) <
+            await GetLogicalColumnIndexAsync(page, movedSecondSourceProp);
+
+        await EditCellAsync(
+            page,
+            20,
+            await GetVisualColumnIndexAsync(page, movedFirstSourceProp),
+            "moved-layout-first");
+        await EditCellAsync(
+            page,
+            20,
+            await GetVisualColumnIndexAsync(page, movedSecondSourceProp),
+            "moved-layout-second");
+        await SaveButton(page).ClickAsync();
+        await WaitForCleanSaveAsync(page);
+
+        var missingDestinationMove = await MoveVisibleRowsToYearAsync(
+            page,
+            destinationYear,
+            20);
+
+        await SwitchYearAsync(page, destinationYear);
+
+        var movedFirstDestinationProp = await GetColumnPropByNameAsync(page, movedFirstName);
+        var movedSecondDestinationProp = await GetColumnPropByNameAsync(page, movedSecondName);
+        E2ETestAssert.True(
+            !string.IsNullOrWhiteSpace(movedFirstDestinationProp) &&
+            !string.IsNullOrWhiteSpace(movedSecondDestinationProp),
+            "Moving valued Custom Columns into a missing destination did not create both definitions.");
+
+        E2ETestAssert.Equal(
+            firstSourceRegion,
+            await GetCoreNeighborSignatureAsync(page, movedFirstDestinationProp),
+            "The first auto-created destination Custom Column moved into a different core-column region.");
+        E2ETestAssert.Equal(
+            secondSourceRegion,
+            await GetCoreNeighborSignatureAsync(page, movedSecondDestinationProp),
+            "The second auto-created destination Custom Column moved into a different core-column region.");
+        E2ETestAssert.Equal(
+            firstBeforeSecond,
+            await GetLogicalColumnIndexAsync(page, movedFirstDestinationProp) <
+                await GetLogicalColumnIndexAsync(page, movedSecondDestinationProp),
+            "Two auto-created destination Custom Columns changed their relative source-year order.");
+
+        var missingDestinationDbRow = await GetDbRowAsync(
+            database.ConnectionString,
+            missingDestinationMove.Single().DatabaseId);
+        E2ETestAssert.Equal(
+            "moved-layout-first",
+            CustomColumnValue(
+                missingDestinationDbRow.CustomValuesJson,
+                movedFirstDestinationProp),
+            "The first moved Custom Value did not reach its destination definition.");
+        E2ETestAssert.Equal(
+            "moved-layout-second",
+            CustomColumnValue(
+                missingDestinationDbRow.CustomValuesJson,
+                movedSecondDestinationProp),
+            "The second moved Custom Value did not reach its destination definition.");
+
+        // 2) Same name + same type: reuse the existing destination definition.
+        const string reuseName = "B12 Reusable Procedure";
+        await InsertCustomColumnAsync(page, reuseName, "Text");
+        var reuseDestinationProp = await GetColumnPropByNameAsync(page, reuseName);
+        await SaveButton(page).ClickAsync();
+        await WaitForCleanSaveAsync(page);
+
+        var reuseDestinationBefore = await GetDbCustomColumnAsync(
+            database.ConnectionString,
+            reuseDestinationProp,
+            destinationYear);
+
+        await SwitchYearAsync(page, sourceYear);
+        await InsertCustomColumnAsync(page, reuseName, "Text");
+        var reuseSourceProp = await GetColumnPropByNameAsync(page, reuseName);
+        await EditCellAsync(
+            page,
+            25,
+            await GetVisualColumnIndexAsync(page, reuseSourceProp),
+            "reuse-value");
+        await SaveButton(page).ClickAsync();
+        await WaitForCleanSaveAsync(page);
+
+        var reuseMove = await MoveVisibleRowsToYearAsync(page, destinationYear, 25);
+        await SwitchYearAsync(page, destinationYear);
+
+        E2ETestAssert.Equal(
+            1,
+            await CountColumnsNamedAsync(page, reuseName),
+            "Same-name/same-type move created a duplicate destination Custom Column.");
+        E2ETestAssert.Equal(
+            reuseDestinationProp,
+            await GetColumnPropByNameAsync(page, reuseName),
+            "Same-name/same-type move did not reuse the existing destination field identity.");
+
+        var reuseDestinationAfter = await GetDbCustomColumnAsync(
+            database.ConnectionString,
+            reuseDestinationProp,
+            destinationYear);
+        E2ETestAssert.Equal(
+            reuseDestinationBefore.LayoutOrder,
+            reuseDestinationAfter.LayoutOrder,
+            "Compatible destination reuse unexpectedly moved the destination column.");
+
+        var reuseDbRow = await GetDbRowAsync(
+            database.ConnectionString,
+            reuseMove.Single().DatabaseId);
+        E2ETestAssert.Equal(
+            "reuse-value",
+            CustomColumnValue(reuseDbRow.CustomValuesJson, reuseDestinationProp),
+            "Compatible destination reuse did not remap the moved value.");
+        E2ETestAssert.Equal(
+            string.Empty,
+            CustomColumnValue(reuseDbRow.CustomValuesJson, reuseSourceProp),
+            "Compatible destination reuse left the source-year field key on the moved row.");
+
+        // 3) Same name + different type: one safe destination Text definition
+        // must be created and reused for a two-row batch. One Save confirmation
+        // must cover the whole move.
+        const string conflictName = "B12 Procedure Conflict";
+        await InsertCustomColumnAsync(page, conflictName, "Money");
+        var conflictMoneyProp = await GetColumnPropByNameAsync(page, conflictName);
+        await SaveButton(page).ClickAsync();
+        await WaitForCleanSaveAsync(page);
+        var conflictMoneyBefore = await GetDbCustomColumnAsync(
+            database.ConnectionString,
+            conflictMoneyProp,
+            destinationYear);
+
+        await SwitchYearAsync(page, sourceYear);
+        await InsertCustomColumnAsync(page, conflictName, "Text");
+        var conflictSourceProp = await GetColumnPropByNameAsync(page, conflictName);
+
+        var firstConflictRow = await GetVisibleRowAsync(page, 30);
+        var secondConflictRow = await GetVisibleRowAsync(page, 31);
+        var firstConflictId = firstConflictRow.GetProperty("id").GetInt32();
+        var secondConflictId = secondConflictRow.GetProperty("id").GetInt32();
+
+        await EditCellAsync(
+            page,
+            30,
+            await GetVisualColumnIndexAsync(page, conflictSourceProp),
+            "conflict-first");
+        await EditCellAsync(
+            page,
+            31,
+            await GetVisualColumnIndexAsync(page, conflictSourceProp),
+            "conflict-second");
+        await SaveButton(page).ClickAsync();
+        await WaitForCleanSaveAsync(page);
+
+        await MoveVisibleRowsToYearAsync(page, destinationYear, 30, 31);
+        await SwitchYearAsync(page, destinationYear);
+
+        var safeConflictName = $"{conflictName} ({sourceYear})";
+        E2ETestAssert.Equal(
+            1,
+            await CountColumnsNamedAsync(page, conflictName),
+            "The original different-type destination Custom Column was duplicated.");
+        E2ETestAssert.Equal(
+            1,
+            await CountColumnsNamedAsync(page, safeConflictName),
+            "A two-row name/type conflict created more than one safe destination Custom Column.");
+
+        var safeConflictProp = await GetColumnPropByNameAsync(page, safeConflictName);
+        var safeConflictDefinition = await GetDbCustomColumnAsync(
+            database.ConnectionString,
+            safeConflictProp,
+            destinationYear);
+        E2ETestAssert.Equal(
+            "Text",
+            safeConflictDefinition.DataType,
+            "The safe destination definition did not preserve the source Text type.");
+
+        var conflictMoneyAfter = await GetDbCustomColumnAsync(
+            database.ConnectionString,
+            conflictMoneyProp,
+            destinationYear);
+        E2ETestAssert.Equal(
+            conflictMoneyBefore.LayoutOrder,
+            conflictMoneyAfter.LayoutOrder,
+            "Resolving a name/type conflict moved the existing destination definition.");
+
+        var firstConflictStored = await GetDbRowAsync(
+            database.ConnectionString,
+            firstConflictId);
+        var secondConflictStored = await GetDbRowAsync(
+            database.ConnectionString,
+            secondConflictId);
+        E2ETestAssert.Equal(
+            "conflict-first",
+            CustomColumnValue(firstConflictStored.CustomValuesJson, safeConflictProp),
+            "The first conflicting moved row did not use the shared safe destination definition.");
+        E2ETestAssert.Equal(
+            "conflict-second",
+            CustomColumnValue(secondConflictStored.CustomValuesJson, safeConflictProp),
+            "The second conflicting moved row did not use the same shared safe destination definition.");
+
+        // 4) Blank value: owning a source definition is not enough to create a
+        // destination definition. Only a non-empty moved value may do that.
+        const string blankName = "B12 Blank Move";
+        await SwitchYearAsync(page, sourceYear);
+        await InsertCustomColumnAsync(page, blankName, "Text");
+        await SaveButton(page).ClickAsync();
+        await WaitForCleanSaveAsync(page);
+
+        var blankMove = await MoveVisibleRowsToYearAsync(page, destinationYear, 35);
+        await SwitchYearAsync(page, destinationYear);
+
+        E2ETestAssert.True(
+            !await HasColumnNamedAsync(page, blankName),
+            "A blank moved Custom Value created a destination Custom Column.");
+        E2ETestAssert.Equal(
+            0,
+            await CountDbCustomColumnsByNameAsync(
+                database.ConnectionString,
+                destinationYear,
+                blankName),
+            "A blank moved Custom Value persisted a destination Custom Column in SQL.");
+
+        var blankStored = await GetDbRowAsync(
+            database.ConnectionString,
+            blankMove.Single().DatabaseId);
+        E2ETestAssert.Equal(
+            0,
+            CustomColumnValueCount(blankStored.CustomValuesJson),
+            "The blank-value move unexpectedly persisted a Custom Value payload.");
+
+        await SwitchYearAsync(page, sourceYear);
+    }
+
+    private static async Task AssertCustomColumnViewStateIsolationAsync(
+        IPage page,
+        E2ETestDatabase database)
+    {
+        const string filterColumnName = "B12 Year View Filter";
+        const string sortColumnName = "B12 Year View Sort";
+        const string filterValue = "only-current-year-filter";
+        const string sortValue = "12345.67";
+        var sourceYear = database.Seed.CurrentYear;
+        var destinationYear = database.Seed.PreviousYear;
+
+        await SwitchYearAsync(page, sourceYear);
+        await InsertCustomColumnAsync(page, filterColumnName, "Text");
+        await InsertCustomColumnAsync(page, sortColumnName, "Money");
+        var filterProp = await GetColumnPropByNameAsync(page, filterColumnName);
+        var sortProp = await GetColumnPropByNameAsync(page, sortColumnName);
+
+        await EditCellAsync(
+            page,
+            0,
+            await GetVisualColumnIndexAsync(page, filterProp),
+            filterValue);
+        await EditCellAsync(
+            page,
+            0,
+            await GetVisualColumnIndexAsync(page, sortProp),
+            sortValue);
+        await SaveButton(page).ClickAsync();
+        await WaitForCleanSaveAsync(page);
+
+        var sort = await GetVisibleSortButtonAsync(page, sortProp);
+        await EnsureSortClearedAsync(page, sort, sortProp);
+        await ClickSortAndWaitForLabelChangeAsync(page, sort, sortProp);
+        var sortedLabel = await sort.GetAttributeAsync("aria-label") ?? string.Empty;
+
+        var sourceCount = await GetSourceCountAsync(page);
+        await ApplySingleFilterAsync(page, filterProp, filterValue);
+        var filteredCount = await GetVisibleSourceCountAsync(page);
+        E2ETestAssert.True(
+            filteredCount > 0 && filteredCount < sourceCount,
+            "The Custom Text filter did not create a meaningful filtered source-year view.");
+
+        await SwitchYearAsync(page, destinationYear);
+        E2ETestAssert.True(
+            !await HasColumnNamedAsync(page, filterColumnName),
+            "The source-year Custom Text Filter column leaked into the destination year.");
+        E2ETestAssert.True(
+            !await HasColumnNamedAsync(page, sortColumnName),
+            "The source-year Custom Money Sort column leaked into the destination year.");
+        E2ETestAssert.Equal(
+            await GetSourceCountAsync(page),
+            await GetVisibleSourceCountAsync(page),
+            "The source year's Custom Column Filter leaked into the destination dataset.");
+        E2ETestAssert.Equal(
+            0,
+            await page.Locator(
+                $".erp-revo-sort-button[data-erp-sort-prop=\"{sortProp}\"]").CountAsync(),
+            "The source year's Custom Money Sort control leaked into a year that does not own the column.");
+
+        await SwitchYearAsync(page, sourceYear);
+        E2ETestAssert.True(
+            await HasColumnNamedAsync(page, filterColumnName),
+            "Returning to the source year did not restore its Custom Text Filter column.");
+        E2ETestAssert.True(
+            await HasColumnNamedAsync(page, sortColumnName),
+            "Returning to the source year did not restore its Custom Money Sort column.");
+        E2ETestAssert.Equal(
+            filteredCount,
+            await GetVisibleSourceCountAsync(page),
+            "Returning to the source year did not restore its own Custom Column Filter state.");
+
+        var restoredSort = await GetVisibleSortButtonAsync(page, sortProp);
+        E2ETestAssert.Equal(
+            sortedLabel,
+            await restoredSort.GetAttributeAsync("aria-label") ?? string.Empty,
+            "Returning to the source year did not restore its own Custom Money Sort state.");
+
+        await ClearFilterAsync(page, filterProp);
+        await EnsureSortClearedAsync(page, restoredSort, sortProp);
+    }
+
+    private static async Task AssertCustomColumnConcurrencyRejectsAsync(
+        IPage page,
+        E2ETestDatabase database)
+    {
+        const string columnName = "B12 Structural Concurrency";
+        var workYear = database.Seed.CurrentYear;
+
+        await SwitchYearAsync(page, workYear);
+        await InsertCustomColumnAsync(page, columnName, "Text");
+        var prop = await GetColumnPropByNameAsync(page, columnName);
+        await SaveButton(page).ClickAsync();
+        await WaitForCleanSaveAsync(page);
+
+        var staleDefinition = await GetDbCustomColumnAsync(
+            database.ConnectionString,
+            prop,
+            workYear);
+        await BumpCustomColumnRowVersionExternallyAsync(
+            database.ConnectionString,
+            staleDefinition.Id);
+
+        await DeleteCustomColumnAsync(page, prop);
+        await SaveButton(page).ClickAsync();
+        await WaitForOperationMessageAsync(page, "another session");
+
+        E2ETestAssert.True(
+            await DbCustomColumnExistsAsync(
+                database.ConnectionString,
+                prop,
+                workYear),
+            "A stale Custom Column delete partially removed the authoritative SQL definition.");
+        E2ETestAssert.True(
+            (await GetChangeStateAsync(page)).GetProperty("dirty").GetBoolean(),
+            "Structural concurrency rejection incorrectly marked the employee's local deletion Clean.");
+
+        // Refresh is recovery after a real concurrency rejection, not a hidden
+        // requirement for a successful Save.
+        await ReloadGateAsync(page);
+        E2ETestAssert.True(
+            await HasColumnNamedAsync(page, columnName),
+            "Reload after structural concurrency rejection did not restore the authoritative definition.");
+        E2ETestAssert.True(
+            !(await GetChangeStateAsync(page)).GetProperty("dirty").GetBoolean(),
+            "Reload after structural concurrency rejection did not return to a clean authoritative baseline.");
+    }
+
     private static async Task AssertEditDuringSaveAndFilterSnapshotAsync(
         IPage page,
         E2ETestDatabase database)
@@ -226,7 +895,6 @@ internal static class Gate5B12RealDbSaveRunner
         var visibleIndex = await FindVisibleIndexByClientKeyAsync(page, clientKey);
         E2ETestAssert.True(visibleIndex >= 0,
             "Clearing Filter did not restore the row that still owns the newer Dirty edit.");
-        await ScrollToRowAsync(page, visibleIndex);
 
         await SaveButton(page).ClickAsync();
         await WaitForCleanSaveAsync(page);
@@ -271,7 +939,6 @@ internal static class Gate5B12RealDbSaveRunner
 
         var visibleIndex = await FindVisibleIndexByClientKeyAsync(page, clientKey);
         E2ETestAssert.True(visibleIndex >= 0, "Inserted new row is not visible for real employee editing.");
-        await ScrollToRowAsync(page, visibleIndex);
 
         var workOrderNumberColumn = await GetVisualColumnIndexAsync(page, "workOrderNumber");
         var workTypeColumn = await GetVisualColumnIndexAsync(page, "workTypeCode");
@@ -346,9 +1013,9 @@ internal static class Gate5B12RealDbSaveRunner
     {
         var visibleIndex = await FindVisibleIndexByClientKeyAsync(page, row.ClientKey);
         E2ETestAssert.True(visibleIndex >= 0, "Saved new row disappeared before the Delete test.");
-        await ScrollToRowAsync(page, visibleIndex);
-
+        await WaitForRenderedRowHeaderAsync(page, visibleIndex);
         await RowHeader(page, visibleIndex).ClickAsync();
+        await WaitForRenderedCellAsync(page, visibleIndex, 0);
         await DataCell(page, visibleIndex, 0).ClickAsync(
             new LocatorClickOptions { Button = MouseButton.Right });
         await page.Locator(".erp-revo-structure-menu:not([hidden])").WaitForAsync(
@@ -462,6 +1129,7 @@ internal static class Gate5B12RealDbSaveRunner
         IPage page,
         E2ETestDatabase database)
     {
+        var modulePath = await ResolveActiveModulePathAsync(page);
         var workTypeColumn = await GetVisualColumnIndexAsync(page, "workTypeCode");
         E2ETestAssert.True(workTypeColumn >= 0, "Could not resolve Work Type column for the large Save test.");
 
@@ -472,12 +1140,14 @@ internal static class Gate5B12RealDbSaveRunner
         // filled by native Revo range selection + real Ctrl+C/Ctrl+V, matching
         // how an employee performs a large Excel-style edit.
         await EditCellAsync(page, 0, workTypeColumn, "499");
+        await WaitForRenderedCellAsync(page, 0, workTypeColumn);
         await DataCell(page, 0, workTypeColumn).ClickAsync();
         await page.Keyboard.PressAsync("Control+C");
         await page.WaitForTimeoutAsync(120);
 
+        await WaitForRenderedCellAsync(page, 1, workTypeColumn);
         await DataCell(page, 1, workTypeColumn).ClickAsync();
-        await ScrollToRowAsync(page, LargeSaveRowCount - 1);
+        await WaitForRenderedCellAsync(page, LargeSaveRowCount - 1, workTypeColumn);
         await page.Keyboard.DownAsync("Shift");
         try
         {
@@ -492,7 +1162,7 @@ internal static class Gate5B12RealDbSaveRunner
         await page.WaitForFunctionAsync(
             $$"""
             async expected => {
-                const state = (await import('{{ModulePath}}')).getChangeState('{{GridHostId}}');
+                const state = (await import('{{modulePath}}')).getChangeState('{{GridHostId}}');
                 return Number(state?.dirtyCount ?? 0) >= expected;
             }
             """,
@@ -509,7 +1179,7 @@ internal static class Gate5B12RealDbSaveRunner
         await page.WaitForFunctionAsync(
             $$"""
             async () => {
-                const module = await import('{{ModulePath}}');
+                const module = await import('{{modulePath}}');
                 try {
                     const saveId = module.getActiveSaveId('{{GridHostId}}');
                     return saveId && Number(module.getActiveSavePersistenceMetrics('{{GridHostId}}', saveId)?.bytes ?? 0) > 0;
@@ -524,7 +1194,7 @@ internal static class Gate5B12RealDbSaveRunner
         var diagnosticsJson = await page.EvaluateAsync<string>(
             $$"""
             async () => {
-                const module = await import('{{ModulePath}}');
+                const module = await import('{{modulePath}}');
                 const saveId = module.getActiveSaveId('{{GridHostId}}');
                 return JSON.stringify({
                     projection: module.getActiveSavePersistenceMetrics('{{GridHostId}}', saveId),
@@ -577,9 +1247,8 @@ internal static class Gate5B12RealDbSaveRunner
         var dbBeforeRejectedSave = await GetDbRowAsync(database.ConnectionString, id);
 
         // The preceding 1,200-row real-user range edit intentionally leaves the
-        // virtualized viewport near row 1,200. Return to the concurrency target
-        // using real mouse-wheel scrolling before attempting the real cell edit.
-        await ScrollToRowAsync(page, rowIndex);
+        // virtualized viewport near row 1,200. EditCellAsync owns deterministic
+        // viewport positioning before the real employee-style cell interaction.
         await EditCellAsync(page, rowIndex, valueColumn, Format(next));
         await SaveButton(page).ClickAsync();
         await WaitForOperationMessageAsync(page, "تم تعديل/حذف أمر عمل من جلسة أخرى");
@@ -625,9 +1294,9 @@ internal static class Gate5B12RealDbSaveRunner
             command.CommandText =
                 """
                 INSERT INTO [CustomColumnDefinitions]
-                    ([DepartmentId], [FieldKey], [Name], [DataType], [LayoutOrder], [CreatedAt], [CreatedBy])
+                    ([DepartmentId], [WorkYear], [FieldKey], [Name], [DataType], [LayoutOrder], [CreatedAt], [CreatedBy])
                 SELECT TOP (1)
-                    [DepartmentId], @FieldKey, @Name, 1, @LayoutOrder, SYSUTCDATETIME(), [CreatedBy]
+                    [DepartmentId], [WorkYear], @FieldKey, @Name, 1, @LayoutOrder, SYSUTCDATETIME(), [CreatedBy]
                 FROM [WorkOrders]
                 WHERE [WorkYear] = @Year
                 ORDER BY [DisplayOrder], [Id];
@@ -647,7 +1316,7 @@ internal static class Gate5B12RealDbSaveRunner
         await WaitForRenderedCellAsync(page, row, column);
         var cell = DataCell(page, row, column);
         await cell.DblClickAsync();
-        var editor = page.Locator($"#{GridHostId} input").Last;
+        var editor = page.Locator($"#{GridHostId} revogr-edit input").Last;
         await editor.WaitForAsync(new LocatorWaitForOptions
         {
             State = WaitForSelectorState.Visible,
@@ -743,12 +1412,361 @@ internal static class Gate5B12RealDbSaveRunner
             """,
             year,
             new PageWaitForFunctionOptions { Timeout = 30_000 });
-        await WaitForRenderedCellAsync(page, 0, 0);
+        await WaitForAnyRenderedDataCellAsync(page);
+    }
+
+
+    private static async Task AssertActiveSurfaceAsync(IPage page)
+    {
+        var path = new Uri(page.Url).AbsolutePath;
+        E2ETestAssert.Equal(
+            GatePath,
+            path,
+            $"Closure browser journey opened '{path}' instead of the accepted Revo Gate 5C-1 surface.");
+
+        var aggregates = page.GetByTestId("gate5c1-visible-aggregates");
+        await aggregates.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 30_000
+        });
+        await page.WaitForFunctionAsync(
+            """
+            () => document.querySelector(
+                '[data-testid="gate5c1-visible-aggregates"]')
+                ?.dataset?.aggregateReady === 'true'
+            """,
+            null,
+            new PageWaitForFunctionOptions { Timeout = 30_000 });
+    }
+
+    private static async Task<string> ResolveActiveModulePathAsync(IPage page)
+    {
+        var urls = await page.EvaluateAsync<string[]>(
+            """
+            () => [...new Set(
+                performance.getEntriesByType('resource')
+                    .map(entry => String(entry?.name ?? ''))
+                    .filter(name => /\/js\/revoGridGate5B1\.js(?:\?|$)/.test(name))
+            )]
+            """);
+
+        E2ETestAssert.Equal(
+            1,
+            urls.Length,
+            $"Expected exactly one active revoGridGate5B1 module URL, found {urls.Length}: {string.Join(", ", urls)}");
+
+        var modulePath = urls[0];
+        E2ETestAssert.True(
+            modulePath.Contains(
+                ExpectedModuleVersionToken,
+                StringComparison.OrdinalIgnoreCase),
+            $"The browser loaded '{modulePath}' instead of the expected '{ExpectedModuleVersionToken}' Revo module.");
+
+        return modulePath;
+    }
+
+    private static async Task SwitchYearAsync(IPage page, int year)
+    {
+        var selector = page.GetByTestId("gate5a-year-selector");
+        var requested = year.ToString(CultureInfo.InvariantCulture);
+        if (!string.Equals(
+                await selector.InputValueAsync(),
+                requested,
+                StringComparison.Ordinal))
+        {
+            await selector.SelectOptionAsync(requested);
+        }
+        await WaitForYearAsync(page, year);
+    }
+
+    private static async Task<IReadOnlyList<MovedRowRef>> MoveVisibleRowsToYearAsync(
+        IPage page,
+        int destinationYear,
+        params int[] rowIndexes)
+    {
+        E2ETestAssert.True(
+            rowIndexes.Length > 0,
+            "Cross-year browser test requires at least one row.");
+
+        var rows = new List<MovedRowRef>(rowIndexes.Length);
+        foreach (var rowIndex in rowIndexes)
+        {
+            var row = await GetVisibleRowAsync(page, rowIndex);
+            rows.Add(new MovedRowRef(
+                row.GetProperty("id").GetInt32(),
+                row.GetProperty("clientKey").GetString() ?? string.Empty,
+                row.GetProperty("workOrderNumber").GetString() ?? string.Empty));
+        }
+
+        var assignmentColumn = await GetVisualColumnIndexAsync(page, "assignmentDate");
+        var targetDate = $"15/08/{destinationYear}";
+
+        foreach (var rowIndex in rowIndexes)
+        {
+            await EditCellAsync(page, rowIndex, assignmentColumn, targetDate);
+        }
+
+        // One employee Save owns one confirmation for the complete cross-year
+        // batch. If the product opens another confirmation, the wait below will
+        // not complete cleanly and the scenario fails.
+        await ClickSaveHandlingConfirmAsync(page, accept: true);
+
+        foreach (var row in rows)
+        {
+            await page.WaitForFunctionAsync(
+                """
+                async key => !(await document.querySelector(
+                    '#revogrid-native-gate5a-grid revo-grid')
+                    .getSource('rgRow'))
+                    .some(row => String(row?.clientKey ?? '') === key)
+                """,
+                row.ClientKey,
+                new PageWaitForFunctionOptions { Timeout = 30_000 });
+        }
+
+        await WaitForOperationMessageAsync(page, "تم الحفظ في قاعدة البيانات");
+        E2ETestAssert.True(
+            !(await GetChangeStateAsync(page)).GetProperty("dirty").GetBoolean(),
+            "Accepted cross-year Save did not return the source sheet to Clean.");
+
+        return rows;
+    }
+
+    private static async Task<int> GetLogicalColumnIndexAsync(
+        IPage page,
+        string prop) =>
+        await page.EvaluateAsync<int>(
+            """
+            async prop => {
+                const grid = document.querySelector(
+                    '#revogrid-native-gate5a-grid revo-grid');
+                const columns = Array.isArray(grid.columns)
+                    ? grid.columns
+                    : await grid.getColumns();
+                return columns.findIndex(
+                    column => String(column?.prop ?? '') === prop);
+            }
+            """,
+            prop);
+
+    private static async Task<string> GetCoreNeighborSignatureAsync(
+        IPage page,
+        string prop) =>
+        await page.EvaluateAsync<string>(
+            """
+            async prop => {
+                const grid = document.querySelector(
+                    '#revogrid-native-gate5a-grid revo-grid');
+                const columns = Array.isArray(grid.columns)
+                    ? grid.columns
+                    : await grid.getColumns();
+                const core = new Set([
+                    'workOrderNumber',
+                    'workTypeCode',
+                    'assignmentDate',
+                    'workOrderValue',
+                    'partialAmount',
+                    'remainingAmount',
+                    'basket'
+                ]);
+                const index = columns.findIndex(
+                    column => String(column?.prop ?? '') === prop);
+                if (index < 0) return '';
+
+                let previous = '';
+                let next = '';
+
+                for (let i = index - 1; i >= 0; i -= 1) {
+                    const candidate = String(columns[i]?.prop ?? '');
+                    if (core.has(candidate)) {
+                        previous = candidate;
+                        break;
+                    }
+                }
+
+                for (let i = index + 1; i < columns.length; i += 1) {
+                    const candidate = String(columns[i]?.prop ?? '');
+                    if (core.has(candidate)) {
+                        next = candidate;
+                        break;
+                    }
+                }
+
+                return `${previous}|${next}`;
+            }
+            """,
+            prop);
+
+    private static async Task<int> CountColumnsNamedAsync(
+        IPage page,
+        string name) =>
+        await page.EvaluateAsync<int>(
+            """
+            async name => {
+                const grid = document.querySelector(
+                    '#revogrid-native-gate5a-grid revo-grid');
+                const columns = Array.isArray(grid.columns)
+                    ? grid.columns
+                    : await grid.getColumns();
+                return columns.filter(
+                    column => String(column?.name ?? '') === name).length;
+            }
+            """,
+            name);
+
+    private static async Task<int> GetSourceCountAsync(IPage page) =>
+        await page.EvaluateAsync<int>(
+            """
+            async () => (await document.querySelector(
+                '#revogrid-native-gate5a-grid revo-grid')
+                .getSource('rgRow')).length
+            """);
+
+    private static async Task<int> GetVisibleSourceCountAsync(IPage page) =>
+        await page.EvaluateAsync<int>(
+            """
+            async () => (await document.querySelector(
+                '#revogrid-native-gate5a-grid revo-grid')
+                .getVisibleSource('rgRow')).length
+            """);
+
+    private static async Task<ILocator> GetVisibleSortButtonAsync(IPage page, string prop)
+    {
+        await ScrollToColumnByPropAsync(page, prop);
+        var sort = page.Locator($".erp-revo-sort-button[data-erp-sort-prop=\"{prop}\"]");
+        await sort.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 10_000
+        });
+        return sort;
+    }
+
+    private static async Task<ILocator> GetVisibleFilterButtonAsync(IPage page, string prop)
+    {
+        await ScrollToColumnByPropAsync(page, prop);
+        var filter = page.Locator($".erp-revo-excel-filter-button[data-erp-filter-prop=\"{prop}\"]");
+        await filter.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 10_000
+        });
+        return filter;
+    }
+
+    private static async Task ApplySingleFilterAsync(
+        IPage page,
+        string prop,
+        string value)
+    {
+        var filterButton = await GetVisibleFilterButtonAsync(page, prop);
+        await filterButton.ClickAsync();
+
+        var popup = page.Locator(".erp-revo-excel-filter");
+        await popup.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 10_000
+        });
+
+        var selectAll = popup.Locator(
+            ".erp-revo-excel-filter__select-all input[type=\"checkbox\"]");
+        if (await selectAll.IsCheckedAsync())
+        {
+            await selectAll.ClickAsync();
+        }
+
+        await popup.Locator(
+                $".erp-revo-excel-filter__body label:has-text(\"{value}\") input[type=\"checkbox\"]")
+            .First
+            .ClickAsync();
+        await popup.Locator(
+                ".erp-revo-excel-filter__actions button[data-primary=\"true\"]")
+            .ClickAsync();
+        await popup.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Detached,
+            Timeout = 10_000
+        });
+    }
+
+    private static async Task ClearFilterAsync(
+        IPage page,
+        string prop)
+    {
+        var filterButton = await GetVisibleFilterButtonAsync(page, prop);
+        await filterButton.ClickAsync();
+
+        var popup = page.Locator(".erp-revo-excel-filter");
+        await popup.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 10_000
+        });
+        await popup.Locator(
+                ".erp-revo-excel-filter__actions button:has-text(\"Clear Filter\")")
+            .ClickAsync();
+        await popup.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Detached,
+            Timeout = 10_000
+        });
+    }
+
+    private static async Task ClickSortAndWaitForLabelChangeAsync(
+        IPage page,
+        ILocator sort,
+        string prop)
+    {
+        await ScrollToColumnByPropAsync(page, prop);
+        await sort.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 10_000
+        });
+        var before = await sort.GetAttributeAsync("aria-label") ?? string.Empty;
+        await sort.ClickAsync();
+
+        for (var attempt = 0; attempt < 100; attempt++)
+        {
+            var current = await sort.GetAttributeAsync("aria-label") ?? string.Empty;
+            if (!string.Equals(current, before, StringComparison.Ordinal))
+            {
+                return;
+            }
+            await page.WaitForTimeoutAsync(50);
+        }
+
+        throw new InvalidOperationException(
+            $"Sort state for '{prop}' did not change after the employee clicked its Sort button.");
+    }
+
+    private static async Task EnsureSortClearedAsync(
+        IPage page,
+        ILocator sort,
+        string prop)
+    {
+        for (var attempt = 0; attempt < 4; attempt++)
+        {
+            var label = await sort.GetAttributeAsync("aria-label") ?? string.Empty;
+            if (label.Contains(
+                    "not sorted",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+            await ClickSortAndWaitForLabelChangeAsync(page, sort, prop);
+        }
+
+        throw new InvalidOperationException(
+            $"Could not return Custom Column '{prop}' Sort to clear state.");
     }
 
     private static async Task ApplySingleWorkTypeFilterAsync(IPage page, string value)
     {
-        await page.Locator(".erp-revo-excel-filter-button[data-erp-filter-prop=\"workTypeCode\"]").ClickAsync();
+        var filterButton = await GetVisibleFilterButtonAsync(page, "workTypeCode");
+        await filterButton.ClickAsync();
         var popup = page.Locator(".erp-revo-excel-filter");
         await popup.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible, Timeout = 10_000 });
         var selectAll = popup.Locator(".erp-revo-excel-filter__select-all input[type=\"checkbox\"]");
@@ -763,7 +1781,8 @@ internal static class Gate5B12RealDbSaveRunner
 
     private static async Task ClearWorkTypeFilterAsync(IPage page)
     {
-        await page.Locator(".erp-revo-excel-filter-button[data-erp-filter-prop=\"workTypeCode\"]").ClickAsync();
+        var filterButton = await GetVisibleFilterButtonAsync(page, "workTypeCode");
+        await filterButton.ClickAsync();
         var popup = page.Locator(".erp-revo-excel-filter");
         await popup.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible, Timeout = 10_000 });
         await popup.Locator(".erp-revo-excel-filter__actions button:has-text(\"Clear Filter\")").ClickAsync();
@@ -809,6 +1828,23 @@ internal static class Gate5B12RealDbSaveRunner
         return element;
     }
 
+    private static async Task<JsonElement> GetSourceRowByIdAsync(IPage page, int id)
+    {
+        var json = await page.EvaluateAsync<string>(
+            """
+            async id => {
+                const row = (await document.querySelector('#revogrid-native-gate5a-grid revo-grid').getSource('rgRow'))
+                    .find(item => Number(item?.id ?? 0) === Number(id));
+                return JSON.stringify(row ?? null);
+            }
+            """,
+            id);
+        var element = JsonDocument.Parse(json).RootElement.Clone();
+        E2ETestAssert.True(element.ValueKind == JsonValueKind.Object,
+            $"Could not resolve source row for database Id {id}.");
+        return element;
+    }
+
     private static async Task<int> GetVisualColumnIndexAsync(IPage page, string prop) =>
         await page.EvaluateAsync<int>(
             """
@@ -844,62 +1880,131 @@ internal static class Gate5B12RealDbSaveRunner
 
     private static async Task<JsonElement> GetChangeStateAsync(IPage page)
     {
+        var modulePath = await ResolveActiveModulePathAsync(page);
         var json = await page.EvaluateAsync<string>(
             $$"""
-            async () => JSON.stringify((await import('{{ModulePath}}')).getChangeState('{{GridHostId}}'))
+            async () => JSON.stringify((await import('{{modulePath}}')).getChangeState('{{GridHostId}}'))
             """);
         return JsonDocument.Parse(json).RootElement.Clone();
     }
 
+    private static async Task WaitForAnyRenderedDataCellAsync(
+        IPage page,
+        int timeoutMs = 30_000) =>
+        await page.Locator(
+                $"#{GridHostId} revogr-viewport-scroll.rgCol:not([row-header]) [data-rgRow][data-rgCol]")
+            .First.WaitForAsync(new LocatorWaitForOptions
+            {
+                State = WaitForSelectorState.Visible,
+                Timeout = timeoutMs
+            });
+
     private static async Task ScrollToRowAsync(IPage page, int row)
     {
-        if (await DataCell(page, row, 0).IsVisibleAsync())
+        if (await RenderedRowCell(page, row).IsVisibleAsync())
         {
             return;
         }
 
-        var viewport = page.Locator($"#{GridHostId} revogr-viewport-scroll.rgCol:not([row-header])").First;
-        var bounds = await viewport.BoundingBoxAsync();
-        E2ETestAssert.True(bounds is not null, "Could not locate Revo viewport for real mouse-wheel scrolling.");
-        await page.Mouse.MoveAsync((float)(bounds!.X + bounds.Width / 2), (float)(bounds.Y + bounds.Height / 2));
+        await page.EvaluateAsync(
+            """
+            async row => {
+                const grid = document.querySelector(
+                    '#revogrid-native-gate5a-grid revo-grid');
+                if (!grid || typeof grid.scrollToRow !== 'function') {
+                    throw new Error('Revo scrollToRow API is unavailable.');
+                }
+                await grid.scrollToRow(row);
+            }
+            """,
+            row);
 
-        for (var attempt = 0; attempt < 80; attempt++)
+        await RenderedRowCell(page, row).WaitForAsync(new LocatorWaitForOptions
         {
-            if (await DataCell(page, row, 0).IsVisibleAsync())
-            {
-                return;
-            }
-
-            var renderedRows = await page.EvaluateAsync<int[]>(
-                """
-                () => [...document.querySelectorAll('#revogrid-native-gate5a-grid revogr-viewport-scroll.rgCol:not([row-header]) [data-rgRow][data-rgCol="0"]')]
-                    .map(element => Number(element.getAttribute('data-rgRow')))
-                    .filter(Number.isFinite)
-                """);
-            E2ETestAssert.True(renderedRows.Length > 0, "Revo rendered no rows during real mouse-wheel scroll.");
-            var minimum = renderedRows.Min();
-            var maximum = renderedRows.Max();
-            var direction = row > maximum ? 1 : row < minimum ? -1 : 0;
-            if (direction == 0)
-            {
-                await WaitForRenderedCellAsync(page, row, 0);
-                return;
-            }
-            var edge = direction > 0 ? maximum : minimum;
-            var distance = Math.Abs(row - edge);
-            await page.Mouse.WheelAsync(0, direction * Math.Clamp(distance * 42, 360, 3200));
-            await page.WaitForTimeoutAsync(35);
-        }
-
-        throw new InvalidOperationException($"Real mouse-wheel scrolling did not render row {row}.");
+            State = WaitForSelectorState.Visible,
+            Timeout = 10_000
+        });
     }
 
-    private static async Task WaitForRenderedCellAsync(IPage page, int row, int column) =>
+    private static async Task ScrollToColumnAsync(IPage page, int column)
+    {
+        if (await RenderedColumnCell(page, column).IsVisibleAsync())
+        {
+            return;
+        }
+
+        await page.EvaluateAsync(
+            """
+            async column => {
+                const grid = document.querySelector(
+                    '#revogrid-native-gate5a-grid revo-grid');
+                if (!grid || typeof grid.scrollToColumnIndex !== 'function') {
+                    throw new Error('Revo scrollToColumnIndex API is unavailable.');
+                }
+                await grid.scrollToColumnIndex(column);
+            }
+            """,
+            column);
+
+        await RenderedColumnCell(page, column).WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 10_000
+        });
+    }
+
+    private static async Task ScrollToColumnByPropAsync(IPage page, string prop)
+    {
+        var column = await GetVisualColumnIndexAsync(page, prop);
+        E2ETestAssert.True(
+            column >= 0,
+            $"Could not resolve column '{prop}' for viewport navigation.");
+
+        if (await RenderedColumnCell(page, column).IsVisibleAsync())
+        {
+            return;
+        }
+
+        await page.EvaluateAsync(
+            """
+            async prop => {
+                const grid = document.querySelector(
+                    '#revogrid-native-gate5a-grid revo-grid');
+                if (!grid || typeof grid.scrollToColumnProp !== 'function') {
+                    throw new Error('Revo scrollToColumnProp API is unavailable.');
+                }
+                await grid.scrollToColumnProp(prop);
+            }
+            """,
+            prop);
+
+        await RenderedColumnCell(page, column).WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 10_000
+        });
+    }
+
+    private static async Task WaitForRenderedCellAsync(IPage page, int row, int column)
+    {
+        await ScrollToRowAsync(page, row);
+        await ScrollToColumnAsync(page, column);
         await DataCell(page, row, column).First.WaitForAsync(new LocatorWaitForOptions
         {
             State = WaitForSelectorState.Visible,
             Timeout = 30_000
         });
+    }
+
+    private static async Task WaitForRenderedRowHeaderAsync(IPage page, int row)
+    {
+        await ScrollToRowAsync(page, row);
+        await RowHeader(page, row).WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 30_000
+        });
+    }
 
     private static async Task OpenStructureMenuAsync(IPage page, int row, int column)
     {
@@ -921,8 +2026,183 @@ internal static class Gate5B12RealDbSaveRunner
     private static ILocator SaveButton(IPage page) => page.Locator("#revogrid-gate5b11-save");
     private static ILocator RowHeader(IPage page, int row) =>
         page.Locator($"#{GridHostId} revogr-row-headers [data-rgRow=\"{row}\"]").First;
+    private static ILocator RenderedRowCell(IPage page, int row) =>
+        page.Locator($"#{GridHostId} revogr-viewport-scroll.rgCol:not([row-header]) [data-rgRow=\"{row}\"][data-rgCol]").First;
+    private static ILocator RenderedColumnCell(IPage page, int column) =>
+        page.Locator($"#{GridHostId} revogr-viewport-scroll.rgCol:not([row-header]) [data-rgRow][data-rgCol=\"{column}\"]").First;
     private static ILocator DataCell(IPage page, int row, int column) =>
         page.Locator($"#{GridHostId} revogr-viewport-scroll.rgCol:not([row-header]) [data-rgRow=\"{row}\"][data-rgCol=\"{column}\"]");
+
+    private static async Task InsertCustomColumnAsync(
+        IPage page,
+        string name,
+        string dataType = "Text")
+    {
+        var anchor = await GetVisualColumnIndexAsync(page, "partialAmount");
+        await OpenStructureMenuAsync(page, 0, anchor);
+        await ClickStructureMenuAsync(page, "Insert Columns...");
+        var dialog = VisibleDialog(page, "Insert Columns");
+        await dialog.Locator("input[type=\"number\"]").First.FillAsync("1");
+        await dialog.Locator("input[type=\"number\"]").First.PressAsync("Tab");
+        var spec = dialog.Locator(".erp-revo-structure-dialog__column-spec").First;
+        await spec.Locator("input[type=\"text\"]").FillAsync(name);
+        await spec.Locator("select").SelectOptionAsync(dataType);
+        await dialog.Locator("button:has-text(\"Insert Right\")").ClickAsync();
+        await page.WaitForFunctionAsync(
+            "name => Array.from(document.querySelector('#revogrid-native-gate5a-grid revo-grid').columns ?? []).some(c => String(c?.name ?? '') === name)",
+            name);
+    }
+
+
+
+
+
+
+
+    private static async Task DeleteCustomColumnAsync(
+        IPage page,
+        string prop)
+    {
+        var columnIndex = await GetVisualColumnIndexAsync(page, prop);
+        E2ETestAssert.True(
+            columnIndex >= 0,
+            $"Could not resolve Custom Column '{prop}' before Delete.");
+
+        await OpenStructureMenuAsync(page, 0, columnIndex);
+        await ClickStructureMenuAsync(page, "Delete Columns...");
+        var dialog = VisibleDialog(page, "Delete Columns");
+        await dialog.Locator("button:has-text(\"Delete\")").ClickAsync();
+
+        await page.WaitForFunctionAsync(
+            """
+            prop => !Array.from(document.querySelector(
+                '#revogrid-native-gate5a-grid revo-grid').columns ?? [])
+                .some(column => String(column?.prop ?? '') === prop)
+            """,
+            prop);
+    }
+
+    private static async Task<bool> HasColumnNamedAsync(IPage page, string name) =>
+        await page.EvaluateAsync<bool>(
+            "name => Array.from(document.querySelector('#revogrid-native-gate5a-grid revo-grid').columns ?? []).some(c => String(c?.name ?? '') === name)",
+            name);
+
+    private static async Task<string> GetColumnPropByNameAsync(IPage page, string name) =>
+        await page.EvaluateAsync<string>(
+            "name => String(Array.from(document.querySelector('#revogrid-native-gate5a-grid revo-grid').columns ?? []).find(c => String(c?.name ?? '') === name)?.prop ?? '')",
+            name);
+
+    private static async Task ReloadGateAsync(IPage page)
+    {
+        await page.ReloadAsync(new PageReloadOptions { WaitUntil = WaitUntilState.DOMContentLoaded });
+        await Grid(page).WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 45_000
+        });
+        await WaitForAnyRenderedDataCellAsync(page);
+    }
+
+    private static string CustomColumnValue(string json, string fieldKey)
+    {
+        using var document = JsonDocument.Parse(json);
+        return document.RootElement.TryGetProperty(fieldKey, out var value)
+            ? value.GetString() ?? string.Empty
+            : string.Empty;
+    }
+
+    private static int CustomColumnValueCount(string json)
+    {
+        using var document = JsonDocument.Parse(json);
+        return document.RootElement.EnumerateObject().Count();
+    }
+
+    private static async Task<DbCustomColumn> GetDbCustomColumnAsync(
+        string connectionString,
+        string fieldKey,
+        int workYear)
+    {
+        await using var connection = new SqlConnection(connectionString);
+        await connection.OpenAsync();
+        await using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT [Id], [FieldKey], [Name], [DataType], [LayoutOrder], [RowVersion]
+            FROM [CustomColumnDefinitions]
+            WHERE [FieldKey] = @FieldKey AND [WorkYear] = @WorkYear;
+            """;
+        command.Parameters.AddWithValue("@FieldKey", fieldKey);
+        command.Parameters.AddWithValue("@WorkYear", workYear);
+        await using var reader = await command.ExecuteReaderAsync();
+        E2ETestAssert.True(await reader.ReadAsync(),
+            $"SQL custom column {fieldKey} was not found in Work Year {workYear}.");
+        return new DbCustomColumn(
+            reader.GetInt32(0),
+            reader.GetString(1),
+            reader.GetString(2),
+            ((ERPPrototype.Data.Entities.CustomColumnDataType)reader.GetInt32(3)).ToString(),
+            reader.GetInt64(4),
+            (byte[])reader[5]);
+    }
+
+    private static async Task<bool> DbCustomColumnExistsAsync(
+        string connectionString,
+        string fieldKey,
+        int workYear)
+    {
+        await using var connection = new SqlConnection(connectionString);
+        await connection.OpenAsync();
+        await using var command = connection.CreateCommand();
+        command.CommandText =
+            "SELECT COUNT(*) FROM [CustomColumnDefinitions] WHERE [FieldKey] = @FieldKey AND [WorkYear] = @WorkYear;";
+        command.Parameters.AddWithValue("@FieldKey", fieldKey);
+        command.Parameters.AddWithValue("@WorkYear", workYear);
+        return Convert.ToInt32(
+            await command.ExecuteScalarAsync(),
+            CultureInfo.InvariantCulture) > 0;
+    }
+
+
+    private static async Task<int> CountDbCustomColumnsByNameAsync(
+        string connectionString,
+        int workYear,
+        string name)
+    {
+        await using var connection = new SqlConnection(connectionString);
+        await connection.OpenAsync();
+        await using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT COUNT(*)
+            FROM [CustomColumnDefinitions]
+            WHERE [WorkYear] = @WorkYear AND [Name] = @Name;
+            """;
+        command.Parameters.AddWithValue("@WorkYear", workYear);
+        command.Parameters.AddWithValue("@Name", name);
+        return Convert.ToInt32(
+            await command.ExecuteScalarAsync(),
+            CultureInfo.InvariantCulture);
+    }
+
+    private static async Task BumpCustomColumnRowVersionExternallyAsync(
+        string connectionString,
+        int id)
+    {
+        await using var connection = new SqlConnection(connectionString);
+        await connection.OpenAsync();
+        await using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            UPDATE [CustomColumnDefinitions]
+            SET [Name] = [Name]
+            WHERE [Id] = @Id;
+            """;
+        command.Parameters.AddWithValue("@Id", id);
+        E2ETestAssert.Equal(
+            1,
+            await command.ExecuteNonQueryAsync(),
+            "External E2E Custom Column concurrency update did not touch exactly one definition.");
+    }
 
     private static string Format(decimal value) => value.ToString("0.##", CultureInfo.InvariantCulture);
 
@@ -932,7 +2212,7 @@ internal static class Gate5B12RealDbSaveRunner
         await connection.OpenAsync();
         await using var command = connection.CreateCommand();
         command.CommandText =
-            "SELECT [Id], [WorkOrderNumber], [WorkTypeCode], [WorkYear], [DisplayOrder], [WorkOrderValue], [PartialAmount], [CustomValuesJson], [RowVersion] FROM [WorkOrders] WHERE [Id] = @Id;";
+            "SELECT [Id], [WorkOrderNumber], [WorkTypeCode], [WorkYear], [DisplayOrder], [WorkOrderValue], [PartialAmount], [Busket], [CustomValuesJson], [RowVersion] FROM [WorkOrders] WHERE [Id] = @Id;";
         command.Parameters.AddWithValue("@Id", id);
         await using var reader = await command.ExecuteReaderAsync();
         E2ETestAssert.True(await reader.ReadAsync(), $"SQL Work Order {id} was not found.");
@@ -945,7 +2225,7 @@ internal static class Gate5B12RealDbSaveRunner
         await connection.OpenAsync();
         await using var command = connection.CreateCommand();
         command.CommandText =
-            "SELECT TOP (1) [Id], [WorkOrderNumber], [WorkTypeCode], [WorkYear], [DisplayOrder], [WorkOrderValue], [PartialAmount], [CustomValuesJson], [RowVersion] FROM [WorkOrders] WHERE [WorkOrderNumber] = @Number AND [WorkTypeCode] = @Type ORDER BY [Id] DESC;";
+            "SELECT TOP (1) [Id], [WorkOrderNumber], [WorkTypeCode], [WorkYear], [DisplayOrder], [WorkOrderValue], [PartialAmount], [Busket], [CustomValuesJson], [RowVersion] FROM [WorkOrders] WHERE [WorkOrderNumber] = @Number AND [WorkTypeCode] = @Type ORDER BY [Id] DESC;";
         command.Parameters.AddWithValue("@Number", number);
         command.Parameters.AddWithValue("@Type", type);
         await using var reader = await command.ExecuteReaderAsync();
@@ -960,8 +2240,9 @@ internal static class Gate5B12RealDbSaveRunner
         DisplayOrder: reader.GetInt64(4),
         WorkOrderValue: reader.IsDBNull(5) ? null : reader.GetDecimal(5),
         PartialAmount: reader.IsDBNull(6) ? null : reader.GetDecimal(6),
-        CustomValuesJson: reader.GetString(7),
-        RowVersion: (byte[])reader[8]);
+        Busket: reader.GetString(7),
+        CustomValuesJson: reader.GetString(8),
+        RowVersion: (byte[])reader[9]);
 
     private static async Task<int> CountDbRowsByWorkTypeAsync(
         string connectionString,
@@ -1067,8 +2348,20 @@ internal static class Gate5B12RealDbSaveRunner
         long DisplayOrder,
         decimal? WorkOrderValue,
         decimal? PartialAmount,
+        string Busket,
         string CustomValuesJson,
         byte[] RowVersion);
+    private sealed record DbCustomColumn(
+        int Id,
+        string FieldKey,
+        string Name,
+        string DataType,
+        long LayoutOrder,
+        byte[] RowVersion);
+    private sealed record MovedRowRef(
+        int DatabaseId,
+        string ClientKey,
+        string WorkOrderNumber);
 
     private sealed class SqlRowLock : IAsyncDisposable
     {

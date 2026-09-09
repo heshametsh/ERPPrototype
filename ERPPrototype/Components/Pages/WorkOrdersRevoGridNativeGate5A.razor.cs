@@ -252,7 +252,7 @@ public partial class WorkOrdersRevoGridNativeGate5A
         {
             var gridModulePath = EnableChangeEngine
                 ? EnableSaveHandshake
-                    ? "./js/revoGridGate5B1.js?v=20260901-b12-final-1"
+                    ? "./js/revoGridGate5B1.js?v=20260906-cc-delete-reconcile-2"
                     : EnableHeaderMultiSelection
                     ? "./js/revoGridGate5B1.js?v=20260830-selection-core-r2"
                     : EnableStructureWorkspace
@@ -496,6 +496,7 @@ public partial class WorkOrdersRevoGridNativeGate5A
                     "replaceDataset",
                     GridElementId,
                     snapshot.Rows,
+                    snapshot.CustomColumns,
                     snapshot.WorkYear);
             }
 

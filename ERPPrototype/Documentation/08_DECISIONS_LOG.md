@@ -1,4 +1,4 @@
-# ACCEPTED DECISIONS - B11 THROUGH GATE 5C-1
+﻿# ACCEPTED DECISIONS - B11 THROUGH GATE 5C-1
 
 ## DEC-066 - Gate 5C-1 visible aggregates use the current visible Revo snapshot
 
@@ -761,3 +761,15 @@
 - **Acceptance rule:** important Grid behavior is not accepted from an isolated/self-test alone. The matching Playwright real-browser journey must exercise the employee-facing page and assert the visible/data/History result. On failure it preserves screenshot, browser trace, console/network diagnostics, loaded module URLs, and range-event evidence.
 - **Evidence:** Change Engine self-tests PASS 39/39 and the 2026-08-26 Gate 5B-5 real Chromium journey passed Delete, Backspace, one-step Undo/Redo, financial Remaining synchronization, readonly protection, and the existing structural/filter/sort journey without console, request, or HTTP 5xx errors.
 - **Scope:** this qualifies the isolated Revo Gate 5B-5 behavior only. It does not cut over `/work-orders` and does not add database Save.
+
+## DEC-067 — Custom Column definitions are owned by Department + Work Year
+
+- **Date:** 2026-09-06
+- **Status:** Approved and server/data-evidenced; real DB migration and core Revo manual smoke passed. Visible Revo Custom Column persistence acceptance remains pending the preserved persistence/history reconnect, then user-manual-first validation followed by automated closure regression.
+- **Definition ownership:** each Work Year owns an independent Custom Column catalogue inside the employee's department. Add, Rename, and Delete affect the current year only.
+- **Move rule:** moving a Work Order to another year preserves every non-empty custom value. Reuse a destination definition when name + type match; create a missing definition automatically; if the same name exists with another type, create one safe unique destination name and reuse it for the batch.
+- **Blank rule:** blank custom values do not create destination definitions.
+- **Transaction rule:** destination-definition creation, custom-value remapping, and Work Order movement succeed or roll back together in the existing Save transaction.
+- **Layout exception:** Width/visibility remains intentionally department-scoped by `DepartmentId + FieldKey` under DEC-027/DEC-029. Definition ownership changed; layout ownership did not.
+- **Migration rule:** the legacy department-wide catalogue is duplicated to each existing Work Year so old `CustomValuesJson` field keys remain readable. A department with no Work Orders receives its surviving legacy catalogue in the migration-time fallback year.
+- **Rollback:** the schema migration is intentionally forward-only because independently edited year catalogues cannot be safely collapsed into one department-wide catalogue. Deployment rollback therefore requires a database backup/restore plan rather than EF `Down()`.

@@ -108,7 +108,7 @@ Example:
 | Partial Amount | Optional positive money value, not above Work Order Value |
 | Remaining Amount | Calculated, read-only |
 | Basket | Required from fixed list |
-| Custom columns | Optional `Text`, `Money`, `Date`, or whole `Number`; department-scoped |
+| Custom columns | Optional `Text`, `Money`, `Date`, or whole `Number`; definitions are scoped by Department + Work Year |
 
 System fields مثل Id وWorkYear وDisplayOrder وRowVersion لا تظهر للمستخدم.
 
@@ -328,6 +328,9 @@ Example: pasting a custom Text column into 4,952 rows changes 4,952 values, but 
 
 ## 19. Custom Column Filter, Sort, and Visibility Contract — Phase 9.3E
 
+- Custom Column definitions are year-scoped within the employee's department. Add/Rename/Delete affect only the current Work Year.
+- Moving a Work Order to another year preserves non-empty custom values. A destination column with the same name + type is reused; a missing column is created; a same-name/different-type conflict receives a safe unique destination name. Blank values do not create destination columns.
+- Width/visibility layout is intentionally separate from definition ownership and remains department-scoped by `DepartmentId + FieldKey`, so layout can still be shared across years when the same field key exists there.
 - The custom-column type is selected once during creation and cannot be changed later, even while the column is empty.
 - `Rename Custom Column` changes the name only.
 - Custom `Text`, `Date`, and whole `Number` columns receive a value filter automatically.

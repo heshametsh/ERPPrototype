@@ -30,6 +30,7 @@ internal static class IntegrationTestRunner
 
         var planTests = new WorkOrderSavePlanBuilderTests();
         var integrationTests = new WorkOrderSaveIntegrationTests(database);
+        var migrationTests = new CustomColumnMigrationIntegrationTests();
 
         var cases = new List<(string Name, Func<Task> Execute)>
         {
@@ -85,7 +86,10 @@ internal static class IntegrationTestRunner
                 "Legacy Status and Notes columns are removed",
                 integrationTests.LegacyStatusAndNotesColumnsAreRemovedAsync),
             (
-                "Custom columns persist across years and remain department-scoped",
+                "Year-scoped custom-column migration preserves populated legacy data",
+                migrationTests.YearScopeMigrationPreservesPopulatedLegacyDataAsync),
+            (
+                "Custom columns are isolated by year and department",
                 integrationTests.CustomColumnsPersistAcrossYearsAndRemainDepartmentScopedAsync),
             (
                 "Custom column positions rebalance with RowVersion protection",
@@ -100,8 +104,29 @@ internal static class IntegrationTestRunner
                 "Custom column type is immutable after creation",
                 integrationTests.CustomColumnTypeIsImmutableAfterCreationAsync),
             (
-                "Custom column deletion removes values across department years",
+                "Custom column deletion removes values only in its year",
                 integrationTests.CustomColumnDeletionRemovesValuesAcrossDepartmentYearsAsync),
+            (
+                "Deleting two valued custom columns returns the implicitly affected row and new RowVersion",
+                integrationTests.DeletingTwoValuedCustomColumnsReturnsImplicitlyAffectedRowAsync),
+            (
+                "Moving a work order creates destination custom columns and remaps values",
+                integrationTests.MovedWorkOrderCreatesDestinationColumnsAndRemapsValuesAsync),
+            (
+                "Moving into an empty destination year creates the required custom column",
+                integrationTests.MovedWorkOrderCreatesColumnWhenDestinationYearHasNoCustomDefinitionsAsync),
+            (
+                "Multi-row move resolves one safe destination column for a name/type conflict",
+                integrationTests.MovedRowsReuseSingleDestinationColumnWhenNameTypeConflictsAsync),
+            (
+                "Moving reuses an existing destination column with the same name and type",
+                integrationTests.MovedWorkOrderReusesCompatibleDestinationColumnAsync),
+            (
+                "Moved custom columns preserve relative order when a destination position is occupied",
+                integrationTests.MovedCustomColumnsPreserveRelativeOrderWhenDestinationPositionIsOccupiedAsync),
+            (
+                "Blank moved custom values do not create destination columns",
+                integrationTests.BlankMovedCustomValueDoesNotCreateDestinationColumnAsync),
             (
                 "Column layout persists across years and remains department-scoped",
                 integrationTests.ColumnLayoutPersistsAcrossYearsAndRemainsDepartmentScopedAsync),

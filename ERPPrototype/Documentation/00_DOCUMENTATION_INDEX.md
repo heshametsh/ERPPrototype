@@ -1,3 +1,16 @@
+﻿# LIVE AI / CURRENT-STATE ENTRY POINT — 2026-09-06
+
+Before using older handoff sections in this file:
+
+1. read root `AI_CONTROL_CENTER.md`;
+2. read root `AI_CURRENT_STATE.md`;
+3. read the latest relevant `AI_WORK_LOG.md` entries;
+4. use current Git/code/test evidence when narrative text conflicts.
+
+For CC-YEAR-001, user-visible acceptance follows the manual-first rule: user hands-on validation first, assistant/automated closure regression second.
+
+---
+
 # CURRENT DOCUMENTATION GUIDE - 2026-09-04
 
 **Accepted product checkpoint:** `bdc37fe`
