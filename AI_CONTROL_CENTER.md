@@ -1,95 +1,69 @@
 ﻿# AI CONTROL CENTER — ERP Prototype
 
-Purpose: this is the stable reminder/router file for the active chat. It is intentionally small and can be re-uploaded unchanged whenever the user wants to force a memory refresh.
+Purpose: stable router for project continuity. It is not project state and must not duplicate changing implementation facts.
 
-This file is **not** the project state and must not duplicate changing implementation facts.
+## Refresh order
 
-## Mandatory refresh when this file is received or referenced
+Before a material ERP answer/action:
 
-Before answering the ERP-project request:
-
-1. Read `AI_CURRENT_STATE.md` completely.
-2. Read the latest relevant entries in `ERPPrototype/Documentation/AI_WORK_LOG.md`.
-3. Read `AGENTS.md` for the stable engineering and communication contract.
-4. If the question concerns Grid behavior/architecture, read the relevant part of `ERPPrototype/Documentation/AI_GRID_REFERENCE_MATRIX.md` and perform the required Tabulator / RevoGrid Community / RevoGrid Pro reference pass.
-5. If the question concerns workflow quality or repeated mistakes, inspect `ERPPrototype/Documentation/AI_WORK_METRICS.csv` and `ERPPrototype/Documentation/AI_WORK_CYCLE.md`.
-6. Treat the newest user message as the newest authority for product behavior. If it changes an approved decision, synchronize the live state and append a work-log receipt before moving on.
-7. If test review exposes a missing or weaker user-visible capability, classify it first as a **test gap**, **parity gap**, or **new product behavior**. Do not implement it inside a test-hardening pass. For an existing Work Orders capability, perform the feature-specific Tabulator/Revo/ERP reference pass and surface the behavior to the user before changing product code.
+1. Read `AI_CURRENT_STATE.md`.
+2. Read the latest relevant `ERPPrototype/Documentation/AI_WORK_LOG.md` entries.
+3. Read live Git when repository state matters: branch, HEAD, status, diff, stashes.
+4. Read only the canonical code/docs needed by the current mission.
+5. For Grid behavior/architecture, perform the focused Tabulator → installed RevoGrid Community → relevant Pro evidence → ERP ownership reference pass.
+6. For workflow/learning questions, read `AI_WORK_METRICS.csv` and `AI_WORK_CYCLE.md`.
 
 ## Authority order
 
-When information conflicts:
-
-1. Current Git/worktree + current code + executed test evidence.
-2. Latest user-approved behavior.
+1. Live Git/worktree + current code + executed test evidence.
+2. Latest user-approved behavior/instruction.
 3. `AI_CURRENT_STATE.md`.
-4. Current project documentation/decision records.
+4. Canonical project documentation/decisions.
 5. `AI_WORK_LOG.md` chronology.
 6. Historical handoffs/chat summaries.
 
-## What each file is for
+## Memory roles
 
-- `AI_CURRENT_STATE.md` — compact live memory: current mission, approved behavior, implemented/tested/unproven state, protected WIP, open risks, next action. Rewrite and prune it.
-- `ERPPrototype/Documentation/AI_WORK_LOG.md` — append-only chronological receipt of important decisions, implementation results, tests, failures, and checkpoints.
-- `ERPPrototype/Documentation/AI_WORK_METRICS.csv` — measurements used to learn from multiple missions and improve the workflow.
-- `ERPPrototype/Documentation/AI_WORK_CYCLE.md` — the engineering cycle: establish truth → behavior contract → ownership → break pass → smallest slice → evidence → adversarial diff review → manual acceptance → checkpoint.
-- `ERPPrototype/Documentation/AI_GRID_REFERENCE_MATRIX.md` — focused comparison record for Tabulator, installed RevoGrid Community, RevoGrid Pro evidence, and ERP ownership decisions.
-- `AGENTS.md` — stable rules for engineering, testing, state discipline, and how to explain results to the user.
+- `AI_CURRENT_STATE.md` — compact logical state only. No mirrored live Git HEAD/status.
+- `AI_WORK_LOG.md` — append-only chronology and failure/decision receipts.
+- `AI_WORK_METRICS.csv` — factual per-mission learning data.
+- `AI_WORK_CYCLE.md` — one compact engineering cycle and root-cause guardrails.
+- `AI_LIVE_MEMORY_PROTOCOL.md` — synchronization/closure rules.
+- `AI_GRID_REFERENCE_MATRIX.md` — focused Grid comparison record.
+- `AGENTS.md` — stable engineering/communication contract.
 
-## Same-chat rule
+## Material-event rule
 
-Do not ask the user to upload all these files repeatedly if they were already made available in the current chat. This control-center file can be re-uploaded periodically as a **refresh trigger**. On receipt, reread the existing live state/log files instead of relying on conversational recall.
+A user-run command/package/test result, behavior decision, code change, rollback, blocker, scope correction, or checkpoint is a material event.
 
-If a referenced live file is genuinely unavailable, say exactly which file is unavailable and reconstruct the minimum state from available evidence. Do not pretend it was read.
+Before another modifying candidate:
 
-## State synchronization rule
+- classify the result;
+- re-anchor from the actual result and current Git;
+- update Current State when current truth changed;
+- append a Work Log receipt;
+- update the canonical owner only when that owner's truth changed.
 
-After every material event — approved behavior, code change, test result, rollback, blocker, scope change, accepted checkpoint, or change in next action — update `AI_CURRENT_STATE.md` and append the material receipt to `AI_WORK_LOG.md`.
+After two consecutive Tooling/Package failures on the same blocker, stop chaining packages and require a fresh exact-state status/diff/snapshot before a third candidate.
 
-A user-run command/package/test output is a material event too. Before issuing another modifying package, re-anchor from that actual result and current Git; after two consecutive tooling/package failures, require an exact current status/diff or small snapshot before a third candidate.
+## Product/test boundary
 
-Do not treat that two-file update as sufficient when the event changes a canonical project truth. Route the same event to the owning document:
+Test hardening does not authorize employee-visible product changes. If a missing capability is found, classify it separately; for existing Work Orders behavior, recover the Tabulator/Revo/ERP contract and get user approval before runtime implementation.
 
-- behavior/business rule → `15_BUSINESS_DOMAIN_AND_PERMISSIONS.md` and/or `05_WORK_ORDERS_GRID_BEHAVIOUR.md`;
-- accepted architectural/product decision → `08_DECISIONS_LOG.md`;
-- test/evidence milestone → `06_REGRESSION_TEST_CHECKLIST.md`;
-- Grid/reference status → `AI_GRID_REFERENCE_MATRIX.md`;
-- workflow mistake/lesson → `AI_WORK_CYCLE.md`;
-- mission closure → one factual row in `AI_WORK_METRICS.csv`.
+## Acceptance and closure
 
-At checkpoints, prune resolved/superseded detail from `AI_CURRENT_STATE.md`. Do not prune the chronological log.
+Automated PASS never implies user hands-on acceptance.
 
-## Memory integrity gate
+At a major evidence milestone, handoff, checkpoint, or mission closure:
 
-At every major evidence milestone, handoff/context export, and before any checkpoint/mission closure:
+1. prune Current State to current truth;
+2. synchronize only affected canonical owners;
+3. run `ERPPrototype/Tools/AI/Test-AIMemoryConsistency.ps1`;
+4. for a completed mission, require one factual Metrics row;
+5. stop on checker `FAIL`.
 
-1. synchronize all affected canonical documents;
-2. run `ERPPrototype/Tools/AI/Test-AIMemoryConsistency.ps1`;
-3. if it reports `FAIL`, stop and repair documentation drift before advancing;
-4. only a `PASS` allows the workflow to continue;
-5. before declaring a mission/checkpoint memory-closed, verify that Current State was rebuilt/pruned to final truth and `AI_WORK_METRICS.csv` contains a factual row for the completed mission. Never backfill missing historical counts by guess.
-6. require the memory gate to verify Current State branch, HEAD, and CLEAN/DIRTY against live Git; if `Mission status: COMPLETE`, require a metrics row for the same MissionId.
+The checker is a mechanical guardrail, not a second source of product truth.
 
-`AI_CURRENT_STATE.md` is a live snapshot, not chronology. Dated receipts, superseded `PENDING` statements, and old expected test counts belong only in `AI_WORK_LOG.md`.
+## Communication
 
-## If the user asks "ذاكرتك فيها إيه؟"
-
-Answer from the refreshed live state, not from chat recall. Summarize only:
-
-- current mission;
-- approved behavior that still matters;
-- what exists now;
-- what is actually tested;
-- what is still unproven/open;
-- protected WIP that must not be lost;
-- next action.
-
-Keep the answer concise, logical, understandable to a non-programmer, and use a few fuller paragraphs rather than many short stacked lines.
-
-## Manual-first acceptance rule
-
-Automated PASS evidence never implies user manual acceptance; user-visible acceptance remains manual-first unless an earlier safety/read-only gate is required to protect data.
-
-## Communication reminder
-
-Default response style: concise but complete. Explain what happens in the program, why it matters, and the recommended decision. Use concrete ERP examples when useful. Avoid implementation noise, repeated history, and fragmented line-by-line writing unless the user asks for structured detail.
+Default to concise Egyptian Arabic with cause/effect first: what happened, why it matters, and what decision follows. Do not dump implementation detail unless it materially changes the decision.

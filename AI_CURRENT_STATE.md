@@ -1,28 +1,24 @@
 # AI CURRENT STATE
 
-Updated: 2026-09-09
-Mission: PROJECT-REVIEW-20260909
+Updated: 2026-09-11
+Mission: MEMORY-SIMPLIFY-20260909
 Mission status: **COMPLETE**
 
 ## Current mission
 
-Project review + project-memory audit are complete for the recovered snapshot. This mission changed documentation/memory/tooling only. No product runtime, test-runtime, migration, Rename/parity, or feature implementation was authorized or changed.
+The project-memory simplification is now proven by the user's real Windows execution. V1 exposed an EOL bug in the memory checker and rolled back cleanly. V2 corrected the parser, added LF+CRLF self-checking, preserved the eight-file scope, passed `git diff --check`, and passed the simplified memory gate as `V8.1-SIMPLE`.
+
+This mission changed memory/workflow documentation and the memory checker only. Product runtime, test runtime, migrations, Rename/parity, and employee-visible behavior were not changed.
 
 ## Authority
 
-1. Current Git/worktree + current code + executed evidence.
+1. Live Git/worktree + current code + executed evidence.
 2. Latest user-approved behavior/instruction.
-3. This compact state.
+3. This compact state for logical project state only.
 4. Current canonical documentation.
 5. `AI_WORK_LOG.md` chronology.
-6. Historical handoffs/chat summaries.
 
-## Live Git truth
-
-- Branch: `recovery-last-known-20260908`.
-- HEAD: `008c293e44eb434ed19c48fc2dab67b62b25f293`.
-- Working tree: **DIRTY** — uncommitted project-review / memory / workflow-tooling changes only. Product runtime, test runtime, and migrations remain unchanged.
-- The clean recovery commit above remains the rollback/checkpoint baseline. Do not describe the live worktree as clean while these audit changes are uncommitted.
+Git branch/HEAD/CLEAN-DIRTY are deliberately **not mirrored here**. Read them live from Git whenever they matter.
 
 ## Approved behavior that still matters
 
@@ -31,47 +27,49 @@ Project review + project-memory audit are complete for the recovered snapshot. T
 - Cross-year movement preserves every non-empty custom value and resolves destination definitions transactionally.
 - Width/visibility layout remains department-scoped by DepartmentId + FieldKey.
 - Accepted Work Orders foundations remain protected: snapshot-safe Save, real SQL Save, Selection Core V4R3, RowVersion concurrency, edit-while-Save, persisted delete/re-add identity, cross-year transactional Save, and Gate 5C-1 visible aggregates.
-- Test review may strengthen tests/diagnostics only; a missing user-visible capability is a separate product/parity decision requiring the relevant reference pass and user approval.
+- Test hardening may improve tests/diagnostics only. Missing user-visible behavior is a separate product/parity decision requiring the relevant reference pass and user approval.
 
 ## Current proven evidence
 
-- Build PASS on the clean recovered environment.
-- Real SQL Core suite 34/34 PASS; Phase 9.3D legacy-column removal gate PASS.
-- Gate 5C-1 / Gate5B12 real-user browser journey FULL PASS through `[00]`-`[07]`.
-- Employee Real Workday FULL PASS through `[00-login]`-`[17-arabic-ui]`.
-- Recovery closure is the current technical baseline; older pending browser/test receipts are chronology only.
+- Accepted technical product baseline remains the clean-machine recovery evidence: Build PASS, SQL Core 34/34 PASS, Phase 9.3D PASS, Gate5B12 FULL PASS, and Employee Real Workday FULL PASS.
+- Memory checkpoint `140bdd4` is the accepted baseline before this simplification mission.
+- Simplification V1: preflight PASS, payload copy PASS, `git diff --check` PASS, then memory-checker FAIL on CRLF structured-log parsing; automatic rollback returned the repository CLEAN.
+- Simplification V2: user-executed preflight PASS, `git diff --check` PASS, and `AI memory consistency: PASS (V8.1-SIMPLE)`. The candidate touched exactly eight memory/workflow/checker files and left Product runtime, Test runtime, and Migrations unchanged.
+- The V1 failure is classified **TOOLING / MEMORY-CHECKER EOL**, not a data-model failure and not product evidence.
 
 ## Open review findings
 
-These are recorded findings only; no fix is authorized by this completed review mission.
+These are recorded findings only; no fix is authorized by this memory mission.
 
 - `SEC-001`: forced temporary-password protection is not uniform across Admin mutation paths.
 - Startup seeding can reactivate a disabled initial Admin, contrary to the recorded restart rule.
 - The documented minimum-8-simple-character temporary-password rule is not explicitly encoded in Identity options.
-- Later Revo Gate wrappers are inconsistent about route-level Employee authorization; server-side Work Orders scope checks remain present, so this is defense-in-depth review rather than proven exposure.
-- Revo uses Saudi UTC+3 for current business year while legacy/service defaults still use `DateTime.Now.Year`; year-boundary ownership remains a risk.
+- Later Revo Gate wrappers are inconsistent about route-level Employee authorization; server-side scope checks remain present, so this is defense-in-depth review rather than proven exposure.
+- Revo uses Saudi UTC+3 for current business year while some legacy/service defaults use `DateTime.Now.Year`.
 - Revo 4.25.2 still depends on jsDelivr CDN assets; production self-host/pin/license closure remains open.
-- The year-scoped Custom Column migration is intentionally forward-only; rollback requires database backup/restore.
-- Admin/Login/Security automated coverage is materially thinner than Work Orders SQL/browser coverage.
+- The year-scoped Custom Column migration is forward-only; rollback requires database backup/restore.
+- Admin/Login/Security automated coverage is thinner than Work Orders SQL/browser coverage.
 
-## Memory/workflow audit result
+## Simplified memory model
 
-- **Continuity:** PASS — Work Log can reconstruct the important product/test/tooling decisions and failures.
-- **Current truth:** PASS only when the live Git branch/HEAD/working-tree state agrees with this file; Memory Gate V8 now checks that directly.
-- **Learning:** STARTED — the metrics loop now records this mission factually instead of leaving a header-only CSV or optimistic zeroes.
-- The audit exposed two package/tooling failures before V3, one later semantic rework of the memory design, one scope-drift correction, and one communication correction. Exact receipts and counts live in Work Log / Metrics, not as chronology here.
-- Memory consistency alone is not enough: V7.3 proved documents could agree with each other while still describing stale live Git state. V8 binds compact memory to Git truth and requires a factual metrics row for a completed mission.
+- **Git tells Git:** branch, HEAD, status, diff, and stashes are read live; they are not copied into this file.
+- **Current State tells current logic:** mission, approved behavior, evidence, open risks, protected boundaries, next action.
+- **Work Log tells history:** append-only chronology; new entries use one structured `Meta:` line so later metrics can be derived instead of guessed.
+- **Metrics tell learning:** failures are separated into Product, Test/Harness, Build/Stale, Tooling, and Environment categories; trends are judged only after several completed missions.
+- **Memory Checker checks mechanics:** required files, compact-state shape, dates, decision IDs, UTF-8 integrity, structured latest log metadata, and completed-mission metrics. It does not duplicate product semantics or live Git state.
 
 ## Protected boundaries
 
-- Do not modify product/runtime/test behavior as part of this completed review.
-- Rename/current column-menu parity remains deferred; no candidate is accepted without its dedicated reference pass and user approval.
-- Preserve commit `008c293e44eb434ed19c48fc2dab67b62b25f293` as the clean technical rollback baseline until the review/memory diff itself is accepted and committed.
+- Do not reopen accepted Work Orders foundations without regression evidence.
+- Rename/current column-menu parity remains deferred until its dedicated reference pass and user approval.
+- Do not add more permanent memory/workflow rules from a single unusual event. Consolidate at root-cause level.
+- Do not record a candidate as PASS or write completed-mission Metrics before the user-executed result actually exists.
+- Do not redesign the memory system again before the planned multi-mission retrospective unless a concrete correctness defect is proven.
 
 ## Next action
 
-No product action is implied by this review. First review/accept the documentation-memory diff itself. Any later product/security/parity fix starts as a separate user-authorized mission from the recorded findings.
+Checkpoint the proven eight-file memory simplification. After that, use the simplified system during real project work and judge it only after several completed missions; do not keep tuning the memory system in isolation.
 
 ## Communication
 
-Explain the program as a story of cause and effect in natural Egyptian Arabic: what happened, why it matters, and what decision follows. Keep implementation names/details in the background unless they change the decision or the user asks for them.
+Explain the program as cause and effect in natural Egyptian Arabic: what happened, why it matters, and what decision follows. Keep implementation detail in the background unless it changes the decision or the user asks for it.

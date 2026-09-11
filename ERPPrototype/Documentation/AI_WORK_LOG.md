@@ -620,3 +620,27 @@ Purpose: chronological receipt of material work. This file is append-only during
 - User-run output is a first-class material event. Before another modifying package is prepared, the result must be re-anchored into the next Current State/Work Log view; after two consecutive tooling/package failures, an exact status/snapshot is mandatory before a third candidate.
 - Package source guards must distinguish Git logical content from platform line endings and compare Git paths in one canonical separator before allowlist decisions.
 - This V8 correction changes project memory/workflow tooling only. It does not change ERP runtime, E2E/runtime tests, migrations, or product behavior.
+
+<!-- STRUCTURED-LOG-V1 -->
+## 2026-09-09 — Memory simplification V1 execution failure
+
+Meta: Mission=MEMORY-SIMPLIFY-20260909; Class=TOOLING; Outcome=FAIL; Stage=VALIDATION; Scope=DOCS_TOOLING
+
+- V1 preflight passed, the reviewed eight-file payload was copied, and `git diff --check` passed.
+- The simplified memory gate then failed with `No structured Work Log entry exists after STRUCTURED-LOG-V1 marker.`
+- Exact package review proved the Work Log did contain both the marker and the structured entry. The checker heading regex ended with a line-boundary assumption that matched LF but not the real CRLF line ending used by the Windows payload.
+- Classification: **TOOLING / MEMORY-CHECKER EOL BUG**. This is not a failure of the structured-log data model and not product/test-runtime evidence.
+- The package automatic rollback restored all eight reviewed files. User output confirmed `Rollback verification: working tree CLEAN`.
+- V1 had also pre-written its own simplification `Outcome=PASS` receipt and completed Metrics row before user execution. Rollback prevented those claims from entering the repository, but the design is corrected: execution results are recorded only after they actually occur.
+- The next candidate is limited to the same simplification scope plus an EOL-neutral parser and LF+CRLF parser self-check. The mission remains OPEN until the user-executed candidate passes and that actual PASS is recorded.
+
+## 2026-09-11 — Memory simplification V2 user execution PASS
+
+Meta: Mission=MEMORY-SIMPLIFY-20260909; Class=WORKFLOW; Outcome=PASS; Stage=VALIDATION; Scope=DOCS_TOOLING
+
+- User executed the corrected V2 package on the real Windows project. Preflight PASS, the reviewed eight-file payload applied, and `git diff --check` PASS.
+- The simplified memory gate returned `AI memory consistency: PASS (V8.1-SIMPLE)`. It observed live Git directly and did not require branch/HEAD/CLEAN-DIRTY to be mirrored inside Current State.
+- Scope remained exactly eight memory/workflow/checker files. Product runtime, Test runtime, and Migrations remained unchanged.
+- V2 proves the structured-log parser now handles the real Windows CRLF Work Log; the checker also carries an explicit LF+CRLF parser self-check.
+- No V2 success or completed Metrics row was pre-recorded. This receipt exists only because the user's executed output now proves the PASS.
+- The simplification mission is therefore evidence-complete. Its factual Metrics row is written now, after execution, and the next action is one checkpoint of the proven eight-file candidate.
