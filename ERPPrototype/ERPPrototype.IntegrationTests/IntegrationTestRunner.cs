@@ -131,6 +131,12 @@ internal static class IntegrationTestRunner
                 "Column layout persists across years and remains department-scoped",
                 integrationTests.ColumnLayoutPersistsAcrossYearsAndRemainsDepartmentScopedAsync),
             (
+                "Revo column visibility is isolated by work year and ignores legacy hidden state",
+                integrationTests.YearScopedColumnVisibilityIsIndependentFromLegacyLayoutAsync),
+            (
+                "Revo column visibility rejects hide-all and stale RowVersion",
+                integrationTests.YearScopedColumnVisibilityRejectsHideAllAndStaleRowVersionAsync),
+            (
                 "Invalid column width is rejected atomically",
                 integrationTests.InvalidColumnWidthIsRejectedAtomicallyAsync),
             (

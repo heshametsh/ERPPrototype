@@ -20,4 +20,7 @@ public sealed class Department
 
     public ICollection<DepartmentColumnLayout> ColumnLayouts { get; set; }
         = new List<DepartmentColumnLayout>();
+
+    public ICollection<DepartmentColumnVisibility> ColumnVisibilities { get; set; }
+        = new List<DepartmentColumnVisibility>();
 }

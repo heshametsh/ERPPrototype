@@ -6,7 +6,7 @@ Mission status: **OPEN**
 
 ## Current mission
 
-Hide/Unhide Columns on the active RevoGrid Gate 5C-1 is the current approved product mission. The behavior/reference pass is complete and the contract is locked before runtime implementation. Rename remains a protected accepted foundation and must not regress.
+Hide/Unhide Columns on the active RevoGrid Gate 5C-1 is the current approved product mission. The behavior/reference pass is complete and the first backend persistence foundation is implemented and SQL-tested: year-scoped visibility now has separate persistence, identity, and RowVersion ownership without changing department-wide width ownership. This backend checkpoint is not yet wired to Revo load/save/UI, so there is no manual feature acceptance yet. Rename remains a protected accepted foundation and must not regress.
 
 ## Authority
 
@@ -93,7 +93,7 @@ These remain review findings only; Rename closure does not authorize unrelated f
 
 ## Next action
 
-Checkpoint this approved Hide/Unhide contract first. Then implement the smallest isolated slice: separate year-scoped visibility persistence plus one ERP visibility owner and thin Revo visibility adapter, followed by focused break tests before broader regression.
+Checkpoint the SQL-tested backend visibility foundation. Then wire the new year-scoped visibility DTO/load/save path into the active Revo Gate, add one ERP visibility owner plus the thin prop-based Revo trim adapter, and expose Hide/Unhide through the existing right-click menu. Once the feature is visible, user manual acceptance comes before focused automated UI coverage and the final full regression.
 
 ## Communication
 

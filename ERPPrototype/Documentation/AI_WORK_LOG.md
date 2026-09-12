@@ -755,3 +755,18 @@ Meta: Mission=REVO-HIDE-UNHIDE-20260912; Class=PRODUCT; Outcome=OPEN; Stage=REFE
 - Current Revo architecture review keeps the full authored column source and uses a prop-based trim/visibility adapter. Filtering authored `grid.columns` to hide a column is rejected because it risks turning Hide into structural removal and disturbing sort metadata.
 - Rename remains a protected accepted foundation. No product runtime code, tests, migrations, or database schema changed in this contract-lock step.
 - Next implementation slice: separate year-scoped visibility persistence plus ERP Visibility Owner and thin Revo visibility adapter, then focused break tests before broader regression.
+
+## 2026-09-12 - REVO-HIDE-UNHIDE-20260912 backend visibility foundation PASS
+
+Meta: Mission=REVO-HIDE-UNHIDE-20260912; Class=PRODUCT; Outcome=PASS; Stage=BACKEND_FOUNDATION; Scope=YEAR_VISIBILITY_PERSISTENCE
+
+- Started from GitHub checkpoint `acae0ef` with the Hide/Unhide contract already locked.
+- Added separate `DepartmentColumnVisibility` persistence keyed by `DepartmentId + WorkYear + FieldKey`, with independent `RowVersion`, `UpdatedAt`, and `UpdatedBy`.
+- Width ownership was not changed. Existing `DepartmentColumnLayout` remains department-scoped, so this slice does not make width year-specific.
+- Migration `20260912193138_AddYearScopedColumnVisibility` creates only the new visibility table/index/FK. It does not copy legacy `DepartmentColumnLayout.IsHidden` values, so the new Revo visibility baseline starts all-visible.
+- Added `DepartmentColumnVisibilityService` with year-scoped load/prepare behavior, unknown-field rejection, duplicate-input rejection, last-visible-column protection, and RowVersion stale-write protection.
+- Added SQL integration coverage for year isolation, legacy-hidden-state non-migration, hide-all rejection, and stale visibility RowVersion rejection.
+- Two red runs were classified as TEST/HARNESS fixture contamination, not product defects. The fixture corrections changed test code only and isolated the cases from shared prior test state.
+- Final application/integration build PASS and Core SQL integration suite PASS: **36/36**.
+- This checkpoint does not yet connect visibility to the active Revo load/save/UI, context menu, History, selection reconciliation, aggregates, or trim adapter. Therefore no user manual Hide/Unhide acceptance is claimed yet.
+- Next slice: wire year-scoped visibility through the Revo Gate save/load contract, ERP visibility owner, prop-based trim adapter, and existing right-click menu; then user manual acceptance before focused UI automation and full regression.

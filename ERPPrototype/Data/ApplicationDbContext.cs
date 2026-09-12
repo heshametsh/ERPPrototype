@@ -22,6 +22,9 @@ public class ApplicationDbContext(
     public DbSet<DepartmentColumnLayout> DepartmentColumnLayouts =>
         Set<DepartmentColumnLayout>();
 
+    public DbSet<DepartmentColumnVisibility> DepartmentColumnVisibilities =>
+        Set<DepartmentColumnVisibility>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
@@ -119,6 +122,45 @@ public class ApplicationDbContext(
             {
                 layout.DepartmentId,
                 layout.FieldKey
+            })
+            .IsUnique();
+        });
+
+        builder.Entity<DepartmentColumnVisibility>(entity =>
+        {
+            entity.ToTable("DepartmentColumnVisibilities");
+
+            entity.HasKey(visibility => visibility.Id);
+
+            entity.Property(visibility => visibility.WorkYear)
+                .IsRequired();
+
+            entity.Property(visibility => visibility.FieldKey)
+                .IsUnicode(false)
+                .HasMaxLength(40)
+                .IsRequired();
+
+            entity.Property(visibility => visibility.IsHidden)
+                .HasDefaultValue(false)
+                .IsRequired();
+
+            entity.Property(visibility => visibility.UpdatedBy)
+                .HasMaxLength(450)
+                .IsRequired();
+
+            entity.Property(visibility => visibility.RowVersion)
+                .IsRowVersion();
+
+            entity.HasOne(visibility => visibility.Department)
+                .WithMany(department => department.ColumnVisibilities)
+                .HasForeignKey(visibility => visibility.DepartmentId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasIndex(visibility => new
+            {
+                visibility.DepartmentId,
+                visibility.WorkYear,
+                visibility.FieldKey
             })
             .IsUnique();
         });

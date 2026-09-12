@@ -1974,6 +1974,262 @@ internal sealed class WorkOrderSaveIntegrationTests(
                 stored.CustomValuesJson).Count,
             "The blank-value row gained custom data during the move.");
     }
+    public async Task YearScopedColumnVisibilityIsIndependentFromLegacyLayoutAsync()
+    {
+        const int currentYear = 2026;
+        const int previousYear = 2025;
+
+        var currentSheet =
+            await database.Service.LoadSheetAsync(
+                database.EmployeeAId,
+                currentYear);
+
+        TestAssert.NotNull(
+            currentSheet,
+            "The current-year sheet could not be loaded before preparing the legacy visibility fixture.");
+
+        var currentBasketLayout = currentSheet!.ColumnLayouts
+            .SingleOrDefault(layout => layout.FieldKey == "basket");
+        var legacyLayout = await database.Service.SaveChangesAsync(
+            database.EmployeeAId,
+            currentYear,
+            addedRecords: [],
+            changedRecords: Array.Empty<WorkOrderChangeSet>(),
+            deletedRecords: [],
+            customColumns: [],
+            customColumnsChanged: false,
+            columnLayouts:
+            [
+                new DepartmentColumnLayoutInput(
+                    currentBasketLayout?.Id ?? 0,
+                    "basket",
+                    320,
+                    currentBasketLayout?.RowVersion ?? string.Empty,
+                    IsHidden: true)
+            ],
+            columnLayoutsChanged: true);
+
+        TestAssert.True(
+            legacyLayout.Succeeded,
+            $"Preparing the legacy hidden-state fixture failed: {legacyLayout.ErrorMessage}");
+
+        await using (var dbContext =
+            await database.Factory.CreateDbContextAsync())
+        {
+            var currentBefore =
+                await DepartmentColumnVisibilityService.LoadVisibilityAsync(
+                    dbContext,
+                    database.DepartmentAId,
+                    currentYear);
+            var previousBefore =
+                await DepartmentColumnVisibilityService.LoadVisibilityAsync(
+                    dbContext,
+                    database.DepartmentAId,
+                    previousYear);
+
+            TestAssert.Equal(
+                0,
+                currentBefore.Count,
+                "Legacy DepartmentColumnLayout.IsHidden leaked into the new Revo visibility source.");
+            TestAssert.Equal(
+                0,
+                previousBefore.Count,
+                "The new visibility source did not start all-visible in the previous year.");
+        }
+
+        await using (var dbContext =
+            await database.Factory.CreateDbContextAsync())
+        {
+            var prepared =
+                await DepartmentColumnVisibilityService.PrepareVisibilityAsync(
+                    dbContext,
+                    database.DepartmentAId,
+                    currentYear,
+                    database.EmployeeAId,
+                    [
+                        new DepartmentColumnVisibilityInput(
+                            0,
+                            "basket",
+                            true)
+                    ],
+                    visibilityChanged: true,
+                    customColumns: []);
+
+            TestAssert.True(
+                prepared.Succeeded,
+                $"Preparing current-year visibility failed: {prepared.ErrorMessage}");
+
+            await dbContext.SaveChangesAsync();
+        }
+
+        await using (var dbContext =
+            await database.Factory.CreateDbContextAsync())
+        {
+            var currentAfter =
+                await DepartmentColumnVisibilityService.LoadVisibilityAsync(
+                    dbContext,
+                    database.DepartmentAId,
+                    currentYear);
+            var previousAfter =
+                await DepartmentColumnVisibilityService.LoadVisibilityAsync(
+                    dbContext,
+                    database.DepartmentAId,
+                    previousYear);
+
+            TestAssert.Equal(
+                1,
+                currentAfter.Count,
+                "The current-year visibility record was not persisted.");
+            TestAssert.True(
+                currentAfter.Single().IsHidden,
+                "Basket was not hidden in the current-year visibility source.");
+            TestAssert.Equal(
+                "basket",
+                currentAfter.Single().FieldKey,
+                "The persisted visibility record targeted the wrong field.");
+            TestAssert.True(
+                currentAfter.Single().Id > 0 &&
+                !string.IsNullOrWhiteSpace(currentAfter.Single().RowVersion),
+                "The visibility record did not receive database identity and RowVersion.");
+
+            TestAssert.Equal(
+                0,
+                previousAfter.Count,
+                "Hiding Basket in 2026 leaked into 2025.");
+        }
+
+        var legacyPreviousYear =
+            await database.Service.LoadSheetAsync(
+                database.EmployeeAId,
+                previousYear);
+
+        TestAssert.True(
+            legacyPreviousYear!.ColumnLayouts.Single(layout =>
+                layout.FieldKey == "basket").IsHidden,
+            "The compatibility slice unexpectedly rewrote the legacy layout record.");
+    }
+
+    public async Task YearScopedColumnVisibilityRejectsHideAllAndStaleRowVersionAsync()
+    {
+        const int workYear = 2027;
+
+        var allCoreFields = new[]
+        {
+            "workOrderNumber",
+            "workTypeCode",
+            "assignmentDate",
+            "workOrderValue",
+            "partialAmount",
+            "remainingAmount",
+            "basket"
+        };
+
+        await using (var dbContext =
+            await database.Factory.CreateDbContextAsync())
+        {
+            var hideAll =
+                await DepartmentColumnVisibilityService.PrepareVisibilityAsync(
+                    dbContext,
+                    database.DepartmentAId,
+                    workYear,
+                    database.EmployeeAId,
+                    allCoreFields
+                        .Select(fieldKey =>
+                            new DepartmentColumnVisibilityInput(
+                                0,
+                                fieldKey,
+                                true))
+                        .ToList(),
+                    visibilityChanged: true,
+                    customColumns: []);
+
+            TestAssert.False(
+                hideAll.Succeeded,
+                "The new visibility owner allowed every data column to be hidden.");
+        }
+
+        DepartmentColumnVisibilityData firstSaved;
+
+        await using (var dbContext =
+            await database.Factory.CreateDbContextAsync())
+        {
+            var prepared =
+                await DepartmentColumnVisibilityService.PrepareVisibilityAsync(
+                    dbContext,
+                    database.DepartmentAId,
+                    workYear,
+                    database.EmployeeAId,
+                    [
+                        new DepartmentColumnVisibilityInput(
+                            0,
+                            "basket",
+                            true)
+                    ],
+                    visibilityChanged: true,
+                    customColumns: []);
+
+            TestAssert.True(
+                prepared.Succeeded,
+                $"Preparing the visibility RowVersion fixture failed: {prepared.ErrorMessage}");
+
+            await dbContext.SaveChangesAsync();
+
+            firstSaved = DepartmentColumnVisibilityService.MapVisibility(
+                prepared.Visibility.Single(item =>
+                    item.FieldKey == "basket"));
+        }
+
+        await using (var dbContext =
+            await database.Factory.CreateDbContextAsync())
+        {
+            var updated =
+                await DepartmentColumnVisibilityService.PrepareVisibilityAsync(
+                    dbContext,
+                    database.DepartmentAId,
+                    workYear,
+                    database.EmployeeAId,
+                    [
+                        new DepartmentColumnVisibilityInput(
+                            firstSaved.Id,
+                            firstSaved.FieldKey,
+                            false,
+                            firstSaved.RowVersion)
+                    ],
+                    visibilityChanged: true,
+                    customColumns: []);
+
+            TestAssert.True(
+                updated.Succeeded,
+                $"Updating the visibility fixture failed: {updated.ErrorMessage}");
+
+            await dbContext.SaveChangesAsync();
+        }
+
+        await using (var dbContext =
+            await database.Factory.CreateDbContextAsync())
+        {
+            var stale =
+                await DepartmentColumnVisibilityService.PrepareVisibilityAsync(
+                    dbContext,
+                    database.DepartmentAId,
+                    workYear,
+                    database.EmployeeAId,
+                    [
+                        new DepartmentColumnVisibilityInput(
+                            firstSaved.Id,
+                            firstSaved.FieldKey,
+                            true,
+                            firstSaved.RowVersion)
+                    ],
+                    visibilityChanged: true,
+                    customColumns: []);
+
+            TestAssert.False(
+                stale.Succeeded,
+                "A stale visibility RowVersion was accepted.");
+        }
+    }
+
     public async Task ColumnLayoutPersistsAcrossYearsAndRemainsDepartmentScopedAsync()
     {
         const int workYear = 2026;
