@@ -1038,12 +1038,12 @@ Next acceptance order:
 
 - [ ] Reconnect preserved Revo Custom Column persistence/history with the Phase 1 `WorkYear` fixture change preserved.
 - [ ] User manually accepts Custom Column Add + Save + reload.
-- [ ] User manually accepts Rename + Save + reload.
+- [x] User manually accepts Rename + Save + reload — closed by REVO-RENAME-20260911 on 2026-09-12.
 - [ ] User manually accepts Delete + Save without affecting another year.
 - [ ] User manually accepts year isolation between at least two Work Years.
 - [ ] User manually accepts cross-year valued move reuse/create/conflict behavior.
-- [ ] After user manual acceptance, run assistant/automated Revo + SQL closure regressions.
-- [ ] Run memory consistency + final diff review.
+- [x] After user manual acceptance, run assistant/automated Revo + SQL closure regressions — final one-command regression PASS on 2026-09-12.
+- [x] Run memory consistency + final diff review as part of the Rename closure sync package; failed checks roll back the document sync.
 - [ ] Append factual CC-YEAR-001 metrics.
 - [ ] Create final accepted checkpoint.
 
@@ -1058,7 +1058,7 @@ Deployment safety:
 - [x] Corrected year-switch module was proven loaded in the browser.
 - [x] User manual PASS — Add Custom Column + value + Save.
 - [x] User manual PASS — column is absent in another Work Year and returns when switching back, without requiring Refresh, on the corrected year-switch module.
-- [ ] Rename + Save + reload remains pending.
+- [x] Rename + Save + reload accepted on the final Revo Rename implementation (2026-09-12).
 - [ ] Delete + Save acceptance remains pending. The first delete path exposed a separate post-commit reconcile problem.
 - [ ] V2 delete-reconcile candidate has **not yet received a valid manual test** because the later trace showed the browser was still running the older `cc-year-reconnect-1` module.
 - [ ] Before any further manual product result is accepted, prove runtime freshness: stop server, remove app bin/obj, Build the real project, abort on Build failure, Run without `--no-build`, open a new tab, and verify the intended module version.
@@ -1152,6 +1152,25 @@ Browser closure execution note — 2026-09-07:
 - [x] Browser trace/screenshot evidence captured.
 - [x] Employee Real Workday 00-17 rerun on rebuilt machine PASS through [00]-[17].
 - [ ] Rename/current column-menu parity remains outside this recovery closure.
+
+### REVO-RENAME-20260911 — final closure (2026-09-12)
+
+- [x] Manual interaction accepted: normal single-click selection; double-click on Custom Column name opens Rename and clears whole-column selection.
+- [x] Rename input Select-All is preserved; underlying Custom Column header text is not browser-selectable.
+- [x] Filter, Sort, and core-header double-clicks do not enter Rename.
+- [x] Enter/Escape/no-op/outside-click/duplicate/blank/max-150 behavior is covered by the focused browser suite.
+- [x] Undo/Redo repaint the authoritative visible header and keep Rename as one atomic History action.
+- [x] Save persists name only and preserves Id/FieldKey/DataType/LayoutOrder/custom values.
+- [x] Reload and Work-Year isolation PASS.
+- [x] Stale Custom Column RowVersion rejection PASS.
+- [x] Focused Rename break suite R00-R13 PASS.
+- [x] Real Employee Workday 00-17 PASS.
+- [x] B9-B11 Full Regression PASS.
+- [x] B12 Real DB Save PASS.
+- [x] Integration tests PASS.
+- [x] `ERP FULL REGRESSION : PASS` from `Run-ERP-Full-Regression.ps1`.
+
+**Current regression command:** from repository root run `powershell -ExecutionPolicy Bypass -File ".\Run-ERP-Full-Regression.ps1"`. The runner performs a fresh build, executes all five protected suites, continues through suite failures, and emits one final summary.
 
 ### REVIEW-ONLY AUDIT — 2026-09-09 — security/account/memory gaps
 

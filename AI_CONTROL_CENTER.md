@@ -40,6 +40,7 @@ Before another modifying candidate:
 
 - classify the result;
 - re-anchor from the actual result and current Git;
+- if automation suggests a PRODUCT defect, show Expected vs Actual and evidence to the user before changing product behavior;
 - update Current State when current truth changed;
 - append a Work Log receipt;
 - update the canonical owner only when that owner's truth changed.

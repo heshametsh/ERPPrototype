@@ -18,7 +18,7 @@ Purpose: keep only the Grid comparisons that materially affect current ERP behav
 | Undo/Redo across Save for column structure | Current Tabulator code removes/sanitizes Custom Column structural history after an accepted Save baseline | Current ERP Sheet History tracks structural Custom Column actions; preserved stash discards saved Column Workspace history after accepted Save | Public Pro History docs can track built-in column-schema mutations, while application-owned handlers are excluded; Pro stack/source replacement rules do not define ERP Save-baseline semantics | ERP owns whether saved structural history survives, is rebased, or is discarded | Keep current preserved behavior as candidate only; user-visible post-Save Undo/Redo behavior must be manually checked after reconnect before final acceptance | REFERENCE PASS COMPLETE — LOCAL-CODE + OFFICIAL-DOCS; behavior acceptance PENDING manual reconnect test |
 | Cross-year Custom Column movement | Tabulator `/work-orders` remains a legacy/live behavior reference until cutover; Phase 1 regression acceptance is Revo Gate 5C-1 | Grid should not own cross-year business semantics | Pro capability is not expected to own ERP year semantics; verify only if relevant after reconnect | ERP service/data layer | Year-scoped server/data behavior implemented; Revo Custom Column persistence/history reconnect remains post-Phase-1 | REAL SQL VERIFIED (34/34 + populated migration); GATE5B12 FULL PASS; REVO EMPLOYEE REAL WORKDAY PASS (00-17); visible year-scoped Revo Custom Column Add/Save/year-isolation/delete/cross-year/order behavior accepted in the recovered closure |
 
-| Custom Column Rename / column-menu parity | Legacy Tabulator is the mandatory behavior reference for this existing migrated capability; exact Rename and companion column-menu commands/edge cases must be re-inspected before Revo implementation | Current Revo integration must be compared against Community column mechanics and the existing ERP Column Workspace/History ownership; absence of a current command is a parity gap, not permission to invent behavior | Use official Pro docs/examples only when relevant; no Pro source claim without licensed source | ERP owns business identity, validation, year scope, Save/History meaning; Grid owns supported column mechanics | Stop implementation until the feature-specific Tabulator → Revo → ERP comparison is recorded and the user approves the recovered behavior | REFERENCE PASS REQUIRED — prior Rename closure candidate not accepted |
+| Custom Column Rename / column-menu parity | Tabulator remains the historical parity reference for future companion column-menu work; Rename itself now has an explicit user-approved Revo behavior contract | RevoGrid Community 4.25.2 source confirms `headerdblclick`, `beforeheaderrender`, Revo-owned `columnTemplate`, and public `updateColumns(cols)`; `refresh("rgCol")` is not a supported column-refresh call | Public Pro docs remain advisory only; no Pro source claim without licensed source | ERP owns name validation, identity, year scope, Save/History meaning; Revo owns the supported header render/update lifecycle | Accepted Rename uses Revo-owned header rendering, stable `prop`, one ERP History action, and name-only persistence; companion menu parity remains a separate future mission | ACCEPTED 2026-09-12 — LOCAL-CODE + OFFICIAL-SOURCE + USER MANUAL + REAL-BROWSER E2E; no licensed PRO-SOURCE |
 
 Update only rows touched by the active mission. Remove obsolete rows when no longer useful; historical decisions remain in Git/work log.
 
@@ -28,7 +28,7 @@ Update only rows touched by the active mission. Remove obsolete rows when no lon
 - Real local DB migration: applied and post-verified after a validated backup.
 - User manual core Revo result: PASS for edit/save/refresh, year switching, cross-year Cancel/Continue, Sort/Filter + Save, and Undo/Redo.
 - Reconnected Custom Column manual result after fixes: PASS for Add + value + Save/reload, year isolation, valued Delete without forced Refresh/false layout conflict, cross-year custom-value movement, and destination-column ordering.
-- Rename/current column-menu parity is not yet accepted in this closure cycle; perform the feature-specific legacy Tabulator reference pass before any Revo runtime change.
+- Custom Column Rename is accepted on Gate 5C-1. Future companion column-menu parity remains a separate mission and should still use the focused Tabulator → Revo → ERP reference pass.
 - Acceptance order remains: user-approved behavior/reference → manual user acceptance → assistant/automated closure.
 
 
@@ -39,3 +39,12 @@ Update only rows touched by the active mission. Remove obsolete rows when no lon
 - Official RevoGrid Community API reference inspected for column-set events/mechanics.
 - Official RevoGrid Pro public History/Context Menu documentation inspected for structural History and application-owned command-handler boundaries.
 - No licensed Revo Pro package/source was available in this review; evidence label remains `OFFICIAL-DOCS`, not `PRO-SOURCE`.
+
+## REVO-RENAME-20260911 closure receipt
+
+- Revo Community version reviewed: **4.25.2**.
+- Supported lifecycle used by the accepted implementation: `headerdblclick`, `beforeheaderrender`, Revo-owned `columnTemplate`, and `updateColumns(cols)` by stable `prop`.
+- `refresh("rgCol")` was disproven for column refresh and is not part of the accepted design.
+- ERP Column Workspace owns Rename validation, year scope, Dirty/History, Save projection, persistence identity, and RowVersion authority.
+- User manual interaction PASS plus focused browser R00-R13 PASS and the final one-command full regression PASS close Rename.
+- No licensed Revo Pro source was inspected; Pro references remain `OFFICIAL-DOCS` only.

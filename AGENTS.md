@@ -23,6 +23,9 @@ Before changing code:
 - identify rollback and the evidence needed;
 - do not silently invent a new business rule.
 
+Keep the workflow proportional to the risk. Do not require preview packages or architecture ceremony for routine test/harness corrections. For Grid/library behavior, inspect version-matched source/API when the design actually depends on that lifecycle or contract.
+
+
 ## Verification
 
 Classify every red result before changing product code:
@@ -34,6 +37,8 @@ Classify every red result before changing product code:
 - **ENVIRONMENT** — missing/unavailable external runtime or infrastructure.
 
 Do not use one class as evidence for another.
+
+When an automated test appears to expose a **PRODUCT** defect, show the exact Expected vs Actual, the evidence, and the proposed classification to the user before changing product code. If the failure is TEST/HARNESS, BUILD/STALE, TOOLING, or ENVIRONMENT, correct only that layer.
 
 Use the lowest evidence layer that proves the risk, then move upward as needed: build/static → deterministic tests → real SQL/integration → browser E2E → user hands-on acceptance.
 

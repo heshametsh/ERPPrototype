@@ -1,16 +1,17 @@
-﻿import * as nativeGate5A from "./revoGridNativeGate5A.js?v=20260829-gate5b10-header-selection-plugin-1";
+import * as nativeGate5A from "./revoGridNativeGate5A.js?v=20260911-rename-lifecycle-1";
 import { createRevoGridChangeBridge } from "./revoGridChangeBridge.js?v=20260826-unified-validation-1";
 import { createRevoGridHistoryCoordinator } from "./revoGridHistoryCoordinator.js?v=20260821-minimal-reveal-1";
 import { createRevoGridHistoryFocus } from "./revoGridHistoryFocus.js?v=20260821-gate5b4-keyboard-sort-1";
-import { createRevoGridExcelFilter } from "./revoGridExcelFilter.js?v=20260828-structure-workspace-2";
-import { createRevoGridSort } from "./revoGridSort.js?v=20260828-structure-workspace-2";
+import { createRevoGridExcelFilter } from "./revoGridExcelFilter.js?v=20260912-rename-noselect-1";
+import { createRevoGridSort } from "./revoGridSort.js?v=20260912-rename-noselect-1";
 import { createRevoGridColumnSelection } from "./revoGridColumnSelection.js?v=20260821-gate5b4-keyboard-sort-1";
 import { createRevoGridSelectionLifecycle } from "./revoGridSelectionLifecycle.js?v=20260821-gate5b4-keyboard-sort-1";
 import { createRevoGridSelectionContext } from "./revoGridSelectionContext.js?v=20260829-gate5b10-header-selection-1";
 import { createRevoGridRowStructure } from "./revoGridRowStructure.js?v=20260829-gate5b10-header-selection-1";
 import { createRevoGridValidation } from "./revoGridValidation.js?v=20260826-unified-validation-1";
 import { createRevoGridPersistenceIdentity } from "./revoGridPersistenceIdentity.js?v=20260826-persistence-identity-1";
-import { createRevoGridColumnWorkspace } from "./revoGridColumnWorkspace.js?v=20260906-cc-year-reconnect-1";
+import { createRevoGridColumnWorkspace } from "./revoGridColumnWorkspace.js?v=20260911-rename-1";
+import { createRevoGridColumnRename } from "./revoGridColumnRename.js?v=20260912-rename-noselect-4";
 import { createRevoGridStructureMenu } from "./revoGridStructureMenu.js?v=20260828-context-menu-settle-1";
 import { createRevoGridStructureCommands } from "./revoGridStructureCommands.js?v=20260829-gate5b10-header-selection-1";
 import {
@@ -279,6 +280,11 @@ async function destroyBinding(elementId) {
 
     try {
         state.columnWorkspace?.destroy();
+    } catch {
+    }
+
+    try {
+        state.columnRename?.destroy();
     } catch {
     }
 
@@ -582,6 +588,26 @@ export async function initialize(elementId, rows, customColumns, options) {
             }
         });
 
+        state.columnRename = createRevoGridColumnRename({
+            grid,
+            columnWorkspace: state.columnWorkspace,
+            clearColumnSelection: async () => {
+                const headerState = state.headerSelection?.getState?.();
+                if (headerState?.kind === "columns") {
+                    await state.headerSelection.clear({ clearNative: true });
+                    return;
+                }
+
+                const snapshot = state.selectionContext?.getSnapshot
+                    ? await state.selectionContext.getSnapshot()
+                    : null;
+                if (snapshot?.kind === "column" || snapshot?.kind === "columns") {
+                    state.selectionContext?.clearExplicitSelection?.();
+                    await grid.clearFocus();
+                }
+            }
+        });
+
         state.structureCommands = createRevoGridStructureCommands({
             rowStructure: state.rowStructure,
             columnWorkspace: state.columnWorkspace,
@@ -629,6 +655,14 @@ export async function initialize(elementId, rows, customColumns, options) {
         const original = detail?.original;
 
         if (!original) {
+            return;
+        }
+
+        // Inline Rename is an external text editor. Keep Enter/Escape and
+        // ordinary typing owned by its input; Revo must not also interpret
+        // those events as sheet keyboard actions.
+        if (state.columnRename?.ownsKeyboardEvent?.(original)) {
+            event.preventDefault();
             return;
         }
 

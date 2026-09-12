@@ -504,6 +504,52 @@ export function createRevoGridColumnWorkspace(options) {
         );
     }
 
+    function renameError(fieldKey, name) {
+        const column = current.find(item => item.fieldKey === fieldKey);
+        if (!column) {
+            return "The custom column is no longer available.";
+        }
+
+        const normalized = String(name ?? "").trim();
+        if (!normalized) {
+            return "Column name is required.";
+        }
+        if (normalized.length > 150) {
+            return "Column name cannot exceed 150 characters.";
+        }
+
+        const duplicate = buildOrderedEntries(current).some(item =>
+            item.prop !== fieldKey &&
+            String(item.name ?? "").trim().toLocaleLowerCase() ===
+                normalized.toLocaleLowerCase()
+        );
+        return duplicate ? "A column with the same name already exists." : null;
+    }
+
+    async function renameColumn(fieldKey, name) {
+        const prop = String(fieldKey ?? "").trim();
+        const error = renameError(prop, name);
+        if (error) {
+            return { succeeded: false, message: error };
+        }
+
+        const normalized = String(name ?? "").trim();
+        const column = current.find(item => item.fieldKey === prop);
+        if (!column || normalized === column.name) {
+            return { succeeded: true, changed: false, message: "" };
+        }
+
+        const changed = await mutate(
+            `Rename Column ${column.name}`,
+            columns => columns.map(item => item.fieldKey === prop
+                ? { ...item, name: normalized }
+                : item)
+        );
+        return changed
+            ? { succeeded: true, changed: true, message: "" }
+            : { succeeded: false, changed: false, message: "Unable to rename the custom column." };
+    }
+
     async function resolveContext(clickedCell, selectionSnapshot = null) {
         const columns = await grid.getColumns();
         const targetIndex = Number(clickedCell?.colIndex);
@@ -669,6 +715,7 @@ export function createRevoGridColumnWorkspace(options) {
     return Object.freeze({
         insertColumns,
         deleteColumns,
+        renameColumn,
         resolveContext,
         getState,
         getOrderedProps,

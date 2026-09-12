@@ -704,30 +704,14 @@ internal static class Gate5B10SelectionRunner
         await ScrollToRowAsync(page, 0);
         await DataCell(page, 0, 0).ClickAsync();
 
-        await page.EvaluateAsync(
-            """
-            () => {
-                const root = document.querySelector('#revogrid-native-gate5a-grid revogr-row-headers');
-                const send = (row, ctrlKey) => {
-                    const target = root?.querySelector(`[data-rgRow="${row}"]`);
-                    if (!target) throw new Error(`Missing row header ${row}.`);
-                    target.dispatchEvent(new PointerEvent('pointerdown', {
-                        bubbles: true,
-                        composed: true,
-                        button: 0,
-                        ctrlKey
-                    }));
-                };
-
-                send(1, false);
-                send(3, true);
-                send(5, true);
-                send(7, true);
-                send(9, true);
-                send(3, true);
-                send(7, true);
-            }
-            """);
+        // Exercise the same sequence through real Playwright clicks rather than
+        // dispatching seven synthetic pointerdown events in one JavaScript turn.
+        await RowHeader(page, 1).ClickAsync();
+        foreach (var row in new[] { 3, 5, 7, 9, 3, 7 })
+        {
+            await WithKeyAsync(page, "Control", () => RowHeader(page, row).ClickAsync());
+            await page.WaitForTimeoutAsync(100);
+        }
 
         await page.WaitForFunctionAsync(
             """

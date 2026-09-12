@@ -252,7 +252,7 @@ public partial class WorkOrdersRevoGridNativeGate5A
         {
             var gridModulePath = EnableChangeEngine
                 ? EnableSaveHandshake
-                    ? "./js/revoGridGate5B1.js?v=20260906-cc-delete-reconcile-2"
+                    ? "./js/revoGridGate5B1.js?v=20260912-revo-rename-6"
                     : EnableHeaderMultiSelection
                     ? "./js/revoGridGate5B1.js?v=20260830-selection-core-r2"
                     : EnableStructureWorkspace

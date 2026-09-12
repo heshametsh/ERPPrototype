@@ -10,7 +10,6 @@ internal static class Gate5B11SaveHandshakeRunner
     private const int FixedPort = 5265;
     private const string GatePath = "/work-orders-revogrid-gate5b11";
     private const string GridHostId = "revogrid-native-gate5a-grid";
-    private const string ModulePath = "/js/revoGridGate5B1.js?v=20260830-selection-core-r2";
 
     public static async Task<int> RunAsync()
     {
@@ -199,15 +198,17 @@ internal static class Gate5B11SaveHandshakeRunner
         E2ETestAssert.True(await SaveButton(page).IsDisabledAsync(),
             "Save button remained enabled while a Save snapshot was active.");
 
+        var moduleUrl = await GetLoadedGateModuleUrlAsync(page);
         var result = await page.EvaluateAsync<string>(
-            $$"""
-            async () => {
-                const module = await import('{{ModulePath}}');
-                const second = await module.beginSaveHandshake('{{GridHostId}}');
-                const switchDecision = await module.beginDatasetSwitch('{{GridHostId}}');
+            """
+            async args => {
+                const module = await import(args.moduleUrl);
+                const second = await module.beginSaveHandshake(args.gridHostId);
+                const switchDecision = await module.beginDatasetSwitch(args.gridHostId);
                 return JSON.stringify({ second, switchDecision });
             }
-            """);
+            """,
+            new { moduleUrl, gridHostId = GridHostId });
         using var document = JsonDocument.Parse(result);
         E2ETestAssert.Equal("save-active",
             document.RootElement.GetProperty("second").GetProperty("reason").GetString(),
@@ -496,30 +497,55 @@ internal static class Gate5B11SaveHandshakeRunner
         await page.WaitForTimeoutAsync(100);
     }
 
+    private static async Task<string> GetLoadedGateModuleUrlAsync(IPage page)
+    {
+        var urls = await page.EvaluateAsync<string[]>(
+            """
+            () => [...new Set(
+                performance.getEntriesByType('resource')
+                    .map(entry => String(entry?.name ?? ''))
+                    .filter(name => name.includes('/js/revoGridGate5B1.js?v='))
+            )]
+            """);
+
+        E2ETestAssert.True(urls.Length > 0,
+            "The browser did not report a loaded Gate module URL.");
+        return urls[^1];
+    }
+
     private static async Task<JsonElement> GetSaveDiagnosticsAsync(IPage page)
     {
+        var moduleUrl = await GetLoadedGateModuleUrlAsync(page);
         var json = await page.EvaluateAsync<string>(
-            $$"""
-            async () => JSON.stringify((await import('{{ModulePath}}')).getSaveHandshakeDiagnostics('{{GridHostId}}'))
-            """);
+            """
+            async args => JSON.stringify(
+                (await import(args.moduleUrl)).getSaveHandshakeDiagnostics(args.gridHostId))
+            """,
+            new { moduleUrl, gridHostId = GridHostId });
         return JsonDocument.Parse(json).RootElement.Clone();
     }
 
     private static async Task<JsonElement> GetChangeStateAsync(IPage page)
     {
+        var moduleUrl = await GetLoadedGateModuleUrlAsync(page);
         var json = await page.EvaluateAsync<string>(
-            $$"""
-            async () => JSON.stringify((await import('{{ModulePath}}')).getChangeState('{{GridHostId}}'))
-            """);
+            """
+            async args => JSON.stringify(
+                (await import(args.moduleUrl)).getChangeState(args.gridHostId))
+            """,
+            new { moduleUrl, gridHostId = GridHostId });
         return JsonDocument.Parse(json).RootElement.Clone();
     }
 
     private static async Task<JsonElement> GetDirtyCellsAsync(IPage page)
     {
+        var moduleUrl = await GetLoadedGateModuleUrlAsync(page);
         var json = await page.EvaluateAsync<string>(
-            $$"""
-            async () => JSON.stringify((await import('{{ModulePath}}')).getDirtyCells('{{GridHostId}}'))
-            """);
+            """
+            async args => JSON.stringify(
+                (await import(args.moduleUrl)).getDirtyCells(args.gridHostId))
+            """,
+            new { moduleUrl, gridHostId = GridHostId });
         return JsonDocument.Parse(json).RootElement.Clone();
     }
 

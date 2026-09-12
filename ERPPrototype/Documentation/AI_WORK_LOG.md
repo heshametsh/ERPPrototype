@@ -644,3 +644,102 @@ Meta: Mission=MEMORY-SIMPLIFY-20260909; Class=WORKFLOW; Outcome=PASS; Stage=VALI
 - V2 proves the structured-log parser now handles the real Windows CRLF Work Log; the checker also carries an explicit LF+CRLF parser self-check.
 - No V2 success or completed Metrics row was pre-recorded. This receipt exists only because the user's executed output now proves the PASS.
 - The simplification mission is therefore evidence-complete. Its factual Metrics row is written now, after execution, and the next action is one checkpoint of the proven eight-file candidate.
+
+## 2026-09-11 — REVO-RENAME-20260911 review-fix round
+
+Meta: Mission=REVO-RENAME-20260911; Class=PRODUCT; Outcome=OPEN; Stage=REVIEW_FIX; Scope=RENAME_ONLY
+
+- The original Rename candidate added inline Custom Column header rename on the active RevoGrid Gate 5C-1 surface, preserving name-only metadata semantics and one Column Workspace History action.
+- Review finding 1 was confirmed: a successful no-op Rename returned success without closing the inline input. The fix now reports `changed:false` and restores the normal header text, including after an invalid value is corrected to the original name; no History or Dirty mutation is created.
+- Review finding 2 was confirmed: Rename had no explicit keyboard ownership in Gate5B1. The fix adds `ownsKeyboardEvent` to the Rename owner and checks it in the existing `beforekeydown` path before Excel Filter and sheet shortcut handling. Rename Enter/Escape/typing stay with the input without a broad keyboard hack.
+- Focused Gate5B12 coverage now includes no-op Enter, no-op History/Dirty, invalid-to-original recovery, Filter/Sort/core control isolation, and the existing Rename persistence/value/FieldKey/Undo/Redo cases.
+- Application build, IntegrationTests build, E2ETests build, `git diff --check`, and the memory checker passed. SQL Integration and Gate5B12 browser execution were blocked by unavailable LocalDB; the E2E harness then failed creating its Downloads artifact after setup failure. Browser behavior remains UNPROVEN and manual acceptance is pending.
+- No commit or push was made. `appsettings.Development.json` was not intentionally changed; its content hash matched HEAD after the failed harness setup, though Git reported a worktree/index refresh anomaly.
+
+## 2026-09-11 — REVO-RENAME-20260911 manual acceptance teardown defect
+
+Meta: Mission=REVO-RENAME-20260911; Class=PRODUCT; Outcome=OPEN; Stage=MANUAL_ACCEPTANCE; Scope=RENAME_ONLY
+
+- Real Gate 5C-1 manual browser acceptance found a PRODUCT defect after the static review: a successful changed Rename set Dirty and accepted the name, but the inline input remained visibly stuck in the header.
+- The previous static review proved the `changed:false` path and keyboard ownership but did not prove successful `changed:true` editor teardown. The root cause was `commit()` setting `active = null` while assuming Revo would replace the existing header DOM node.
+- The targeted fix now replaces the active input with the accepted trimmed new name in the existing header node after the workspace mutation succeeds. It does not revert to the old name, repeat the mutation, or add another History action.
+- Focused E2E coverage now waits for the input to detach after a real changed Enter path. No-op, invalid-to-original, Escape, Filter/Sort/core isolation, identity/value, History, Save/reload, and year cases remain in the focused scenario.
+- Application/IntegrationTests/E2ETests builds, `git diff --check`, and the memory checker are expected gates to rerun. Browser re-verification is still pending; no broader testing is authorized in this round.
+- This mission remains OPEN. No commit or push was made.
+
+## 2026-09-11 — REVO-RENAME-20260911 visible-header History replay defect
+
+Meta: Mission=REVO-RENAME-20260911; Class=PRODUCT; Outcome=OPEN; Stage=MANUAL_ACCEPTANCE; Scope=RENAME_ONLY
+
+- Real Gate 5C-1 manual browser acceptance found a second confirmed PRODUCT defect: Rename closed correctly and changed History counters, but the visible Custom Column header stayed stale through Undo and Redo.
+- Current code verified the ownership failure: `commit()` manually replaced the retained header name node, while `ColumnWorkspace.applyWorkspaceSnapshot()` replayed snapshots through `replaceCustomColumns()` without requesting a Revo column viewport refresh. The retained DOM text therefore was not replaced by the authoritative column template during History replay.
+- The smallest fix removes the successful-commit manual header text patch and makes `replaceCustomColumns()` call the existing public `grid.refresh("rgCol")` boundary after assigning the new column definitions. Revo's column template is again the single renderer for the visible name during commit, Undo, and Redo; no second mutation or History entry is added.
+- Focused browser assertions now cover visible new/old/new header text and editor absence after Rename/Undo/Redo. Browser execution remains UNPROVEN because the available environment is still blocked by LocalDB/harness setup; no broader testing was run.
+- Rename remains OPEN and manual acceptance is incomplete. No commit or push was made.
+
+## 2026-09-11 — AI-CHANGE-GATE-V1 workflow hardening
+
+Meta: Mission=AI-CHANGE-GATE-V1; Class=WORKFLOW; Outcome=OPEN; Stage=VALIDATION; Scope=DOCS_TOOLING
+
+- Installed the permanent Change Gate protocol in `AI_WORK_CYCLE.md`: Truth, Ownership/Reference, Architecture Decision, Preview Package, Adversarial Review, Explicit User Approval, Exact Apply, Verify/Manual Acceptance, and Learn/Memory Update.
+- Kept `AI_CONTROL_CENTER.md` as the mandatory router and added the hard-stop requirement to `AGENTS.md`: product code, tests, harness behavior, configuration behavior, migrations, and behavior-changing scripts cannot be applied before the relevant gate is satisfied.
+- Added PowerShell 5.1-compatible tooling under `ERPPrototype/Tools/AI`: isolated preview workspace/package creation, package/live BEFORE-hash verification, and explicit-approval exact apply with drift detection and rollback on apply failure.
+- Example dry-run created `ERP_CHANGE_PREVIEW_CHANGE-GATE-V1-EXAMPLE_20260911T122503Z.zip` in ignored `artifacts/erp-change-previews`; the verifier returned PASS and no live source file was changed by the example.
+- Rename was not implemented, resumed, or otherwise changed by this mission. The Change Gate policy/tooling mission remains OPEN pending ChatGPT review; no commit or push was made.
+
+
+## 2026-09-11 — REVO-RENAME-20260911 Option A V2 manual PASS
+
+Meta: Mission=REVO-RENAME-20260911; Class=PRODUCT; Outcome=OPEN; Stage=MANUAL_ACCEPTANCE; Scope=RENAME_ONLY
+
+- RevoGrid v4.25.2 source review established the supported header lifecycle: `headerdblclick`/`beforeheaderrender`, Revo-owned `columnTemplate`, and `updateColumns(cols)`; `refresh("rgCol")` is not a supported column-refresh call.
+- User approved Option A for click intent: ordinary single-click selection remains immediate; once a double-click is recognized as Rename intent, the whole-column selection is cleared rather than delaying every single click.
+- Real Arabic/RTL manual testing exposed a third distinct PRODUCT defect: the temporary input was positioned as if the header were LTR and the browser retained native text selection, creating a visually overlapped header.
+- Option A V2 corrected only that defect using direction-aware editor positioning and clearing native browser text selection. It did not reintroduce persistent DOM ownership, `replaceChildren()`, or `refresh("rgCol")`.
+- User execution evidence: V2 pre-apply SHA256 PASS, post-apply SHA256 PASS, `git diff --check` PASS, followed by manual confirmation: `كله تمام`.
+- Rename remains OPEN only because the final Save/refresh persistence/value-stability receipt has not yet been explicitly re-recorded after V2. No commit or push was performed by the apply package.
+
+## 2026-09-12 — REVO-RENAME-20260911 native-selection defect closed
+
+Meta: Mission=REVO-RENAME-20260911; Class=PRODUCT; Outcome=CORRECTED; Stage=AUTOMATED_BREAK; Scope=RENAME_ONLY
+
+- After Option A V2 manual acceptance, the independent focused browser suite proved that the original header text could still remain natively selected outside the Rename input. The test reported the exact old Custom Column name through browser Selection state, and the user manually reproduced the unwanted external selection.
+- The first V3 attempt intercepted the second `mousedown`; the same focused test proved that approach did not remove the defect, so it was not layered further.
+- Source review re-anchored the fix at the header-name owner: the clean V4 candidate was rebuilt from accepted Option A V2, removed the failed V3 interception, made only Custom Column header-name text non-selectable, and kept the Rename input normally selectable with Select-All.
+- Manual V4 interaction passed. The final product design therefore keeps Revo-owned header rendering and stable `prop` identity; it does not use persistent manual header DOM ownership, `replaceChildren()`, or `refresh("rgCol")`.
+
+## 2026-09-12 — REVO-RENAME-20260911 focused harness stabilized
+
+Meta: Mission=REVO-RENAME-20260911; Class=TEST/HARNESS; Outcome=PASS; Stage=AUTOMATED_BREAK; Scope=RENAME_FOCUSED
+
+- Focused-test failures were separated from product behavior before correction. The harness was corrected where it accidentally composed single-click + double-click into a synthetic triple-click, where it treated `window.getSelection()==""` as the product contract, and where a shared visibility helper incorrectly waited for a Custom Column marker on core columns.
+- A stale compiled focused runner and a mixed old/new Gate artifact were classified BUILD/STALE and corrected with clean rebuilds rather than product changes.
+- The final focused Rename break suite passed **R00-R13**, including single/double-click intent, input focus/Select-All, Escape/no-op, validation, Filter/Sort/core isolation, rapid Enter/History, outside-click behavior, Save/reload/value/identity/year preservation, and stale RowVersion concurrency rejection.
+
+## 2026-09-12 — Work Orders one-command regression harness closed
+
+Meta: Mission=REVO-RENAME-20260911; Class=TEST/HARNESS; Outcome=PASS; Stage=FULL_REGRESSION; Scope=REGRESSION_HARNESS
+
+- `Run-ERP-Full-Regression.ps1` now provides one operator command: clean/restore/build, Real Employee Workday, Rename focused break suite, B9-B11, B12 Real DB Save, and Integration tests. Test suites continue after one suite fails so a single run exposes every failing area.
+- Full-regression harness defects were corrected without product changes: Login no longer waits for generic Playwright `NetworkIdle`; B10 rapid Ctrl selection uses sequential real Playwright Ctrl+Clicks; B11 imports the Gate module URL actually loaded by the browser instead of a stale hard-coded version; B12 verifies the real `maxlength=150` browser contract instead of expecting a 151-character invalid state that the input cannot enter.
+- These corrections changed tests/harness only and were each re-run against the same product candidate.
+
+## 2026-09-12 — REVO-RENAME-20260911 COMPLETE
+
+Meta: Mission=REVO-RENAME-20260911; Class=PRODUCT; Outcome=COMPLETE; Stage=CLOSURE; Scope=RENAME_AND_REGRESSION
+
+- User-run final one-command regression ended with `ERP FULL REGRESSION : PASS`.
+- Real Employee Workday **PASS** through scenarios 00-17.
+- Rename Focused **PASS** through R00-R13.
+- B9-B11 Full Regression **PASS**, including the corrected real Ctrl-selection and active-module Save diagnostics.
+- B12 Real DB Save **PASS**, including Rename validation, Save/reload/value stability, year isolation, large Save, and concurrency.
+- Integration tests **PASS**.
+- User manual acceptance of the final Rename interaction was already PASS. Required evidence is complete; Rename is now an accepted protected Work Orders foundation.
+
+## 2026-09-12 — AI-CHANGE-GATE-V1 retired
+
+Meta: Mission=AI-CHANGE-GATE-V1; Class=WORKFLOW; Outcome=ABANDONED; Stage=CLOSURE; Scope=DOCS_TOOLING
+
+- The preview-package Change Gate experiment added too much ceremony for the project's execution-first test/fix/retest workflow and was explicitly abandoned.
+- It is no longer a mandatory project rule. `AGENTS.md`, `AI_CONTROL_CENTER.md`, and `AI_WORK_CYCLE.md` return to the compact evidence-led cycle.
+- The three untracked Change Gate preview helper scripts are removed from the checkpoint candidate. Historical Work Log/metrics receipts remain as chronology; ignored preview artifacts may remain local but are not project authority.

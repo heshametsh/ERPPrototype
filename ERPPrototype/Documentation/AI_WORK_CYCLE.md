@@ -14,9 +14,11 @@ Describe employee-visible behavior and explicit non-goals before design. Ask the
 
 ### 2. Reference and ownership
 
-For Grid missions, run the focused Tabulator → installed RevoGrid Community → relevant Pro evidence → ERP ownership pass.
+For Grid missions, run the focused Tabulator → installed RevoGrid Community → relevant Pro evidence → ERP ownership pass when the behavior/API decision depends on it.
 
 Identify the existing owner of each truth (year/dataset, identity, selection, Dirty/Baseline, History, Save authority, database/concurrency). Reject a second owner unless evidence proves it is necessary.
+
+Do not turn reference research into a blanket implementation gate. Routine test/harness corrections should move directly once their failure class and owner are clear.
 
 ### 3. Break pass
 
@@ -40,11 +42,17 @@ Use the lowest layer that proves the risk, then continue upward when needed:
 
 A Build PASS is not product acceptance. Automated PASS is not manual acceptance.
 
+When automation appears to expose a PRODUCT defect, stop before changing product code: show the user the exact Expected vs Actual, evidence, and classification. Once the user verifies the product defect, fix the product. If the failure is TEST/HARNESS, BUILD/STALE, TOOLING, or ENVIRONMENT, fix only that layer.
+
 ### 6. Hostile review
 
 After green evidence, reread the candidate as a reviewer: behavior contract, duplicate ownership, failure/rollback, migration safety, hidden/filter/sort/history interactions, unnecessary scope, and whether tests prove user behavior rather than implementation detail.
 
-### 7. Memory + checkpoint
+### 7. Full regression / manual acceptance
+
+For Work Orders closure, prefer the existing `Run-ERP-Full-Regression.ps1` after focused evidence. It performs a fresh build and runs the real Employee Workday, Rename focused break suite, B9-B11 regression, B12 real DB Save, and Integration tests. It continues through test-suite failures so one run exposes all failing areas.
+
+### 8. Memory + checkpoint
 
 Synchronize only changed truths, prune Current State, append the Work Log, update Metrics for a completed mission, run the mechanical memory checker, then checkpoint only after required evidence/user acceptance.
 
@@ -78,6 +86,10 @@ Do not change production behavior until evidence points to PRODUCT.
 ### Test/harness discipline
 
 - Reuse the approved existing harness/fixtures/page objects/diagnostics before creating a parallel runner.
+- Prefer real Playwright mouse/keyboard actions for user behavior; synthetic zero-time DOM event bursts are diagnostics, not user-equivalent acceptance.
+- Bind browser diagnostics to the module actually loaded by the page; stale hard-coded cache/version literals are not acceptance evidence.
+- Browser readiness should wait for the requested surface/element, not generic `NetworkIdle` when the application keeps live connections.
+- Assertions must test the user contract. Do not require browser-internal state such as an empty Selection object when visible/interactive behavior is already the actual contract.
 - Shared test databases are shared mutable state: use unique owned state or merge current state; do not assume empty global configuration/exact counts you do not own.
 - When schema changes, search direct-SQL fixture writers for affected required columns/keys before browser regression.
 - Browser readiness/navigation must follow the active surface and native grid mechanics, not fragile DOM assumptions.

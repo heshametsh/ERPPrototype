@@ -122,12 +122,21 @@ export function sortOnlyHeaderTemplate(h, column) {
         }
     }, [
         h("span", {
+            ...(column?.erpCustomColumn
+                ? { "data-erp-custom-column-name-prop": prop }
+                : {}),
             style: {
                 overflow: "hidden",
                 textOverflow: "ellipsis",
                 whiteSpace: "nowrap",
                 minWidth: "0",
-                flex: "1 1 auto"
+                flex: "1 1 auto",
+                ...(column?.erpCustomColumn
+                    ? {
+                        userSelect: "none",
+                        WebkitUserSelect: "none"
+                    }
+                    : {})
             }
         }, title),
         h("button", {

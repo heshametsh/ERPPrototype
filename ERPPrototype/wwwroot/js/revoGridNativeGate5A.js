@@ -3,8 +3,8 @@ import { defineCustomElement as defineFilterPanel } from "https://cdn.jsdelivr.n
 import {
     createExcelFilterColumn,
     createExcelFilterNativeConfig
-} from "./revoGridExcelFilter.js?v=20260828-structure-workspace-2";
-import { createSortOnlyColumn } from "./revoGridSort.js?v=20260828-structure-workspace-2";
+} from "./revoGridExcelFilter.js?v=20260911-rename-1";
+import { createSortOnlyColumn } from "./revoGridSort.js?v=20260911-rename-1";
 
 const VERSION = "4.25.2";
 const COLUMN_LAYOUT_STEP = 1_000_000_000_000;
@@ -434,6 +434,9 @@ export async function replaceCustomColumns(elementId, customColumns) {
     state.customColumns = normalized;
     state.columns = columns.length;
 
+    // RevoGrid v4.25.2 watches the public columns property and reapplies the
+    // column collection. refresh() is a row-data viewport API and does not
+    // accept "rgCol"; header rendering stays owned by the column definition.
     await new Promise(resolve =>
         requestAnimationFrame(() =>
             requestAnimationFrame(resolve)));

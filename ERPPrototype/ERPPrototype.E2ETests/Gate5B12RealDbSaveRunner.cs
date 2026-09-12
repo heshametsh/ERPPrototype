@@ -11,7 +11,7 @@ internal static class Gate5B12RealDbSaveRunner
     private const int FixedPort = 5265;
     private const string GatePath = "/work-orders-revogrid-gate5c1";
     private const string GridHostId = "revogrid-native-gate5a-grid";
-    private const string ExpectedModuleVersionToken = "cc-delete-reconcile-2";
+    private const string ExpectedModuleVersionToken = "20260912-revo-rename-6";
     private const string CustomFieldKey = "custom_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     private const string CustomFieldName = "B12 E2E Note";
     private const int LargeSaveRowCount = 1_200;
@@ -212,7 +212,7 @@ internal static class Gate5B12RealDbSaveRunner
             "name => !Array.from(document.querySelector('#revogrid-native-gate5a-grid revo-grid').columns ?? []).some(c => String(c?.name ?? '') === name)",
             undoneName);
 
-        const string savedName = "B12 Saved Custom Column";
+        var savedName = "B12 Saved Custom Column";
         var row = await GetVisibleRowAsync(page, 0);
         var rowId = row.GetProperty("id").GetInt32();
         var oldBasket = row.GetProperty("basket").GetString() ?? string.Empty;
@@ -290,6 +290,198 @@ internal static class Gate5B12RealDbSaveRunner
         E2ETestAssert.Equal("persisted custom value",
             returnedRow.GetProperty(returnedProp).GetString() ?? string.Empty,
             "Saved current-year custom value did not return after switching back.");
+
+        // Rename is inline on the custom header name only. It must remain one
+        // Column Workspace History action and must not change the stable prop.
+        var renameInput = page.Locator(
+            $"input[data-erp-column-rename-input=\"{returnedProp}\"]");
+        var renameName = "B12 Renamed Custom Column";
+        var undoBeforeRename = int.Parse(
+            (await page.Locator("#revogrid-gate5b1-undo-count").TextContentAsync())?.Trim() ?? "0",
+            CultureInfo.InvariantCulture);
+        await page.Locator(
+                $"[data-erp-custom-column-name-prop=\"{returnedProp}\"]")
+            .DblClickAsync();
+        await renameInput.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 10_000
+        });
+        E2ETestAssert.Equal(0, await page.Locator(
+            $"[data-erp-column-header-selected=\"true\"][data-erp-selected-column-prop=\"{returnedProp}\"]")
+            .CountAsync(),
+            "Double-click Rename left the custom column header selected.");
+        E2ETestAssert.Equal(0, await page.Locator(
+            $"[data-erp-column-selected=\"true\"][data-erp-selected-column-prop=\"{returnedProp}\"]")
+            .CountAsync(),
+            "Double-click Rename left custom-column cells selected.");
+        await renameInput.FillAsync(renameName);
+        await renameInput.PressAsync("Enter");
+        await renameInput.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Detached,
+            Timeout = 10_000
+        });
+        await page.WaitForFunctionAsync(
+            "name => Array.from(document.querySelector('#revogrid-native-gate5a-grid revo-grid').columns ?? []).some(c => String(c?.name ?? '') === name)",
+            renameName);
+        E2ETestAssert.Equal(
+            undoBeforeRename + 1,
+            int.Parse(
+                (await page.Locator("#revogrid-gate5b1-undo-count").TextContentAsync())?.Trim() ?? "0",
+                CultureInfo.InvariantCulture),
+            "Rename did not create exactly one History action.");
+        E2ETestAssert.Equal(
+            returnedProp,
+            await GetColumnPropByNameAsync(page, renameName),
+            "Rename changed the custom column FieldKey/prop.");
+        E2ETestAssert.Equal(renameName,
+            (await page.Locator(
+                $"[data-erp-custom-column-name-prop=\"{returnedProp}\"]")
+                .TextContentAsync())?.Trim(),
+            "Rename did not update the visible custom header name.");
+        E2ETestAssert.Equal(0, await page.Locator(
+            "input[data-erp-column-rename-input]").CountAsync(),
+            "Rename editor remained visible after Enter.");
+
+        await page.Locator("#revogrid-gate5b1-undo").ClickAsync();
+        E2ETestAssert.True(await HasColumnNamedAsync(page, savedName),
+            "Undo did not restore the previous custom column name.");
+        E2ETestAssert.Equal(savedName,
+            (await page.Locator(
+                $"[data-erp-custom-column-name-prop=\"{returnedProp}\"]")
+                .TextContentAsync())?.Trim(),
+            "Undo did not update the visible custom header name.");
+        E2ETestAssert.Equal(0, await page.Locator(
+            "input[data-erp-column-rename-input]").CountAsync(),
+            "Rename editor reappeared after Undo.");
+        await page.Locator("#revogrid-gate5b1-redo").ClickAsync();
+        E2ETestAssert.True(await HasColumnNamedAsync(page, renameName),
+            "Redo did not reapply the custom column name.");
+        E2ETestAssert.Equal(renameName,
+            (await page.Locator(
+                $"[data-erp-custom-column-name-prop=\"{returnedProp}\"]")
+                .TextContentAsync())?.Trim(),
+            "Redo did not update the visible custom header name.");
+        E2ETestAssert.Equal(0, await page.Locator(
+            "input[data-erp-column-rename-input]").CountAsync(),
+            "Rename editor reappeared after Redo.");
+
+        // Escape cancels. Filter and core header controls must not enter the
+        // inline editor.
+        await page.Locator(
+                $"[data-erp-custom-column-name-prop=\"{returnedProp}\"]")
+            .DblClickAsync();
+        await renameInput.FillAsync("temporary rename");
+        await renameInput.PressAsync("Escape");
+        E2ETestAssert.True(await HasColumnNamedAsync(page, renameName),
+            "Escape did not cancel inline rename.");
+
+        var filterButton = await GetVisibleFilterButtonAsync(page, returnedProp);
+        await filterButton.DblClickAsync();
+        E2ETestAssert.Equal(0, await renameInput.CountAsync(),
+            "Double-clicking Filter entered inline rename.");
+
+        var coreHeader = page.GetByText(
+            "Work Order Number",
+            new PageGetByTextOptions { Exact = true }).Last;
+        await coreHeader.DblClickAsync();
+        E2ETestAssert.Equal(0, await page.Locator(
+            "input[data-erp-column-rename-input]").CountAsync(),
+            "Double-clicking a core header entered inline rename.");
+
+        await page.Locator(
+                $"[data-erp-custom-column-name-prop=\"{returnedProp}\"]")
+            .DblClickAsync();
+        await renameInput.FillAsync("   ");
+        await renameInput.PressAsync("Enter");
+        E2ETestAssert.Equal("true", await renameInput.GetAttributeAsync("aria-invalid"),
+            "Blank rename was accepted.");
+        // The real Rename input has maxlength=150, so a user cannot actually
+        // enter character 151. Verify the real browser behavior instead of
+        // expecting an impossible validation state.
+        E2ETestAssert.Equal("150", await renameInput.GetAttributeAsync("maxlength"),
+            "Rename input no longer exposes the 150-character limit.");
+        await renameInput.FillAsync(new string('x', 151));
+        E2ETestAssert.Equal(150, (await renameInput.InputValueAsync()).Length,
+            "Rename input allowed a real user action to exceed 150 characters.");
+        await renameInput.FillAsync("Work Order Number");
+        await renameInput.PressAsync("Enter");
+        E2ETestAssert.Equal("true", await renameInput.GetAttributeAsync("aria-invalid"),
+            "Duplicate rename was accepted.");
+        await renameInput.FillAsync(renameName);
+        await renameInput.PressAsync("Enter");
+
+        var sortButton = await GetVisibleSortButtonAsync(page, "workOrderValue");
+        await sortButton.DblClickAsync();
+        E2ETestAssert.Equal(0, await renameInput.CountAsync(),
+            "Double-clicking Sort entered inline rename.");
+
+        savedName = renameName;
+        await SaveButton(page).ClickAsync();
+        await WaitForCleanSaveAsync(page);
+        var renamedDefinition = await GetDbCustomColumnAsync(
+            database.ConnectionString,
+            returnedProp,
+            database.Seed.CurrentYear);
+        E2ETestAssert.Equal(renameName, renamedDefinition.Name,
+            "Save did not persist the renamed custom column.");
+        var renamedRow = await GetDbRowAsync(database.ConnectionString, rowId);
+        E2ETestAssert.Equal("persisted custom value",
+            CustomColumnValue(renamedRow.CustomValuesJson, returnedProp),
+            "Rename changed the existing CustomValuesJson value.");
+        await ReloadGateAsync(page);
+        E2ETestAssert.True(await HasColumnNamedAsync(page, renameName),
+            "Saved rename did not survive reload.");
+        E2ETestAssert.Equal(returnedProp,
+            await GetColumnPropByNameAsync(page, renameName),
+            "Reloaded rename did not preserve the FieldKey/prop.");
+
+        // A no-op Enter must close the editor without creating Dirty/History.
+        var noOpUndoCount = int.Parse(
+            (await page.Locator("#revogrid-gate5b1-undo-count").TextContentAsync())?.Trim() ?? "0",
+            CultureInfo.InvariantCulture);
+        var noOpInput = page.Locator(
+            $"input[data-erp-column-rename-input=\"{returnedProp}\"]");
+        await page.Locator(
+                $"[data-erp-custom-column-name-prop=\"{returnedProp}\"]")
+            .DblClickAsync();
+        await noOpInput.PressAsync("Enter");
+        await noOpInput.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Detached,
+            Timeout = 10_000
+        });
+        E2ETestAssert.Equal(noOpUndoCount,
+            int.Parse(
+                (await page.Locator("#revogrid-gate5b1-undo-count").TextContentAsync())?.Trim() ?? "0",
+                CultureInfo.InvariantCulture),
+            "No-op Rename created a History action.");
+        E2ETestAssert.True(
+            !(await GetChangeStateAsync(page)).GetProperty("dirty").GetBoolean(),
+            "No-op Rename changed Dirty state.");
+
+        // A rejected value can be corrected to the original name and then
+        // accepted as a no-op, which must also close without mutation.
+        await page.Locator(
+                $"[data-erp-custom-column-name-prop=\"{returnedProp}\"]")
+            .DblClickAsync();
+        await noOpInput.FillAsync("Work Order Number");
+        await noOpInput.PressAsync("Enter");
+        E2ETestAssert.Equal("true", await noOpInput.GetAttributeAsync("aria-invalid"),
+            "Invalid rename did not remain safely editable.");
+        await noOpInput.FillAsync(renameName);
+        await noOpInput.PressAsync("Enter");
+        await noOpInput.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Detached,
+            Timeout = 10_000
+        });
+        E2ETestAssert.Equal(noOpUndoCount,
+            int.Parse(
+                (await page.Locator("#revogrid-gate5b1-undo-count").TextContentAsync())?.Trim() ?? "0",
+                CultureInfo.InvariantCulture),
+            "Correcting an invalid rename to the original created History.");
 
         var columnIndex = await GetVisualColumnIndexAsync(page, returnedProp);
         await OpenStructureMenuAsync(page, 0, columnIndex);
