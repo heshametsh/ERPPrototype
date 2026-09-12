@@ -13,6 +13,17 @@ Before a material ERP answer/action:
 5. For Grid behavior/architecture, perform the focused Tabulator → installed RevoGrid Community → relevant Pro evidence → ERP ownership reference pass.
 6. For workflow/learning questions, read `AI_WORK_METRICS.csv` and `AI_WORK_CYCLE.md`.
 
+## GitHub/live-source modification discipline
+
+For any tracked-file modification:
+
+1. refresh GitHub/live Git first and read the exact current file on the active branch;
+2. edit only from that current version;
+3. verify the smallest relevant evidence for the change;
+4. commit and push the coherent change promptly so the remote remains the next review baseline;
+5. synchronize Current State / Work Log / canonical owner when their truth changed.
+
+Do not start a modification from a chat copy, historical handoff, or stale local file when the live repository is available.
 ## Authority order
 
 1. Live Git/worktree + current code + executed test evidence.
