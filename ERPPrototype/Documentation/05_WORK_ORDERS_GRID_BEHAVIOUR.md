@@ -326,23 +326,25 @@ Example: pasting a custom Text column into 4,952 rows changes 4,952 values, but 
 - When width is insufficient, the title uses an ellipsis; icons remain visible.
 - The row-number Header is not a saved data-column layout.
 
-## 19. Custom Column Filter, Sort, and Visibility Contract — Phase 9.3E
+## 19. Custom Column Filter, Sort, and Visibility Contract - current Revo override
 
 - Custom Column definitions are year-scoped within the employee's department. Add/Rename/Delete affect only the current Work Year.
-- Moving a Work Order to another year preserves non-empty custom values. A destination column with the same name + type is reused; a missing column is created; a same-name/different-type conflict receives a safe unique destination name. Blank values do not create destination columns.
-- Width/visibility layout is intentionally separate from definition ownership and remains department-scoped by `DepartmentId + FieldKey`, so layout can still be shared across years when the same field key exists there.
-- The custom-column type is selected once during creation and cannot be changed later, even while the column is empty.
-- `Rename Custom Column` changes the name only.
-- Custom `Text`, `Date`, and whole `Number` columns receive a value filter automatically.
-- Custom `Money` columns receive numeric Header sorting only. The first sort is descending, then ascending, then cleared by Tabulator's normal cycle.
-- Filter option values are derived from the rows already loaded in the browser and are scanned only when the popup opens. Applying a filter remains client-side and does not request the server.
+- Moving a Work Order to another year preserves non-empty custom values. A destination column with the same name + type is reused; a missing column is created; a same-name/different-type conflict receives one safe unique destination name reused for the batch. Blank values do not create destination columns.
+- Width and visibility now have separate ownership: width remains department-scoped by `DepartmentId + FieldKey`; visibility is year-scoped by `DepartmentId + WorkYear + FieldKey`.
+- Existing legacy department-wide hidden choices are not carried into the new visibility model. The first new visibility baseline is all columns visible.
+- The custom-column type is selected once during creation and cannot be changed later.
+- `Rename Custom Column` changes the name only and keeps the same stable FieldKey/Revo prop.
+- Custom `Text`, `Date`, and whole `Number` columns receive value filters; Custom `Money` columns receive numeric Header sorting.
+- Hide/Unhide is client-side presentation state until the employee presses the normal Save button.
 - Right-clicking a visible data-column Header exposes `Hide Column`.
-- `Unhide Column` appears in that same context menu only when at least one data column is hidden. Its list is created only when the menu opens.
-- The row-number column cannot be hidden, and at least one data column must remain visible so the Header context menu remains reachable.
-- Hide/Unhide changes update Tabulator locally, participate in Undo/Redo, and are sent to SQL Server only by the normal Save action.
-- Visibility is stored with the existing department column layout (`DepartmentId + FieldKey`) and therefore applies to every year of that department without affecting another department.
-- The selection summary renders totals only for amount columns that are currently visible. Fixed yearly summaries remain independent of column visibility.
-
+- `Unhide Column` appears in that same context menu only when the current Work Year has hidden data columns, and its names are built on demand.
+- Row number cannot be hidden, and at least one data column must remain visible.
+- Hidden columns remain logically present: active Sort and Filter continue to use them, row/data edits and structural movement continue to carry their values, and Undo/Redo/Dirty/Save logic does not treat Hide as Delete.
+- One Hide or Unhide is one Sheet History action and does not cross a Work Year boundary.
+- Selection/focus involving the affected column prop is safely cleared/reconciled before the visual projection changes.
+- Revo keeps the complete authored column source. ERP visibility is projected by stable prop through a thin visibility/trim adapter and reapplied after column rebuild/update; numeric display indexes are never persisted as visibility identity.
+- The selection summary and visible aggregate strip include Money columns only while those columns are visible. Fixed yearly summaries remain independent of column visibility.
+- Accepted Rename behavior remains protected while visibility changes are introduced.
 
 ## 20. RevoGrid Gate 5B-5 Range Clear Contract
 

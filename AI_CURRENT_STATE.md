@@ -1,12 +1,12 @@
 # AI CURRENT STATE
 
 Updated: 2026-09-12
-Mission: REVO-RENAME-20260911
-Mission status: **COMPLETE**
+Mission: REVO-HIDE-UNHIDE-20260912
+Mission status: **OPEN**
 
 ## Current mission
 
-Custom Column Rename on active RevoGrid Gate 5C-1 is closed. The user manually accepted the final interaction, the focused real-browser Rename suite passed through persistence/year/concurrency, and the one-command full regression passed all protected Work Orders suites. The next product mission has not been selected yet.
+Hide/Unhide Columns on the active RevoGrid Gate 5C-1 is the current approved product mission. The behavior/reference pass is complete and the contract is locked before runtime implementation. Rename remains a protected accepted foundation and must not regress.
 
 ## Authority
 
@@ -18,6 +18,21 @@ Custom Column Rename on active RevoGrid Gate 5C-1 is closed. The user manually a
 
 Git branch/HEAD/CLEAN-DIRTY are deliberately **not mirrored here**. Read them live from Git whenever they matter.
 
+## Approved Hide/Unhide contract
+
+- Visibility is owned by Department + Work Year + stable FieldKey/prop. Hiding a column in one year does not hide it in another year.
+- Width ownership does not change: width remains Department + FieldKey and is shared across years.
+- Legacy department-wide IsHidden state is not migrated into the new year-scoped visibility model. The new visibility state starts with all columns visible once.
+- Hide and Unhide live in the same right-click column context menu. Unhide lists the hidden columns for the current year on demand.
+- Row number cannot be hidden and at least one data column must remain visible.
+- Hidden means visually hidden only. The column remains logically present and must keep participating in Sort, Filter, row/data movement, edits, History, and Save semantics.
+- Hide/Unhide applies locally immediately and reaches SQL only through the normal explicit Save.
+- One Hide/Unhide action is one Sheet History action; History never crosses a Work Year boundary.
+- Selection/focus involving the affected prop is safely cleared/reconciled before the visibility projection changes.
+- Hidden Money columns are excluded from visible selection/aggregate displays; fixed yearly summaries remain independent.
+- Revo integration keeps complete authored columns and projects visibility through a thin prop-based visibility/trim adapter. Do not implement Hide by deleting definitions from grid.columns.
+- Visibility must be reapplied after column rebuild/update. Identity is stable prop/FieldKey, never numeric display index.
+- Existing Rename behavior and its R00-R13/full-regression protection remain mandatory.
 ## Accepted Rename behavior
 
 - Single-click on a header keeps the normal whole-column selection behavior.
@@ -78,7 +93,7 @@ These remain review findings only; Rename closure does not authorize unrelated f
 
 ## Next action
 
-Synchronize the closure documents, run the memory consistency checker and `git diff --check`, then create one accepted Git checkpoint for the proven current worktree. After that, start the next user-selected feature from this checkpoint.
+Checkpoint this approved Hide/Unhide contract first. Then implement the smallest isolated slice: separate year-scoped visibility persistence plus one ERP visibility owner and thin Revo visibility adapter, followed by focused break tests before broader regression.
 
 ## Communication
 

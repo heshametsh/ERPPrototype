@@ -1,5 +1,22 @@
 ﻿# ACCEPTED DECISIONS - B11 THROUGH GATE 5C-1
 
+## DEC-068 - Revo Hide/Unhide visibility is year-scoped
+
+- **Date:** 2026-09-12
+- **Status:** Approved behavior/reference contract; implementation pending.
+- **Visibility ownership:** hidden state is keyed by `DepartmentId + WorkYear + FieldKey`. A Hide in 2026 does not change 2025; returning to 2026 restores the saved 2026 visibility state.
+- **Width ownership unchanged:** DEC-027 still owns width as `DepartmentId + FieldKey`, shared across years. Width must not become year-scoped as a side effect of this feature.
+- **Supersedes:** only the department-wide visibility clauses in DEC-029 and the visibility part of the DEC-067 layout exception. Custom Column definition year ownership and width ownership remain unchanged.
+- **Legacy visibility migration:** do not migrate old department-wide `IsHidden` choices. The new year-scoped visibility system starts all columns visible once, after which each year is independent.
+- **Display-only meaning:** Hide removes a column from rendering/dimension only. It does not delete the column definition or field identity. Hidden columns continue to participate in Sort, Filter, row movement, edits, custom-value movement, History, Dirty/Save semantics, and current row data.
+- **Context-menu rule:** right-click a visible data column exposes `Hide Column`; the same context menu exposes `Unhide Column` only when the current year has hidden columns and lists those names on demand. No separate Manage Columns dialog is part of this slice.
+- **Safety:** row number cannot hide; at least one data column must remain visible; selection/focus involving the affected prop is cleared/reconciled safely before the visibility projection changes.
+- **History/Save:** each Hide or Unhide is one Sheet History action. The change is immediate locally, crosses no Work Year boundary, and is persisted only by the existing explicit Save transaction with RowVersion authority.
+- **Aggregates:** hidden Money columns disappear from visible selection/aggregate displays; fixed yearly summaries remain independent.
+- **Revo Community architecture:** keep the complete authored column source and apply visibility through a thin prop-based trim/visibility adapter. Do not implement Hide by filtering/deleting definitions from `grid.columns`, and do not use DOM ownership hacks or `refresh("rgCol")`.
+- **Rebuild rule:** visibility is stored by stable prop/FieldKey, never numeric column index, and must be reapplied after column rebuild/update so Add/Delete/Rename do not accidentally reveal hidden columns.
+- **Protected foundation:** accepted Custom Column Rename behavior remains unchanged and must keep passing its focused/full regression protection.
+
 ## DEC-066 - Gate 5C-1 visible aggregates use the current visible Revo snapshot
 
 - **Status:** Accepted.

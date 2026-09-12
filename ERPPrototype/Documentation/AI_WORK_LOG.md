@@ -743,3 +743,15 @@ Meta: Mission=AI-CHANGE-GATE-V1; Class=WORKFLOW; Outcome=ABANDONED; Stage=CLOSUR
 - The preview-package Change Gate experiment added too much ceremony for the project's execution-first test/fix/retest workflow and was explicitly abandoned.
 - It is no longer a mandatory project rule. `AGENTS.md`, `AI_CONTROL_CENTER.md`, and `AI_WORK_CYCLE.md` return to the compact evidence-led cycle.
 - The three untracked Change Gate preview helper scripts are removed from the checkpoint candidate. Historical Work Log/metrics receipts remain as chronology; ignored preview artifacts may remain local but are not project authority.
+
+## 2026-09-12 - REVO-HIDE-UNHIDE-20260912 contract locked
+
+Meta: Mission=REVO-HIDE-UNHIDE-20260912; Class=PRODUCT; Outcome=OPEN; Stage=REFERENCE_PASS; Scope=HIDE_UNHIDE_ONLY
+
+- Started from clean Git checkpoint `03adac0` after the GitHub-first workflow rule was committed and pushed.
+- Re-read current GitHub files before modification: Current State, Decisions Log, Grid Behaviour, Grid Reference Matrix, current Column Workspace/Structure Commands/Menu, and current department layout persistence.
+- User-approved behavior is locked: visibility is per Work Year; width remains department-wide; legacy hidden choices reset to all-visible once; Hide and Unhide share the right-click menu; hidden columns remain logically active for Sort/Filter/data movement/History/Save.
+- Current server ownership review confirmed Width and IsHidden are coupled in `DepartmentColumnLayout`; implementation must split year visibility from width rather than adding WorkYear to the existing width record.
+- Current Revo architecture review keeps the full authored column source and uses a prop-based trim/visibility adapter. Filtering authored `grid.columns` to hide a column is rejected because it risks turning Hide into structural removal and disturbing sort metadata.
+- Rename remains a protected accepted foundation. No product runtime code, tests, migrations, or database schema changed in this contract-lock step.
+- Next implementation slice: separate year-scoped visibility persistence plus ERP Visibility Owner and thin Revo visibility adapter, then focused break tests before broader regression.
