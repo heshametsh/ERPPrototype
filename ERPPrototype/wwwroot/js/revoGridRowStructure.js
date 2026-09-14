@@ -531,6 +531,22 @@ export function createRevoGridRowStructure(options) {
     const excelFilter = options?.excelFilter;
     const persistenceIdentity = options?.persistenceIdentity ?? null;
     const selectionContext = options?.selectionContext ?? null;
+    const getDisplayedColumns =
+        typeof options?.getDisplayedColumns === "function"
+            ? options.getDisplayedColumns
+            : async (columnType = "all") => {
+                const columns = await grid.getColumns();
+                const all = Array.isArray(columns)
+                    ? columns
+                    : [];
+                if (!columnType || columnType === "all") {
+                    return all;
+                }
+                return all.filter(column =>
+                    String(column?.pin || "rgCol") ===
+                    String(columnType)
+                );
+            };
 
     if (!grid || typeof grid.getSource !== "function") {
         throw new Error("A compatible RevoGrid element is required.");
@@ -953,11 +969,20 @@ export function createRevoGridRowStructure(options) {
             // the clicked column by prop so the Structure menu still knows a
             // right-click happened inside the selected columns.
             if (selectionKind === "columns" && clickedCell) {
-                const columns = await grid.getColumns();
-                const clickedColumnIndex = Number(clickedCell.colIndex);
-                const clickedProp = Number.isInteger(clickedColumnIndex)
-                    ? String(columns[clickedColumnIndex]?.prop ?? "").trim()
-                    : "";
+                const columns =
+                    await getDisplayedColumns(
+                        clickedCell?.colType ?? "rgCol"
+                    );
+                const clickedColumnIndex =
+                    Number(clickedCell.colIndex);
+                const clickedProp =
+                    Number.isInteger(clickedColumnIndex)
+                        ? String(
+                            columns[
+                                clickedColumnIndex
+                            ]?.prop ?? ""
+                        ).trim()
+                        : "";
                 const selectedProps = new Set(
                     (Array.isArray(snapshot?.selectedProps) ? snapshot.selectedProps : [])
                         .map(value => String(value ?? "").trim())

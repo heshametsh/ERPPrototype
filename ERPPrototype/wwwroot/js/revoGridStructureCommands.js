@@ -2,7 +2,9 @@ export const REVO_GRID_STRUCTURE_COMMANDS = Object.freeze({
     INSERT_ROWS: "row.insert",
     DELETE_ROWS: "row.delete",
     INSERT_COLUMNS: "column.insert",
-    DELETE_COLUMNS: "column.delete"
+    DELETE_COLUMNS: "column.delete",
+    HIDE_COLUMN: "column.hide",
+    UNHIDE_COLUMN: "column.unhide"
 });
 
 function normalizeScope(value) {
@@ -13,6 +15,7 @@ export function createRevoGridStructureCommands(options) {
     const rowStructure = options?.rowStructure;
     const columnWorkspace = options?.columnWorkspace;
     const selectionContext = options?.selectionContext ?? null;
+    const columnVisibility = options?.columnVisibility ?? null;
 
     if (!rowStructure?.getContext || !rowStructure?.insertRows || !rowStructure?.deleteRows) {
         throw new Error("Structure Commands require the Row Structure owner.");
@@ -56,6 +59,29 @@ export function createRevoGridStructureCommands(options) {
             selectionCount: column.selectedCustomProps?.length ?? 0,
             currentProtected: Boolean(column.targetProp && !column.targetCustom)
         });
+    }
+
+    async function describeColumnVisibility(context) {
+        if (
+            context?.clickedCell?.rowHeader ||
+            !columnVisibility?.describeContext
+        ) {
+            return Object.freeze({
+                enabled: false,
+                targetProp: null,
+                targetHidden: false,
+                canHide: false,
+                hideReason: "",
+                hiddenColumns: [],
+                visibleCount: 0
+            });
+        }
+
+        return Object.freeze(
+            await columnVisibility.describeContext(
+                context?.column?.targetProp ?? null
+            )
+        );
     }
 
     async function execute(commandId, context, payload = {}) {
@@ -135,6 +161,38 @@ export function createRevoGridStructureCommands(options) {
                 return columnWorkspace.deleteColumns(props);
             }
 
+            case REVO_GRID_STRUCTURE_COMMANDS.HIDE_COLUMN: {
+                if (
+                    context?.clickedCell?.rowHeader ||
+                    !columnVisibility?.hideColumn
+                ) {
+                    throw new Error(
+                        "Row numbers cannot be hidden."
+                    );
+                }
+
+                const prop = String(
+                    payload.prop ??
+                    context?.column?.targetProp ??
+                    ""
+                ).trim();
+
+                return columnVisibility.hideColumn(prop);
+            }
+
+            case REVO_GRID_STRUCTURE_COMMANDS.UNHIDE_COLUMN: {
+                if (!columnVisibility?.unhideColumn) {
+                    throw new Error(
+                        "Column visibility is not enabled."
+                    );
+                }
+
+                const prop =
+                    String(payload.prop ?? "").trim();
+
+                return columnVisibility.unhideColumn(prop);
+            }
+
             default:
                 throw new Error(`Unknown Structure command '${commandId}'.`);
         }
@@ -144,6 +202,7 @@ export function createRevoGridStructureCommands(options) {
         captureContext,
         describeRowDelete,
         describeColumnDelete,
+        describeColumnVisibility,
         execute
     });
 }

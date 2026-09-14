@@ -99,7 +99,9 @@ public sealed class WorkOrderService(
         IReadOnlyCollection<DepartmentColumnLayoutInput>? columnLayouts = null,
         bool columnLayoutsChanged = false,
         CancellationToken cancellationToken = default,
-        ICollection<WorkOrderServicePerformanceStage>? performanceStages = null)
+        ICollection<WorkOrderServicePerformanceStage>? performanceStages = null,
+        IReadOnlyCollection<DepartmentColumnVisibilityInput>? columnVisibilities = null,
+        bool columnVisibilitiesChanged = false)
     {
         var serviceStartedAt = Stopwatch.GetTimestamp();
 
@@ -236,6 +238,41 @@ public sealed class WorkOrderService(
                 {
                     Layouts = departmentColumnLayouts.Count,
                     ConfigurationChanged = columnLayoutsChanged
+                });
+
+            var columnVisibilityStartedAt = Stopwatch.GetTimestamp();
+
+            var columnVisibilityPreparation =
+                await DepartmentColumnVisibilityService.PrepareVisibilityAsync(
+                    dbContext,
+                    departmentId,
+                    workYear,
+                    userId,
+                    columnVisibilities,
+                    columnVisibilitiesChanged,
+                    customColumnDefinitions,
+                    cancellationToken);
+
+            if (!columnVisibilityPreparation.Succeeded)
+            {
+                return columnVisibilityPreparation.ConcurrencyConflict
+                    ? WorkOrderSaveResult.ConcurrencyFailure(
+                        columnVisibilityPreparation.ErrorMessage)
+                    : WorkOrderSaveResult.ValidationFailure(
+                        columnVisibilityPreparation.ErrorMessage);
+            }
+
+            var departmentColumnVisibilities =
+                columnVisibilityPreparation.Visibility;
+
+            RecordPerformanceStage(
+                performanceStages,
+                "save.server.column-visibility-prepare",
+                columnVisibilityStartedAt,
+                new
+                {
+                    VisibilityRecords = departmentColumnVisibilities.Count,
+                    ConfigurationChanged = columnVisibilitiesChanged
                 });
 
             var customValuesError =
@@ -908,6 +945,13 @@ public sealed class WorkOrderService(
                 .Select(DepartmentColumnLayoutService.MapLayout)
                 .ToList();
 
+            var savedColumnVisibilities = departmentColumnVisibilities
+                .Where(visibility =>
+                    dbContext.Entry(visibility).State != EntityState.Deleted)
+                .OrderBy(visibility => visibility.FieldKey)
+                .Select(DepartmentColumnVisibilityService.MapVisibility)
+                .ToList();
+
             RecordPerformanceStage(
                 performanceStages,
                 "save.server.map-result",
@@ -934,7 +978,8 @@ public sealed class WorkOrderService(
                 savedRecords,
                 deletedRecordIds,
                 savedCustomColumns,
-                savedColumnLayouts);
+                savedColumnLayouts,
+                savedColumnVisibilities);
         }
         catch (DbUpdateConcurrencyException exception)
         {
@@ -951,6 +996,10 @@ public sealed class WorkOrderService(
             var conflictingCustomColumn = exception.Entries
                 .Select(entry => entry.Entity)
                 .OfType<CustomColumnDefinition>()
+                .FirstOrDefault();
+            var conflictingColumnVisibility = exception.Entries
+                .Select(entry => entry.Entity)
+                .OfType<DepartmentColumnVisibility>()
                 .FirstOrDefault();
 
             logger.LogWarning(
@@ -969,6 +1018,12 @@ public sealed class WorkOrderService(
             {
                 return WorkOrderSaveResult.ConcurrencyFailure(
                     "A custom column was changed or deleted by another session. Refresh the sheet and try again.");
+            }
+
+            if (conflictingColumnVisibility is not null)
+            {
+                return WorkOrderSaveResult.ConcurrencyFailure(
+                    "The column visibility was changed by another session. Refresh the sheet and try again.");
             }
 
             return WorkOrderSaveResult.ConcurrencyFailure(
@@ -1001,6 +1056,13 @@ public sealed class WorkOrderService(
                 {
                     return WorkOrderSaveResult.ValidationFailure(
                         "A width for the same column was saved by another session. Refresh the sheet and try again.");
+                }
+
+                if (exception.Entries.Any(entry =>
+                    entry.Entity is DepartmentColumnVisibility))
+                {
+                    return WorkOrderSaveResult.ConcurrencyFailure(
+                        "The column visibility was saved by another session. Refresh the sheet and try again.");
                 }
 
                 return WorkOrderSaveResult.DuplicateFailure(
@@ -1159,7 +1221,8 @@ public sealed record WorkOrderSheetData(
     List<int> AvailableYears,
     List<CustomColumnDefinitionData> CustomColumns,
     List<DepartmentColumnLayoutData> ColumnLayouts,
-    List<WorkOrderSheetRow> WorkOrders);
+    List<WorkOrderSheetRow> WorkOrders,
+    List<DepartmentColumnVisibilityData> ColumnVisibilities);
 
 public sealed record WorkOrderSheetRow(
     int Id,
@@ -1234,13 +1297,15 @@ public sealed record WorkOrderSaveResult(
     IReadOnlyList<int>? DeletedRecordIds = null,
     IReadOnlyList<WorkOrderDuplicateConflict>? DuplicateConflicts = null,
     IReadOnlyList<CustomColumnDefinitionData>? SavedCustomColumns = null,
-    IReadOnlyList<DepartmentColumnLayoutData>? SavedColumnLayouts = null)
+    IReadOnlyList<DepartmentColumnLayoutData>? SavedColumnLayouts = null,
+    IReadOnlyList<DepartmentColumnVisibilityData>? SavedColumnVisibilities = null)
 {
     public static WorkOrderSaveResult Success(
         IReadOnlyList<WorkOrderSavedRecord> savedRecords,
         IReadOnlyList<int> deletedRecordIds,
         IReadOnlyList<CustomColumnDefinitionData>? savedCustomColumns = null,
-        IReadOnlyList<DepartmentColumnLayoutData>? savedColumnLayouts = null) =>
+        IReadOnlyList<DepartmentColumnLayoutData>? savedColumnLayouts = null,
+        IReadOnlyList<DepartmentColumnVisibilityData>? savedColumnVisibilities = null) =>
         new(
             true,
             WorkOrderSaveFailureType.None,
@@ -1248,7 +1313,8 @@ public sealed record WorkOrderSaveResult(
             SavedRecords: savedRecords,
             DeletedRecordIds: deletedRecordIds,
             SavedCustomColumns: savedCustomColumns,
-            SavedColumnLayouts: savedColumnLayouts);
+            SavedColumnLayouts: savedColumnLayouts,
+            SavedColumnVisibilities: savedColumnVisibilities);
 
     public static WorkOrderSaveResult ValidationFailure(
         string message) =>

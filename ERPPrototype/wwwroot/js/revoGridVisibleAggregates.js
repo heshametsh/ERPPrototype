@@ -19,6 +19,7 @@ const DATA_HISTORY_ADAPTER = "data-cell-set";
 const FILTER_HISTORY_ADAPTER = "work-orders-filter-state";
 const ROW_HISTORY_ADAPTER = "work-orders-row-structure";
 const COLUMN_HISTORY_ADAPTER = "work-orders-column-workspace";
+const VISIBILITY_HISTORY_ADAPTER = "work-orders-column-visibility";
 const AFTER_HISTORY_REPLAY_EVENT = "erpaftersheethistoryreplay";
 
 function text(value) {
@@ -159,6 +160,11 @@ export function createRevoGridVisibleAggregates(options) {
         ? options.hasActiveFilters
         : () => false;
 
+    const getHiddenProps =
+        typeof options?.getHiddenProps === "function"
+            ? options.getHiddenProps
+            : () => [];
+
     let destroyed = false;
     let scheduled = false;
     let scheduledReason = "initialize";
@@ -181,7 +187,21 @@ export function createRevoGridVisibleAggregates(options) {
     }
 
     function currentMoneyDefinitions() {
-        return buildMoneyDefinitions(currentCustomColumns());
+        const hidden = new Set(
+            (
+                Array.isArray(getHiddenProps())
+                    ? getHiddenProps()
+                    : []
+            )
+                .map(text)
+                .filter(Boolean)
+        );
+
+        return buildMoneyDefinitions(
+            currentCustomColumns()
+        ).filter(definition =>
+            !hidden.has(definition.field)
+        );
     }
 
     function moneyFieldSet() {
@@ -274,7 +294,7 @@ export function createRevoGridVisibleAggregates(options) {
 
         const token = ++refreshToken;
         const customColumns = currentCustomColumns();
-        const definitions = buildMoneyDefinitions(customColumns);
+        const definitions = currentMoneyDefinitions();
         const rows = await grid.getVisibleSource("rgRow");
 
         if (destroyed || token !== refreshToken) {
@@ -501,7 +521,8 @@ export function createRevoGridVisibleAggregates(options) {
         if (
             adapterKey === FILTER_HISTORY_ADAPTER ||
             adapterKey === ROW_HISTORY_ADAPTER ||
-            adapterKey === COLUMN_HISTORY_ADAPTER
+            adapterKey === COLUMN_HISTORY_ADAPTER ||
+            adapterKey === VISIBILITY_HISTORY_ADAPTER
         ) {
             scheduleRefresh(`history-${entry?.kind ?? adapterKey}`);
             return;

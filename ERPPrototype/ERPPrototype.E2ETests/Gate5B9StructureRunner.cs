@@ -138,7 +138,7 @@ internal static class Gate5B9StructureRunner
             Timeout = 10_000
         });
 
-        var labels = await menu.Locator("button").AllTextContentsAsync();
+        var labels = await menu.Locator("button:visible").AllTextContentsAsync();
         var expected = new[]
         {
             "Insert Rows...",

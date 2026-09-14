@@ -120,6 +120,16 @@ internal static class Program
                 argument =>
                     string.Equals(
                         argument,
+                        "--revo-gate5c1-visibility-focused",
+                        StringComparison.OrdinalIgnoreCase)))
+        {
+            return await Gate5C1VisibilityFocusedRunner.RunAsync();
+        }
+
+        if (args.Any(
+                argument =>
+                    string.Equals(
+                        argument,
                         "--revo-gate5b6-validation",
                         StringComparison.OrdinalIgnoreCase)))
         {

@@ -68,6 +68,9 @@ public partial class WorkOrdersRevoGridNativeGate5A
     [Parameter]
     public bool EnableVisibleAggregates { get; set; }
 
+    [Parameter]
+    public bool EnableColumnVisibility { get; set; }
+
     // Saudi Arabia is UTC+3 all year. The page always opens on the
     // current Saudi business year and does not persist the last selected year.
     private static int CurrentBusinessYear =>
@@ -95,6 +98,7 @@ public partial class WorkOrdersRevoGridNativeGate5A
     private List<int> AvailableWorkYears = [CurrentBusinessYear];
     private List<NativeGate5ARow> Rows = [];
     private List<CustomColumnDefinitionData> CustomColumns = [];
+    private List<DepartmentColumnVisibilityData> ColumnVisibilities = [];
 
     private IJSObjectReference? GridModule;
     private NativeGate5ADiagnostics? Diagnostics;
@@ -223,6 +227,7 @@ public partial class WorkOrdersRevoGridNativeGate5A
             AvailableWorkYears = availableYears,
             Rows = rows,
             CustomColumns = customColumns,
+            ColumnVisibilities = sheet.ColumnVisibilities,
             ServerLoadMilliseconds = elapsedMilliseconds
         };
     }
@@ -236,6 +241,7 @@ public partial class WorkOrdersRevoGridNativeGate5A
         Rows = snapshot.Rows;
         DisplayedRowCount = snapshot.Rows.Count;
         CustomColumns = snapshot.CustomColumns;
+        ColumnVisibilities = snapshot.ColumnVisibilities;
         ServerLoadMilliseconds = snapshot.ServerLoadMilliseconds;
     }
 
@@ -252,7 +258,7 @@ public partial class WorkOrdersRevoGridNativeGate5A
         {
             var gridModulePath = EnableChangeEngine
                 ? EnableSaveHandshake
-                    ? "./js/revoGridGate5B1.js?v=20260912-revo-rename-6"
+                    ? "./js/revoGridGate5B1.js?v=20260912-revo-hide-atomic-1"
                     : EnableHeaderMultiSelection
                     ? "./js/revoGridGate5B1.js?v=20260830-selection-core-r2"
                     : EnableStructureWorkspace
@@ -292,6 +298,8 @@ public partial class WorkOrdersRevoGridNativeGate5A
                     EnableClipboardRangeFill,
                     EnableSaveHandshake,
                     EnableVisibleAggregates,
+                    EnableColumnVisibility,
+                    ColumnVisibilities,
                     BasketValues = WorkOrderBuskets.All,
                     RowCountElementId,
                     ChangeStatusElementId,
@@ -497,7 +505,8 @@ public partial class WorkOrdersRevoGridNativeGate5A
                     GridElementId,
                     snapshot.Rows,
                     snapshot.CustomColumns,
-                    snapshot.WorkYear);
+                    snapshot.WorkYear,
+                    snapshot.ColumnVisibilities);
             }
 
             ApplySnapshot(snapshot);
@@ -695,6 +704,7 @@ public partial class WorkOrdersRevoGridNativeGate5A
         public List<int> AvailableWorkYears { get; set; } = [];
         public List<NativeGate5ARow> Rows { get; set; } = [];
         public List<CustomColumnDefinitionData> CustomColumns { get; set; } = [];
+        public List<DepartmentColumnVisibilityData> ColumnVisibilities { get; set; } = [];
         public double ServerLoadMilliseconds { get; set; }
     }
 

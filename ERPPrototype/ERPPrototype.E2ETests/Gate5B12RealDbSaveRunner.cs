@@ -11,7 +11,7 @@ internal static class Gate5B12RealDbSaveRunner
     private const int FixedPort = 5265;
     private const string GatePath = "/work-orders-revogrid-gate5c1";
     private const string GridHostId = "revogrid-native-gate5a-grid";
-    private const string ExpectedModuleVersionToken = "20260912-revo-rename-6";
+    private const string ExpectedModuleVersionToken = "20260912-revo-hide-atomic-1";
     private const string CustomFieldKey = "custom_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     private const string CustomFieldName = "B12 E2E Note";
     private const int LargeSaveRowCount = 1_200;

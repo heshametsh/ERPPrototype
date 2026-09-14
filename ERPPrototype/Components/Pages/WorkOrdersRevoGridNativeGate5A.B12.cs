@@ -143,7 +143,7 @@ public partial class WorkOrdersRevoGridNativeGate5A
                 throw;
             }
 
-            if (contract.SchemaVersion != 2)
+            if (contract.SchemaVersion != 3)
             {
                 throw new InvalidOperationException(
                     $"Unsupported B12 persistence schema version {contract.SchemaVersion}.");
@@ -228,7 +228,9 @@ public partial class WorkOrdersRevoGridNativeGate5A
                 preparation.DeletedWorkOrders,
                 contract.CustomColumns,
                 contract.CustomColumnsChanged,
-                performanceStages: serviceStages);
+                performanceStages: serviceStages,
+                columnVisibilities: contract.ColumnVisibilities,
+                columnVisibilitiesChanged: contract.ColumnVisibilitiesChanged);
             Logger.LogInformation(
                 "[B12-PERF] phase=work-order-service elapsedMs={ElapsedMs:F1} succeeded={Succeeded} stages={StageCount}",
                 ElapsedB12Ms(serviceStartedAt),
@@ -573,6 +575,8 @@ public partial class WorkOrdersRevoGridNativeGate5A
 
         var reconcile = new NativeGate5B12ReconcileResult();
         reconcile.SavedCustomColumns = (result.SavedCustomColumns ?? []).ToList();
+        reconcile.SavedColumnVisibilities =
+            (result.SavedColumnVisibilities ?? []).ToList();
 
         foreach (var saved in result.SavedRecords ?? [])
         {
@@ -805,6 +809,11 @@ public partial class WorkOrdersRevoGridNativeGate5A
     private static string FormatB12Failure(WorkOrderSaveResult result) =>
         result.FailureType switch
         {
+            WorkOrderSaveFailureType.Concurrency
+                when result.ErrorMessage.Contains(
+                    "column visibility",
+                    StringComparison.OrdinalIgnoreCase) =>
+                "فشل الحفظ: تم تغيير إظهار/إخفاء الأعمدة من جلسة أخرى. حدّث الشيت ثم حاول مرة أخرى؛ لم يتم فقد تغييراتك.",
             WorkOrderSaveFailureType.Concurrency =>
                 "فشل الحفظ: تم تعديل/حذف أمر عمل من جلسة أخرى. لم يتم فقد تغييراتك.",
             WorkOrderSaveFailureType.Duplicate =>
@@ -834,6 +843,8 @@ public partial class WorkOrdersRevoGridNativeGate5A
         public long Revision { get; set; }
         public bool CustomColumnsChanged { get; set; }
         public List<CustomColumnDefinitionInput> CustomColumns { get; set; } = [];
+        public bool ColumnVisibilitiesChanged { get; set; }
+        public List<DepartmentColumnVisibilityInput> ColumnVisibilities { get; set; } = [];
         public List<NativeGate5B12ChangedRecord> ChangedRecords { get; set; } = [];
         public List<NativeGate5B12DeletedRecord> DeletedRecords { get; set; } = [];
     }
@@ -909,5 +920,6 @@ public partial class WorkOrdersRevoGridNativeGate5A
         public List<NativeGate5ARow> SavedRows { get; set; } = [];
         public List<string> RemovedClientKeys { get; set; } = [];
         public List<CustomColumnDefinitionData> SavedCustomColumns { get; set; } = [];
+        public List<DepartmentColumnVisibilityData> SavedColumnVisibilities { get; set; } = [];
     }
 }

@@ -406,6 +406,7 @@ export function createRevoGridHeaderSelectionFeature() {
     class RevoGridHeaderSelectionPlugin {
         constructor(grid, providers) {
             this.grid = grid;
+            this.providers = providers;
             this.destroyed = false;
             this.nativeSyncDepth = 0;
             this.nativeProjectionQueue = Promise.resolve(false);
@@ -429,8 +430,49 @@ export function createRevoGridHeaderSelectionFeature() {
         }
 
         async columns() {
-            const columns = await this.grid.getColumns();
-            return Array.isArray(columns) ? columns : [];
+            const raw =
+                this.providers?.column?.getRawColumns?.();
+            const stores =
+                this.providers?.column?.stores;
+
+            if (raw && stores) {
+                const result = [];
+
+                for (const type of [
+                    "colPinStart",
+                    "rgCol",
+                    "colPinEnd"
+                ]) {
+                    const source =
+                        Array.isArray(raw?.[type])
+                            ? raw[type]
+                            : [];
+                    const items =
+                        stores?.[type]?.store?.get?.(
+                            "items"
+                        );
+
+                    if (items) {
+                        result.push(
+                            ...Array.from(items)
+                                .map(index =>
+                                    source[Number(index)])
+                                .filter(Boolean)
+                        );
+                    } else {
+                        result.push(...source);
+                    }
+                }
+
+                return result;
+            }
+
+            const columns =
+                await this.grid.getColumns();
+
+            return Array.isArray(columns)
+                ? columns
+                : [];
         }
 
         async orderedColumnProps() {

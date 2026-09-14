@@ -303,6 +303,22 @@ export function createRevoGridColumnWorkspace(options) {
     const sortController = options?.sortController ?? null;
     const replaceColumns = options?.replaceColumns;
     const structureLocked = options?.structureLocked ?? (() => false);
+    const getDisplayedColumns =
+        typeof options?.getDisplayedColumns === "function"
+            ? options.getDisplayedColumns
+            : async (columnType = "all") => {
+                const columns = await grid.getColumns();
+                const all = Array.isArray(columns)
+                    ? columns
+                    : [];
+                if (!columnType || columnType === "all") {
+                    return all;
+                }
+                return all.filter(column =>
+                    String(column?.pin || "rgCol") ===
+                    String(columnType)
+                );
+            };
 
     if (!grid || typeof grid.getColumns !== "function" || typeof grid.getSource !== "function") {
         throw new Error("A compatible RevoGrid element is required.");
@@ -551,92 +567,193 @@ export function createRevoGridColumnWorkspace(options) {
     }
 
     async function resolveContext(clickedCell, selectionSnapshot = null) {
-        const columns = await grid.getColumns();
+        const targetColumnType =
+            String(clickedCell?.colType ?? "rgCol");
+        const [columns, allDisplayedColumns] =
+            await Promise.all([
+                getDisplayedColumns(targetColumnType),
+                getDisplayedColumns("all")
+            ]);
+
         const targetIndex = Number(clickedCell?.colIndex);
-        const target = Number.isInteger(targetIndex) ? columns[targetIndex] : null;
-        const targetProp = String(target?.prop ?? "").trim() || null;
+        const target =
+            Number.isInteger(targetIndex)
+                ? columns[targetIndex]
+                : null;
+        const targetProp =
+            String(target?.prop ?? "").trim() || null;
         const snapshot = selectionSnapshot ??
-            (selectionContext?.getSnapshot ? await selectionContext.getSnapshot() : null);
+            (selectionContext?.getSnapshot
+                ? await selectionContext.getSnapshot()
+                : null);
         const range = snapshot?.range;
         const selectedProps = [];
 
         if (snapshot?.kind === "columns") {
             const existingProps = new Set(
-                (Array.isArray(columns) ? columns : [])
-                    .map(column => String(column?.prop ?? "").trim())
+                (Array.isArray(allDisplayedColumns)
+                    ? allDisplayedColumns
+                    : [])
+                    .map(column =>
+                        String(
+                            column?.prop ?? ""
+                        ).trim())
                     .filter(Boolean)
             );
             const semanticProps = [...new Set(
-                (Array.isArray(snapshot?.selectedProps) ? snapshot.selectedProps : [])
-                    .map(value => String(value ?? "").trim())
-                    .filter(prop => prop && existingProps.has(prop))
+                (
+                    Array.isArray(
+                        snapshot?.selectedProps
+                    )
+                        ? snapshot.selectedProps
+                        : []
+                )
+                    .map(value =>
+                        String(value ?? "").trim())
+                    .filter(prop =>
+                        prop &&
+                        existingProps.has(prop))
             )];
-            const clickedInside = Boolean(targetProp && semanticProps.includes(targetProp));
-            const clickedOutside = Boolean(
-                targetProp && semanticProps.length > 0 && !clickedInside
-            );
-            const effectiveProps = clickedOutside
-                ? [targetProp]
-                : semanticProps.length > 0
-                    ? semanticProps
-                    : targetProp
-                        ? [targetProp]
-                        : [];
-            const customKeys = new Set(current.map(column => column.fieldKey));
+            const clickedInside =
+                Boolean(
+                    targetProp &&
+                    semanticProps.includes(
+                        targetProp
+                    )
+                );
+            const clickedOutside =
+                Boolean(
+                    targetProp &&
+                    semanticProps.length > 0 &&
+                    !clickedInside
+                );
+            const effectiveProps =
+                clickedOutside
+                    ? [targetProp]
+                    : semanticProps.length > 0
+                        ? semanticProps
+                        : targetProp
+                            ? [targetProp]
+                            : [];
+            const customKeys =
+                new Set(
+                    current.map(column =>
+                        column.fieldKey)
+                );
+
             return {
                 targetProp,
-                targetCustom: Boolean(targetProp && customKeys.has(targetProp)),
+                targetCustom:
+                    Boolean(
+                        targetProp &&
+                        customKeys.has(targetProp)
+                    ),
                 selectedProps: effectiveProps,
-                selectedCustomProps: effectiveProps.filter(prop => customKeys.has(prop)),
-                allCustomProps: current.map(column => column.fieldKey),
+                selectedCustomProps:
+                    effectiveProps.filter(prop =>
+                        customKeys.has(prop)),
+                allCustomProps:
+                    current.map(column =>
+                        column.fieldKey),
                 customColumnCount: current.length,
-                selectionKind: clickedOutside
-                    ? "cell"
-                    : semanticProps.length
-                        ? "columns"
-                        : (targetProp ? "cell" : "none")
+                selectionKind:
+                    clickedOutside
+                        ? "cell"
+                        : semanticProps.length
+                            ? "columns"
+                            : targetProp
+                                ? "cell"
+                                : "none"
             };
         }
 
-        const clickedInsideSelectedColumns = Boolean(
-            Number.isInteger(targetIndex) &&
+        const clickedInsideSelectedColumns =
+            Boolean(
+                Number.isInteger(targetIndex) &&
+                range &&
+                Number.isInteger(range.x) &&
+                Number.isInteger(range.x1) &&
+                targetIndex >=
+                    Math.min(range.x, range.x1) &&
+                targetIndex <=
+                    Math.max(range.x, range.x1)
+            );
+
+        // Secondary-click coordinates are Revo VISIBLE indexes. Resolve
+        // them against the trimmed visible collection, never raw authored
+        // column indexes, so hiding one prop cannot retarget the next click.
+        if (
+            targetProp &&
+            !clickedInsideSelectedColumns
+        ) {
+            selectedProps.push(targetProp);
+        } else if (
             range &&
             Number.isInteger(range.x) &&
-            Number.isInteger(range.x1) &&
-            targetIndex >= Math.min(range.x, range.x1) &&
-            targetIndex <= Math.max(range.x, range.x1)
-        );
+            Number.isInteger(range.x1)
+        ) {
+            const start =
+                Math.max(
+                    0,
+                    Math.min(range.x, range.x1)
+                );
+            const end =
+                Math.min(
+                    columns.length - 1,
+                    Math.max(range.x, range.x1)
+                );
 
-        // Same spreadsheet rule as Row Structure: right-click inside the
-        // employee's current column/range Selection preserves it. Right-click
-        // outside it targets only the clicked column so stale Selection state
-        // can never make a destructive command operate on a different column.
-        if (targetProp && !clickedInsideSelectedColumns) {
-            selectedProps.push(targetProp);
-        } else if (range && Number.isInteger(range.x) && Number.isInteger(range.x1)) {
-            const start = Math.max(0, Math.min(range.x, range.x1));
-            const end = Math.min(columns.length - 1, Math.max(range.x, range.x1));
-            for (let index = start; index <= end; index += 1) {
-                const prop = String(columns[index]?.prop ?? "").trim();
+            for (
+                let index = start;
+                index <= end;
+                index += 1
+            ) {
+                const prop =
+                    String(
+                        columns[index]?.prop ?? ""
+                    ).trim();
+
                 if (prop) {
                     selectedProps.push(prop);
                 }
             }
-        } else if (snapshot?.kind === "column" && snapshot?.prop) {
-            selectedProps.push(String(snapshot.prop));
+        } else if (
+            snapshot?.kind === "column" &&
+            snapshot?.prop
+        ) {
+            selectedProps.push(
+                String(snapshot.prop)
+            );
         } else if (targetProp) {
             selectedProps.push(targetProp);
         }
 
-        const customKeys = new Set(current.map(column => column.fieldKey));
+        const customKeys =
+            new Set(
+                current.map(column =>
+                    column.fieldKey)
+            );
+
         return {
             targetProp,
-            targetCustom: Boolean(targetProp && customKeys.has(targetProp)),
-            selectedProps: [...new Set(selectedProps)],
-            selectedCustomProps: [...new Set(selectedProps.filter(prop => customKeys.has(prop)))],
-            allCustomProps: current.map(column => column.fieldKey),
+            targetCustom:
+                Boolean(
+                    targetProp &&
+                    customKeys.has(targetProp)
+                ),
+            selectedProps:
+                [...new Set(selectedProps)],
+            selectedCustomProps:
+                [...new Set(
+                    selectedProps.filter(prop =>
+                        customKeys.has(prop))
+                )],
+            allCustomProps:
+                current.map(column =>
+                    column.fieldKey),
             customColumnCount: current.length,
-            selectionKind: snapshot?.kind ?? "none"
+            selectionKind:
+                snapshot?.kind ?? "none"
         };
     }
 

@@ -43,7 +43,18 @@ function injectStyles() {
         }
         .${MENU_CLASS} button:hover:not(:disabled) { background: #eef7fc; color: #0b5f95; }
         .${MENU_CLASS} button[data-danger="true"] { color: #a52a2a; }
+        .${MENU_CLASS} button:disabled { color: #8b99a4; cursor: default; }
         .${MENU_CLASS}__separator { height: 1px; background: #dce5eb; margin: 5px 3px; }
+        .${MENU_CLASS}__unhide-list {
+            margin: 2px 0 4px 12px;
+            padding-left: 5px;
+            border-left: 2px solid #dce5eb;
+        }
+        .${MENU_CLASS}__unhide-list[hidden] { display: none !important; }
+        .${MENU_CLASS}__unhide-list button {
+            font-size: .84rem;
+            font-weight: 600;
+        }
         .${DIALOG_CLASS} {
             position: fixed;
             inset: 0;
@@ -197,8 +208,16 @@ function pointerCellFromEvent(event) {
     const path = typeof event?.composedPath === "function" ? event.composedPath() : [];
     let rowIndex = null;
     let colIndex = null;
+    let rowHeader = false;
 
     for (const node of path) {
+        const viewportType =
+            node?.getAttribute?.("col-type") ??
+            node?.colType;
+
+        if (String(viewportType ?? "") === "rowHeaders") {
+            rowHeader = true;
+        }
         if (rowIndex === null) {
             const raw = node?.dataset?.rgrow ?? node?.dataset?.rgRow;
             const value = Number(raw);
@@ -222,7 +241,8 @@ function pointerCellFromEvent(event) {
         rowIndex,
         colIndex,
         colType: "rgCol",
-        rowType: "rgRow"
+        rowType: "rgRow",
+        rowHeader
     };
 }
 
@@ -305,6 +325,15 @@ export function createRevoGridStructureMenu(options) {
     function closeMenu() {
         menu.hidden = true;
         menuContext = null;
+
+        const unhideList =
+            menu.querySelector(
+                `.${MENU_CLASS}__unhide-list`
+            );
+
+        if (unhideList) {
+            unhideList.hidden = true;
+        }
     }
 
     function closeDialog(dialog) {
@@ -640,6 +669,148 @@ export function createRevoGridStructureMenu(options) {
         makeMenuButton("Delete Columns...", () => void openDeleteColumnsDialog(), true)
     );
 
+    const visibilitySeparator =
+        document.createElement("div");
+    visibilitySeparator.className =
+        `${MENU_CLASS}__separator`;
+    visibilitySeparator.hidden = true;
+
+    const hideColumnButton =
+        makeMenuButton(
+            "Hide Column",
+            async () => {
+                const context = menuContext;
+                if (!context) {
+                    return;
+                }
+
+                try {
+                    await structureCommands.execute(
+                        REVO_GRID_STRUCTURE_COMMANDS.HIDE_COLUMN,
+                        context
+                    );
+                    closeMenu();
+                } catch (error) {
+                    hideColumnButton.title =
+                        error?.message ||
+                        "Unable to hide the column.";
+                }
+            }
+        );
+    hideColumnButton.hidden = true;
+
+    const unhideList =
+        document.createElement("div");
+    unhideList.className =
+        `${MENU_CLASS}__unhide-list`;
+    unhideList.hidden = true;
+
+    const unhideColumnButton =
+        makeMenuButton(
+            "Unhide Column >",
+            () => {
+                unhideList.hidden =
+                    !unhideList.hidden;
+            }
+        );
+    unhideColumnButton.hidden = true;
+
+    menu.append(
+        visibilitySeparator,
+        hideColumnButton,
+        unhideColumnButton,
+        unhideList
+    );
+
+    async function refreshVisibilityMenu(context) {
+        if (
+            !structureCommands
+                ?.describeColumnVisibility
+        ) {
+            visibilitySeparator.hidden = true;
+            hideColumnButton.hidden = true;
+            unhideColumnButton.hidden = true;
+            unhideList.hidden = true;
+            return;
+        }
+
+        const description =
+            await structureCommands
+                .describeColumnVisibility(context);
+
+        const enabled =
+            description?.enabled === true;
+
+        visibilitySeparator.hidden = !enabled;
+
+        hideColumnButton.hidden =
+            !enabled ||
+            description?.targetHidden === true;
+
+        hideColumnButton.disabled =
+            enabled &&
+            description?.canHide !== true;
+
+        hideColumnButton.title =
+            description?.hideReason ?? "";
+
+        const hiddenColumns =
+            Array.isArray(
+                description?.hiddenColumns
+            )
+                ? description.hiddenColumns
+                : [];
+
+        unhideColumnButton.hidden =
+            !enabled ||
+            hiddenColumns.length === 0;
+
+        unhideColumnButton.title = "";
+        unhideList.hidden = true;
+        unhideList.replaceChildren();
+
+        for (const column of hiddenColumns) {
+            const prop =
+                String(
+                    column?.prop ?? ""
+                ).trim();
+
+            if (!prop) {
+                continue;
+            }
+
+            const item =
+                makeMenuButton(
+                    String(
+                        column?.name ?? prop
+                    ),
+                    async () => {
+                        const activeContext =
+                            menuContext;
+
+                        if (!activeContext) {
+                            return;
+                        }
+
+                        try {
+                            await structureCommands.execute(
+                                REVO_GRID_STRUCTURE_COMMANDS.UNHIDE_COLUMN,
+                                activeContext,
+                                { prop }
+                            );
+                            closeMenu();
+                        } catch (error) {
+                            unhideColumnButton.title =
+                                error?.message ||
+                                "Unable to unhide the column.";
+                        }
+                    }
+                );
+
+            unhideList.append(item);
+        }
+    }
+
     document.body.append(menu, insertRowsDialog, deleteRowsDialog, insertColumnsDialog, deleteColumnsDialog);
 
     const onPointerDown = event => {
@@ -677,6 +848,15 @@ export function createRevoGridStructureMenu(options) {
                 }
 
                 menuContext = context;
+                await refreshVisibilityMenu(context);
+
+                if (
+                    destroyed ||
+                    sequence !== contextMenuSequence
+                ) {
+                    return;
+                }
+
                 positionMenu(menu, x, y);
             })
             .catch(() => closeMenu());

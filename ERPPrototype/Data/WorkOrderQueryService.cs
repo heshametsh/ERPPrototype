@@ -169,6 +169,26 @@ public sealed class WorkOrderQueryService(
                 Layouts = columnLayouts.Count
             });
 
+        var columnVisibilityStartedAt = Stopwatch.GetTimestamp();
+
+        var columnVisibilities =
+            await DepartmentColumnVisibilityService.LoadVisibilityAsync(
+                dbContext,
+                userScope.DepartmentId,
+                workYear,
+                cancellationToken);
+
+        RecordPerformanceStage(
+            performanceStages,
+            "open.server.column-visibility-query",
+            columnVisibilityStartedAt,
+            new
+            {
+                DepartmentId = userScope.DepartmentId,
+                WorkYear = workYear,
+                VisibilityRecords = columnVisibilities.Count
+            });
+
         var rowsStopwatch = Stopwatch.StartNew();
         var rowsStartedAt = Stopwatch.GetTimestamp();
 
@@ -239,7 +259,8 @@ public sealed class WorkOrderQueryService(
             availableYears,
             customColumns,
             columnLayouts,
-            workOrders);
+            workOrders,
+            columnVisibilities);
     }
 
     private static bool IsValidWorkYear(int workYear) =>

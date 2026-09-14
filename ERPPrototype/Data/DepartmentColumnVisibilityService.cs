@@ -73,6 +73,24 @@ public static class DepartmentColumnVisibilityService
             item => item.FieldKey,
             StringComparer.Ordinal);
 
+        // A persisted Custom Column delete owns its yearly visibility cleanup
+        // in the same SQL transaction. Local Delete/Undo can keep the semantic
+        // prop in browser History until Save accepts the final authored set.
+        var obsolete = existing
+            .Where(item => !allowedFields.Contains(item.FieldKey))
+            .ToList();
+
+        if (obsolete.Count > 0)
+        {
+            dbContext.DepartmentColumnVisibilities.RemoveRange(obsolete);
+
+            foreach (var item in obsolete)
+            {
+                existing.Remove(item);
+                existingByField.Remove(item.FieldKey);
+            }
+        }
+
         if (!visibilityChanged)
         {
             return ValidateVisibleColumnExists(
@@ -114,7 +132,8 @@ public static class DepartmentColumnVisibilityService
                     !RowVersionMatches(input.RowVersion, stored.RowVersion))
                 {
                     return DepartmentColumnVisibilityPreparationResult.Failed(
-                        "The column visibility was changed in another session. Refresh the sheet and try again.");
+                        "The column visibility was changed in another session. Refresh the sheet and try again.",
+                        concurrencyConflict: true);
                 }
 
                 if (stored.IsHidden != input.IsHidden)
@@ -130,7 +149,8 @@ public static class DepartmentColumnVisibilityService
             if (input.Id > 0 || !string.IsNullOrWhiteSpace(input.RowVersion))
             {
                 return DepartmentColumnVisibilityPreparationResult.Failed(
-                    "The column visibility is stale. Refresh the sheet and try again.");
+                    "The column visibility is stale. Refresh the sheet and try again.",
+                    concurrencyConflict: true);
             }
 
             var added = new DepartmentColumnVisibility
@@ -215,7 +235,8 @@ public sealed record DepartmentColumnVisibilityData(
 public sealed record DepartmentColumnVisibilityPreparationResult(
     bool Succeeded,
     string ErrorMessage,
-    List<DepartmentColumnVisibility> Visibility)
+    List<DepartmentColumnVisibility> Visibility,
+    bool ConcurrencyConflict = false)
 {
     public static DepartmentColumnVisibilityPreparationResult Success(
         IEnumerable<DepartmentColumnVisibility> visibility) =>
@@ -227,6 +248,7 @@ public sealed record DepartmentColumnVisibilityPreparationResult(
                 .ToList());
 
     public static DepartmentColumnVisibilityPreparationResult Failed(
-        string message) =>
-        new(false, message, []);
+        string message,
+        bool concurrencyConflict = false) =>
+        new(false, message, [], concurrencyConflict);
 }
