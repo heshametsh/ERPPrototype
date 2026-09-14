@@ -802,3 +802,13 @@ Meta: Mission=AI-LEARNING-REVIEW-20260914; Class=WORKFLOW; Outcome=PASS; Stage=L
 - Largest repeated classified failure source: Test/Harness = 13. Other accumulated waste signals: Package iterations = 21, Rework loops = 10, Tooling failures = 5, Product failures = 4, Build/Stale = 2, Environment = 2.
 - One workflow experiment only for the next five completed missions: before an expensive browser regression, perform a lightweight harness-freshness preflight against current source/runtime (route/module token, feature flags, visible menu expectations, and build freshness). Do not create a new framework for this.
 - Execution telemetry remains a separate user-requested measurement layer for local step duration and failure classification; it does not replace mission Metrics.
+## 2026-09-14 - Regression harness freshness preflight activated
+
+Meta: Mission=AI-WORKFLOW-OPTIMIZATION-20260914; Class=WORKFLOW; Outcome=PASS; Stage=EXPERIMENT_START; Scope=REGRESSION_PREFLIGHT
+
+- Implemented the five-mission experiment inside the existing `Run-ERP-Full-Regression.ps1`; no new framework or Product runtime code was added.
+- Source/Harness preflight now checks Gate 5C-1 route, Save/Visibility flags, Visibility focused runner wiring, B9 visible-menu expectation/feature isolation, and B12 module token freshness before expensive browser suites.
+- `-PreflightOnly` PASS. Tracked local execution time was 568 ms; the Remote tool round-trip was about 1.2 s.
+- E2E Build PASS with 0 warnings / 0 errors; build freshness validation proved the compiled E2E DLL is newer than the relevant harness sources.
+- Full regression now includes the accepted Visibility focused break suite so Hide/Unhide remains protected alongside Rename, B9-B11, B12, and Integration.
+- Measure this preflight experiment across the next five completed missions before deciding whether to keep, change, or remove it.
