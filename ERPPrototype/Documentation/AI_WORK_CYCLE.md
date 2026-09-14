@@ -1,4 +1,4 @@
-﻿# AI Work Cycle — ERP Prototype
+# AI Work Cycle — ERP Prototype
 
 Purpose: one small repeatable engineering cycle. Git/code/test evidence remains authority; memory records continuity and learning without becoming a second product model.
 
@@ -14,7 +14,7 @@ Describe employee-visible behavior and explicit non-goals before design. Ask the
 
 ### 2. Reference and ownership
 
-For Grid missions, run the focused Tabulator → installed RevoGrid Community → relevant Pro evidence → ERP ownership pass when the behavior/API decision depends on it.
+For high-risk Grid behavior/API decisions, run the focused legacy Tabulator → exact installed RevoGrid Community version/source → relevant PUBLIC RevoGrid Pro docs/demos/APIs → ERP ownership pass. Pro is a design/UX/architecture reference only; never assume proprietary source or chase parity for its own sake.
 
 Identify the existing owner of each truth (year/dataset, identity, selection, Dirty/Baseline, History, Save authority, database/concurrency). Reject a second owner unless evidence proves it is necessary.
 
@@ -74,6 +74,7 @@ Do not change production behavior until evidence points to PRODUCT.
 
 ### Tooling/package discipline
 
+- Prefer direct edits/tests on the authorized live repository over generated ZIP/apply-package transport; use packaging only when direct access is unavailable or isolation is materially required.
 - Prefer an existing deterministic/SQL/browser path over inventing a probe that answers the same question.
 - Do not rerun an unchanged failure unless a material input changed.
 - After two consecutive Tooling/Package failures on one blocker, stop chaining and re-anchor from exact current Git/status/diff/snapshot.
@@ -116,7 +117,9 @@ Test hardening does not authorize product scope. Missing employee-visible behavi
 
 ## Metrics
 
-Use Metrics to compare missions, not to score them. Keep counts factual.
+Use Metrics to compare missions, not to score them. Keep counts factual. For a mission that predates prospective capture, use NA for an unavailable counter; never encode unknown as zero.
+
+Execution telemetry is separate from mission Metrics: `AI_EXECUTION_LOG.csv` records material device-side Review/Read/Edit/Build/Test/Diagnose steps with start/end time, local duration, outcome, failure class, and evidence path. Use `Tools/AI/Invoke-AITrackedStep.ps1` inside material local batches so timing is captured without adding Remote round-trips. These durations measure device execution only; model thinking and network/tool transport latency are not included.
 
 Important fields:
 
@@ -129,6 +132,8 @@ Important fields:
 - `RequiredEvidenceComplete`, `ManualAcceptance`, `ReferencePassComplete` — closure context.
 
 Do not judge trend from one row. After five completed missions, compare the rows, identify the single biggest repeated source of waste/risk, and choose at most one workflow experiment for the next five missions.
+
+Current five-mission experiment (2026-09-14 -> next five completed missions): before an expensive browser regression, do a lightweight harness-freshness preflight against current source/runtime for route/module token, feature flags, visible-menu expectations, and build freshness. No new gate/framework is authorized by this experiment.
 
 `ReopenedWithin3Missions` is not a closure-time metric because the future is unknown. Evaluate reopening retrospectively when enough later missions exist.
 

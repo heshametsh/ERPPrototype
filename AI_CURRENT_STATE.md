@@ -1,12 +1,12 @@
 # AI CURRENT STATE
 
-Updated: 2026-09-12
+Updated: 2026-09-14
 Mission: REVO-HIDE-UNHIDE-20260912
-Mission status: **OPEN**
+Mission status: **COMPLETE**
 
 ## Current mission
 
-Hide/Unhide Columns on the active RevoGrid Gate 5C-1 is the current approved product mission. The behavior/reference pass is complete and the first backend persistence foundation is implemented and SQL-tested: year-scoped visibility now has separate persistence, identity, and RowVersion ownership without changing department-wide width ownership. This backend checkpoint is not yet wired to Revo load/save/UI, so there is no manual feature acceptance yet. Rename remains a protected accepted foundation and must not regress.
+Hide/Unhide Columns on the active RevoGrid Gate 5C-1 is complete and accepted. The approved year-scoped visibility contract, SQL persistence, runtime wiring, History integration, right-click menu, year switching, selection/focus reconciliation, and visible Money aggregate behavior are checkpointed locally at 0e9117f. User manual behavior acceptance is PASS. Focused Hide/Unhide browser evidence, B9-B11 full regression, B12 Real DB Save, and the 36/36 SQL integration suite are all PASS. Rename remains a protected accepted foundation and must not regress.
 
 ## Authority
 
@@ -60,6 +60,12 @@ Git branch/HEAD/CLEAN-DIRTY are deliberately **not mirrored here**. Read them li
   - Integration tests.
 - Final B12 evidence proves Rename Save/reload/value stability, and the full run loaded Gate module `20260912-revo-rename-6`.
 - The final harness corrections changed tests only; no product runtime change was required after the accepted Rename source was established.
+- Hide/Unhide focused browser suite **H00-H05 PASS**: real-menu Hide, Dirty/History, Undo/Redo, Save/SQL, reload, Work Year isolation, Unhide, and visible Money aggregate restoration.
+- Hide/Unhide backend SQL integration remains **36/36 PASS**, including year isolation, last-visible-column protection, and stale RowVersion rejection.
+- Final B9-B11 full regression **PASS** after test-only harness alignment for hidden menu buttons.
+- Final B12 Real DB Save **PASS** on Gate module 20260912-revo-hide-atomic-1, including the 1,200-cell large Save and concurrency.
+- No Product defect was found during closure; harness-only fixes corrected the focused selector, B9 visible-button expectation, and B12 freshness token. One B9 startup timeout was confirmed Environment by standalone PASS.
+- Local accepted Product/Test checkpoint: 0e9117f (Close Revo Hide Unhide column visibility).
 
 ## Protected foundations
 
@@ -69,10 +75,11 @@ Git branch/HEAD/CLEAN-DIRTY are deliberately **not mirrored here**. Read them li
 - Gate 5C-1 visible aggregates and Custom Money behavior.
 - Year-scoped Custom Column definitions and cross-year custom-value mapping.
 - Rename is now an accepted foundation; do not reopen its settled header lifecycle without new failing evidence.
+- Hide/Unhide is now an accepted foundation; preserve year-scoped visibility, explicit Save semantics, History atomicity, selection reconciliation, and visible-only Money aggregates unless new failing evidence proves a defect.
 
 ## Open review findings
 
-These remain review findings only; Rename closure does not authorize unrelated fixes.
+These remain review findings only; accepted Work Orders feature closures do not authorize unrelated fixes.
 
 - `SEC-001`: forced temporary-password protection is not uniform across Admin mutation paths.
 - Startup seeding can reactivate a disabled initial Admin, contrary to the recorded restart rule.
@@ -93,7 +100,7 @@ These remain review findings only; Rename closure does not authorize unrelated f
 
 ## Next action
 
-Checkpoint the SQL-tested backend visibility foundation. Then wire the new year-scoped visibility DTO/load/save path into the active Revo Gate, add one ERP visibility owner plus the thin prop-based Revo trim adapter, and expose Hide/Unhide through the existing right-click menu. Once the feature is visible, user manual acceptance comes before focused automated UI coverage and the final full regression.
+Await the next user-approved ERP mission. Start from the local accepted checkpoint, run the bootstrap, inspect only mission-relevant code/evidence, and preserve the accepted Rename and Hide/Unhide foundations unless new failing evidence proves a defect. Remote Git/GitHub remains out of the routine workflow until the user reopens it.
 
 ## Communication
 

@@ -1,81 +1,64 @@
-﻿# AI CONTROL CENTER — ERP Prototype
+# AI CONTROL CENTER — ERP Prototype
 
-Purpose: stable router for project continuity. It is not project state and must not duplicate changing implementation facts.
+Purpose: a small router into the live project. It is not project state and must not duplicate changing implementation facts.
 
-## Refresh order
+## Start every material ERP mission
 
-Before a material ERP answer/action:
+1. Run `ERPPrototype/Tools/AI/Get-AIContext.ps1` against the live repository.
+2. Treat its output as working-memory bootstrap, not as product truth by itself.
+3. Resolve any conflict between live Git/code/evidence and narrative memory before modifying anything.
+4. Read only the mission-relevant code, tests, decisions, and evidence after bootstrap.
 
-1. Read `AI_CURRENT_STATE.md`.
-2. Read the latest relevant `ERPPrototype/Documentation/AI_WORK_LOG.md` entries.
-3. Read live Git when repository state matters: branch, HEAD, status, diff, stashes.
-4. Read only the canonical code/docs needed by the current mission.
-5. For Grid behavior/architecture, perform the focused Tabulator → installed RevoGrid Community → relevant Pro evidence → ERP ownership reference pass.
-6. For workflow/learning questions, read `AI_WORK_METRICS.csv` and `AI_WORK_CYCLE.md`.
-
-## GitHub/live-source modification discipline
-
-For any tracked-file modification:
-
-1. refresh GitHub/live Git first and read the exact current file on the active branch;
-2. edit only from that current version;
-3. verify the smallest relevant evidence for the change;
-4. commit and push the coherent change promptly so the remote remains the next review baseline;
-5. synchronize Current State / Work Log / canonical owner when their truth changed.
-
-Do not start a modification from a chat copy, historical handoff, or stale local file when the live repository is available.
 ## Authority order
 
-1. Live Git/worktree + current code + executed test evidence.
-2. Latest user-approved behavior/instruction.
+1. Live worktree/current code + executed evidence.
+2. Latest user-approved behavior/decision.
 3. `AI_CURRENT_STATE.md`.
-4. Canonical project documentation/decisions.
+4. Canonical project documentation.
 5. `AI_WORK_LOG.md` chronology.
-6. Historical handoffs/chat summaries.
+6. Historical chats/handoffs.
 
-## Memory roles
+A dirty local worktree is candidate truth until classified. Never overwrite it merely because remote Git is older or cleaner.
+## Decision depth follows risk
 
-- `AI_CURRENT_STATE.md` — compact logical state only. No mirrored live Git HEAD/status.
-- `AI_WORK_LOG.md` — append-only chronology and failure/decision receipts.
-- `AI_WORK_METRICS.csv` — factual per-mission learning data.
-- `AI_WORK_CYCLE.md` — one compact engineering cycle and root-cause guardrails.
-- `AI_LIVE_MEMORY_PROTOCOL.md` — synchronization/closure rules.
-- `AI_GRID_REFERENCE_MATRIX.md` — focused Grid comparison record.
-- `AGENTS.md` — stable engineering/communication contract.
+For high-risk Grid/Save/History/DB/concurrency/year-scope work:
 
-## Material-event rule
+**Behavior -> focused reference -> ownership -> break pass -> user decision -> implementation.**
 
-A user-run command/package/test result, behavior decision, code change, rollback, blocker, scope correction, or checkpoint is a material event.
+For Grid reference work, compare only what is relevant:
+- accepted Tabulator behavior/reference;
+- exact installed RevoGrid Community source/API;
+- relevant public Revo Pro UX/architecture concepts;
+- ERP's existing owner of the state/behavior.
 
-Before another modifying candidate:
+Pro is an idea/reference source, never a parity target or proprietary implementation source. Routine labels/CSS/test-harness fixes do not require a full reference pass.
 
-- classify the result;
-- re-anchor from the actual result and current Git;
-- if automation suggests a PRODUCT defect, show Expected vs Actual and evidence to the user before changing product behavior;
-- update Current State when current truth changed;
-- append a Work Log receipt;
-- update the canonical owner only when that owner's truth changed.
+## Failure boundary
 
-After two consecutive Tooling/Package failures on the same blocker, stop chaining packages and require a fresh exact-state status/diff/snapshot before a third candidate.
+Classify every red result before changing product code:
+`PRODUCT`, `TEST/HARNESS`, `BUILD/STALE`, `TOOLING`, or `ENVIRONMENT`.
 
-## Product/test boundary
+Test hardening never authorizes a new employee-visible feature. If automation suggests a product defect, show Expected vs Actual + evidence before changing behavior.
 
-Test hardening does not authorize employee-visible product changes. If a missing capability is found, classify it separately; for existing Work Orders behavior, recover the Tabulator/Revo/ERP contract and get user approval before runtime implementation.
+## Memory owners
 
-## Acceptance and closure
+- `AI_CURRENT_STATE.md` — compact current logical truth.
+- `AI_WORK_LOG.md` — material chronology and decision/failure receipts.
+- `AI_WORK_METRICS.csv` — one factual row per completed mission.
+- `AI_EXECUTION_LOG.csv` - raw per-step local execution telemetry; use it to find time sinks and repeated failure classes without bloating chat context.
+- `AI_WORK_CYCLE.md` — permanent execution method and learning rules.
+- `AI_LIVE_MEMORY_PROTOCOL.md` — compatibility pointer only; no duplicate rules.
+## Learning loop
 
-Automated PASS never implies user hands-on acceptance.
+At mission closure:
+1. update Current State only if logical truth changed;
+2. append only material Work Log events;
+3. add one factual Metrics row;
+4. run the memory consistency checker;
+5. create the local checkpoint after required evidence and acceptance; push/sync remote state only when the current delivery decision authorizes it.
 
-At a major evidence milestone, handoff, checkpoint, or mission closure:
-
-1. prune Current State to current truth;
-2. synchronize only affected canonical owners;
-3. run `ERPPrototype/Tools/AI/Test-AIMemoryConsistency.ps1`;
-4. for a completed mission, require one factual Metrics row;
-5. stop on checker `FAIL`.
-
-The checker is a mechanical guardrail, not a second source of product truth.
+Do not create a permanent rule from one unusual failure. After five completed Metrics missions, review the pattern and change at most one workflow rule for the next five missions.
 
 ## Communication
 
-Default to concise Egyptian Arabic with cause/effect first: what happened, why it matters, and what decision follows. Do not dump implementation detail unless it materially changes the decision.
+Default to concise Egyptian Arabic: what happens -> why it matters -> recommended decision. Technical detail stays in the background unless it changes the decision.

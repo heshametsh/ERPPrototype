@@ -770,3 +770,35 @@ Meta: Mission=REVO-HIDE-UNHIDE-20260912; Class=PRODUCT; Outcome=PASS; Stage=BACK
 - Final application/integration build PASS and Core SQL integration suite PASS: **36/36**.
 - This checkpoint does not yet connect visibility to the active Revo load/save/UI, context menu, History, selection reconciliation, aggregates, or trim adapter. Therefore no user manual Hide/Unhide acceptance is claimed yet.
 - Next slice: wire year-scoped visibility through the Revo Gate save/load contract, ERP visibility owner, prop-based trim adapter, and existing right-click menu; then user manual acceptance before focused UI automation and full regression.
+
+
+## 2026-09-13 - Live AI context bootstrap trial PASS
+
+Meta: Mission=AI-LIVE-CONTEXT-BOOTSTRAP-20260913; Class=WORKFLOW; Outcome=PASS; Stage=BOOTSTRAP_TRIAL; Scope=MEMORY_ONLY
+
+- Added read-only `ERPPrototype/Tools/AI/Get-AIContext.ps1` to load live Git, Current State, mission-relevant Work Log receipts, recent Metrics, top waste signals, learned shortcuts, and Work Cycle guardrails in one pass.
+- The first real run immediately exposed a useful state/reality mismatch: Current State still describes Revo visibility wiring as not yet connected while the live worktree already contains a large uncommitted wiring candidate. No product interpretation or change was made from that mismatch.
+- `AI_CONTROL_CENTER.md` now requires this bootstrap before material ERP reasoning/action and explicitly forbids proceeding from chat memory alone. Metrics/Work Cycle learning signals now inform every material mission, not only workflow discussions.
+- This trial changes workflow/memory tooling only. No product runtime, tests, database schema, or Current State product truth was changed.
+- Memory semantics clarified: the Current State body changes only when logical truth changes; its `Updated:` date advances when the state is explicitly re-reviewed against a newer material event and remains accurate.
+
+## 2026-09-14 - REVO-HIDE-UNHIDE-20260912 COMPLETE
+
+Meta: Mission=REVO-HIDE-UNHIDE-20260912; Class=PRODUCT; Outcome=COMPLETE; Stage=CLOSURE; Scope=HIDE_UNHIDE_AND_REGRESSION
+
+- User manual Hide/Unhide behavior acceptance is PASS.
+- Focused browser suite H00-H05 PASS: runtime freshness, real-menu Hide, Dirty/History, Undo/Redo, Save/SQL, reload, Work Year isolation, Unhide, and visible Money aggregate restoration.
+- Core SQL integration remains 36/36 PASS, including year isolation, hide-all protection, and stale visibility RowVersion rejection.
+- B9-B11 full regression PASS; B9 required a test-only visible-button correction, with no Product change.
+- B12 Real DB Save PASS on module token 20260912-revo-hide-atomic-1, including custom-column flows, snapshot safety, cross-year Save, 1,200-cell large Save, and concurrency.
+- One B9 startup timeout was classified ENVIRONMENT after the same suite passed standalone immediately afterward.
+- No automated failure required a Product runtime correction during closure.
+- Accepted Product/Test local checkpoint:  0e9117f. No remote push was performed.
+## 2026-09-14 - FIRST FIVE-MISSION LEARNING REVIEW
+
+Meta: Mission=AI-LEARNING-REVIEW-20260914; Class=WORKFLOW; Outcome=PASS; Stage=LEARNING_REVIEW; Scope=FIRST_5_COMPLETED_MISSIONS
+
+- Five completed Metrics missions are now available.
+- Largest repeated classified failure source: Test/Harness = 13. Other accumulated waste signals: Package iterations = 21, Rework loops = 10, Tooling failures = 5, Product failures = 4, Build/Stale = 2, Environment = 2.
+- One workflow experiment only for the next five completed missions: before an expensive browser regression, perform a lightweight harness-freshness preflight against current source/runtime (route/module token, feature flags, visible menu expectations, and build freshness). Do not create a new framework for this.
+- Execution telemetry remains a separate user-requested measurement layer for local step duration and failure classification; it does not replace mission Metrics.

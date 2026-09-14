@@ -23,17 +23,17 @@ Before changing code:
 - identify rollback and the evidence needed;
 - do not silently invent a new business rule.
 
-### GitHub-first modification rule
+### Live-worktree-first modification rule
 
 Before modifying any tracked project file:
 
-- fetch/re-read the exact current file from GitHub/live Git on the active branch and work from that current version, never from an old chat snapshot or stale local copy;
-- verify the local working copy is based on the intended current HEAD before editing;
-- make the smallest coherent change on top of what actually exists;
-- after each coherent accepted change and its minimum relevant verification, commit and push it promptly so GitHub remains the current shared source for the next review; do not accumulate unrelated unpushed product changes;
-- after a material change/push, synchronize the project memory owners (AI_CURRENT_STATE.md, relevant Work Log receipt, and any canonical decision owner whose truth changed).
+- read the exact current file from the authorized live device/worktree and work from that version, never from an old chat snapshot or stale exported copy;
+- read live local Git status/HEAD/diff so intentional dirty candidate work is preserved rather than overwritten;
+- make the smallest coherent change on top of what actually exists locally;
+- use GitHub/remote Git only when the user explicitly asks for it or when a remote accepted-baseline comparison is materially needed; do not fetch remote state as a routine prerequisite;
+- after a coherent accepted change and its required evidence, checkpoint it according to the current delivery decision, then synchronize only the memory owners whose logical truth changed.
 
-If GitHub/live Git conflicts with remembered state, GitHub/live Git wins and the memory documents must be corrected.
+If narrative memory conflicts with the live local worktree/current code/executed evidence, the live local evidence wins and the memory documents must be corrected.
 Keep the workflow proportional to the risk. Do not require preview packages or architecture ceremony for routine test/harness corrections. For Grid/library behavior, inspect version-matched source/API when the design actually depends on that lifecycle or contract.
 
 

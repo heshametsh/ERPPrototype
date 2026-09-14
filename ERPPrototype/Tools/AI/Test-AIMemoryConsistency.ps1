@@ -200,8 +200,8 @@ try {
                 foreach ($field in @('CommunicationCorrectionTurns','ReworkLoops','ScopeDriftEvents','ProductFailures','TestHarnessFailures','BuildStaleFailures','ToolingFailures','EnvironmentFailures','StateSyncMisses','StaleStateCorrections','PackageIterations')) {
                     $value = $row.$field
                     $parsed = 0
-                    if ([string]::IsNullOrWhiteSpace($value) -or -not [int]::TryParse($value, [ref]$parsed) -or $parsed -lt 0) {
-                        Add-Error "Metrics field $field must be a non-negative integer for $missionId."
+                    if ($value -ne 'NA' -and ([string]::IsNullOrWhiteSpace($value) -or -not [int]::TryParse($value, [ref]$parsed) -or $parsed -lt 0)) {
+                        Add-Error "Metrics field $field must be NA or a non-negative integer for $missionId."
                     }
                 }
             }
