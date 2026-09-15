@@ -719,7 +719,10 @@ export function createRevoGridRowStructure(options) {
         }
 
         const keys = rows.map(rowKey);
-        const targetKey = requireText(payload.targetKey, "targetKey");
+        const emptySheetInsert = payload?.emptySheetInsert === true;
+        const targetKey = emptySheetInsert
+            ? null
+            : requireText(payload?.targetKey, "targetKey");
         const adjustments = Array.isArray(payload?.adjustments)
             ? payload.adjustments
             : [];
@@ -759,12 +762,30 @@ export function createRevoGridRowStructure(options) {
             }
         }
 
-        const nextView = composeViewAfterInsertMany(
-            view,
-            targetKey,
-            keys,
-            payload.position
-        );
+        const nextView = emptySheetInsert
+            ? (() => {
+                if (
+                    view.sourceKeys.length !== 0 ||
+                    view.proxyKeys.length !== 0 ||
+                    view.visibleKeys.length !== 0
+                ) {
+                    throw new Error("Empty-sheet Insert can only replay into an empty sheet.");
+                }
+                return {
+                    sourceKeys: [...keys],
+                    proxyKeys: [...keys],
+                    visibleKeys: [...keys],
+                    sourceIndex: 0,
+                    proxyIndex: 0,
+                    visibleIndex: 0
+                };
+            })()
+            : composeViewAfterInsertMany(
+                view,
+                targetKey,
+                keys,
+                payload.position
+            );
         const adjustedRows = view.source.map(item => {
             const adjustment = adjustments.find(
                 candidate => candidate.clientKey === rowKey(item)
@@ -1074,9 +1095,7 @@ export function createRevoGridRowStructure(options) {
         const count = Number(requestedCount);
         const context = explicitContext ?? menuContext;
 
-        if (busy || !context?.targetKey) {
-            return false;
-        }
+        if (busy) return false;
         if (!Number.isInteger(count) || count < 1 || count > MAX_INSERT_ROWS) {
             throw new Error(`Insert row count must be between 1 and ${MAX_INSERT_ROWS}.`);
         }
@@ -1088,48 +1107,56 @@ export function createRevoGridRowStructure(options) {
 
         try {
             const view = await captureView();
-            const targetKey = context.targetKey;
-            const targetIndex = view.sourceKeys.indexOf(targetKey);
-            if (targetIndex < 0 || !view.visibleKeys.includes(targetKey)) {
-                throw new Error("Insert target is no longer visible.");
+            const targetKey = String(context?.targetKey ?? "").trim();
+            const emptySheetInsert = !targetKey && view.source.length === 0;
+            const normalizedPosition = String(position ?? "").toLowerCase();
+
+            if (!emptySheetInsert && !targetKey) {
+                throw new Error("Insert target is required while the sheet contains rows.");
+            }
+            if (!emptySheetInsert && normalizedPosition !== "above" && normalizedPosition !== "below") {
+                throw new Error("Insert Rows position must be above or below.");
             }
 
-            const insertIndex = targetIndex + (position === "above" ? 0 : 1);
-            const plan = planDisplayOrderBatchInsertion(
-                view.source,
-                insertIndex,
-                count
-            );
+            let insertIndex = 0;
+            if (!emptySheetInsert) {
+                const targetIndex = view.sourceKeys.indexOf(targetKey);
+                if (targetIndex < 0 || !view.visibleKeys.includes(targetKey)) {
+                    throw new Error("Insert target is no longer visible.");
+                }
+                insertIndex = targetIndex + (normalizedPosition === "above" ? 0 : 1);
+            }
+
+            const plan = planDisplayOrderBatchInsertion(view.source, insertIndex, count);
             const rows = plan.newOrders.map(order => createBlankRow(order));
             const keys = rows.map(rowKey);
-            const nextView = composeViewAfterInsertMany(
-                view,
-                targetKey,
-                keys,
-                position
-            );
+            const nextView = emptySheetInsert
+                ? { sourceKeys: [...keys], proxyKeys: [...keys], visibleKeys: [...keys], sourceIndex: 0, proxyIndex: 0, visibleIndex: 0 }
+                : composeViewAfterInsertMany(view, targetKey, keys, normalizedPosition);
 
             const adjustedRows = view.source.map(item => {
-                const adjustment = plan.adjustments.find(
-                    candidate => candidate.clientKey === rowKey(item)
-                );
-                return adjustment
-                    ? { ...item, displayOrder: adjustment.after }
-                    : item;
+                const adjustment = plan.adjustments.find(candidate => candidate.clientKey === rowKey(item));
+                return adjustment ? { ...item, displayOrder: adjustment.after } : item;
             });
             const nextRows = [...adjustedRows];
             nextRows.splice(nextView.sourceIndex, 0, ...rows);
 
             await applyView(nextRows, nextView.proxyKeys, nextView.visibleKeys);
-            changeBridge.applyRowChanges(
-                rowTransitionsForInsert(rows, plan.adjustments, "forward")
-            );
+            changeBridge.applyRowChanges(rowTransitionsForInsert(rows, plan.adjustments, "forward"));
 
-            const label = count === 1
-                ? position === "above"
-                    ? "Insert Row Above"
-                    : "Insert Row Below"
-                : `Insert ${count} Rows ${position === "above" ? "Above" : "Below"}`;
+            const label = emptySheetInsert
+                ? count === 1 ? "Insert Row" : `Insert ${count} Rows`
+                : count === 1
+                    ? normalizedPosition === "above" ? "Insert Row Above" : "Insert Row Below"
+                    : `Insert ${count} Rows ${normalizedPosition === "above" ? "Above" : "Below"}`;
+            const historyPayload = {
+                action: "insert",
+                position: emptySheetInsert ? null : normalizedPosition,
+                targetKey: emptySheetInsert ? null : targetKey,
+                emptySheetInsert,
+                rows: cloneValue(rows),
+                adjustments: cloneValue(plan.adjustments)
+            };
 
             try {
                 historyCoordinator.record({
@@ -1137,22 +1164,10 @@ export function createRevoGridRowStructure(options) {
                     kind: count === 1 ? "row-insert" : "row-insert-batch",
                     label,
                     focusTarget: null,
-                    payload: {
-                        action: "insert",
-                        position,
-                        targetKey,
-                        rows: cloneValue(rows),
-                        adjustments: cloneValue(plan.adjustments)
-                    }
+                    payload: historyPayload
                 });
             } catch (error) {
-                await applyInsertPayload({
-                    action: "insert",
-                    position,
-                    targetKey,
-                    rows,
-                    adjustments: plan.adjustments
-                }, "undo");
+                await applyInsertPayload(historyPayload, "undo");
                 throw error;
             }
 
@@ -1163,7 +1178,6 @@ export function createRevoGridRowStructure(options) {
             notifyState();
         }
     }
-
     async function deleteKeys(requestedKeys, options = {}) {
         if (busy) {
             return false;

@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO.Compression;
 using System.Net;
@@ -8,13 +8,12 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.Data.SqlClient;
 using Microsoft.Playwright;
+using static ERPPrototype.E2ETests.RevoCanonicalTestSurface;
 
 namespace ERPPrototype.E2ETests;
 
 internal static class Gate5C1RenameFocusedRunner
 {
-    private const string GatePath = "/work-orders-revogrid-gate5c1";
-    private const string GridHostId = "revogrid-native-gate5a-grid";
     private const string TargetFieldKey = "custom_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
     private const string SiblingFieldKey = "custom_cccccccccccccccccccccccccccccccc";
     private const string TargetName = "Rename Break Target";

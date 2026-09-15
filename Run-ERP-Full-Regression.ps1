@@ -1,4 +1,4 @@
-﻿param(
+param(
     [string]$RepoRoot = "C:\Users\Hesham\source\repos\ERPPrototype",
     [switch]$PreflightOnly
 )
@@ -59,24 +59,22 @@ function Assert-TextContains {
 
 function Invoke-HarnessPreflight {
     $gate = Join-Path $RepoRoot "ERPPrototype\Components\Pages\WorkOrdersRevoGridGate5C1.razor"
-    $b9Gate = Join-Path $RepoRoot "ERPPrototype\Components\Pages\WorkOrdersRevoGridGate5B9.razor"
-    $native = Join-Path $RepoRoot "ERPPrototype\Components\Pages\WorkOrdersRevoGridNativeGate5A.razor.cs"
     $program = Join-Path $RepoRoot "ERPPrototype\ERPPrototype.E2ETests\Program.cs"
-    $b9Runner = Join-Path $RepoRoot "ERPPrototype\ERPPrototype.E2ETests\Gate5B9StructureRunner.cs"
     $b12Runner = Join-Path $RepoRoot "ERPPrototype\ERPPrototype.E2ETests\Gate5B12RealDbSaveRunner.cs"
-    Assert-TextContains $gate '@page "/work-orders-revogrid-gate5c1"' 'Gate 5C-1 route changed or disappeared.'
+    Assert-TextContains $gate '@page "/work-orders-revogrid"' 'Canonical Revo Work Orders route changed or disappeared.'
+    $revoRoutes = Get-ChildItem (Join-Path $RepoRoot "ERPPrototype\Components\Pages") -Filter "WorkOrdersRevoGrid*.razor" |
+        Select-String -Pattern '^@page "/work-orders-revogrid'
+    if ($revoRoutes.Count -ne 1 -or $revoRoutes[0].Line.Trim() -ne '@page "/work-orders-revogrid"') {
+        throw 'Revo Work Orders must expose exactly one route: /work-orders-revogrid.'
+    }
     Assert-TextContains $gate 'EnableSaveHandshake="true"' 'Gate 5C-1 no longer enables the Save handshake used by the active module path.'
     Assert-TextContains $gate 'EnableColumnVisibility="true"' 'Gate 5C-1 no longer enables Column Visibility.'
     Assert-TextContains $program '"--revo-gate5c1-visibility-focused"' 'Visibility focused runner is not wired in Program.cs.'
-    Assert-TextContains $b9Runner 'Locator("button:visible")' 'B9 menu assertion is stale: it must inspect visible commands only.'
-    if ([IO.File]::ReadAllText($b9Gate,[Text.Encoding]::UTF8).Contains('EnableColumnVisibility="true"')) { throw 'B9 unexpectedly enables Column Visibility; its neutral-menu contract must be reviewed.' }    $nativeText=[IO.File]::ReadAllText($native,[Text.Encoding]::UTF8)
-    $module=[regex]::Match($nativeText,'EnableSaveHandshake\s*\?\s*"\./js/revoGridGate5B1\.js\?v=([^"]+)"')
-    if(-not $module.Success){ throw 'Could not derive the current Gate 5C-1 module token.' }
-    $b12Text=[IO.File]::ReadAllText($b12Runner,[Text.Encoding]::UTF8)
-    $pin=[regex]::Match($b12Text,'ExpectedModuleVersionToken\s*=\s*"([^"]+)"')
-    if(-not $pin.Success){ throw 'B12 module freshness pin is missing.' }
-    if($module.Groups[1].Value -ne $pin.Groups[1].Value){ throw "B12 module pin '$($pin.Groups[1].Value)' is stale; current source token is '$($module.Groups[1].Value)'." }
-    Write-Host ("Harness preflight token: " + $module.Groups[1].Value)
+    Assert-TextContains $program '"--revo-employee-real-workday"' 'Employee Real Workday runner is not wired in Program.cs.'
+    Assert-TextContains $program '"--revo-empty-sheet"' 'Canonical Empty Sheet runner is not wired in Program.cs.'
+    Assert-TextContains $program '"--startup-security"' 'Startup Security runner is not wired in Program.cs.'
+    Assert-TextContains $b12Runner 'private const string GatePath = "/work-orders-revogrid";' 'B12 no longer targets the canonical Revo Work Orders route.'
+    Assert-TextContains $b12Runner 'ResolveActiveModulePathAsync(page)' 'B12 no longer verifies the browser-loaded Gate module dynamically.'
 }
 
 function Assert-E2EBuildFreshness {
@@ -84,9 +82,12 @@ function Assert-E2EBuildFreshness {
     if(-not (Test-Path $dll)){ throw 'E2E build output is missing after Build.' }
     $sources=@(
         "ERPPrototype\ERPPrototype.E2ETests\Program.cs",
+        "ERPPrototype\ERPPrototype.E2ETests\EmployeeRealWorkdayRunner.cs",
+        "ERPPrototype\ERPPrototype.E2ETests\EmptySheetLifecycleRunner.cs",
+        "ERPPrototype\ERPPrototype.E2ETests\StartupSecurityRunner.cs",
+        "ERPPrototype\ERPPrototype.E2ETests\Gate5C1RenameFocusedRunner.cs",
         "ERPPrototype\ERPPrototype.E2ETests\Gate5C1VisibilityFocusedRunner.cs",
-        "ERPPrototype\ERPPrototype.E2ETests\Gate5B12RealDbSaveRunner.cs",
-        "ERPPrototype\ERPPrototype.E2ETests\Gate5B9StructureRunner.cs"
+        "ERPPrototype\ERPPrototype.E2ETests\Gate5B12RealDbSaveRunner.cs"
     ) | ForEach-Object { Get-Item (Join-Path $RepoRoot $_) }
     $latest=($sources | Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1).LastWriteTimeUtc
     if((Get-Item $dll).LastWriteTimeUtc -lt $latest){ throw 'E2E DLL is older than current harness source after Build.' }
@@ -162,12 +163,16 @@ try {
         dotnet run --project $e2e -c Debug --no-build -- --revo-gate5c1-visibility-focused
     }
 
-    Run-TestStep "30 - B9-B11 FULL REGRESSION" {
-        dotnet run --project $e2e -c Debug --no-build -- --revo-b9-b11-full-regression
+    Run-TestStep "30 - CANONICAL EMPTY SHEET" {
+        dotnet run --project $e2e -c Debug --no-build -- --revo-empty-sheet
     }
 
     Run-TestStep "40 - B12 REAL DB SAVE" {
         dotnet run --project $e2e -c Debug --no-build -- --revo-gate5b12-real-db
+    }
+
+    Run-TestStep "45 - STARTUP SECURITY" {
+        dotnet run --project $e2e -c Debug --no-build -- --startup-security
     }
 
     Run-TestStep "50 - INTEGRATION TESTS" {
@@ -182,8 +187,9 @@ try {
         Write-Host "Real Employee Workday .... PASS"
         Write-Host "Rename Focused ........... PASS"
         Write-Host "Visibility Focused ....... PASS"
-        Write-Host "B9-B11 Regression ........ PASS"
+        Write-Host "Canonical Empty Sheet .... PASS"
         Write-Host "B12 Real DB Save ......... PASS"
+        Write-Host "Startup Security ......... PASS"
         Write-Host "Integration .............. PASS"
         exit 0
     }

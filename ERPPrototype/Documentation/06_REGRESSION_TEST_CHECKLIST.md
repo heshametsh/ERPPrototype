@@ -1,3 +1,13 @@
+# ACCEPTANCE OVERRIDE - 2026-09-15 - CANONICAL REVO CLEANUP + STARTUP SECURITY
+
+- User manual browser acceptance: **PASS** on `/work-orders-revogrid`.
+- Manual checks passed: login, normal edit, Undo/Redo, Save + refresh persistence, Structure Menu, Hide/Unhide, Empty Sheet recovery, and retired Gate URL behavior.
+- Automated closure passed before manual acceptance: Employee Real Workday, Canonical Empty Sheet, Rename Focused, Visibility Focused, B12 Real DB Save, Startup Security restart regression, and SQL Integration.
+- Startup security fix preserves a deliberately disabled initial Admin across restart; `MustChangePassword` policy remains deferred.
+- Historical Gate routes/runners are retired only after unique behavior coverage was migrated to the canonical route.
+- Commit is authorized only after this acceptance; remote push remains separate authorization.
+
+---
 # ACCEPTANCE / REGRESSION OVERRIDE - 2026-09-04 - B12 + GATE 5C-1
 
 **Accepted product checkpoint:** `bdc37fe`
@@ -1170,14 +1180,14 @@ Browser closure execution note — 2026-09-07:
 - [x] Integration tests PASS.
 - [x] `ERP FULL REGRESSION : PASS` from `Run-ERP-Full-Regression.ps1`.
 
-**Current regression command:** from repository root run `powershell -ExecutionPolicy Bypass -File ".\Run-ERP-Full-Regression.ps1"`. The runner performs a fresh build, executes all five protected suites, continues through suite failures, and emits one final summary.
+**Current regression command:** from repository root run `powershell -ExecutionPolicy Bypass -File ".\Run-ERP-Full-Regression.ps1"`. The runner performs a fresh build, then protects the canonical Revo Workday, Rename, Visibility, Empty Sheet, B12 real DB Save, Startup Security restart behavior, and Integration tests; it continues through suite failures and emits one final summary.
 
 ### REVIEW-ONLY AUDIT — 2026-09-09 — security/account/memory gaps
 
 Current recovery baseline remains green; these checks are **not yet executed** and must not be inferred from Work Orders PASS evidence:
 
 - [ ] Temporary-password Admin cannot perform any privileged mutation before changing password.
-- [ ] Disabled initial Admin remains disabled after application restart/seeding.
+- [x] Disabled initial Admin remains disabled after application restart/seeding — red-before-fix and green-after-fix Startup Security regression PASS on 2026-09-15.
 - [ ] User creation/change-password behavior matches the approved password rule explicitly, not framework defaults by accident.
 - [ ] Unauthorized/non-Employee direct navigation to every accepted Revo Gate route is rejected at the route/security boundary.
 - [ ] Current business year is consistent at the Saudi New Year boundary across Revo and service/legacy default entry points.
@@ -1185,3 +1195,17 @@ Current recovery baseline remains green; these checks are **not yet executed** a
 - [ ] Backup/restore rollback procedure is tested for the forward-only year-scoped Custom Column migration.
 
 No product or test-runtime change is authorized by this checklist addition; it records review gaps only.
+
+### CANONICAL-REVO-CLEANUP-SECURITY-20260915
+
+- [x] `/work-orders-revogrid` is the only active Revo Work Orders route.
+- [x] Historical B1-B12 wrappers, old Gate5A/Gate5C1 routes, Event Probe, and duplicate historical E2E runners were removed.
+- [x] Unique historical coverage was migrated before deletion: mixed readonly Range Clear, 3-row Insert/Delete history, Duplicate Revo validation, and Empty Sheet lifecycle.
+- [x] Employee Real Workday PASS on the canonical route after coverage consolidation.
+- [x] Canonical Empty Sheet PASS.
+- [x] Rename R00-R13 PASS; Visibility H00-H05 PASS; B12 Real DB Save PASS.
+- [x] Startup Security reproduced disabled-Admin reactivation before the fix, then PASS after removing only the seeder reactivation block.
+- [x] `MustChangePassword` behavior was not changed and remains a separate deferred product decision.
+- [x] `Run-ERP-Full-Regression.ps1` no longer references historical Gates or fixed B12 module tokens and includes Startup Security.
+- [x] Final one-command `ERP FULL REGRESSION : PASS` after the security fix.
+- [ ] Manual browser acceptance is still required before commit.

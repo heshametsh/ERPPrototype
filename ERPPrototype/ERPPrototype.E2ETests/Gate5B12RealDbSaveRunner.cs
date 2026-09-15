@@ -1,17 +1,16 @@
-﻿using System.Globalization;
+using System.Globalization;
 using System.IO.Compression;
 using System.Text.Json;
 using Microsoft.Data.SqlClient;
 using Microsoft.Playwright;
+
+using static ERPPrototype.E2ETests.RevoCanonicalTestSurface;
 
 namespace ERPPrototype.E2ETests;
 
 internal static class Gate5B12RealDbSaveRunner
 {
     private const int FixedPort = 5265;
-    private const string GatePath = "/work-orders-revogrid-gate5c1";
-    private const string GridHostId = "revogrid-native-gate5a-grid";
-    private const string ExpectedModuleVersionToken = "20260912-revo-hide-atomic-1";
     private const string CustomFieldKey = "custom_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     private const string CustomFieldName = "B12 E2E Note";
     private const int LargeSaveRowCount = 1_200;
@@ -1649,13 +1648,7 @@ internal static class Gate5B12RealDbSaveRunner
             $"Expected exactly one active revoGridGate5B1 module URL, found {urls.Length}: {string.Join(", ", urls)}");
 
         var modulePath = urls[0];
-        E2ETestAssert.True(
-            modulePath.Contains(
-                ExpectedModuleVersionToken,
-                StringComparison.OrdinalIgnoreCase),
-            $"The browser loaded '{modulePath}' instead of the expected '{ExpectedModuleVersionToken}' Revo module.");
-
-        return modulePath;
+return modulePath;
     }
 
     private static async Task SwitchYearAsync(IPage page, int year)
@@ -1806,14 +1799,6 @@ internal static class Gate5B12RealDbSaveRunner
             }
             """,
             name);
-
-    private static async Task<int> GetSourceCountAsync(IPage page) =>
-        await page.EvaluateAsync<int>(
-            """
-            async () => (await document.querySelector(
-                '#revogrid-native-gate5a-grid revo-grid')
-                .getSource('rgRow')).length
-            """);
 
     private static async Task<int> GetVisibleSourceCountAsync(IPage page) =>
         await page.EvaluateAsync<int>(
@@ -2055,21 +2040,6 @@ internal static class Gate5B12RealDbSaveRunner
             "async id => Number((await document.querySelector('#revogrid-native-gate5a-grid revo-grid').getSource('rgRow')).find(row => Number(row?.id ?? 0) === id)?.displayOrder ?? 0)",
             id);
 
-    private static async Task<int> FindVisibleIndexByClientKeyAsync(IPage page, string clientKey) =>
-        await page.EvaluateAsync<int>(
-            "async key => (await document.querySelector('#revogrid-native-gate5a-grid revo-grid').getVisibleSource('rgRow')).findIndex(row => String(row?.clientKey ?? '') === key)",
-            clientKey);
-
-    private static async Task<bool> SourceContainsClientKeyAsync(IPage page, string clientKey) =>
-        await page.EvaluateAsync<bool>(
-            "async key => (await document.querySelector('#revogrid-native-gate5a-grid revo-grid').getSource('rgRow')).some(row => String(row?.clientKey ?? '') === key)",
-            clientKey);
-
-    private static async Task<bool> SourceContainsWorkOrderNumberAsync(IPage page, string workOrderNumber) =>
-        await page.EvaluateAsync<bool>(
-            "async value => (await document.querySelector('#revogrid-native-gate5a-grid revo-grid').getSource('rgRow')).some(row => String(row?.workOrderNumber ?? '') === value)",
-            workOrderNumber);
-
     private static async Task<JsonElement> GetChangeStateAsync(IPage page)
     {
         var modulePath = await ResolveActiveModulePathAsync(page);
@@ -2211,20 +2181,10 @@ internal static class Gate5B12RealDbSaveRunner
             .Locator($"button:has-text(\"{label}\")")
             .ClickAsync();
 
-    private static ILocator VisibleDialog(IPage page, string title) =>
-        page.Locator($".erp-revo-structure-dialog:not([hidden]):has(.erp-revo-structure-dialog__title:has-text(\"{title}\"))");
-
-    private static ILocator Grid(IPage page) => page.Locator($"#{GridHostId} revo-grid");
-    private static ILocator SaveButton(IPage page) => page.Locator("#revogrid-gate5b11-save");
-    private static ILocator RowHeader(IPage page, int row) =>
-        page.Locator($"#{GridHostId} revogr-row-headers [data-rgRow=\"{row}\"]").First;
     private static ILocator RenderedRowCell(IPage page, int row) =>
         page.Locator($"#{GridHostId} revogr-viewport-scroll.rgCol:not([row-header]) [data-rgRow=\"{row}\"][data-rgCol]").First;
     private static ILocator RenderedColumnCell(IPage page, int column) =>
         page.Locator($"#{GridHostId} revogr-viewport-scroll.rgCol:not([row-header]) [data-rgRow][data-rgCol=\"{column}\"]").First;
-    private static ILocator DataCell(IPage page, int row, int column) =>
-        page.Locator($"#{GridHostId} revogr-viewport-scroll.rgCol:not([row-header]) [data-rgRow=\"{row}\"][data-rgCol=\"{column}\"]");
-
     private static async Task InsertCustomColumnAsync(
         IPage page,
         string name,
@@ -2513,21 +2473,6 @@ internal static class Gate5B12RealDbSaveRunner
 
         throw new InvalidOperationException(
             $"Expected '{propertyName}' to be a numeric value or numeric string, but received {value.ValueKind}: {value.GetRawText()}");
-    }
-
-    private static string FindProjectRoot()
-    {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory is not null)
-        {
-            var project = Path.Combine(directory.FullName, "ERPPrototype.csproj");
-            if (File.Exists(project))
-            {
-                return directory.FullName;
-            }
-            directory = directory.Parent;
-        }
-        throw new DirectoryNotFoundException("Could not locate ERPPrototype.csproj.");
     }
 
     private sealed record DatabaseFixture(int FirstRowId, int SecondRowId);

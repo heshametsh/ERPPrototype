@@ -143,18 +143,6 @@ public static class ApplicationSeeder
             }
         }
 
-        if (!initialAdmin.IsActive)
-        {
-            initialAdmin.IsActive = true;
-
-            var activateResult =
-                await userManager.UpdateAsync(initialAdmin);
-
-            ThrowIfIdentityOperationFailed(
-                activateResult,
-                "Failed to activate the initial Admin account");
-        }
-
         var currentRoles =
             await userManager.GetRolesAsync(initialAdmin);
 

@@ -812,3 +812,44 @@ Meta: Mission=AI-WORKFLOW-OPTIMIZATION-20260914; Class=WORKFLOW; Outcome=PASS; S
 - E2E Build PASS with 0 warnings / 0 errors; build freshness validation proved the compiled E2E DLL is newer than the relevant harness sources.
 - Full regression now includes the accepted Visibility focused break suite so Hide/Unhide remains protected alongside Rename, B9-B11, B12, and Integration.
 - Measure this preflight experiment across the next five completed missions before deciding whether to keep, change, or remove it.
+## 2026-09-15 - CANONICAL-REVO-CLEANUP-SECURITY-20260915 automation closure
+
+Meta: Mission=CANONICAL-REVO-CLEANUP-SECURITY-20260915; Class=PRODUCT+TEST+SECURITY; Outcome=AUTOMATION_PASS; Stage=MANUAL_ACCEPTANCE_PENDING; Scope=CANONICAL_REVO_AND_STARTUP_ADMIN
+
+- Consolidated active Revo Work Orders to one route: `/work-orders-revogrid`.
+- Retired historical B1-B12 wrappers, old Gate5A/Gate5C1 routes, Event Probe, and duplicate stage-specific E2E runners only after migrating unique behavior coverage.
+- Employee Real Workday now protects mixed readonly Range Clear, 3-row Insert/Delete History, Duplicate Revo validation, plus the previously accepted Selection/Filter/Sort/Save/concurrency journeys.
+- Canonical Empty Sheet, Rename, Visibility, B12 Real DB Save, and the consolidated Workday all PASS on the single canonical product surface.
+- Replaced stale fixed B12 module-token preflight with dynamic browser-loaded module verification and canonical route checks.
+- Startup Security red test reproduced the defect: a deliberately disabled initial Admin was reactivated on restart.
+- Product fix removed only the seeder reactivation block; Admin creation/role invariants remain intact and `MustChangePassword` was not changed.
+- Startup Security green test PASS after the fix and is now part of `Run-ERP-Full-Regression.ps1`.
+- Final one-command regression PASS after the security fix: Workday, Rename, Visibility, Empty Sheet, B12, Startup Security, Integration.
+- Workflow learning retained: migrate behavior before deleting historical scaffolding; after scripted edits, scan source and build before expensive browser suites; avoid stale hand-maintained module-token assertions.
+- No commit yet. User manual browser acceptance remains required.
+
+## 2026-09-15 - CANONICAL CLEANUP / REMOTE EXECUTION POST-MORTEM
+
+Meta: Mission=AI-EXECUTION-POSTMORTEM-20260915; Class=WORKFLOW; Outcome=REVIEWED; Stage=LEARNING_REVIEW; Scope=SEP14_TO_SEP15_EXECUTION
+
+- The dominant avoidable waste remained TEST/HARNESS drift: historical Gate-stage assertions, stale module/version assumptions, and generic Blazor readiness caused red results without Product defects. This matches the prior five-mission finding where Test/Harness failures were the largest repeated class.
+- Useful runtime was also substantial and must not be mislabeled as waste: strengthened browser journeys take tens of seconds, while the final canonical one-command regression took about 3.4 minutes and protected Workday, Rename, Visibility, Empty Sheet, B12, Startup Security, and Integration together.
+- Tooling waste was real: quote-heavy PowerShell replacements/regexes caused several fail-before-write attempts, one scripted B12 corruption was caught and restored, one transform left a trailing comma caught by preflight, and an assumed solution-file path was invalid. No such tooling failure justified a Product change.
+- Remote orchestration was too chatty. Aggregate Desktop Commander telemetry spanning Sep13-Sep15 shows many more terminal/filesystem calls than source edits; this supports batching status/read/search work and polling long processes less frequently.
+- Connector outages are external to Product state. Valid device/auth plus `offline` is now treated as connector unavailability, not proof that Windows or the ERP process is down; use a watch instead of repeated probes where possible.
+- Execution telemetry coverage itself was incomplete: `AI_EXECUTION_LOG.csv` stops on Sep14 around 20:23 and does not contain the large Sep15 cleanup/security journey. Exact Sep15 phase durations therefore remain unavailable and will not be reconstructed from memory.
+- Workflow changes retained: canonical behavioral coverage over historical stage shape; realistic fixture guards; surgical deterministic edits; immediate scan/build after scripted edits; device-status triage; lower-frequency polling; tracked execution by default for material Build/Test/Regression commands.
+- `AI_WORK_CYCLE.md` was updated to the current canonical regression contents and these root-cause rules. No new framework was added.
+- The cleanup/security mission Metrics row remains pending until manual acceptance/closure; do not encode unknown or incomplete counters as zero.
+
+## 2026-09-15 - CANONICAL-REVO-CLEANUP-SECURITY-20260915 COMPLETE
+
+Meta: Mission=CANONICAL-REVO-CLEANUP-SECURITY-20260915; Class=PRODUCT+TEST+SECURITY; Outcome=COMPLETE; Stage=CLOSURE; Scope=CANONICAL_REVO_AND_STARTUP_ADMIN
+
+- User manual browser acceptance PASS on the single canonical route `/work-orders-revogrid`.
+- Manual checks PASS: CCU login, edit/Undo/Redo/Save, Save persistence after refresh, Structure Menu, Hide/Unhide, Empty Sheet recovery, and retired Gate URL behavior.
+- Automated closure remains PASS: Employee Real Workday, Empty Sheet lifecycle, Rename Focused, Visibility Focused, B12 Real DB Save, Startup Security restart regression, and SQL Integration.
+- Test-only canonical surface cleanup centralized the canonical route/GridHost and ten shared E2E primitives; affected focused suites were rerun and passed.
+- A failed second helper-extraction slice was classified TOOLING, reverted from its pre-slice backup, rebuilt cleanly, and did not change Product behavior.
+- Admin password-reset UX is deferred as a future requirement: scoped Reset Password via ASP.NET Identity/UserManager, clearing lockout/failed-access state; first-login forced change remains undecided.
+- Mission is accepted for local checkpoint. No remote push is authorized by this closure.

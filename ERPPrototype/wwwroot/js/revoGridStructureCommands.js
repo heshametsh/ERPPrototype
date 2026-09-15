@@ -41,6 +41,12 @@ export function createRevoGridStructureCommands(options) {
         return Object.freeze({ clickedCell, snapshot, row, column });
     }
 
+    function describeRowInsert() {
+        return Object.freeze({
+            empty: Number(rowStructure.getState?.().rowCount ?? 0) === 0
+        });
+    }
+
     async function describeRowDelete(context) {
         const row = context?.row ?? {};
         const selectionCount = row.selectionKind === "column" || row.selectionKind === "columns"
@@ -87,14 +93,20 @@ export function createRevoGridStructureCommands(options) {
     async function execute(commandId, context, payload = {}) {
         switch (commandId) {
             case REVO_GRID_STRUCTURE_COMMANDS.INSERT_ROWS: {
-                const position = String(payload.position ?? "").toLowerCase();
                 const count = Number(payload.count);
-                if (position !== "above" && position !== "below") {
-                    throw new Error("Insert Rows position must be above or below.");
-                }
                 if (!Number.isInteger(count) || count < 1 || count > 1000) {
                     throw new Error("Insert Rows count must be between 1 and 1000.");
                 }
+
+                if (describeRowInsert().empty) {
+                    return rowStructure.insertRows({ count });
+                }
+
+                const position = String(payload.position ?? "").toLowerCase();
+                if (position !== "above" && position !== "below") {
+                    throw new Error("Insert Rows position must be above or below.");
+                }
+
                 let targetKey = context?.row?.targetKey ?? null;
                 if (!targetKey) {
                     const displayed = await rowStructure.getDisplayedKeys();
@@ -107,7 +119,6 @@ export function createRevoGridStructureCommands(options) {
                 }
                 return rowStructure.insertRows({ targetKey, position, count });
             }
-
             case REVO_GRID_STRUCTURE_COMMANDS.DELETE_ROWS: {
                 const scope = normalizeScope(payload.scope);
                 let keys = [];
@@ -200,6 +211,7 @@ export function createRevoGridStructureCommands(options) {
 
     return Object.freeze({
         captureContext,
+        describeRowInsert,
         describeRowDelete,
         describeColumnDelete,
         describeColumnVisibility,

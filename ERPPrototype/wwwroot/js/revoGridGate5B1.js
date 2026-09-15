@@ -7,15 +7,15 @@ import { createRevoGridSort } from "./revoGridSort.js?v=20260912-rename-noselect
 import { createRevoGridColumnSelection } from "./revoGridColumnSelection.js?v=20260821-gate5b4-keyboard-sort-1";
 import { createRevoGridSelectionLifecycle } from "./revoGridSelectionLifecycle.js?v=20260821-gate5b4-keyboard-sort-1";
 import { createRevoGridSelectionContext } from "./revoGridSelectionContext.js?v=20260829-gate5b10-header-selection-1";
-import { createRevoGridRowStructure } from "./revoGridRowStructure.js?v=20260829-gate5b10-header-selection-1";
+import { createRevoGridRowStructure } from "./revoGridRowStructure.js?v=20260914-empty-sheet-1";
 import { createRevoGridValidation } from "./revoGridValidation.js?v=20260826-unified-validation-1";
 import { createRevoGridPersistenceIdentity } from "./revoGridPersistenceIdentity.js?v=20260826-persistence-identity-1";
 import { createRevoGridColumnWorkspace } from "./revoGridColumnWorkspace.js?v=20260912-hide-atomic-1";
 import { createRevoGridColumnRename } from "./revoGridColumnRename.js?v=20260912-rename-noselect-4";
 import { createRevoGridColumnVisibilityAdapter } from "./revoGridColumnVisibilityAdapter.js?v=20260912-hide-atomic-1";
 import { createRevoGridColumnVisibility } from "./revoGridColumnVisibility.js?v=20260912-hide-atomic-1";
-import { createRevoGridStructureMenu } from "./revoGridStructureMenu.js?v=20260912-hide-atomic-1";
-import { createRevoGridStructureCommands } from "./revoGridStructureCommands.js?v=20260912-hide-atomic-1";
+import { createRevoGridStructureMenu } from "./revoGridStructureMenu.js?v=20260914-empty-sheet-1";
+import { createRevoGridStructureCommands } from "./revoGridStructureCommands.js?v=20260914-empty-sheet-1";
 import {
     createRevoGridHeaderSelectionFeature
 } from "./revoGridHeaderSelection.js?v=20260912-hide-atomic-1";
@@ -183,6 +183,25 @@ function renderState(state) {
         state.rowCountElement.textContent = Number(
             state.rowStructure.getState().rowCount ?? 0
         ).toLocaleString();
+    }
+
+    const sourceRowCount = state.rowStructure
+        ? Number(state.rowStructure.getState().rowCount ?? 0)
+        : -1;
+    const showEmptyState = Boolean(state.structureMenu) && sourceRowCount === 0;
+    if (state.emptyStateElement) {
+        state.emptyStateElement.hidden = !showEmptyState;
+    }
+    if (state.emptyStateAddRowsButton) {
+        state.emptyStateAddRowsButton.disabled =
+            !showEmptyState ||
+            state.datasetSwitchActive ||
+            filterBusy ||
+            sortBusy ||
+            structureBusy ||
+            current.editLocked ||
+            current.replayActive ||
+            current.saveActive;
     }
 
     if (state.undoButton) {
@@ -480,6 +499,12 @@ export async function initialize(elementId, rows, customColumns, options) {
         rowCountElement: findElement(
             value(options, "rowCountElementId", "RowCountElementId", "")
         ),
+        emptyStateElement: findElement(
+            value(options, "emptyStateElementId", "EmptyStateElementId", "")
+        ),
+        emptyStateAddRowsButton: findElement(
+            value(options, "emptyStateAddRowsButtonId", "EmptyStateAddRowsButtonId", "")
+        ),
         saveButton: findElement(
             value(options, "saveButtonId", "SaveButtonId", "")
         ),
@@ -759,6 +784,16 @@ export async function initialize(elementId, rows, customColumns, options) {
         state.structureMenu = createRevoGridStructureMenu({
             grid,
             structureCommands: state.structureCommands
+        });
+
+        addListener(state, state.emptyStateAddRowsButton, "click", () => {
+            if (
+                Number(state.rowStructure?.getState?.().rowCount ?? -1) !== 0 ||
+                !state.structureMenu?.openInsertRowsDialog
+            ) {
+                return;
+            }
+            void state.structureMenu.openInsertRowsDialog();
         });
     }
 

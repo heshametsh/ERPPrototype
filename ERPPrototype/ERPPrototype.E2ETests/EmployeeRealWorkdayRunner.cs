@@ -1,16 +1,16 @@
-﻿using System.Globalization;
+using System.Globalization;
 using System.IO.Compression;
 using System.Text.Json;
 using Microsoft.Data.SqlClient;
 using Microsoft.Playwright;
+
+using static ERPPrototype.E2ETests.RevoCanonicalTestSurface;
 
 namespace ERPPrototype.E2ETests;
 
 internal static class EmployeeRealWorkdayRunner
 {
     private const int FixedPort = 5265;
-    private const string GatePath = "/work-orders-revogrid-gate5c1";
-    private const string GridHostId = "revogrid-native-gate5a-grid";
     private const string CustomFieldKey = "custom_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     private const string CustomFieldName = "B12 E2E Note";
     private const int LargeSaveRowCount = 1_200;
@@ -90,6 +90,9 @@ internal static class EmployeeRealWorkdayRunner
 
                 await AssertClipboardUndoRedoAsync(page);
                 Console.WriteLine("[03-clipboard-history] PASS — real Ctrl+V + Undo/Redo changes and restores the same row");
+
+                await AssertRangeClearReadonlyAsync(page);
+                Console.WriteLine("[03b-range-clear] PASS — mixed Partial/Remaining range clear changes editable cells only and Undo restores the exact rows");
 
                 await AssertInsertRedoUndoAsync(page);
                 Console.WriteLine("[04-structure-history] PASS — Insert + Undo + Redo + Undo returns the sheet to its baseline");
@@ -236,12 +239,17 @@ internal static class EmployeeRealWorkdayRunner
         await password.FillAsync(seed.Password);
         await submit.ClickAsync();
 
-        await page.WaitForURLAsync(
-            $"**{GatePath}*",
-            new PageWaitForURLOptions
+        await page.Locator($"#{GridHostId} revo-grid").WaitForAsync(
+            new LocatorWaitForOptions
             {
+                State = WaitForSelectorState.Visible,
                 Timeout = 45_000
             });
+
+        var actualPath = new Uri(page.Url).AbsolutePath;
+        E2ETestAssert.True(
+            string.Equals(actualPath, GatePath, StringComparison.Ordinal),
+            $"Login reached '{actualPath}' instead of canonical '{GatePath}'.");
     }
 
     private static async Task AssertExistingUpdatePersistsAsync(
@@ -843,6 +851,80 @@ internal static class EmployeeRealWorkdayRunner
         await WaitForSourceTextAsync(page, key, "workTypeCode", original);
     }
 
+    private static async Task AssertRangeClearReadonlyAsync(IPage page)
+    {
+        const int startRow = 2;
+        const int endRow = 5;
+        var partialColumn = await GetVisualColumnIndexAsync(page, "partialAmount");
+        var remainingColumn = await GetVisualColumnIndexAsync(page, "remainingAmount");
+        await ScrollToRowAsync(page, endRow);
+
+        const string snapshotScript = """
+            async args => JSON.stringify((await document
+                .querySelector('#revogrid-native-gate5a-grid revo-grid')
+                .getVisibleSource('rgRow'))
+                .slice(args.start, args.end + 1)
+                .map(row => ({
+                    clientKey: String(row?.clientKey ?? ''),
+                    workOrderValue: row?.workOrderValue ?? null,
+                    partialAmount: row?.partialAmount ?? null,
+                    remainingAmount: row?.remainingAmount ?? null
+                })))
+            """;
+        var before = await page.EvaluateAsync<string>(
+            snapshotScript,
+            new { start = startRow, end = endRow });
+
+        await DataCell(page, startRow, partialColumn).ClickAsync();
+        await page.Keyboard.DownAsync("Shift");
+        try
+        {
+            await DataCell(page, endRow, remainingColumn).ClickAsync();
+        }
+        finally
+        {
+            await page.Keyboard.UpAsync("Shift");
+        }
+        await page.Keyboard.PressAsync("Delete");
+
+        await page.WaitForFunctionAsync(
+            """
+            async args => {
+                const rows = (await document
+                    .querySelector('#revogrid-native-gate5a-grid revo-grid')
+                    .getVisibleSource('rgRow'))
+                    .slice(args.start, args.end + 1);
+                return rows.length === args.end - args.start + 1 && rows.every(row => {
+                    const partialBlank = row?.partialAmount == null ||
+                        String(row.partialAmount).trim() === '';
+                    const value = Number(row?.workOrderValue ?? NaN);
+                    const remaining = Number(row?.remainingAmount ?? NaN);
+                    return partialBlank && Number.isFinite(value) &&
+                        Number.isFinite(remaining) && Math.abs(remaining - value) < 0.005;
+                });
+            }
+            """,
+            new { start = startRow, end = endRow },
+            new PageWaitForFunctionOptions { Timeout = 10_000 });
+
+        await page.Locator("#revogrid-gate5b1-undo").ClickAsync();
+        await page.WaitForFunctionAsync(
+            """
+            async args => JSON.stringify((await document
+                .querySelector('#revogrid-native-gate5a-grid revo-grid')
+                .getVisibleSource('rgRow'))
+                .slice(args.start, args.end + 1)
+                .map(row => ({
+                    clientKey: String(row?.clientKey ?? ''),
+                    workOrderValue: row?.workOrderValue ?? null,
+                    partialAmount: row?.partialAmount ?? null,
+                    remainingAmount: row?.remainingAmount ?? null
+                }))) === args.before
+            """,
+            new { start = startRow, end = endRow, before },
+            new PageWaitForFunctionOptions { Timeout = 10_000 });
+        await DataCell(page, 0, 0).ClickAsync();
+    }
     private static async Task AssertInsertRedoUndoAsync(IPage page)
     {
         await ScrollToRowAsync(page, 6);
@@ -851,20 +933,19 @@ internal static class EmployeeRealWorkdayRunner
         await OpenStructureMenuAsync(page, 6, 0);
         await ClickStructureMenuAsync(page, "Insert Rows...");
         var dialog = VisibleDialog(page, "Insert Rows");
-        await dialog.Locator("input[type=\"number\"]").FillAsync("1");
+        await dialog.Locator("input[type=\"number\"]").FillAsync("3");
         await dialog.Locator("button:has-text(\"Insert Above\")").ClickAsync();
-        await WaitForSourceCountAsync(page, baseline + 1);
+        await WaitForSourceCountAsync(page, baseline + 3);
 
         await page.Locator("#revogrid-gate5b1-undo").ClickAsync();
         await WaitForSourceCountAsync(page, baseline);
 
         await page.Locator("#revogrid-gate5b1-redo").ClickAsync();
-        await WaitForSourceCountAsync(page, baseline + 1);
+        await WaitForSourceCountAsync(page, baseline + 3);
 
         await page.Locator("#revogrid-gate5b1-undo").ClickAsync();
         await WaitForSourceCountAsync(page, baseline);
     }
-
     private static async Task AssertMoneyAggregateUndoRedoAsync(IPage page)
     {
         await ScrollToRowAsync(page, 2);
@@ -1025,12 +1106,14 @@ internal static class EmployeeRealWorkdayRunner
 
     private static async Task AssertDeleteAggregateUndoAsync(IPage page)
     {
-        await ScrollToRowAsync(page, 4);
+        await ScrollToRowAsync(page, 6);
         var baselineCount = await GetSourceCountAsync(page);
         var before = await ReadAggregateSnapshotAsync(page);
 
         await RowHeader(page, 4).ClickAsync();
-        await DataCell(page, 4, 0).ClickAsync(
+        await WithKeyAsync(page, "Shift", () => RowHeader(page, 6).ClickAsync());
+        await WaitForSelectedRowKeyCountAsync(page, 3);
+        await DataCell(page, 5, 0).ClickAsync(
             new LocatorClickOptions { Button = MouseButton.Right });
         await page.Locator(".erp-revo-structure-menu:not([hidden])")
             .WaitForAsync(new LocatorWaitForOptions
@@ -1040,32 +1123,27 @@ internal static class EmployeeRealWorkdayRunner
             });
         await ClickStructureMenuAsync(page, "Delete Rows...");
         var dialog = VisibleDialog(page, "Delete Rows");
+        var selectedScope = dialog.Locator("input[type=\"radio\"][value=\"selection\"]");
+        E2ETestAssert.True(await selectedScope.IsEnabledAsync(),
+            "Three-row employee selection was not available to Delete Rows.");
+        await selectedScope.CheckAsync();
         await dialog.Locator("button:has-text(\"Delete\")").ClickAsync();
-        await WaitForSourceCountAsync(page, baselineCount - 1);
+        await WaitForSourceCountAsync(page, baselineCount - 3);
         await page.WaitForFunctionAsync(
-            """
-            expected => Number(document.querySelector(
-                '[data-testid="gate5c1-visible-aggregates"]')
-                ?.dataset?.visibleRowCount ?? NaN) === expected
-            """,
-            before.VisibleRowCount - 1,
+            "expected => Number(document.querySelector('[data-testid=\"gate5c1-visible-aggregates\"]')?.dataset?.visibleRowCount ?? NaN) === expected",
+            before.VisibleRowCount - 3,
             new PageWaitForFunctionOptions { Timeout = 10_000 });
         await AssertAggregateMatchesVisibleSourceAsync(page);
 
         await page.Locator("#revogrid-gate5b1-undo").ClickAsync();
         await WaitForSourceCountAsync(page, baselineCount);
         await page.WaitForFunctionAsync(
-            """
-            expected => Number(document.querySelector(
-                '[data-testid="gate5c1-visible-aggregates"]')
-                ?.dataset?.visibleRowCount ?? NaN) === expected
-            """,
+            "expected => Number(document.querySelector('[data-testid=\"gate5c1-visible-aggregates\"]')?.dataset?.visibleRowCount ?? NaN) === expected",
             before.VisibleRowCount,
             new PageWaitForFunctionOptions { Timeout = 10_000 });
         await AssertAggregateMatchesVisibleSourceAsync(page);
         await DataCell(page, 0, 0).ClickAsync();
     }
-
     private static async Task AssertCustomMoneyAggregateAsync(IPage page)
     {
         var partialColumn = await GetVisualColumnIndexAsync(page, "partialAmount");
@@ -1139,20 +1217,23 @@ internal static class EmployeeRealWorkdayRunner
     {
         await ScrollToRowAsync(page, 0);
         var numberColumn = await GetVisualColumnIndexAsync(page, "workOrderNumber");
+        var typeColumn = await GetVisualColumnIndexAsync(page, "workTypeCode");
         var partialColumn = await GetVisualColumnIndexAsync(page, "partialAmount");
         var remainingColumn = await GetVisualColumnIndexAsync(page, "remainingAmount");
         var row = await GetVisibleRowAsync(page, 0);
+        var second = await GetVisibleRowAsync(page, 1);
         var key = row.GetProperty("clientKey").GetString() ?? string.Empty;
         var originalNumber = row.GetProperty("workOrderNumber").GetString() ?? string.Empty;
+        var originalType = row.GetProperty("workTypeCode").GetString() ?? string.Empty;
+        var duplicateNumber = second.GetProperty("workOrderNumber").GetString() ?? string.Empty;
+        var duplicateType = second.GetProperty("workTypeCode").GetString() ?? string.Empty;
         var value = ReadDecimalProperty(row, "workOrderValue");
 
         await EditCellAsync(page, 0, numberColumn, "123");
         E2ETestAssert.True(await SaveButton(page).IsDisabledAsync(),
             "Invalid Work Order Number did not block Save.");
         E2ETestAssert.True(
-            await page.Locator(
-                $"#{GridHostId} [data-rgRow=\"0\"][data-rgCol=\"{numberColumn}\"]" +
-                "[data-erp-validation-invalid=\"true\"]").CountAsync() > 0,
+            await page.Locator($"#{GridHostId} [data-rgRow=\"0\"][data-rgCol=\"{numberColumn}\"][data-erp-validation-invalid=\"true\"]").CountAsync() > 0,
             "Invalid Work Order Number was not visibly marked.");
         await page.Locator("#revogrid-gate5b1-undo").ClickAsync();
         await WaitForSourceTextAsync(page, key, "workOrderNumber", originalNumber);
@@ -1162,14 +1243,24 @@ internal static class EmployeeRealWorkdayRunner
             "Partial Amount greater than Work Order Value did not block Save.");
         await page.Locator("#revogrid-gate5b1-undo").ClickAsync();
 
+        await EditCellAsync(page, 0, numberColumn, duplicateNumber);
+        await EditCellAsync(page, 0, typeColumn, duplicateType);
+        E2ETestAssert.True(await SaveButton(page).IsDisabledAsync(),
+            "Duplicate Work Order identity did not block Save in Revo.");
+        E2ETestAssert.True(
+            await page.Locator($"#{GridHostId} [data-rgRow=\"0\"][data-rgCol=\"{numberColumn}\"][data-erp-validation-invalid=\"true\"]").CountAsync() > 0 &&
+            await page.Locator($"#{GridHostId} [data-rgRow=\"0\"][data-rgCol=\"{typeColumn}\"][data-erp-validation-invalid=\"true\"]").CountAsync() > 0,
+            "Duplicate Work Order identity was not visibly marked in Revo.");
+        await page.Locator("#revogrid-gate5b1-undo").ClickAsync();
+        await page.Locator("#revogrid-gate5b1-undo").ClickAsync();
+        await WaitForSourceTextAsync(page, key, "workOrderNumber", originalNumber);
+        await WaitForSourceTextAsync(page, key, "workTypeCode", originalType);
+
         await DataCell(page, 0, remainingColumn).DblClickAsync();
-        E2ETestAssert.Equal(
-            0,
-            await page.Locator($"#{GridHostId} input:visible").CountAsync(),
+        E2ETestAssert.Equal(0, await page.Locator($"#{GridHostId} input:visible").CountAsync(),
             "Remaining Amount unexpectedly opened an editable input.");
         await page.Keyboard.PressAsync("Escape");
     }
-
     private static async Task AssertVisibleArabicIsNotCorruptedAsync(IPage page)
     {
         var text = await page.Locator("body").InnerTextAsync();
@@ -1344,14 +1435,6 @@ internal static class EmployeeRealWorkdayRunner
                 .findIndex(row => String(row?.workTypeCode ?? '') === value)
             """,
             value);
-
-    private static async Task<int> GetSourceCountAsync(IPage page) =>
-        await page.EvaluateAsync<int>(
-            """
-            async () => (await document
-                .querySelector('#revogrid-native-gate5a-grid revo-grid')
-                .getSource('rgRow')).length
-            """);
 
     private static async Task WaitForSourceCountAsync(
         IPage page,
@@ -1746,21 +1829,6 @@ internal static class EmployeeRealWorkdayRunner
             "async id => Number((await document.querySelector('#revogrid-native-gate5a-grid revo-grid').getSource('rgRow')).find(row => Number(row?.id ?? 0) === id)?.displayOrder ?? 0)",
             id);
 
-    private static async Task<int> FindVisibleIndexByClientKeyAsync(IPage page, string clientKey) =>
-        await page.EvaluateAsync<int>(
-            "async key => (await document.querySelector('#revogrid-native-gate5a-grid revo-grid').getVisibleSource('rgRow')).findIndex(row => String(row?.clientKey ?? '') === key)",
-            clientKey);
-
-    private static async Task<bool> SourceContainsClientKeyAsync(IPage page, string clientKey) =>
-        await page.EvaluateAsync<bool>(
-            "async key => (await document.querySelector('#revogrid-native-gate5a-grid revo-grid').getSource('rgRow')).some(row => String(row?.clientKey ?? '') === key)",
-            clientKey);
-
-    private static async Task<bool> SourceContainsWorkOrderNumberAsync(IPage page, string workOrderNumber) =>
-        await page.EvaluateAsync<bool>(
-            "async value => (await document.querySelector('#revogrid-native-gate5a-grid revo-grid').getSource('rgRow')).some(row => String(row?.workOrderNumber ?? '') === value)",
-            workOrderNumber);
-
     private static async Task<JsonElement> GetChangeStateAsync(IPage page)
     {
         var json = await page.EvaluateAsync<string>(
@@ -1832,16 +1900,6 @@ internal static class EmployeeRealWorkdayRunner
         await page.Locator(".erp-revo-structure-menu:not([hidden])")
             .Locator($"button:has-text(\"{label}\")")
             .ClickAsync();
-
-    private static ILocator VisibleDialog(IPage page, string title) =>
-        page.Locator($".erp-revo-structure-dialog:not([hidden]):has(.erp-revo-structure-dialog__title:has-text(\"{title}\"))");
-
-    private static ILocator Grid(IPage page) => page.Locator($"#{GridHostId} revo-grid");
-    private static ILocator SaveButton(IPage page) => page.Locator("#revogrid-gate5b11-save");
-    private static ILocator RowHeader(IPage page, int row) =>
-        page.Locator($"#{GridHostId} revogr-row-headers [data-rgRow=\"{row}\"]").First;
-    private static ILocator DataCell(IPage page, int row, int column) =>
-        page.Locator($"#{GridHostId} revogr-viewport-scroll.rgCol:not([row-header]) [data-rgRow=\"{row}\"][data-rgCol=\"{column}\"]");
 
     private static string Format(decimal value) => value.ToString("0.##", CultureInfo.InvariantCulture);
 
@@ -2020,21 +2078,6 @@ internal static class EmployeeRealWorkdayRunner
 
         File.WriteAllLines(path, lines);
         return path;
-    }
-
-    private static string FindProjectRoot()
-    {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory is not null)
-        {
-            var project = Path.Combine(directory.FullName, "ERPPrototype.csproj");
-            if (File.Exists(project))
-            {
-                return directory.FullName;
-            }
-            directory = directory.Parent;
-        }
-        throw new DirectoryNotFoundException("Could not locate ERPPrototype.csproj.");
     }
 
     private sealed record DatabaseFixture(int FirstRowId, int SecondRowId);

@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json;
 using ERPPrototype.Data;
@@ -19,6 +19,8 @@ public partial class WorkOrdersRevoGridNativeGate5A
     private const string RedoButtonId = "revogrid-gate5b1-redo";
     private const string FinancialErrorElementId = "revogrid-gate5b-financial-errors";
     private const string RowCountElementId = "revogrid-gate5b-row-count";
+    private const string EmptyStateElementId = "revogrid-empty-state";
+    private const string EmptyStateAddRowsButtonId = "revogrid-empty-state-add-rows";
     private const string SaveButtonId = "revogrid-gate5b11-save";
     private const string SaveStatusElementId = "revogrid-gate5b11-save-status";
     private const string VisibleAggregateElementId = "revogrid-gate5c1-visible-aggregates";
@@ -258,7 +260,7 @@ public partial class WorkOrdersRevoGridNativeGate5A
         {
             var gridModulePath = EnableChangeEngine
                 ? EnableSaveHandshake
-                    ? "./js/revoGridGate5B1.js?v=20260912-revo-hide-atomic-1"
+                    ? "./js/revoGridGate5B1.js?v=20260914-empty-sheet-1"
                     : EnableHeaderMultiSelection
                     ? "./js/revoGridGate5B1.js?v=20260830-selection-core-r2"
                     : EnableStructureWorkspace
@@ -302,6 +304,8 @@ public partial class WorkOrdersRevoGridNativeGate5A
                     ColumnVisibilities,
                     BasketValues = WorkOrderBuskets.All,
                     RowCountElementId,
+                    EmptyStateElementId,
+                    EmptyStateAddRowsButtonId,
                     ChangeStatusElementId,
                     UndoCountElementId,
                     RedoCountElementId,

@@ -50,7 +50,7 @@ After green evidence, reread the candidate as a reviewer: behavior contract, dup
 
 ### 7. Full regression / manual acceptance
 
-For Work Orders closure, prefer the existing `Run-ERP-Full-Regression.ps1` after focused evidence. It performs a fresh build and runs the real Employee Workday, Rename focused break suite, B9-B11 regression, B12 real DB Save, and Integration tests. It continues through test-suite failures so one run exposes all failing areas.
+For Work Orders closure, prefer the existing `Run-ERP-Full-Regression.ps1` after focused evidence. It performs a fresh build and runs the real Employee Workday, Rename focused break suite, Visibility focused suite, Canonical Empty Sheet lifecycle, B12 real DB Save, Startup Security restart regression, and Integration tests. It continues through test-suite failures so one run exposes all failing areas.
 
 ### 8. Memory + checkpoint
 
@@ -82,6 +82,10 @@ Do not change production behavior until evidence points to PRODUCT.
 - Normalize Git paths before allowlist/scope comparisons.
 - Target Windows PowerShell 5.1 unless otherwise verified.
 - Resolve paths from `git rev-parse --show-toplevel`.
+- Prefer surgical `edit_block`/simple deterministic edits over quote-heavy PowerShell source-rewrite one-liners. If scripted replacement is necessary, require an exact replacement count and stop before write on mismatch.
+- Immediately source-scan/parse and build after scripted source edits before starting a long browser suite.
+- For Remote Desktop work, verify device status once before a material batch. Valid auth + `offline` means the connector is unavailable; do not infer that Windows/the project is down and do not burn repeated probes when a watch can wait for recovery.
+- Launch long commands once and poll near an expected milestone/completion instead of high-frequency output reads; batch related read/status/search work where safe.
 - Complete preflight before copy; later failure must roll back.
 
 ### Test/harness discipline
@@ -94,6 +98,8 @@ Do not change production behavior until evidence points to PRODUCT.
 - Shared test databases are shared mutable state: use unique owned state or merge current state; do not assume empty global configuration/exact counts you do not own.
 - When schema changes, search direct-SQL fixture writers for affected required columns/keys before browser regression.
 - Browser readiness/navigation must follow the active surface and native grid mechanics, not fragile DOM assumptions.
+- Preserve behavior coverage, not historical stage shape: when retiring old Gate/scaffold tests, migrate only unique user-contract scenarios to the canonical surface and prove them there before deletion.
+- Keep realistic fixture/capacity guards. Do not weaken a 1,000+ row guard merely to make a focused scenario convenient; redesign the test around the real operating envelope.
 - Test data must come from current product-owned contracts where possible; stale literals are not product evidence.
 
 ### Runtime freshness
@@ -119,7 +125,7 @@ Test hardening does not authorize product scope. Missing employee-visible behavi
 
 Use Metrics to compare missions, not to score them. Keep counts factual. For a mission that predates prospective capture, use NA for an unavailable counter; never encode unknown as zero.
 
-Execution telemetry is separate from mission Metrics: `AI_EXECUTION_LOG.csv` records material device-side Review/Read/Edit/Build/Test/Diagnose steps with start/end time, local duration, outcome, failure class, and evidence path. Use `Tools/AI/Invoke-AITrackedStep.ps1` inside material local batches so timing is captured without adding Remote round-trips. These durations measure device execution only; model thinking and network/tool transport latency are not included.
+Execution telemetry is separate from mission Metrics: `AI_EXECUTION_LOG.csv` records material device-side Review/Read/Edit/Build/Test/Diagnose steps with start/end time, local duration, outcome, failure class, and evidence path. Use `Tools/AI/Invoke-AITrackedStep.ps1` inside material local batches so timing is captured without adding Remote round-trips. For Build/Test/Regression or other commands expected to take more than a few seconds, tracked execution is the default unless the wrapper would materially distort or block the command. If a mission was not tracked, record the telemetry gap explicitly; never reconstruct exact durations from memory. These durations measure device execution only; model thinking and network/tool transport latency are not included.
 
 Important fields:
 

@@ -1,101 +1,9 @@
-﻿namespace ERPPrototype.E2ETests;
+namespace ERPPrototype.E2ETests;
 
 internal static class Program
 {
     public static async Task<int> Main(string[] args)
     {
-        if (args.Any(
-                argument =>
-                    string.Equals(
-                        argument,
-                        "--revo-gate5b5-trace",
-                        StringComparison.OrdinalIgnoreCase)))
-        {
-            return await Gate5B5TraceRunner.RunAsync();
-        }
-
-        if (args.Any(
-                argument =>
-                    string.Equals(
-                        argument,
-                        "--revo-gate5b6-regression",
-                        StringComparison.OrdinalIgnoreCase)))
-        {
-            return await Gate5B5TraceRunner.RunAsync(
-                "/work-orders-revogrid-gate5b6",
-                "Gate 5B-6",
-                "gate5b6");
-        }
-
-        if (args.Any(
-                argument =>
-                    string.Equals(
-                        argument,
-                        "--revo-gate5b7-persistence",
-                        StringComparison.OrdinalIgnoreCase)))
-        {
-            return await Gate5B5TraceRunner.RunAsync(
-                "/work-orders-revogrid-gate5b7",
-                "Gate 5B-7",
-                "gate5b7",
-                assertPersistenceIdentity: true);
-        }
-
-        if (args.Any(
-                argument =>
-                    string.Equals(
-                        argument,
-                        "--revo-gate5b8-selection",
-                        StringComparison.OrdinalIgnoreCase)))
-        {
-            return await Gate5B5TraceRunner.RunAsync(
-                "/work-orders-revogrid-gate5b8",
-                "Gate 5B-8",
-                "gate5b8",
-                assertPersistenceIdentity: true,
-                assertSelectionContext: true);
-        }
-
-        if (args.Any(
-                argument =>
-                    string.Equals(
-                        argument,
-                        "--revo-gate5b9-structure",
-                        StringComparison.OrdinalIgnoreCase)))
-        {
-            return await Gate5B9StructureRunner.RunAsync();
-        }
-
-        if (args.Any(
-                argument =>
-                    string.Equals(
-                        argument,
-                        "--revo-gate5b10-selection",
-                        StringComparison.OrdinalIgnoreCase)))
-        {
-            return await Gate5B10SelectionRunner.RunAsync();
-        }
-
-        if (args.Any(
-                argument =>
-                    string.Equals(
-                        argument,
-                        "--revo-gate5b11-save",
-                        StringComparison.OrdinalIgnoreCase)))
-        {
-            return await Gate5B11SaveHandshakeRunner.RunAsync();
-        }
-
-        if (args.Any(
-                argument =>
-                    string.Equals(
-                        argument,
-                        "--revo-b9-b11-full-regression",
-                        StringComparison.OrdinalIgnoreCase)))
-        {
-            return await Gate5B9ToB11RegressionRunner.RunAsync();
-        }
-
         if (args.Any(
                 argument =>
                     string.Equals(
@@ -130,22 +38,20 @@ internal static class Program
                 argument =>
                     string.Equals(
                         argument,
-                        "--revo-gate5b6-validation",
+                        "--revo-empty-sheet",
                         StringComparison.OrdinalIgnoreCase)))
         {
-            return await FinancialDiagnosticRunner.RunAsync(
-                "/work-orders-revogrid-gate5b6",
-                unifiedValidation: true);
+            return await EmptySheetLifecycleRunner.RunAsync();
         }
 
         if (args.Any(
                 argument =>
                     string.Equals(
                         argument,
-                        "--revo-gate5b5-financial-diagnostic",
+                        "--startup-security",
                         StringComparison.OrdinalIgnoreCase)))
         {
-            return await FinancialDiagnosticRunner.RunAsync();
+            return await StartupSecurityRunner.RunAsync();
         }
 
         if (args.Any(

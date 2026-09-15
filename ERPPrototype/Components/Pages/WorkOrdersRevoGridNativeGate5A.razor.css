@@ -130,6 +130,50 @@
     min-height: 0;
 }
 
+.native-gate5a__empty-state {
+    position: absolute;
+    inset: 42px 0 0;
+    z-index: 4;
+    display: grid;
+    place-items: center;
+    background: rgb(255 255 255 / .92);
+    text-align: center;
+}
+
+.native-gate5a__empty-state[hidden] {
+    display: none;
+}
+
+.native-gate5a__empty-state-card {
+    display: grid;
+    justify-items: center;
+    gap: 8px;
+    color: #344054;
+    font-size: 13px;
+}
+
+.native-gate5a__empty-state-card strong {
+    color: #1d2939;
+    font-size: 15px;
+}
+
+.native-gate5a__empty-state-card button {
+    min-height: 32px;
+    padding: 5px 14px;
+    border: 1px solid #175cd3;
+    border-radius: 6px;
+    background: #175cd3;
+    color: #fff;
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.native-gate5a__empty-state-card button:disabled {
+    cursor: default;
+    opacity: .55;
+}
+
 .native-gate5a__loading {
     position: absolute;
     inset: 0;

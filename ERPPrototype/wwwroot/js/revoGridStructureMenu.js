@@ -1,4 +1,4 @@
-import { REVO_GRID_STRUCTURE_COMMANDS } from "./revoGridStructureCommands.js";
+import { REVO_GRID_STRUCTURE_COMMANDS } from "./revoGridStructureCommands.js?v=20260914-empty-sheet-1";
 
 const STYLE_ID = "erp-revogrid-structure-menu-style";
 const MENU_CLASS = "erp-revo-structure-menu";
@@ -359,24 +359,34 @@ export function createRevoGridStructureMenu(options) {
         dialog.hidden = false;
     }
 
-    async function openInsertRowsDialog() {
-        const context = menuContext;
-        if (!context) return;
+    async function openInsertRowsDialog(explicitContext = null) {
+        const emptySheet = structureCommands.describeRowInsert?.().empty === true;
+        const context = explicitContext ?? menuContext;
+        if (!emptySheet && !context) return;
+
+        const commandContext = context ?? Object.freeze({
+            clickedCell: null,
+            snapshot: null,
+            row: Object.freeze({}),
+            column: Object.freeze({})
+        });
         const body = insertRowsDialog.querySelector("[data-body]");
         const actions = insertRowsDialog.querySelector("[data-actions]");
         const error = insertRowsDialog.querySelector("[data-error]");
+        const title = insertRowsDialog.querySelector(`.${DIALOG_CLASS}__title`);
         body.replaceChildren();
         actions.replaceChildren();
         error.textContent = "";
+        if (title) title.textContent = emptySheet ? "إضافة صفوف" : "Insert Rows";
 
         const label = document.createElement("label");
-        label.textContent = "Number of rows";
+        label.textContent = emptySheet ? "عدد الصفوف" : "Number of rows";
         const input = document.createElement("input");
         input.type = "number";
         input.min = "1";
         input.max = String(MAX_INSERT_ROWS);
         input.step = "1";
-        input.value = "1";
+        input.value = emptySheet ? "100" : "1";
         input.inputMode = "numeric";
         label.append(input);
         body.append(label);
@@ -384,32 +394,40 @@ export function createRevoGridStructureMenu(options) {
         const submit = async position => {
             const count = Number(input.value);
             if (!Number.isInteger(count) || count < 1 || count > MAX_INSERT_ROWS) {
-                error.textContent = `Enter a whole number from 1 to ${MAX_INSERT_ROWS}.`;
+                error.textContent = emptySheet
+                    ? `أدخل رقمًا صحيحًا من 1 إلى ${MAX_INSERT_ROWS}.`
+                    : `Enter a whole number from 1 to ${MAX_INSERT_ROWS}.`;
                 input.focus();
                 return;
             }
-
             try {
                 await structureCommands.execute(
                     REVO_GRID_STRUCTURE_COMMANDS.INSERT_ROWS,
-                    context,
-                    { position, count }
+                    commandContext,
+                    emptySheet ? { count } : { position, count }
                 );
                 closeDialog(insertRowsDialog);
             } catch (exception) {
-                error.textContent = exception?.message || "Unable to insert rows.";
+                error.textContent = exception?.message ||
+                    (emptySheet ? "تعذر إضافة الصفوف." : "Unable to insert rows.");
             }
         };
 
-        actions.append(
-            button("Cancel", () => closeDialog(insertRowsDialog)),
-            button("Insert Above", () => void submit("above"), { primary: true }),
-            button("Insert Below", () => void submit("below"), { primary: true })
-        );
+        if (emptySheet) {
+            actions.append(
+                button("إلغاء", () => closeDialog(insertRowsDialog)),
+                button("إضافة", () => void submit(null), { primary: true })
+            );
+        } else {
+            actions.append(
+                button("Cancel", () => closeDialog(insertRowsDialog)),
+                button("Insert Above", () => void submit("above"), { primary: true }),
+                button("Insert Below", () => void submit("below"), { primary: true })
+            );
+        }
         showDialog(insertRowsDialog);
         queueMicrotask(() => { input.focus(); input.select(); });
     }
-
     async function openDeleteRowsDialog() {
         const context = menuContext;
         if (!context) return;
@@ -922,7 +940,7 @@ export function createRevoGridStructureMenu(options) {
         destroyed = true;
     }
 
-    return Object.freeze({ getState, destroy });
+    return Object.freeze({ getState, openInsertRowsDialog, destroy });
 }
 
 export const revoGridStructureMenuInternals = Object.freeze({

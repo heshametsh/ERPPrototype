@@ -1,5 +1,10 @@
-@page "/work-orders-revogrid-gate5c1"
+@page "/work-orders-revogrid"
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
+
+@using ERPPrototype.Data
+@using Microsoft.AspNetCore.Authorization
+
+@attribute [Authorize(Roles = AppRoles.Employee)]
 
 <PageTitle>RevoGrid Gate 5C-1</PageTitle>
 

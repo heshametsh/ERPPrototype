@@ -1,4 +1,3 @@
-@page "/work-orders-revogrid-gate5a"
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @implements IAsyncDisposable
 
@@ -155,6 +154,19 @@
 
             <div id="@GridElementId"
                  class="native-gate5a__grid-host">
+            </div>
+
+            <div id="@EmptyStateElementId"
+                 class="native-gate5a__empty-state"
+                 data-testid="work-orders-empty-state"
+                 hidden>
+                <div class="native-gate5a__empty-state-card">
+                    <strong>لا توجد أوامر عمل</strong>
+                    <span>ابدأ بإضافة صفوف.</span>
+                    <button id="@EmptyStateAddRowsButtonId" type="button">
+                        إضافة صفوف
+                    </button>
+                </div>
             </div>
         </main>
 

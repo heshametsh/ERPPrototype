@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string[]]$RunnerArguments = @('--revo-gate5b5-trace')
+    [string[]]$RunnerArguments = @('--revo-employee-real-workday')
 )
 
 Set-StrictMode -Version Latest
