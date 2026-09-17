@@ -325,6 +325,8 @@ Example: pasting a custom Text column into 4,952 rows changes 4,952 values, but 
 - Header title, filter icon, and sort icon stay directly adjacent. Extra horizontal space remains after that group.
 - When width is insufficient, the title uses an ellipsis; icons remain visible.
 - The row-number Header is not a saved data-column layout.
+- In Arabic/RTL mode, the right edge is the logical start of the sheet. When the user is already at that logical start, resizing/Auto Fit/Undo/Redo must keep the right-start column visible and let horizontal overflow grow toward the left.
+- If the user has deliberately scrolled horizontally away from the RTL logical start, a later width change must not force the viewport back to the right.
 
 ## 19. Custom Column Filter, Sort, and Visibility Contract - current Revo override
 

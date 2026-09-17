@@ -1,4 +1,4 @@
-import * as nativeGate5A from "./revoGridNativeGate5A.js?v=20260911-rename-lifecycle-1";
+import * as nativeGate5A from "./revoGridNativeGate5A.js?v=20260916-rtl-underflow-1";
 import { createRevoGridChangeBridge } from "./revoGridChangeBridge.js?v=20260826-unified-validation-1";
 import { createRevoGridHistoryCoordinator } from "./revoGridHistoryCoordinator.js?v=20260821-minimal-reveal-1";
 import { createRevoGridHistoryFocus } from "./revoGridHistoryFocus.js?v=20260821-gate5b4-keyboard-sort-1";
@@ -14,6 +14,7 @@ import { createRevoGridColumnWorkspace } from "./revoGridColumnWorkspace.js?v=20
 import { createRevoGridColumnRename } from "./revoGridColumnRename.js?v=20260912-rename-noselect-4";
 import { createRevoGridColumnVisibilityAdapter } from "./revoGridColumnVisibilityAdapter.js?v=20260912-hide-atomic-1";
 import { createRevoGridColumnVisibility } from "./revoGridColumnVisibility.js?v=20260912-hide-atomic-1";
+import { createRevoGridColumnWidth } from "./revoGridColumnWidth.js?v=20260916-native-resize-commit-2";
 import { createRevoGridStructureMenu } from "./revoGridStructureMenu.js?v=20260914-empty-sheet-1";
 import { createRevoGridStructureCommands } from "./revoGridStructureCommands.js?v=20260914-empty-sheet-1";
 import {
@@ -108,11 +109,15 @@ function combinedState(state) {
         state.columnWorkspace?.getState?.() ?? {};
     const visibilityState =
         state.columnVisibility?.getState?.() ?? {};
+    const widthState =
+        state.columnWidth?.getState?.() ?? {};
     const columnDirty =
         columnState.customColumnsChanged === true;
     const visibilityDirty =
         visibilityState.columnVisibilitiesChanged ===
         true;
+    const widthDirty =
+        widthState.columnLayoutsChanged === true;
 
     return {
         ...changeState,
@@ -120,17 +125,20 @@ function combinedState(state) {
         ...(state.validationOwner?.getSummaryState?.() ?? {}),
         ...columnState,
         ...visibilityState,
+        ...widthState,
         dirty: Boolean(
             changeState.dirty ||
             columnDirty ||
-            visibilityDirty
+            visibilityDirty ||
+            widthDirty
         ),
         dirtyCount:
             Number(
                 changeState.dirtyCount ?? 0
             ) +
             (columnDirty ? 1 : 0) +
-            (visibilityDirty ? 1 : 0)
+            (visibilityDirty ? 1 : 0) +
+            (widthDirty ? 1 : 0)
     };
 }
 
@@ -141,7 +149,8 @@ function renderState(state) {
     const structureBusy = Boolean(
         state.rowStructure?.getState().structureBusy ||
         state.columnWorkspace?.getState().columnWorkspaceBusy ||
-        state.columnVisibility?.getState().columnVisibilityBusy
+        state.columnVisibility?.getState().columnVisibilityBusy ||
+        state.columnWidth?.getState().columnWidthBusy
     );
 
     if (state.statusElement) {
@@ -253,10 +262,12 @@ function renderState(state) {
         const columnDirty = current.customColumnsChanged === true;
         const visibilityDirty =
             current.columnVisibilitiesChanged === true;
+        const widthDirty =
+            current.columnLayoutsChanged === true;
 
         state.saveStatusElement.textContent = current.saveActive
             ? "Snapshot in flight"
-            : columnDirty || visibilityDirty
+            : columnDirty || visibilityDirty || widthDirty
                 ? "Ready — Column changes included"
                 : invalidCells > 0
                     ? "Save blocked by validation"
@@ -349,6 +360,10 @@ async function destroyBinding(elementId) {
         state.selectionContext?.destroy();
     } catch {
     }
+    try {
+        state.columnWidth?.destroy();
+    } catch {
+    }
 
     try {
         state.historyCoordinator.destroy();
@@ -391,6 +406,9 @@ export async function initialize(elementId, rows, customColumns, options) {
     );
     const enableColumnVisibility = Boolean(
         value(options, "enableColumnVisibility", "EnableColumnVisibility", false)
+    );
+    const enableColumnWidth = Boolean(
+        value(options, "enableColumnWidth", "EnableColumnWidth", false)
     );
     const headerSelectionFeature = enableHeaderMultiSelection
         ? createRevoGridHeaderSelectionFeature()
@@ -465,6 +483,7 @@ export async function initialize(elementId, rows, customColumns, options) {
         columnWorkspace: null,
         columnVisibilityAdapter: null,
         columnVisibility: null,
+        columnWidth: null,
         structureCommands: null,
         structureMenu: null,
         visibleAggregates: null,
@@ -539,6 +558,28 @@ export async function initialize(elementId, rows, customColumns, options) {
         validationOwner: state.validationOwner,
         onStateChange: () => renderState(state)
     });
+
+    if (enableColumnWidth) {
+        state.columnWidth = createRevoGridColumnWidth({
+            grid,
+            historyCoordinator: state.historyCoordinator,
+            columnLayouts: value(
+                options,
+                "columnLayouts",
+                "ColumnLayouts",
+                []
+            ),
+            mutationLocked: () => Boolean(
+                state.datasetSwitchActive ||
+                state.historyCoordinator?.getState?.().replayActive ||
+                state.rowStructure?.getState?.().structureBusy ||
+                state.columnWorkspace?.getState?.().columnWorkspaceBusy ||
+                state.columnVisibility?.getState?.().columnVisibilityBusy
+            ),
+            onStateChange: () => renderState(state)
+        });
+        await state.columnWidth.reconcileColumns({ apply: false });
+    }
 
     state.selectionLifecycle = createRevoGridSelectionLifecycle({ grid });
     if (Boolean(value(options, "enableSelectionContext", "EnableSelectionContext", false))) {
@@ -660,8 +701,11 @@ export async function initialize(elementId, rows, customColumns, options) {
             replaceColumns: async nextColumns => {
                 await nativeGate5A.replaceCustomColumns(
                     elementId,
-                    nextColumns
+                    nextColumns,
+                    state.columnWidth?.getRenderLayouts?.() ?? []
                 );
+                await state.columnWidth
+                    ?.reconcileColumns?.({ apply: false });
                 await state.columnVisibility
                     ?.reconcileColumns?.();
             },
@@ -703,8 +747,15 @@ export async function initialize(elementId, rows, customColumns, options) {
                                 .structureBusy ||
                             state.columnWorkspace
                                 ?.getState?.()
-                                .columnWorkspaceBusy
+                                .columnWorkspaceBusy ||
+                            state.columnWidth
+                                ?.getState?.()
+                                .columnWidthBusy
                         ),
+                    afterApply: async () => {
+                        await state.columnWidth
+                            ?.reconcileColumns?.({ apply: true });
+                    },
                     clearSelection: async () => {
                         await state.headerSelection
                             ?.clear?.({
@@ -930,7 +981,8 @@ export async function beginDatasetSwitch(elementId) {
         state.sortController?.getState().sortBusy ||
         state.rowStructure?.getState().structureBusy ||
         state.columnWorkspace?.getState().columnWorkspaceBusy ||
-        state.columnVisibility?.getState().columnVisibilityBusy
+        state.columnVisibility?.getState().columnVisibilityBusy ||
+        state.columnWidth?.getState().columnWidthBusy
     ) {
         return { allowed: false, reason: "busy" };
     }
@@ -969,7 +1021,8 @@ export async function replaceDataset(
     rows,
     customColumns,
     workYear,
-    columnVisibilities = []
+    columnVisibilities = [],
+    columnLayouts = []
 ) {
     const state = bindings.get(elementId);
     if (!state) {
@@ -997,6 +1050,12 @@ export async function replaceDataset(
             await state.sortController.suspendForDatasetSwitch();
             sortSuspended = true;
         }
+        if (state.columnWidth) {
+            await state.columnWidth.resetLayouts(
+                columnLayouts,
+                { apply: false }
+            );
+        }
 
         await nativeGate5A.replaceDataset(elementId, rows, workYear);
 
@@ -1020,7 +1079,13 @@ export async function replaceDataset(
                 { preserveViewState: false }
             );
         } else {
-            await nativeGate5A.replaceCustomColumns(elementId, customColumns);
+            await nativeGate5A.replaceCustomColumns(
+                elementId,
+                customColumns,
+                state.columnWidth?.getRenderLayouts?.() ?? columnLayouts
+            );
+            await state.columnWidth
+                ?.reconcileColumns?.({ apply: false });
             state.excelFilter?.refreshColumns?.();
             state.sortController?.refreshColumns?.();
             if (state.validationOwner?.resetDataset) {
@@ -1165,6 +1230,12 @@ function buildSaveContractSnapshot(state, engineSnapshot, sourceRows) {
             columnVisibilities: [],
             generation: { hiddenProps: [] }
         };
+    const widthSnapshot =
+        state.columnWidth?.getSaveSnapshot?.() ?? {
+            columnLayoutsChanged: false,
+            columnLayouts: [],
+            generation: { widths: [] }
+        };
 
     return {
         id: engineSnapshot.id,
@@ -1177,6 +1248,16 @@ function buildSaveContractSnapshot(state, engineSnapshot, sourceRows) {
         deletedRecords,
         customColumnsChanged: columnSnapshot.customColumnsChanged === true,
         customColumns: cloneValue(columnSnapshot.customColumns ?? []),
+        columnLayoutsChanged:
+            widthSnapshot.columnLayoutsChanged === true,
+        columnLayouts:
+            cloneValue(widthSnapshot.columnLayouts ?? []),
+        columnLayoutGeneration:
+            cloneValue(
+                widthSnapshot.generation ?? {
+                    widths: []
+                }
+            ),
         columnVisibilitiesChanged:
             visibilitySnapshot.columnVisibilitiesChanged === true,
         columnVisibilities:
@@ -1207,7 +1288,8 @@ export async function beginSaveHandshake(elementId) {
     const structureBusy = Boolean(
         state.rowStructure?.getState().structureBusy ||
         state.columnWorkspace?.getState().columnWorkspaceBusy ||
-        state.columnVisibility?.getState().columnVisibilityBusy
+        state.columnVisibility?.getState().columnVisibilityBusy ||
+        state.columnWidth?.getState().columnWidthBusy
     );
 
     if (current.saveActive || state.activeSaveContract) {
@@ -1222,7 +1304,8 @@ export async function beginSaveHandshake(elementId) {
     if (
         !changeState.dirty &&
         current.customColumnsChanged !== true &&
-        current.columnVisibilitiesChanged !== true
+        current.columnVisibilitiesChanged !== true &&
+        current.columnLayoutsChanged !== true
     ) {
         return { allowed: false, reason: "clean" };
     }
@@ -1460,6 +1543,9 @@ export async function acceptRealDbSaveResult(elementId, saveId, result = {}) {
     const savedCustomColumns = Array.isArray(result.savedCustomColumns)
         ? result.savedCustomColumns
         : [];
+    const savedColumnLayouts = Array.isArray(result.savedColumnLayouts)
+        ? result.savedColumnLayouts
+        : [];
     const savedColumnVisibilities =
         Array.isArray(result.savedColumnVisibilities)
             ? result.savedColumnVisibilities
@@ -1622,6 +1708,17 @@ export async function acceptRealDbSaveResult(elementId, saveId, result = {}) {
         state.historyCoordinator.discardWhere(entry =>
             entry?.adapterKey === "work-orders-column-workspace"
         );
+    }
+    if (contract.columnLayoutsChanged === true && state.columnWidth) {
+        await state.columnWidth.acceptSavedLayouts(
+            savedColumnLayouts,
+            contract.columnLayoutGeneration,
+            { apply: false }
+        );
+    }
+
+    if (contract.customColumnsChanged === true) {
+        state.columnWidth?.discardHistoryForMissingColumns?.();
     }
 
     if (state.columnVisibility) {

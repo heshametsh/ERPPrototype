@@ -73,6 +73,7 @@ export function createRevoGridColumnVisibility(options) {
     const clearSelection = options?.clearSelection;
     const mutationLocked =
         options?.mutationLocked ?? (() => false);
+    const afterApply = options?.afterApply;
 
     if (
         !adapter?.applyHiddenProps ||
@@ -190,6 +191,9 @@ export function createRevoGridColumnVisibility(options) {
         await adapter.applyHiddenProps(
             hiddenProps(next)
         );
+        if (typeof afterApply === 'function') {
+            await afterApply();
+        }
         current = next;
         notifyState();
     }

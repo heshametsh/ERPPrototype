@@ -28,6 +28,16 @@ internal static class Program
                 argument =>
                     string.Equals(
                         argument,
+                        "--revo-gate5c1-column-width-focused",
+                        StringComparison.OrdinalIgnoreCase)))
+        {
+            return await Gate5C1ColumnWidthFocusedRunner.RunAsync();
+        }
+
+        if (args.Any(
+                argument =>
+                    string.Equals(
+                        argument,
                         "--revo-gate5c1-visibility-focused",
                         StringComparison.OrdinalIgnoreCase)))
         {

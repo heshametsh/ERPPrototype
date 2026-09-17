@@ -1,12 +1,21 @@
 # AI CURRENT STATE
 
-Updated: 2026-09-15
-Mission: CANONICAL-REVO-CLEANUP-SECURITY-20260915
-Mission status: **COMPLETE**
+Updated: 2026-09-17
+Mission: REVO-COLUMN-WIDTH-20260915
+
+## LIVE STATE
+
+- Feature: Column Width / RTL resize integration
+- Stage: **CHECKPOINT**
+- Manual: **PENDING - user will verify when back**
+- Accepted baseline: `2101f41`
+- Current checkpoint: `PENDING-COMMIT`
+- Focused Width: **PASS - W00-W10, real Playwright browser run**
+- Full Regression: **PASS - one complete run**
 
 ## Current mission
 
-Revo Work Orders now has one active employee route only: `/work-orders-revogrid`. Historical B1-B12 route wrappers, the old Gate5A route, the Gate5C1 alias, Event Probe, and duplicate historical E2E runners were removed only after their unique behavior coverage was migrated into current canonical tests. Startup seeding was also corrected so a deliberately disabled initial Admin remains disabled after restart. Automated closure is green and the user completed the manual browser acceptance on 2026-09-15: login, edit/Undo/Redo/Save, Structure Menu, Hide/Unhide, Empty Sheet recovery, and retired Gate URL behavior all passed.
+The current Column Width candidate uses Revo-owned native resize gestures with ERP-owned commit, History, Save, RTL pair policy, and persistence. The old per-frame manual resize engine is gone. AutoFit, RTL owner behavior, Hide/Unhide width restoration, overflow anchoring, Undo/Redo, Save/Reload, cross-year sharing, and the Work Order Number outer-right hard stop are all green in focused browser proof. The full regression is also green. No further Product change is pending before the user's own manual verification. This state is a checkpoint only and does **not** replace the accepted baseline until the user explicitly accepts it.
 
 ## Authority
 
@@ -94,6 +103,7 @@ These remain review findings only; accepted Work Orders feature closures do not 
 ## Workflow rules that matter now
 
 - Classify every red result before changing product behavior: PRODUCT, TEST/HARNESS, BUILD/STALE, TOOLING, or ENVIRONMENT.
+- For framework/library-dependent interactions, the `Framework/library interaction forensics gate` in `AI_WORK_CYCLE.md` is mandatory before a Product edit: exact installed source, full event/store/index/viewport trace, stable `prop` identity, Native-first ownership, runtime probe when semantics are ambiguous, and escaped-manual-bug regression coverage.
 - When an automated test appears to expose a PRODUCT defect, show the exact Expected vs Actual and evidence to the user before changing product code.
 - Fix the owner of the failure only; do not turn a test/harness failure into a product change.
 - Before deleting historical routes/runners, migrate and prove any unique behavior coverage on the canonical product first; do not preserve obsolete stage-shape assertions just because they once existed.
@@ -103,8 +113,19 @@ These remain review findings only; accepted Work Orders feature closures do not 
 
 ## Next action
 
-Mission closed after user manual acceptance on 2026-09-15. No further Product change is pending in this mission. `MustChangePassword` remains explicitly deferred. Admin user management should later add a scoped `Reset Password` action using ASP.NET Identity/UserManager, clearing failed-access/lockout state without forcing first-login password change until that separate policy is decided. Remote Git/GitHub remains out of the routine workflow until the user reopens it.
+Do not modify Column Width Product behavior yet. First apply the new framework/library forensics gate to the remaining coexistence question around existing Header owners (`beforeheaderrender`/Rename and resize events), then produce one cleanup/ownership plan from the proven Revo contract. Only after that plan is reviewed may the current manual Resize layer be simplified. Focused proof and user hands-on acceptance remain separate gates before any broader regression or commit. `MustChangePassword` and Admin Reset Password remain unrelated deferred work.
 
 ## Communication
 
 Explain the program as cause and effect in natural Egyptian Arabic: what happened, why it matters, and what decision follows. Keep implementation detail in the background unless it changes the decision or the user asks for it.
+
+## Active evidence update — 2026-09-15
+
+Tracked post-RTL `Employee Real Workday` regression is now PASS through scenarios 00-17 on module `20260915-column-width-rtl-2`. This supersedes the earlier pending-regression wording above. Current remaining gates for `REVO-COLUMN-WIDTH-20260915` are user hands-on RTL/Width re-acceptance, final hostile diff/memory review, and then local checkpoint/commit only if those pass.
+
+### RTL Excel-parity gate — 2026-09-16
+- Focused Width W00-W06 remain PASS.
+- New W07 is RED: native left-edge RTL resize keeps the right edge fixed during drag, but the previous post-drag `alignRtlLogicalStart()` causes a jump after MouseUp.
+- Classification: PRODUCT. Next action is one narrow removal of the redundant post-drag realignment, then rerun the same focused suite only.
+- 2026-09-16 RTL Excel resize proof: W00-W05 PASS; corrected W06 remains RED without synthetic scroll. Current blocker is RTL viewport drift during active internal-column resize. Next scope is viewport compensation during drag only; no commit.
+- 2026-09-16 Column Width Tabulator-parity cleanup: focused W00-W06 PASS. RTL-specific handle/viewport hacks removed; shared Assignment Date / Work Type boundary now resizes Assignment Date only, Work Type unchanged, one History action. Manual browser acceptance pending; no broad regression/commit yet.

@@ -61,6 +61,7 @@ function Invoke-HarnessPreflight {
     $gate = Join-Path $RepoRoot "ERPPrototype\Components\Pages\WorkOrdersRevoGridGate5C1.razor"
     $program = Join-Path $RepoRoot "ERPPrototype\ERPPrototype.E2ETests\Program.cs"
     $b12Runner = Join-Path $RepoRoot "ERPPrototype\ERPPrototype.E2ETests\Gate5B12RealDbSaveRunner.cs"
+    $canonicalSurface = Join-Path $RepoRoot "ERPPrototype\ERPPrototype.E2ETests\RevoCanonicalTestSurface.cs"
     Assert-TextContains $gate '@page "/work-orders-revogrid"' 'Canonical Revo Work Orders route changed or disappeared.'
     $revoRoutes = Get-ChildItem (Join-Path $RepoRoot "ERPPrototype\Components\Pages") -Filter "WorkOrdersRevoGrid*.razor" |
         Select-String -Pattern '^@page "/work-orders-revogrid'
@@ -73,7 +74,8 @@ function Invoke-HarnessPreflight {
     Assert-TextContains $program '"--revo-employee-real-workday"' 'Employee Real Workday runner is not wired in Program.cs.'
     Assert-TextContains $program '"--revo-empty-sheet"' 'Canonical Empty Sheet runner is not wired in Program.cs.'
     Assert-TextContains $program '"--startup-security"' 'Startup Security runner is not wired in Program.cs.'
-    Assert-TextContains $b12Runner 'private const string GatePath = "/work-orders-revogrid";' 'B12 no longer targets the canonical Revo Work Orders route.'
+    Assert-TextContains $b12Runner 'using static ERPPrototype.E2ETests.RevoCanonicalTestSurface;' 'B12 no longer uses the canonical Revo test surface.'
+    Assert-TextContains $canonicalSurface 'internal const string GatePath = "/work-orders-revogrid";' 'Canonical Revo test surface no longer targets /work-orders-revogrid.'
     Assert-TextContains $b12Runner 'ResolveActiveModulePathAsync(page)' 'B12 no longer verifies the browser-loaded Gate module dynamically.'
 }
 
@@ -82,6 +84,7 @@ function Assert-E2EBuildFreshness {
     if(-not (Test-Path $dll)){ throw 'E2E build output is missing after Build.' }
     $sources=@(
         "ERPPrototype\ERPPrototype.E2ETests\Program.cs",
+        "ERPPrototype\ERPPrototype.E2ETests\RevoCanonicalTestSurface.cs",
         "ERPPrototype\ERPPrototype.E2ETests\EmployeeRealWorkdayRunner.cs",
         "ERPPrototype\ERPPrototype.E2ETests\EmptySheetLifecycleRunner.cs",
         "ERPPrototype\ERPPrototype.E2ETests\StartupSecurityRunner.cs",

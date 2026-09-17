@@ -20,6 +20,21 @@ Identify the existing owner of each truth (year/dataset, identity, selection, Di
 
 Do not turn reference research into a blanket implementation gate. Routine test/harness corrections should move directly once their failure class and owner are clear.
 
+#### Framework/library interaction forensics gate
+
+For employee-visible behavior that depends on RevoGrid or another external framework/library (resize, RTL, scroll, virtualization, selection, clipboard, rendering lifecycle, etc.), complete this gate before a Product edit:
+
+- Inspect the **exact installed version/source** first. Use current upstream/main/public docs only to detect later fixes or supported concepts; never silently substitute newer behavior for the installed runtime.
+- Trace the full path from user gesture to final render/state: DOM/control → library event lifecycle → provider/store → identity/index translation → dimension/viewport → render/persistence boundary. Do not stop at the first plausible implementation detail.
+- Define the mission identity/index glossary before coding. Stable business identity is `FieldKey`/Revo `prop`; numeric indexes must be named by meaning (`source/physical`, `virtual/visible`, `viewport/render`) and must never be mixed. Resolve transient indexes at the point of use after Hide/Unhide/rebuild instead of retaining them as identity.
+- Prefer **Native interaction ownership** when the library already provides the gesture/render loop. ERP should add business policy at supported before/after/commit hooks. Intercept per-frame pointer/mouse movement only when source/runtime evidence proves no supported hook can satisfy the contract.
+- When source semantics are ambiguous—especially RTL/browser coordinates, virtualization, timing, or scroll anchors—run an isolated runtime probe outside Product code and compare measured browser behavior with source semantics before choosing an architecture.
+- A manual user-visible escape against a green automated suite is a coverage gap until reproduced. Preserve the exact escaped scenario as focused regression evidence; do not dismiss the manual result because final numeric state happened to pass.
+- Boundary evidence must include the transitions relevant to the feature, not only the comfortable baseline: underflow↔overflow, repeated gestures, Min/Max, hidden/unhidden columns, core/custom columns, anchored vs deliberately scrolled viewport, and Save/Reload/History where applicable.
+- Browser tests for interaction ownership must bind the **actual visual control/boundary to the expected `prop` and geometry**, not only assert final widths/counts using the same index assumptions as Product code.
+- If two consecutive Product patches on the same interaction do not close the symptom or introduce a new interaction defect, stop before a third patch and perform source + runtime forensics from the original contract.
+- After closure, promote only reusable root-cause lessons into this gate/owning architecture docs. Do not accumulate feature-specific workaround rules; periodically consolidate or remove rules when stronger evidence makes them obsolete.
+
 ### 3. Break pass
 
 Before code, try the mission-relevant failure families: filter/sort/hidden rows, history/baseline, edit-while-save, save failure, concurrency, cross-year, delete/re-add identity, virtualization/large data, partial transaction failure.
@@ -51,6 +66,14 @@ After green evidence, reread the candidate as a reviewer: behavior contract, dup
 ### 7. Full regression / manual acceptance
 
 For Work Orders closure, prefer the existing `Run-ERP-Full-Regression.ps1` after focused evidence. It performs a fresh build and runs the real Employee Workday, Rename focused break suite, Visibility focused suite, Canonical Empty Sheet lifecycle, B12 real DB Save, Startup Security restart regression, and Integration tests. It continues through test-suite failures so one run exposes all failing areas.
+
+### Short-turn remote execution cadence
+
+For interactive Remote Desktop work, default to **one material change + one focused proof per assistant turn**, then report the result before chaining more work. Run broader regression in a separate turn/batch after the focused proof is green. Manual user acceptance is a separate stop point before checkpoint/commit.
+
+Material Build/Test/Regression commands expected to take more than a few seconds must use `Tools/AI/Invoke-AITrackedStep.ps1` by default so `AI_EXECUTION_LOG.csv` receives timing/outcome/classification automatically. If a material run was not tracked, record the telemetry gap in `AI_WORK_LOG.md`; do not invent retrospective durations.
+
+After each material behavior/code/test result, synchronize `AI_CURRENT_STATE.md` + append `AI_WORK_LOG.md` before moving to a different feature/mission. Update the owning behavior/reference document when the contract itself changes. Do not wait until final closure to record the mission's current truth.
 
 ### 8. Memory + checkpoint
 

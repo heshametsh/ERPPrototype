@@ -56,7 +56,31 @@ function customFilterType(dataType) {
         : "string";
 }
 
+function normalizeColumnLayouts(layouts) {
+    return new Map(
+        (Array.isArray(layouts) ? layouts : [])
+            .map(layout => ({
+                fieldKey: String(value(layout, "fieldKey", "FieldKey", "")).trim(),
+                width: Number(value(layout, "width", "Width", 0))
+            }))
+            .filter(layout =>
+                layout.fieldKey &&
+                Number.isFinite(layout.width) &&
+                layout.width >= 45 &&
+                layout.width <= 1000)
+            .map(layout => [layout.fieldKey, Math.round(layout.width)])
+    );
+}
 
+function applyColumnLayouts(columns, layouts) {
+    const widths = normalizeColumnLayouts(layouts);
+    return columns.map(column => ({
+        ...column,
+        size: widths.get(String(column?.prop ?? "")) ?? column.size,
+        minSize: 45,
+        maxSize: 1000
+    }));
+}
 function mergeOrderedColumns(core, customDefinitions, customColumns) {
     const customByProp = new Map(
         (Array.isArray(customColumns) ? customColumns : [])
@@ -250,11 +274,15 @@ function buildColumns(
     enableExcelFilter,
     enableHeaderActions,
     cellPropertiesProvider = null,
-    columnPropertiesProvider = null
+    columnPropertiesProvider = null,
+    columnLayouts = []
 ) {
-    const columns = enableExcelFilter
-        ? buildExcelFilterGateColumns(customColumns, enableHeaderActions)
-        : buildLegacyGateColumns(customColumns);
+    const columns = applyColumnLayouts(
+        enableExcelFilter
+            ? buildExcelFilterGateColumns(customColumns, enableHeaderActions)
+            : buildLegacyGateColumns(customColumns),
+        columnLayouts
+    );
 
     return attachColumnProperties(
         attachCellProperties(columns, cellPropertiesProvider),
@@ -322,7 +350,8 @@ export async function initialize(elementId, rows, customColumns, options) {
         enableExcelFilter,
         enableHeaderActions,
         value(options, "validationCellProperties", "ValidationCellProperties", null),
-        value(options, "columnPropertiesProvider", "ColumnPropertiesProvider", null)
+        value(options, "columnPropertiesProvider", "ColumnPropertiesProvider", null),
+        value(options, "columnLayouts", "ColumnLayouts", [])
     );
     const startedAt = performance.now();
 
@@ -358,8 +387,9 @@ export async function initialize(elementId, rows, customColumns, options) {
         ? { rangeFill: true }
         : true;
     grid.rtl = Boolean(value(options, "rtl", "Rtl", true));
+    grid.classList.toggle("erp-rtl-underflow-align", grid.rtl);
     grid.autoSizeColumn = true;
-    grid.stretch = true;
+    grid.stretch = Boolean(value(options, "stretch", "Stretch", true));
 
     const state = {
         grid,
@@ -384,7 +414,8 @@ export async function initialize(elementId, rows, customColumns, options) {
         columnPropertiesProvider:
             value(options, "columnPropertiesProvider", "ColumnPropertiesProvider", null),
         customColumns: (Array.isArray(customColumns) ? customColumns : [])
-            .map(normalizeCustomColumn)
+            .map(normalizeCustomColumn),
+        columnLayouts: value(options, "columnLayouts", "ColumnLayouts", [])
     };
 
     addListener(state, grid, "viewportscroll", () => {
@@ -412,7 +443,11 @@ export async function initialize(elementId, rows, customColumns, options) {
     states.set(elementId, state);
 }
 
-export async function replaceCustomColumns(elementId, customColumns) {
+export async function replaceCustomColumns(
+    elementId,
+    customColumns,
+    columnLayouts = null
+) {
     const state = states.get(elementId);
     if (!state) {
         throw new Error(`Native RevoGrid state '${elementId}' was not found.`);
@@ -427,11 +462,13 @@ export async function replaceCustomColumns(elementId, customColumns) {
         state.excelFilterEnabled,
         state.headerActionsEnabled,
         state.validationCellProperties,
-        state.columnPropertiesProvider
+        state.columnPropertiesProvider,
+        columnLayouts ?? state.columnLayouts
     );
 
     state.grid.columns = columns;
     state.customColumns = normalized;
+    state.columnLayouts = columnLayouts ?? state.columnLayouts;
     state.columns = columns.length;
 
     // RevoGrid v4.25.2 watches the public columns property and reapplies the

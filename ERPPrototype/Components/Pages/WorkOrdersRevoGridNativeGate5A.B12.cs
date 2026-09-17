@@ -143,7 +143,7 @@ public partial class WorkOrdersRevoGridNativeGate5A
                 throw;
             }
 
-            if (contract.SchemaVersion != 3)
+            if (contract.SchemaVersion != 4)
             {
                 throw new InvalidOperationException(
                     $"Unsupported B12 persistence schema version {contract.SchemaVersion}.");
@@ -228,6 +228,8 @@ public partial class WorkOrdersRevoGridNativeGate5A
                 preparation.DeletedWorkOrders,
                 contract.CustomColumns,
                 contract.CustomColumnsChanged,
+                columnLayouts: contract.ColumnLayouts,
+                columnLayoutsChanged: contract.ColumnLayoutsChanged,
                 performanceStages: serviceStages,
                 columnVisibilities: contract.ColumnVisibilities,
                 columnVisibilitiesChanged: contract.ColumnVisibilitiesChanged);
@@ -575,6 +577,8 @@ public partial class WorkOrdersRevoGridNativeGate5A
 
         var reconcile = new NativeGate5B12ReconcileResult();
         reconcile.SavedCustomColumns = (result.SavedCustomColumns ?? []).ToList();
+        reconcile.SavedColumnLayouts =
+            (result.SavedColumnLayouts ?? []).ToList();
         reconcile.SavedColumnVisibilities =
             (result.SavedColumnVisibilities ?? []).ToList();
 
@@ -811,6 +815,11 @@ public partial class WorkOrdersRevoGridNativeGate5A
         {
             WorkOrderSaveFailureType.Concurrency
                 when result.ErrorMessage.Contains(
+                    "column width",
+                    StringComparison.OrdinalIgnoreCase) =>
+                "فشل الحفظ: تم تغيير عرض الأعمدة من جلسة أخرى. حدّث الشيت ثم حاول مرة أخرى؛ لم يتم فقد تغييراتك.",
+            WorkOrderSaveFailureType.Concurrency
+                when result.ErrorMessage.Contains(
                     "column visibility",
                     StringComparison.OrdinalIgnoreCase) =>
                 "فشل الحفظ: تم تغيير إظهار/إخفاء الأعمدة من جلسة أخرى. حدّث الشيت ثم حاول مرة أخرى؛ لم يتم فقد تغييراتك.",
@@ -843,6 +852,8 @@ public partial class WorkOrdersRevoGridNativeGate5A
         public long Revision { get; set; }
         public bool CustomColumnsChanged { get; set; }
         public List<CustomColumnDefinitionInput> CustomColumns { get; set; } = [];
+        public bool ColumnLayoutsChanged { get; set; }
+        public List<DepartmentColumnLayoutInput> ColumnLayouts { get; set; } = [];
         public bool ColumnVisibilitiesChanged { get; set; }
         public List<DepartmentColumnVisibilityInput> ColumnVisibilities { get; set; } = [];
         public List<NativeGate5B12ChangedRecord> ChangedRecords { get; set; } = [];
@@ -920,6 +931,7 @@ public partial class WorkOrdersRevoGridNativeGate5A
         public List<NativeGate5ARow> SavedRows { get; set; } = [];
         public List<string> RemovedClientKeys { get; set; } = [];
         public List<CustomColumnDefinitionData> SavedCustomColumns { get; set; } = [];
+        public List<DepartmentColumnLayoutData> SavedColumnLayouts { get; set; } = [];
         public List<DepartmentColumnVisibilityData> SavedColumnVisibilities { get; set; } = [];
     }
 }

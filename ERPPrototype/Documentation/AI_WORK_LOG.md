@@ -853,3 +853,62 @@ Meta: Mission=CANONICAL-REVO-CLEANUP-SECURITY-20260915; Class=PRODUCT+TEST+SECUR
 - A failed second helper-extraction slice was classified TOOLING, reverted from its pre-slice backup, rebuilt cleanly, and did not change Product behavior.
 - Admin password-reset UX is deferred as a future requirement: scoped Reset Password via ASP.NET Identity/UserManager, clearing lockout/failed-access state; first-login forced change remains undecided.
 - Mission is accepted for local checkpoint. No remote push is authorized by this closure.
+## 2026-09-15 — REVO-COLUMN-WIDTH-20260915 current evidence + short-turn workflow correction
+
+Meta: Mission=REVO-COLUMN-WIDTH-20260915; Class=PRODUCT+WORKFLOW; Outcome=OPEN; Stage=FOCUSED_EVIDENCE; Scope=COLUMN_WIDTH_RTL
+
+- Canonical Revo Column Width candidate is implemented on `/work-orders-revogrid`: native drag resize, 45–1000 bounds, Dirty/History, Undo/Redo, width-only SQL Save, reload/year persistence, stable FieldKey preservation across Custom Column rebuilds, and native grow-only Auto Fit.
+- Focused Width browser suite currently passes W00-W06. W06 was first added as a reproducer and failed with `Work Order Number disappeared to the right`; this matched the user's manual Arabic/RTL report and classified the defect as PRODUCT.
+- The narrow RTL correction now preserves the right logical-start edge only when the user is already there; horizontal overflow grows left. Deliberate user horizontal scroll is not forcibly reset. W06 passes after the correction.
+- Before the RTL correction, B12 Real DB Save, Rename Focused, Visibility Focused, Empty Sheet, Employee Real Workday, and SQL Integration 36/36 passed. After the RTL correction, the Width suite passed again; full post-RTL regression and user hands-on re-acceptance remain pending.
+- Today's Width/RTL Build/E2E runs were not executed through `Invoke-AITrackedStep.ps1`; therefore they are evidence-backed but absent from `AI_EXECUTION_LOG.csv`. This is a telemetry gap and exact durations will not be backfilled from memory.
+- Workflow correction adopted: interactive Remote Desktop turns default to one material change plus one focused proof, then immediate report. Broader regression is a separate batch/turn, and manual acceptance is a separate stop point before commit. Material Build/Test/Regression commands use tracked execution by default from this point forward.
+
+## 2026-09-15 — REVO-COLUMN-WIDTH post-RTL Workday regression PASS
+
+Meta: Mission=REVO-COLUMN-WIDTH-20260915; Class=TEST/HARNESS; Outcome=PASS; Stage=POST_RTL_REGRESSION; Scope=EMPLOYEE_REAL_WORKDAY
+
+- Tracked Employee Real Workday rerun loaded `revoGridGate5B1.js?v=20260915-column-width-rtl-2` and passed scenarios 00-17.
+- Selection, Sort/Filter, Clipboard, Range Clear, Structure, aggregates, validation, real SQL Save, snapshot-safe Save, new-row identity, persisted delete/restore, cross-year behavior, 1,200-cell large Save, concurrency rejection, and Arabic UI all remained green after the RTL width-anchor fix.
+- Device execution time recorded automatically in `AI_EXECUTION_LOG.csv`: 53,832 ms; outcome PASS.
+- This closes the first post-RTL regression gate only. User hands-on RTL/Width re-acceptance and remaining closure review are still pending; no commit yet.
+## 2026-09-16 — RTL Excel-parity focused proof RED
+
+Meta: Mission=REVO-COLUMN-WIDTH-20260915; Class=PRODUCT; Outcome=RED; Stage=RTL_EXCEL_PARITY; Scope=COLUMN_WIDTH_RTL
+
+- Focused Width W00-W06 remained PASS after switching RTL data-column resize affordances to the left edge and collapsing a drag gesture to one History action.
+- New W07 reproduces Excel-style RTL boundary behavior on the shared boundary between Work Order Number and Work Type.
+- During the active drag, the right edge stayed fixed; after MouseUp it jumped. Expected: right edge fixed both during and after the gesture.
+- Evidence isolates the defect to the previous post-drag `alignRtlLogicalStart()` correction, not Revo's left-edge native resize math. Classification: PRODUCT.
+- No further Product change was made after the RED. Next change should remove the redundant post-drag realignment only, then rerun the same focused suite.
+
+## 2026-09-16 — RTL Excel resize focused proof remains RED at W06
+
+Meta: Mission=REVO-COLUMN-WIDTH-20260915; Class=PRODUCT; Outcome=RED; Stage=RTL_EXCEL_RESIZE_PROOF; Scope=RTL_VIEWPORT_DURING_RESIZE
+
+- Removed the old post-MouseUp `alignRtlLogicalStart()` correction from manual drag finalization and kept native left-edge RTL resize handles.
+- Corrected W06 test harness so overflow is created from already-visible `Work Type`; no `scrollToColumn(Basket)` or forced horizontal navigation occurs.
+- Focused suite remains PASS W00-W05 but RED at W06: widening visible `Work Type` in RTL causes `Work Order Number` to disappear to the right.
+- Classification is PRODUCT: Revo's central RTL viewport drifts during an internal-column width change. The next change must compensate the viewport during the active drag, not jump after MouseUp.
+- No broader regression or commit was run.
+
+## 2026-09-16 — Tabulator-parity column resize focused proof PASS
+
+Meta: Mission=REVO-COLUMN-WIDTH-20260915; Class=PRODUCT; Outcome=PASS; Stage=TABULATOR_PARITY_FOCUSED_V2; Scope=COLUMN_WIDTH_RESIZE
+
+- Removed Width-specific RTL handle ownership override and RTL logical-start viewport realignment code.
+- Kept the general Width owner only: persistence, Dirty, one History action per drag, Undo/Redo, Auto Fit, Save, year/custom-column wiring.
+- Focused suite PASS W00-W06. W06 proves the shared Assignment Date / Work Type boundary changes Assignment Date 160px -> 140px while Work Type remains 130px, matching the accepted Tabulator behavior.
+- Build PASS with 0 warnings / 0 errors. No broader regression or commit was run; manual browser acceptance is next.
+
+## 2026-09-16 — Framework/library interaction forensics gate adopted
+
+Meta: Mission=REVO-COLUMN-WIDTH-20260915; Class=WORKFLOW; Outcome=PASS; Stage=LEARNING_UPDATE; Scope=FRAMEWORK_INTERACTION_GATE
+
+- Width/RTL forensics converted the recent resize failures into reusable workflow rules rather than another feature-specific patch: exact installed-source tracing, stable `FieldKey`/`prop` identity, explicit source/virtual/viewport index semantics, Native-first gesture ownership, isolated runtime probes for ambiguous browser/RTL/virtualization behavior, and boundary-transition evidence.
+- The permanent gate now requires the full user-gesture → library event → provider/store → identity/index translation → dimension/viewport → render/persistence path before Product edits that depend on framework internals.
+- Manual user-visible escapes against green automation are now treated as coverage gaps until the exact escaped scenario is reproduced and protected; interaction tests must bind the actual visual boundary/control to the expected `prop`/geometry instead of relying only on final numeric state.
+- A patch-stop rule is now explicit: after two Product corrections on the same interaction fail to close the symptom or introduce a new interaction defect, stop before a third patch and perform source + runtime forensics.
+- The gate is deliberately evolutionary: only reusable root-cause lessons are promoted, and obsolete/overlapping rules should be consolidated or removed when stronger evidence appears.
+- `AI_CURRENT_STATE.md` was synchronized to the current truth: the persistence foundation remains preservable, while the present manual Resize/RTL interaction layer is not accepted and must not receive another stacked patch before the remaining ownership/coexistence review.
+- This step changed workflow/documentation only. No ERP Product runtime, test runtime, database schema, or migration behavior was modified.

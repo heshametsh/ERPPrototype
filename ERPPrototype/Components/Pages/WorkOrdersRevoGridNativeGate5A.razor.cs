@@ -72,6 +72,8 @@ public partial class WorkOrdersRevoGridNativeGate5A
 
     [Parameter]
     public bool EnableColumnVisibility { get; set; }
+    [Parameter]
+    public bool EnableColumnWidth { get; set; }
 
     // Saudi Arabia is UTC+3 all year. The page always opens on the
     // current Saudi business year and does not persist the last selected year.
@@ -100,6 +102,7 @@ public partial class WorkOrdersRevoGridNativeGate5A
     private List<int> AvailableWorkYears = [CurrentBusinessYear];
     private List<NativeGate5ARow> Rows = [];
     private List<CustomColumnDefinitionData> CustomColumns = [];
+    private List<DepartmentColumnLayoutData> ColumnLayouts = [];
     private List<DepartmentColumnVisibilityData> ColumnVisibilities = [];
 
     private IJSObjectReference? GridModule;
@@ -229,6 +232,7 @@ public partial class WorkOrdersRevoGridNativeGate5A
             AvailableWorkYears = availableYears,
             Rows = rows,
             CustomColumns = customColumns,
+            ColumnLayouts = sheet.ColumnLayouts,
             ColumnVisibilities = sheet.ColumnVisibilities,
             ServerLoadMilliseconds = elapsedMilliseconds
         };
@@ -243,6 +247,7 @@ public partial class WorkOrdersRevoGridNativeGate5A
         Rows = snapshot.Rows;
         DisplayedRowCount = snapshot.Rows.Count;
         CustomColumns = snapshot.CustomColumns;
+        ColumnLayouts = snapshot.ColumnLayouts;
         ColumnVisibilities = snapshot.ColumnVisibilities;
         ServerLoadMilliseconds = snapshot.ServerLoadMilliseconds;
     }
@@ -260,7 +265,9 @@ public partial class WorkOrdersRevoGridNativeGate5A
         {
             var gridModulePath = EnableChangeEngine
                 ? EnableSaveHandshake
-                    ? "./js/revoGridGate5B1.js?v=20260914-empty-sheet-1"
+                    ? EnableColumnWidth
+                        ? "./js/revoGridGate5B1.js?v=20260916-native-resize-commit-2"
+                        : "./js/revoGridGate5B1.js?v=20260914-empty-sheet-1"
                     : EnableHeaderMultiSelection
                     ? "./js/revoGridGate5B1.js?v=20260830-selection-core-r2"
                     : EnableStructureWorkspace
@@ -301,6 +308,11 @@ public partial class WorkOrdersRevoGridNativeGate5A
                     EnableSaveHandshake,
                     EnableVisibleAggregates,
                     EnableColumnVisibility,
+                    EnableColumnWidth,
+                    Stretch = !EnableColumnWidth,
+                    ColumnLayouts = EnableColumnWidth
+                        ? ColumnLayouts
+                        : [],
                     ColumnVisibilities,
                     BasketValues = WorkOrderBuskets.All,
                     RowCountElementId,
@@ -510,7 +522,10 @@ public partial class WorkOrdersRevoGridNativeGate5A
                     snapshot.Rows,
                     snapshot.CustomColumns,
                     snapshot.WorkYear,
-                    snapshot.ColumnVisibilities);
+                    snapshot.ColumnVisibilities,
+                    EnableColumnWidth
+                        ? snapshot.ColumnLayouts
+                        : []);
             }
 
             ApplySnapshot(snapshot);
@@ -708,6 +723,7 @@ public partial class WorkOrdersRevoGridNativeGate5A
         public List<int> AvailableWorkYears { get; set; } = [];
         public List<NativeGate5ARow> Rows { get; set; } = [];
         public List<CustomColumnDefinitionData> CustomColumns { get; set; } = [];
+        public List<DepartmentColumnLayoutData> ColumnLayouts { get; set; } = [];
         public List<DepartmentColumnVisibilityData> ColumnVisibilities { get; set; } = [];
         public double ServerLoadMilliseconds { get; set; }
     }
