@@ -9,7 +9,7 @@ Mission: REVO-COLUMN-WIDTH-20260915
 - Stage: **CHECKPOINT**
 - Manual: **PENDING - user will verify when back**
 - Accepted baseline: `2101f41`
-- Current checkpoint: `PENDING-COMMIT`
+- Current checkpoint: `7b62e58`
 - Focused Width: **PASS - W00-W10, real Playwright browser run**
 - Full Regression: **PASS - one complete run**
 
