@@ -1,0 +1,26 @@
+<Solution>
+  <Folder Name="/src/" />
+  <Folder Name="/src/BuildingBlocks/">
+    <Project Path="src/BuildingBlocks/ContractorERP.BuildingBlocks.csproj" />
+  </Folder>
+  <Folder Name="/src/Host/">
+    <Project Path="src/Host/ContractorERP.Host.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/" />
+  <Folder Name="/src/Modules/Organization/">
+    <Project Path="src/Modules/Organization/ContractorERP.Modules.Organization.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/WorkOrders/">
+    <Project Path="src/Modules/WorkOrders/ContractorERP.Modules.WorkOrders.csproj" />
+  </Folder>
+  <Folder Name="/tests/" />
+  <Folder Name="/tests/ArchitectureTests/">
+    <Project Path="tests/ArchitectureTests/ContractorERP.ArchitectureTests.csproj" />
+  </Folder>
+  <Folder Name="/tests/IntegrationTests/">
+    <Project Path="tests/IntegrationTests/ContractorERP.IntegrationTests.csproj" />
+  </Folder>
+  <Folder Name="/tests/UnitTests/">
+    <Project Path="tests/UnitTests/ContractorERP.UnitTests.csproj" />
+  </Folder>
+</Solution>

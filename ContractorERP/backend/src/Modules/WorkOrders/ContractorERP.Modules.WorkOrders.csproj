@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="FluentValidation" />
+    <ProjectReference Include="..\..\BuildingBlocks\ContractorERP.BuildingBlocks.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="ContractorERP.Host" />
+    <InternalsVisibleTo Include="ContractorERP.UnitTests" />
+    <InternalsVisibleTo Include="ContractorERP.IntegrationTests" />
+  </ItemGroup>
+</Project>

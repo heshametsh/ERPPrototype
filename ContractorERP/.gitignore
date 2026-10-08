@@ -1,0 +1,12 @@
+bin/
+obj/
+node_modules/
+frontend/dist/
+backend/src/Host/wwwroot/*
+!backend/src/Host/wwwroot/.gitkeep
+deploy/backups/
+deploy/*.env
+!deploy/customer.env.example
+*.user
+.vs/
+.idea/

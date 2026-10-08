@@ -1,0 +1,65 @@
+# One customer = one copy of this file with its own .env (own database, own passwords, own backups).
+# Start:   docker compose --env-file customer.env up -d
+# Migrate: docker compose --env-file customer.env run --rm app --migrate
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: contractor_erp
+      POSTGRES_USER: erp
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in the env file}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U erp -d contractor_erp"]
+      interval: 10s
+      retries: 5
+
+  app:
+    build:
+      context: ..
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__Default: Host=db;Database=contractor_erp;Username=erp;Password=${DB_PASSWORD}
+
+  # HTTPS in front of the app. Caddy gets and renews the certificate automatically (free, Let's Encrypt).
+  proxy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in the env file}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+    depends_on:
+      - app
+
+  # Nightly database backup kept for 14 days. Restore must be tested regularly (see docs/PLAN.md).
+  backup:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      PGPASSWORD: ${DB_PASSWORD}
+    volumes:
+      - ./backups:/backups
+    entrypoint: >
+      sh -c 'while true; do
+        pg_dump -h db -U erp -d contractor_erp -Fc -f /backups/erp-$$(date +%Y%m%d-%H%M).dump;
+        find /backups -name "*.dump" -mtime +14 -delete;
+        sleep 86400; done'
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  db-data:
+  caddy-data:

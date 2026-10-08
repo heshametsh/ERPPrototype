@@ -1,0 +1,7 @@
+html, body, #root { height: 100%; margin: 0; }
+
+/* The sheet itself is left-to-right (approved decision DEC-071); the rest of the UI is Arabic RTL. */
+.sheet-host { direction: ltr; height: calc(100vh - 150px); }
+.cell-dirty { background: #fff7d6; }
+.cell-error { background: #ffe3e3; outline: 1px solid #fa5252; outline-offset: -1px; }
+.cell-readonly { background: #f4f6f8; color: #495057; }
