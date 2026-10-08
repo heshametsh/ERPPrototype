@@ -1,9 +1,40 @@
 ﻿# ACCEPTED DECISIONS - B11 THROUGH GATE 5C-1
 
+## DEC-071 - Work Orders sheet width runtime: fixed LTR, live resize, width follows the column
+
+- **Date:** 2026-10-06
+- **Status:** LTR + live resize + content minimum accepted manually 2026-10-06; W05/W06 corrections automation-green, manual pending; uncommitted.
+- **Direction:** the Work Orders sheet is fixed LTR regardless of UI language; surrounding UI stays Arabic. A separate Arabic sheet would be its own mission. RTL resize/anchor work is superseded.
+- **Interaction:** the dragged column widens/narrows live under the pointer; its left edge and the columns to its left never move; Escape mid-drag restores the start width.
+- **Minimum:** a drag cannot narrow a column below its widest value across all loaded-year rows, measured with a rendered body cell's font/padding/borders; header text is excluded; a column already narrower is not forced wider.
+- **Identity:** a width belongs to the column, not its position. Hide/Unhide never moves one column's width to another (the visibility trim owner preserves widths by prop).
+- **Persistence:** the ERP Width persistence/History owner stays disabled on the canonical route; widths are session-only until it is rebuilt on this runtime.
+- **Evidence:** Width focused runner W00-W06 PASS with real mouse + rendered geometry; W05 and W06 RED -> GREEN on the same oracle; Workday and focused regressions PASS.
+
+## DEC-070 - Custom Date is a calendar date, not a WorkYear field
+
+- **Date:** 2026-09-17
+- **Status:** Implemented; automated closure PASS, manual verification deferred into the consolidated manual batch.
+- **Decision:** Custom Date accepts any real date in the existing `DD/MM/YYYY` format using a four-digit year from 0001 through 9999.
+- **Boundary:** Assignment Date / WorkYear keeps the existing 2000-2100 guard; this decision does not widen WorkYear.
+- **Invalid values:** year 0000, malformed text, and impossible calendar dates such as `31/02/2026` remain invalid.
+- **Architecture:** client validation has separate general-calendar and Assignment-Date validation paths; server Custom Date normalization remains `DateTime.TryParseExact("dd/MM/yyyy")`.
+- **Evidence:** focused Custom Date gate RED before the fix then PASS after it; real SQL integration persists `01/01/0001`; Integration 37/37 PASS; one-command full regression PASS.
+
+## DEC-069 - Visibility has one persisted owner
+
+- **Date:** 2026-09-17
+- **Status:** Implemented; automated closure PASS, manual verification deferred into the consolidated manual batch.
+- **Decision:** `DepartmentColumnVisibility` is the only persisted Hide/Unhide owner, keyed by `DepartmentId + WorkYear + FieldKey`. `DepartmentColumnLayout` owns Width only, keyed by `DepartmentId + FieldKey`.
+- **Schema:** migration `20260917190720_RemoveLegacyColumnLayoutVisibility` drops legacy `DepartmentColumnLayouts.IsHidden`; no compatibility visibility field remains in the layout entity or load/save contracts.
+- **Migration rule:** do not backfill old department-wide hidden choices. DEC-068 already established an all-visible baseline for the new year-scoped owner and canonical Revo ignored the legacy bit.
+- **Save rule:** Width payloads no longer carry hidden state. Last-visible safety, RowVersion authority, History, Dirty, and explicit Save for Hide/Unhide remain owned by the year-scoped visibility path.
+- **Evidence:** focused single-owner gate RED before the fix then PASS after it; SQL Integration 37/37 PASS; one-command full regression PASS including H00-H05, B12, Atomic Work-Year Switch, and the single-owner gate.
+
 ## DEC-068 - Revo Hide/Unhide visibility is year-scoped
 
 - **Date:** 2026-09-12
-- **Status:** Approved behavior/reference contract; implementation pending.
+- **Status:** Accepted and implemented; manual acceptance, focused H00-H05 browser coverage, SQL integration, and full regression are complete.
 - **Visibility ownership:** hidden state is keyed by `DepartmentId + WorkYear + FieldKey`. A Hide in 2026 does not change 2025; returning to 2026 restores the saved 2026 visibility state.
 - **Width ownership unchanged:** DEC-027 still owns width as `DepartmentId + FieldKey`, shared across years. Width must not become year-scoped as a side effect of this feature.
 - **Supersedes:** only the department-wide visibility clauses in DEC-029 and the visibility part of the DEC-067 layout exception. Custom Column definition year ownership and width ownership remain unchanged.
@@ -617,7 +648,7 @@
 - **Type rule:** A custom-column type is selected once at creation and cannot be changed later. `Custom Column Properties` permits rename only; deletion is a separate confirmed action.
 - **Automatic Header rule:** Custom `Text`, `Date`, and whole `Number` columns receive value filters. Custom `Money` columns receive numeric sorting only, starting descending.
 - **Visibility rule:** `Hide Column` is available from a visible data-column Header. `Unhide Column` appears in the same context menu only when hidden columns exist and lists them on demand. No permanent `Columns` toolbar button is added.
-- **Persistence rule:** Width and hidden state are saved by `DepartmentId + FieldKey`, shared by every year of the department, and written only through the existing explicit Save transaction. Hide/Unhide participates in Undo/Redo before Save.
+- **Persistence rule (historical):** the original clause stored Width and hidden state by `DepartmentId + FieldKey`. DEC-068 supersedes only hidden-state ownership: Width remains department-scoped, while visibility is `DepartmentId + WorkYear + FieldKey`. Both still use explicit Save and Hide/Unhide still participates in Undo/Redo before Save.
 - **Performance rule:** Filtering, sorting, hiding, and showing operate on the existing Tabulator data in the browser. No server request is made for those interactions. The hidden-column list is built only when the context menu opens, and the obsolete database scan that supported empty-only type conversion is removed.
 - **Safety constraint:** The row-number column cannot be hidden and at least one data column remains visible, because Unhide is intentionally reachable only through a visible Header.
 
@@ -787,6 +818,29 @@
 - **Move rule:** moving a Work Order to another year preserves every non-empty custom value. Reuse a destination definition when name + type match; create a missing definition automatically; if the same name exists with another type, create one safe unique destination name and reuse it for the batch.
 - **Blank rule:** blank custom values do not create destination definitions.
 - **Transaction rule:** destination-definition creation, custom-value remapping, and Work Order movement succeed or roll back together in the existing Save transaction.
-- **Layout exception:** Width/visibility remains intentionally department-scoped by `DepartmentId + FieldKey` under DEC-027/DEC-029. Definition ownership changed; layout ownership did not.
+- **Layout exception (updated by DEC-068):** Width remains department-scoped by `DepartmentId + FieldKey`. Visibility is no longer part of that exception and is year-scoped by `DepartmentId + WorkYear + FieldKey`. Custom Column definition ownership remains year-scoped.
 - **Migration rule:** the legacy department-wide catalogue is duplicated to each existing Work Year so old `CustomValuesJson` field keys remain readable. A department with no Work Orders receives its surviving legacy catalogue in the migration-time fallback year.
 - **Rollback:** the schema migration is intentionally forward-only because independently edited year catalogues cannot be safely collapsed into one department-wide catalogue. Deployment rollback therefore requires a database backup/restore plan rather than EF `Down()`.
+
+## DEC-072 — Work Order Find is Excel-like Find, not a row filter (2026-10-06, user)
+
+- **Decision:** the Revo Quick Search replaces Tabulator's filter-while-typing with Find: Enter only, Enter cycles and wraps, lands the active cell on the Work Order Number cell; rows are never filtered.
+- **Match rule:** fewer than 9 digits = starts-with in the open Work Year; exactly 9 digits = that number across all Work Types, plus a department-scoped server lookup of other saved years.
+- **Boundaries:** a match hidden by the active Filter is never targeted silently (message + "clear filter and go", one undoable History step); an other-year match offers "open year and go" through the single year-switch path, refused while Dirty; other departments are reported as not found.
+- **Searches the sheet as seen:** unsaved edits are searchable; completed-basket rows are included.
+
+## DEC-073 — Open Work Orders KPI cards are live and Filter-independent (2026-10-06, user)
+
+- **Decision:** four Tabulator-parity cards (Open count, Work Order Value, Partial, Remaining) over every loaded-year row whose basket is not "انتهاء امر العمل"; blank new rows excluded; Filter never changes them.
+- **Live rule:** unsaved edits update the cards immediately (money, basket, inserted rows, Undo/Redo, year switch), not only after Save.
+- **Filtered totals:** the existing visible-totals line is shown only while a Filter is active (deliberate change from always-on).
+- **Owner:** the existing totals owner `revoGridVisibleAggregates.js`; no second aggregation engine.
+
+## DEC-074 — Selection summary and Basket panel scope (2026-10-06, user)
+
+- **Selection summary (Parity C):** row-based like Tabulator: every Work Order touched by the selected range counts once; shows count + Work Order Value + Partial + Remaining (+ visible money custom columns). Blank new rows excluded. Below 2 Work Orders the values are not shown, but the bar keeps its reserved slot with a muted hint ("حدد أمرين أو أكتر لعرض المجموع") so the sheet height never jumps. Bottom bar (not the message line). Live with unsaved edits.
+- **Half-screen is the main use:** the sheet usually sits in half the screen next to the electricity company program, so the summary bar and the Basket panel must stay readable when narrow (compact amounts, full value on hover), like the KPI split mode.
+- **Why row-based:** Filter totals already answer "total per basket"; the gap is "total of the orders I picked by hand".
+- **Basket panel (D):** very important; same content as Tabulator (each basket: Work Order count + Remaining total, over all loaded-year rows, Filter-independent, live with unsaved edits). Same look as Tabulator: a side panel beside the sheet (not an overlay), shown/hidden freely by a button; saved column widths are not shrunk, a horizontal scroll appears instead. Open/closed state remembered per browser (convenience only). Baskets ordered by the workflow order of `WorkOrderBuskets.All`, "انتهاء امر العمل" last and visually separated; unknown basket names (old/test data) after it. Percentage clearly labelled as share of Remaining and computed against the panel's own total.
+- **Not included unless approved later:** clicking a basket to filter the sheet by it.
+- **Owner:** `revoGridVisibleAggregates.js` stays the single totals owner for both.

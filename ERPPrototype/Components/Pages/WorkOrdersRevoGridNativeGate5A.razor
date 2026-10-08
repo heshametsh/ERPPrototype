@@ -73,6 +73,40 @@
                     }
                 </select>
             </label>
+
+            @if (EnableChangeEngine)
+            {
+                <div class="native-gate5a__find" role="search" aria-label="بحث أمر العمل">
+                    <input @ref="FindInputElement"
+                           @bind="FindQuery"
+                           @bind:event="oninput"
+                           @bind:after="ResetFindResult"
+                           @onkeydown="HandleFindKeyDownAsync"
+                           data-testid="gate5a-find-input"
+                           type="search"
+                           inputmode="numeric"
+                           maxlength="9"
+                           autocomplete="off"
+                           disabled="@(IsLoading || IsYearLoading || IsSaveHandshakeInFlight || !GridInitialized)"
+                           placeholder="رقم أمر العمل ثم Enter" />
+
+                    @if (!string.IsNullOrWhiteSpace(FindStatus))
+                    {
+                        <span class="native-gate5a__find-status"
+                              role="status"
+                              data-testid="gate5a-find-status">@FindStatus</span>
+                    }
+
+                    @if (FindPendingAction != FindActionKind.None)
+                    {
+                        <button type="button"
+                                class="native-gate5a__find-action"
+                                data-testid="gate5a-find-action"
+                                disabled="@FindBusy"
+                                @onclick="HandleFindActionAsync">@FindActionLabel</button>
+                    }
+                </div>
+            }
         </div>
     </header>
 

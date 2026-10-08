@@ -37,8 +37,7 @@ function normalizeRecord(record) {
         id: Number(record?.id ?? record?.Id) || 0,
         fieldKey,
         width: boundedWidth(record?.width ?? record?.Width),
-        rowVersion: text(record?.rowVersion ?? record?.RowVersion),
-        isHidden: Boolean(record?.isHidden ?? record?.IsHidden ?? false)
+        rowVersion: text(record?.rowVersion ?? record?.RowVersion)
     };
 }
 
@@ -60,30 +59,6 @@ function eventPath(originalEvent) {
 function isResizeHandle(originalEvent) {
     return eventPath(originalEvent).some(item =>
         item instanceof Element && item.classList?.contains("resizable"));
-}
-
-function calculateRtlBoundaryResize(startWidth, neighborWidth, candidateWidth) {
-    const activeStart = boundedWidth(startWidth);
-    const candidate = boundedWidth(candidateWidth, activeStart);
-    const neighborStart = neighborWidth === null || neighborWidth === undefined
-        ? null
-        : boundedWidth(neighborWidth);
-
-    if (candidate >= activeStart || neighborStart === null) {
-        return {
-            activeWidth: candidate,
-            neighborWidth: neighborStart
-        };
-    }
-
-    const requestedShrink = activeStart - candidate;
-    const appliedShrink = Math.min(
-        requestedShrink,
-        MAX_WIDTH - neighborStart);
-    return {
-        activeWidth: activeStart - appliedShrink,
-        neighborWidth: neighborStart + appliedShrink
-    };
 }
 
 function waitForRender() {
@@ -120,8 +95,7 @@ export function createRevoGridColumnWidth(options) {
             id: 0,
             fieldKey: prop,
             width: defaultWidth(prop),
-            rowVersion: "",
-            isHidden: false
+            rowVersion: ""
         };
     }
 
@@ -175,35 +149,6 @@ export function createRevoGridColumnWidth(options) {
         return null;
     }
 
-    function isRtlLogicalStartAnchored() {
-        if (!grid.rtl) return false;
-        const scroller = grid.querySelector(
-            "revogr-viewport-scroll.rgCol:not([row-header])");
-        if (!(scroller instanceof HTMLElement)) return false;
-        const maxScroll = Math.max(0, scroller.scrollWidth - scroller.clientWidth);
-        return Math.abs(scroller.scrollLeft - maxScroll) <= 3;
-    }
-
-    async function restoreRtlLogicalStart(anchored) {
-        if (!anchored || destroyed || !grid.rtl ||
-            typeof grid.scrollToCoordinate !== "function") {
-            return;
-        }
-        await waitForRender();
-        const value = await providers();
-        const dimension = value.dimension.stores?.rgCol?.store;
-        const realSize = Number(dimension?.get?.("realSize")) || 0;
-        await grid.scrollToCoordinate({ x: realSize });
-    }
-
-    function scheduleRtlLogicalStartRestore(anchored) {
-        if (!anchored) return;
-        void restoreRtlLogicalStart(true)
-            .catch(error => console.error(
-                "Column Width RTL anchor restore failed.",
-                error));
-    }
-
     async function refreshMetadata() {
         const columns = await grid.getColumns();
         allowedProps = new Set();
@@ -221,7 +166,6 @@ export function createRevoGridColumnWidth(options) {
     }
 
     async function applyWidths(widths) {
-        const anchored = isRtlLogicalStartAnchored();
         const value = await providers();
         const grouped = new Map();
         let applied = false;
@@ -237,9 +181,6 @@ export function createRevoGridColumnWidth(options) {
 
         for (const [type, sizes] of grouped) {
             value.dimension.setCustomSizes(type, sizes, true);
-        }
-        if (applied) {
-            scheduleRtlLogicalStartRestore(anchored);
         }
         return applied;
     }
@@ -358,17 +299,10 @@ export function createRevoGridColumnWidth(options) {
             }
         });
 
-    function widthFromEntry(value, entry, fallbackProp) {
-        const sizes = value.dimension.stores?.[entry.type]?.store?.get?.("sizes") ?? {};
-        return boundedWidth(
-            sizes?.[entry.visibleIndex] ?? entry.column?.size,
-            effectiveWidth(current, fallbackProp));
-    }
-
     function onBeforeHeaderRender(event) {
         const prop = text(event?.detail?.data?.prop);
         if (!prop || !allowedProps.has(prop)) return;
-        event.detail.active = grid.rtl ? ["l"] : ["r"];
+        event.detail.active = ["r"];
     }
 
     async function commitNativeResize(prop, candidateWidth) {
@@ -380,43 +314,15 @@ export function createRevoGridColumnWidth(options) {
         const owner = findVisibleEntry(value, prop);
         if (!owner) return false;
 
-        const ownerStart = widthFromEntry(value, owner, prop);
+        // Live resize has already written the dragged width into Revo's size
+        // store, so the ERP width is the authoritative start of the gesture.
+        const ownerStart = effectiveWidth(current, prop);
         const candidate = boundedWidth(candidateWidth, ownerStart);
-        let neighbor = null;
-        let neighborProp = "";
-        let neighborStart = null;
-        let ownerAfter = candidate;
-        let neighborAfter = null;
-
-        if (grid.rtl && owner.type === "rgCol") {
-            const visible = visibleEntries(value, owner.type);
-            neighbor = owner.visibleIndex > 0
-                ? visible[owner.visibleIndex - 1]
-                : null;
-            neighborProp = text(neighbor?.column?.prop);
-            if (neighbor && neighborProp && allowedProps.has(neighborProp)) {
-                neighborStart = widthFromEntry(value, neighbor, neighborProp);
-            }
-            const plan = calculateRtlBoundaryResize(
-                ownerStart,
-                neighborStart,
-                candidate);
-            ownerAfter = plan.activeWidth;
-            neighborAfter = plan.neighborWidth;
-        }
-
         const changes = [{
             prop,
             beforeWidth: ownerStart,
-            afterWidth: ownerAfter
+            afterWidth: candidate
         }];
-        if (neighborProp && neighborStart !== null && neighborAfter !== null) {
-            changes.push({
-                prop: neighborProp,
-                beforeWidth: neighborStart,
-                afterWidth: neighborAfter
-            });
-        }
         const effectiveChanges = changes.filter(change =>
             change.beforeWidth !== change.afterWidth);
         if (effectiveChanges.length === 0) return false;
@@ -461,9 +367,16 @@ export function createRevoGridColumnWidth(options) {
         // Revo owns the smooth pointer gesture. ERP owns the committed width
         // policy, so stop only Revo's final dimension write at MouseUp.
         event.preventDefault();
-        if (destroyed || busy || mutationLocked()) return;
+        // Escape already restored the start width; nothing to commit.
+        const live = candidate?.erpLiveResize;
+        if (live?.cancelled) return;
+        if (destroyed || busy || mutationLocked()) {
+            // Undo the live drag width that will not be recorded.
+            void applyWidth(prop, effectiveWidth(current, prop));
+            return;
+        }
 
-        void commitNativeResize(prop, candidate?.size)
+        void commitNativeResize(prop, live?.width ?? candidate?.size)
             .catch(error => console.error(
                 "Column Width native resize commit failed.",
                 error));
@@ -534,8 +447,7 @@ export function createRevoGridColumnWidth(options) {
                 id: Number(identity.id) || 0,
                 fieldKey: prop,
                 width,
-                rowVersion: text(identity.rowVersion),
-                isHidden: identity.isHidden === true
+                rowVersion: text(identity.rowVersion)
             });
         }
 
@@ -645,6 +557,5 @@ export const revoGridColumnWidthInternals = Object.freeze({
     boundedWidth,
     normalizeRecord,
     normalizeRecords,
-    isResizeHandle,
-    calculateRtlBoundaryResize
+    isResizeHandle
 });

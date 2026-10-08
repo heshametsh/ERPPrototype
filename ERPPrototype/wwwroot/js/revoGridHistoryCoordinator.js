@@ -179,6 +179,16 @@ export function createRevoGridHistoryCoordinator(options) {
         return history.getState();
     }
 
+    function getSnapshot() {
+        return history.getSnapshot();
+    }
+
+    function restoreSnapshot(nextDatasetKey, snapshot) {
+        datasetKey = requireText(nextDatasetKey, "datasetKey");
+        history.restoreSnapshot(datasetKey, snapshot);
+        notifyState();
+    }
+
     function discardWhere(predicate) {
         const result = history.discardWhere(predicate);
         notifyState();
@@ -201,6 +211,8 @@ export function createRevoGridHistoryCoordinator(options) {
         redo,
         resetDataset,
         getState,
+        getSnapshot,
+        restoreSnapshot,
         discardWhere,
         destroy
     });

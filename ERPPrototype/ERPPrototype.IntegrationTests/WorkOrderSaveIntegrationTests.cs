@@ -603,7 +603,7 @@ internal sealed class WorkOrderSaveIntegrationTests(
             {
                 [customColumns[0].FieldKey] = "  permit received  ",
                 [customColumns[1].FieldKey] = "1,234.567",
-                [customColumns[2].FieldKey] = "04/08/2026",
+                [customColumns[2].FieldKey] = "01/01/0001",
                 [customColumns[3].FieldKey] = "0042"
             });
 
@@ -656,7 +656,7 @@ internal sealed class WorkOrderSaveIntegrationTests(
             "The Money custom value was not rounded consistently.");
 
         TestAssert.Equal(
-            "04/08/2026",
+            "01/01/0001",
             storedValues[customColumns[2].FieldKey],
             "The Date custom value was not persisted as day/month/year.");
 
@@ -1974,44 +1974,10 @@ internal sealed class WorkOrderSaveIntegrationTests(
                 stored.CustomValuesJson).Count,
             "The blank-value row gained custom data during the move.");
     }
-    public async Task YearScopedColumnVisibilityIsIndependentFromLegacyLayoutAsync()
+    public async Task YearScopedColumnVisibilityIsIndependentByYearAsync()
     {
         const int currentYear = 2026;
         const int previousYear = 2025;
-
-        var currentSheet =
-            await database.Service.LoadSheetAsync(
-                database.EmployeeAId,
-                currentYear);
-
-        TestAssert.NotNull(
-            currentSheet,
-            "The current-year sheet could not be loaded before preparing the legacy visibility fixture.");
-
-        var currentBasketLayout = currentSheet!.ColumnLayouts
-            .SingleOrDefault(layout => layout.FieldKey == "basket");
-        var legacyLayout = await database.Service.SaveChangesAsync(
-            database.EmployeeAId,
-            currentYear,
-            addedRecords: [],
-            changedRecords: Array.Empty<WorkOrderChangeSet>(),
-            deletedRecords: [],
-            customColumns: [],
-            customColumnsChanged: false,
-            columnLayouts:
-            [
-                new DepartmentColumnLayoutInput(
-                    currentBasketLayout?.Id ?? 0,
-                    "basket",
-                    320,
-                    currentBasketLayout?.RowVersion ?? string.Empty,
-                    IsHidden: true)
-            ],
-            columnLayoutsChanged: true);
-
-        TestAssert.True(
-            legacyLayout.Succeeded,
-            $"Preparing the legacy hidden-state fixture failed: {legacyLayout.ErrorMessage}");
 
         await using (var dbContext =
             await database.Factory.CreateDbContextAsync())
@@ -2030,11 +1996,11 @@ internal sealed class WorkOrderSaveIntegrationTests(
             TestAssert.Equal(
                 0,
                 currentBefore.Count,
-                "Legacy DepartmentColumnLayout.IsHidden leaked into the new Revo visibility source.");
+                "The current year did not start with the default all-visible state.");
             TestAssert.Equal(
                 0,
                 previousBefore.Count,
-                "The new visibility source did not start all-visible in the previous year.");
+                "The previous year did not start with the default all-visible state.");
         }
 
         await using (var dbContext =
@@ -2091,22 +2057,11 @@ internal sealed class WorkOrderSaveIntegrationTests(
                 currentAfter.Single().Id > 0 &&
                 !string.IsNullOrWhiteSpace(currentAfter.Single().RowVersion),
                 "The visibility record did not receive database identity and RowVersion.");
-
             TestAssert.Equal(
                 0,
                 previousAfter.Count,
                 "Hiding Basket in 2026 leaked into 2025.");
         }
-
-        var legacyPreviousYear =
-            await database.Service.LoadSheetAsync(
-                database.EmployeeAId,
-                previousYear);
-
-        TestAssert.True(
-            legacyPreviousYear!.ColumnLayouts.Single(layout =>
-                layout.FieldKey == "basket").IsHidden,
-            "The compatibility slice unexpectedly rewrote the legacy layout record.");
     }
 
     public async Task YearScopedColumnVisibilityRejectsHideAllAndStaleRowVersionAsync()
@@ -2251,8 +2206,7 @@ internal sealed class WorkOrderSaveIntegrationTests(
                 new DepartmentColumnLayoutInput(
                     0,
                     "basket",
-                    320,
-                    IsHidden: true)
+                    320)
             ],
             columnLayoutsChanged: true);
 
@@ -2277,11 +2231,6 @@ internal sealed class WorkOrderSaveIntegrationTests(
                 !string.IsNullOrWhiteSpace(layout.RowVersion)),
             "The layouts owned by this test are missing database identities or RowVersions.");
 
-        TestAssert.True(
-            result.SavedColumnLayouts!.Single(layout =>
-                layout.FieldKey == "basket").IsHidden,
-            "The Basket hidden state was not returned after save.");
-
         var sameDepartmentOtherYear =
             await database.Service.LoadSheetAsync(
                 database.EmployeeAId,
@@ -2297,17 +2246,13 @@ internal sealed class WorkOrderSaveIntegrationTests(
                 layout.FieldKey == "workOrderNumber").Width,
             "Work Order Number width did not persist across years.");
 
-        var hiddenBasket = sameDepartmentOtherYear.ColumnLayouts.Single(
+        var basketLayout = sameDepartmentOtherYear.ColumnLayouts.Single(
             layout => layout.FieldKey == "basket");
 
         TestAssert.Equal(
             320,
-            hiddenBasket.Width,
+            basketLayout.Width,
             "Basket width did not persist across years.");
-
-        TestAssert.True(
-            hiddenBasket.IsHidden,
-            "Basket visibility did not persist across years.");
 
         var otherDepartmentSheet =
             await database.Service.LoadSheetAsync(
@@ -2323,102 +2268,6 @@ internal sealed class WorkOrderSaveIntegrationTests(
             otherDepartmentSheet!.ColumnLayouts.Count,
             "Column layout leaked into another department.");
 
-        var currentYearFieldKeys = new HashSet<string>(
-            new[]
-            {
-                "workOrderNumber",
-                "workTypeCode",
-                "assignmentDate",
-                "workOrderValue",
-                "partialAmount",
-                "remainingAmount",
-                "basket"
-            },
-            StringComparer.Ordinal);
-        currentYearFieldKeys.UnionWith(
-            result.SavedCustomColumns!
-                .Select(column => column.FieldKey));
-
-        var unhiddenLayouts = result.SavedColumnLayouts!
-            .Where(layout => currentYearFieldKeys.Contains(layout.FieldKey))
-            .Select(layout => new DepartmentColumnLayoutInput(
-                layout.Id,
-                layout.FieldKey,
-                layout.Width,
-                layout.RowVersion,
-                IsHidden: false))
-            .ToList();
-
-        var unhideResult = await database.Service.SaveChangesAsync(
-            database.EmployeeAId,
-            workYear,
-            addedRecords: [],
-            changedRecords: Array.Empty<WorkOrderChangeSet>(),
-            deletedRecords: [],
-            customColumns: [],
-            customColumnsChanged: false,
-            columnLayouts: unhiddenLayouts,
-            columnLayoutsChanged: true);
-
-        TestAssert.True(
-            unhideResult.Succeeded,
-            $"Unhiding the column failed: {unhideResult.ErrorMessage}");
-
-        TestAssert.False(
-            unhideResult.SavedColumnLayouts!.Single(layout =>
-                layout.FieldKey == "basket").IsHidden,
-            "The Basket column remained hidden after the unhide save.");
-
-        var persistedByField = unhideResult.SavedColumnLayouts!
-            .ToDictionary(layout => layout.FieldKey, StringComparer.Ordinal);
-        var allDataFields = new[]
-        {
-            "workOrderNumber",
-            "workTypeCode",
-            "assignmentDate",
-            "workOrderValue",
-            "partialAmount",
-            "remainingAmount",
-            "basket"
-        }
-            .Concat(
-                unhideResult.SavedCustomColumns!
-                    .Select(column => column.FieldKey))
-            .Distinct(StringComparer.Ordinal)
-            .ToList();
-        var hideEveryColumn = allDataFields
-            .Select(fieldKey =>
-            {
-                persistedByField.TryGetValue(fieldKey, out var persisted);
-
-                return new DepartmentColumnLayoutInput(
-                    persisted?.Id ?? 0,
-                    fieldKey,
-                    persisted?.Width ?? 180,
-                    persisted?.RowVersion ?? string.Empty,
-                    IsHidden: true);
-            })
-            .ToList();
-
-        var hideAllResult = await database.Service.SaveChangesAsync(
-            database.EmployeeAId,
-            workYear,
-            addedRecords: [],
-            changedRecords: Array.Empty<WorkOrderChangeSet>(),
-            deletedRecords: [],
-            customColumns: [],
-            customColumnsChanged: false,
-            columnLayouts: hideEveryColumn,
-            columnLayoutsChanged: true);
-
-        TestAssert.False(
-            hideAllResult.Succeeded,
-            "The server allowed every data column to be hidden.");
-
-        TestAssert.Equal(
-            WorkOrderSaveFailureType.Validation,
-            hideAllResult.FailureType,
-            "Hiding every data column should return a validation failure.");
     }
 
     public async Task InvalidColumnWidthIsRejectedAtomicallyAsync()
@@ -2500,10 +2349,6 @@ internal sealed class WorkOrderSaveIntegrationTests(
             basketLayoutAfterFailure?.RowVersion,
             "The invalid width changed the persisted layout RowVersion.");
 
-        TestAssert.Equal(
-            basketLayoutBeforeFailure?.IsHidden,
-            basketLayoutAfterFailure?.IsHidden,
-            "The invalid width changed the persisted visibility state.");
     }
 
     public async Task ConcurrentAppendsReceiveDistinctDisplayOrdersAsync()

@@ -81,7 +81,7 @@ function isCompletelyBlankNewRow(row, customColumns) {
     return true;
 }
 
-function validDateParts(value) {
+function validCalendarDateParts(value) {
     const normalized = normalizeDigits(text(value));
     const match = normalized.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
     if (!match) {
@@ -91,11 +91,13 @@ function validDateParts(value) {
     const day = Number(match[1]);
     const month = Number(match[2]);
     const year = Number(match[3]);
-    if (year < 2000 || year > 2100 || month < 1 || month > 12 || day < 1) {
+    if (year < 1 || month < 1 || month > 12 || day < 1) {
         return null;
     }
 
-    const candidate = new Date(Date.UTC(year, month - 1, day));
+    const candidate = new Date(0);
+    candidate.setUTCHours(0, 0, 0, 0);
+    candidate.setUTCFullYear(year, month - 1, day);
     if (
         candidate.getUTCFullYear() !== year ||
         candidate.getUTCMonth() !== month - 1 ||
@@ -105,6 +107,13 @@ function validDateParts(value) {
     }
 
     return { day, month, year };
+}
+
+function validAssignmentDateParts(value) {
+    const parts = validCalendarDateParts(value);
+    return parts && parts.year >= 2000 && parts.year <= 2100
+        ? parts
+        : null;
 }
 
 function identityPart(value, length) {
@@ -171,7 +180,7 @@ function validateCustomValue(column, value) {
     }
 
     if (type === "date") {
-        return validDateParts(raw)
+        return validCalendarDateParts(raw)
             ? null
             : error(
                 column.fieldKey,
@@ -335,7 +344,7 @@ export function createRevoGridValidation(options = {}) {
             }
 
             const assignmentDate = text(row.assignmentDate);
-            if (assignmentDate && !validDateParts(assignmentDate)) {
+            if (assignmentDate && !validAssignmentDateParts(assignmentDate)) {
                 next.set("assignmentDate", error(
                     "assignmentDate",
                     "date-invalid",

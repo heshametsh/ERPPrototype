@@ -287,6 +287,35 @@ export function createRevoGridSheetHistory(options = {}) {
         };
     }
 
+    function restoreSnapshot(nextDatasetKey, snapshot) {
+        if (pendingReplay) {
+            throw new RevoGridSheetHistoryError(
+                "REPLAY_ACTIVE",
+                "History cannot be restored while Undo/Redo replay is active."
+            );
+        }
+
+        datasetKey = requireText(nextDatasetKey, "datasetKey");
+        undoStack.length = 0;
+        redoStack.length = 0;
+        historyBytes = 0;
+
+        for (const entry of Array.isArray(snapshot?.undo) ? snapshot.undo : []) {
+            const restored = cloneValue(entry);
+            undoStack.push(restored);
+            addBytes(restored);
+        }
+        for (const entry of Array.isArray(snapshot?.redo) ? snapshot.redo : []) {
+            const restored = cloneValue(entry);
+            redoStack.push(restored);
+            addBytes(restored);
+        }
+
+        enforceBudget();
+        revision += 1;
+        return getState();
+    }
+
     function discardWhere(predicate) {
         if (pendingReplay) {
             throw new RevoGridSheetHistoryError(
@@ -320,6 +349,7 @@ export function createRevoGridSheetHistory(options = {}) {
         resetDataset,
         getState,
         getSnapshot,
+        restoreSnapshot,
         discardWhere
     });
 }

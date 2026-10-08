@@ -912,3 +912,457 @@ Meta: Mission=REVO-COLUMN-WIDTH-20260915; Class=WORKFLOW; Outcome=PASS; Stage=LE
 - The gate is deliberately evolutionary: only reusable root-cause lessons are promoted, and obsolete/overlapping rules should be consolidated or removed when stronger evidence appears.
 - `AI_CURRENT_STATE.md` was synchronized to the current truth: the persistence foundation remains preservable, while the present manual Resize/RTL interaction layer is not accepted and must not receive another stacked patch before the remaining ownership/coexistence review.
 - This step changed workflow/documentation only. No ERP Product runtime, test runtime, database schema, or migration behavior was modified.
+
+## 2026-09-17 — Vibe Coding Review 1: Architecture Erosion
+
+Meta: Review=VIBE-CODING-01; Class=REVIEW; Outcome=FINDINGS_RECORDED; Scope=REVO+BACKEND; PRODUCT_CHANGE=NONE
+
+- Revo architectural erosion is concentrated in orchestration, not in every feature module. `revoGridGate5B1.js` has grown progressively across Gate milestones and now acts as the central coordinator for many otherwise-separated subsystems.
+- Prototype Gate scaffolding is still present in the canonical Revo path: the current page enables the historical feature-flag ladder even though only the final combined configuration is used. Treat this as cleanup/refactor debt, not a current Product bug.
+- `revoGridColumnWidth.js` is currently a positive example: the native Revo gesture owns pointer interaction while ERP owns policy, History, Save, persistence, and RTL rules. Do not classify current Width architecture as erosion merely because the module is non-trivial.
+- `WorkOrderService.SaveChangesAsync` remains a WATCH item: it is very large and orchestration-heavy, but already delegates important responsibilities to Query, SavePlan, CustomColumn, Layout, and Visibility owners. No refactor is justified from size alone.
+- Tabulator architectural debt is intentionally excluded from remediation/review priority because the project is migrating away from the Tabulator Work Orders implementation. Do not spend cleanup effort there unless required for migration safety or parity evidence.
+- Decision: no refactor now. Complete the remaining Vibe Coding reviews first, then combine findings and choose the smallest coherent cleanup, if any.
+
+## 2026-09-17 — Vibe Coding Review 2: Duplicate Logic + Multiple Sources of Truth
+
+Meta: Review=VIBE-CODING-02; Class=REVIEW; Outcome=FINDINGS_RECORDED; Scope=REVO+BACKEND; PRODUCT_CHANGE=NONE
+
+- Finding: Column visibility currently has two persisted representations. `DepartmentColumnLayout.IsHidden` remains active while year-scoped `DepartmentColumnVisibility.IsHidden` is now the intended visibility owner. The layout service still validates/maps `IsHidden`, and Width snapshots still carry it. This is a real multiple-sources-of-truth risk and should be cleaned after all reviews.
+- Finding: Core-column metadata is repeated across several owners: backend Layout/Visibility core field sets and frontend Native columns, Workspace ordering, Width defaults. Values are currently aligned, but a future core-column add/rename/width change can drift unless the contract is consolidated.
+- Finding: Custom Date validation has a proven client/server mismatch. Revo client validation reuses `validDateParts()` and restricts Custom Date years to 2000-2100; server `CustomColumnService` accepts any valid `dd/MM/yyyy` DateTime. This is actual semantic drift, not just duplicate code.
+- Watch: limits such as custom name 150, text 250, width 45-1000, work-year 2000-2100 and custom types are duplicated across browser/server. Current values match; server remains authoritative, so this is maintainability risk rather than a current defect.
+- Positive: financial validation is intentionally duplicated for UX/server defense, but server and SQL remain authoritative. Remaining Amount is derived, not persisted, and is re-derived server-side. Basket values are passed from the server to Revo rather than independently hardcoded in the canonical path.
+- Positive: duplicate Work Order identity is checked locally for UX, globally on the server, and finally enforced by the SQL unique index. This is intentional layered enforcement, not conflicting truth.
+- Blank-row rules currently align across Revo/B12/SavePlan after the persisted-row exemption fix; keep as a watch area because this class has drifted before.
+- Decision: no refactor during review. Consolidate only after all Vibe Coding reviews identify the final owner boundaries.
+
+## 2026-09-17 — Workflow stop-pattern root cause
+
+Meta: Class=WORKFLOW; Outcome=ROOT_CAUSE_CONFIRMED; PRODUCT_CHANGE=NONE
+
+- Confirmed that `AI_WORK_CYCLE.md` currently contains a short-turn cadence rule: interactive Remote Desktop work defaults to one material change + one focused proof per assistant turn, followed by an immediate report, with broader regression in a separate turn/batch.
+- That rule was introduced to prevent stacked Product patches and force fast evidence after changes, but it is too broad for review/research/forensics work where no Product change is occurring.
+- This over-broad application explains repeated stop-after-tool-call behavior during Vibe Coding reviews: the workflow itself biases execution toward returning after each small evidence slice instead of completing the whole review job.
+- Tool failures such as PowerShell parser errors or missing `rg` amplified the symptom, but they are secondary; the workflow cadence is the structural cause.
+- No Product code or workflow rule was changed in this step. Recommended correction: scope the short-turn rule to Product modifications only; reviews/research/forensics should continue automatically until completion or a real user decision gate.
+
+## 2026-09-17 — Workflow cadence correction approved
+
+- User approved scoping the short-turn stop rule to Product modifications only.
+- Review / Research / Forensics / Audit work should continue automatically through recoverable tool failures until completion, a real user decision gate, or a genuine blocker.
+- This is a workflow/documentation correction only; Product behavior remains unchanged.
+
+## 2026-09-17 - Cross-document memory/documentation synchronization
+
+Meta: Mission=VIBE-CODING-AUDIT-20260917; Class=WORKFLOW; Outcome=PASS; Stage=CROSS_DOCUMENT_SYNC; Scope=DOCS_MEMORY
+
+- Rebuilt AI_CURRENT_STATE as compact current truth for the Vibe Coding audit while preserving the pending Column Width manual-acceptance gate.
+- Synchronized memory ownership: AI_CONTROL_CENTER routes active owners, AI_WORK_CYCLE owns synchronization/closure mechanics, and AI_LIVE_MEMORY_PROTOCOL remains a compatibility pointer.
+- Corrected current documentation so width remains department-scoped while visibility is year-scoped; DEC-068 is the accepted visibility authority.
+- Marked older Phase 9.3E regression material as historical where it conflicts with accepted Revo visibility closure, and added the current canonical regression override.
+- Updated the Grid Reference Matrix visibility row from implementation-pending to accepted evidence.
+- No Product/Test runtime code, migration, or database behavior changed.
+
+## 2026-09-17 — Vibe Coding Review 3: Reinventing What the Library Already Does
+
+Meta: Mission=VIBE-CODING-AUDIT-20260917; Class=REVIEW; Outcome=FINDINGS_RECORDED; Stage=REVIEW_03; Scope=REVO_COMMUNITY_4_25_2
+
+- Primary-source review used RevoGrid v4.25.2 source plus official docs, then mapped 26 ERP Revo modules, 69 native API/event usage pairs, and 30 integration pressure-point groups with a persistent Review Runner outside the repository.
+- Candidate row-drag issue was CLOSED after exact source verification: `canDrag=true` only enables Revo drag infrastructure; actual row reordering requires a column/cell with `rowDrag=true`. ERP contains no `rowDrag` configuration, so the native row-reorder path is not user-triggerable in the current canonical columns.
+- Proven architecture issue: the canonical Header Selection class is registered via grid.plugins but does not inherit Revo BasePlugin, despite the documented plugin contract recommending BasePlugin lifecycle/subscription ownership. ERP manually recreates this lifecycle.
+- Watch: Filter History replay, Visibility, Row Structure, History Focus and Width touch provider/store APIs. These are upgrade-fragile boundaries, but current evidence does not prove they are unnecessary because Community lacks equivalent high-level ERP semantic APIs.
+- Positive: Width delegates the gesture/AutoSize to Revo; Sort delegates ordering to SortingPlugin; Filter delegates row filtering to FilterPlugin; Clipboard/Edit use Revo native range/edit events. Community lacks high-level Column Hide, ERP History, and the required semantic row/column multi-selection, so those custom layers are justified rather than broad reinvention.
+- Incidental cleanup: revoGridColumnSelection.js remains an imported historical fallback but is not instantiated by the canonical all-on Header Multi-Selection path.
+- Decision: do not rewrite native-backed Filter/Sort/Width/Clipboard. Carry only the BasePlugin lifecycle cleanup and provider/store upgrade-watch boundaries into the final cleanup set after all reviews; the row-drag candidate is closed.
+
+## 2026-09-17 - Vibe Coding Review 4: Patch-on-Patch / Symptom Fixes
+
+Meta: Mission=VIBE-CODING-AUDIT-20260917; Class=REVIEW; Outcome=FINDINGS_RECORDED; Stage=REVIEW_04; Scope=REVO_HISTORY_AND_CURRENT_CODE
+
+- Deep review covered 71 relevant commits since 2026-08-01, 6 hot feature windows, 89 dated Work Log sections, and 55 current integration-pressure groups. Commit count alone was not treated as evidence.
+- Proven historical episode: Rename briefly used a manual visible-header DOM patch to close the editor; that created stale visible History replay. A later source review removed that ownership mistake and returned visible header rendering to Revo-owned column templates. A failed V3 mousedown interception was discarded rather than layered.
+- Proven historical episode: Column Width went through RTL-specific correction attempts that caused post-MouseUp jump and viewport drift. After two failed Product corrections, source/runtime forensics stopped patch stacking; the final design removed Width-specific RTL gesture/realignment hacks and returned the gesture to native Revo ownership.
+- Current code assessment: no severe unresolved patch pile was proven in Rename or Width. Their failed workaround layers are not retained in the accepted candidate.
+- Medium watch: revoGridGate5B1.js still contains broad reconcile/event/timing coordination across subsystems. This is accumulated integration scar tissue and overlaps Review 1 architecture erosion, but current evidence does not prove a specific unresolved symptom patch.
+- Filter snapshot viewDelta is intentional ERP behavior, not a symptom patch: Revo owns the filter engine while ERP stores only the identity delta needed to replay the employee-approved snapshot through History.
+- Selection has many commits, but those span feature milestones and later accepted Selection Core work; commit concentration by itself is not patch-on-patch evidence.
+- Decision: no Product edit now. Carry Gate5B1 coordination into final cleanup prioritization; preserve the current Native-first Width/Rename ownership corrections.
+
+## 2026-09-17 - Vibe Coding Review 5: State & Persistence Consistency
+
+Meta: Mission=VIBE-CODING-AUDIT-20260917; Class=REVIEW; Outcome=FINDINGS_RECORDED; Stage=REVIEW_05; Scope=STATE_PERSISTENCE_CONSISTENCY
+
+- Proven failure-path defect: Work-Year switching is not browser-atomic. The JS replacement mutates multiple owners sequentially and does not roll them back if a later step fails; the C# catch restores only the selected year and unlocks the switch. The selector/message can therefore claim the previous year while Revo is partially on the destination dataset.
+- Coverage gap: current success-path year-switch tests do not intentionally fail after the first browser mutation and prove restoration of the complete previous dataset.
+- Proven persistence split-brain: canonical visibility is year-scoped in DepartmentColumnVisibility, but DepartmentColumnLayout.IsHidden remains persisted, submitted by Width, and used by layout validation. A normal Hide/Unhide can intentionally diverge these two SQL values.
+- Positive: Cells/Rows, Custom Columns, Visibility and Width have explicit baseline/current Dirty owners; Filter/Sort/Selection remain view-only and do not enter the persistence projection.
+- Positive: Save generation is snapshot-safe. Cells/Rows preserve newer edits, Width/Visibility rebase newer in-flight changes, and Custom Column structure is locked while Save is active.
+- Positive: Work Orders, Custom Columns, Width Layouts and year-scoped Visibility persist inside one SQL transaction with RowVersion concurrency. Browser reconciliation is separated from SQL commit and can be retried without replaying SQL after a committed Save.
+- Existing focused evidence strongly covers successful Save/Reload/Year behavior: Workday/B12, Visibility H00-H05 and Width W00-W10.
+- Decision: no Product edit during the audit. Carry year-switch rollback/recovery and removal of legacy Layout.IsHidden into the final cleanup set; preserve the current Save-generation architecture.
+
+## 2026-09-17 - Vibe Coding Review 6: Tests That Agree With Code Instead of Requirement
+
+Meta: Mission=VIBE-CODING-AUDIT-20260917; Class=REVIEW; Outcome=FINDINGS_RECORDED; Stage=REVIEW_06; Scope=TEST_ORACLES_AND_CONTRACT_COVERAGE
+
+- Review derived current requirements before comparing tests. Most critical Work Orders evidence is behavior-oriented: Employee Real Workday uses real browser interactions and visible selection/validation checks, while persistence scenarios verify SQL/RowVersion independently.
+- Proven critical coverage gap: successful Work-Year switching is covered, but no current test intentionally fails midway through `replaceDataset` and proves complete restoration of the prior browser dataset. This allowed the non-atomic failure-path defect from Review 5 to coexist with green success-path regression.
+- Implementation-coupled test debt: `YearScopedColumnVisibilityIsIndependentFromLegacyLayoutAsync` deliberately preserves and asserts legacy `DepartmentColumnLayout.IsHidden` while separately proving year-scoped `DepartmentColumnVisibility`. This accurately protects current compatibility behavior but can fossilize the known second visibility truth instead of protecting a single-owner end state.
+- Contract gap: Custom Date has no explicit documented year-range rule and no boundary tests. Client validation applies 2000-2100 through the shared date helper, server validation accepts any valid `dd/MM/yyyy`, and current tests exercise only an ordinary 2026 value. Green tests therefore cannot adjudicate the drift found in Review 2.
+- Self-confirming oracle risk: Column Width uses real mouse gestures and independent SQL persistence, but its numeric `GetActualWidthAsync` / wait oracle reads Revo provider dimension `sizes`, the same internal state the Product width path mutates. It does not independently assert the resized target column's rendered DOM width, so provider-state success could theoretically mask a visual render failure. Manual Width acceptance remains necessary.
+- Harness-coupling debt: `Run-ERP-Full-Regression.ps1` preflight asserts exact source wiring such as feature-flag text, `using static` and a specific helper call. These checks are useful freshness guards, but they are implementation contracts rather than employee behavior and can false-red/fossilize harmless architecture cleanup.
+- Watch before Width acceptance: the one-command full regression currently does not invoke the Width W00-W10 focused runner; Width is still a pending checkpoint, so this is not yet an accepted-baseline defect. Closure should decide whether Width joins the canonical regression command or remains an explicitly required separate gate.
+- Decision: no Product or test refactor during the audit. Carry year-switch failure injection, Custom Date boundary contract, Width rendered-DOM oracle, visibility compatibility-test cleanup, and preflight de-coupling into the final cleanup plan after Reviews 7-8.
+
+## 2026-09-17 - Vibe Coding Review 7: Hidden Performance / Lifecycle Problems
+
+Meta: Mission=VIBE-CODING-AUDIT-20260917; Class=REVIEW; Outcome=FINDINGS_RECORDED; Stage=REVIEW_07; Scope=PERFORMANCE_AND_LIFECYCLE
+
+- No conventional canonical Revo memory leak was proven. Teardown is symmetrical, page disposal calls destroy, the PerformanceObserver is disconnected, no repeating interval was found, style injection is guarded, and Sheet History is bounded at 32 MB and reset per dataset.
+- Finding R7-F1 (Medium-High): canonical Revo has no dedicated long-session/performance regression gate. Existing performance/torture suites target legacy Tabulator even though Revo diagnostics expose Heap, DOM nodes, LongTasks, InitializationCount and related counters. Add a targeted canonical Revo performance proof before release.
+- Finding R7-F2 (Medium): normal value filters virtualize large candidate lists, but the Date filter eagerly builds the full year/month/day tree and listeners. High-cardinality Custom Date columns can therefore create a large synchronous DOM/listener burst. Measure at realistic scale before choosing lazy rendering or virtualization.
+- Finding R7-F3 (Medium): Visible Aggregates rescans all visible rows across money fields and rebuilds its summary DOM on relevant money/filter/history/structure changes. Same-microtask work is coalesced and ordinary unfiltered non-money edits avoid the scan. Measure around realistic 5k-row usage before any incremental-total optimization.
+- Finding R7-F4 (Medium): each Work-Year switch repeats six sequential server queries through LoadSheetAsync, including user scope, available years and department-wide width layouts that are relatively stable within the page session. Indexes and AsNoTracking are present. Measure latency first, then consider a specialized year-load path or careful page-scope caching.
+- Watch: semantic header row selection reads visible rows and refreshes rgRow when selection changes. This is logically justified but rapid Ctrl/Shift selection should be part of the canonical Revo performance gate.
+- Positive: validation is incremental, current Width keeps native mouse-move ownership and does not force full renders during drag, and no dynamic-module or listener-lifecycle leak was proven.
+- Decision: no Product edit during the audit. Carry only measured performance/lifecycle risks into the final cleanup plan. PRODUCT_CHANGE=NONE.
+
+## 2026-09-17 - Vibe Coding Review 8: Security & Trust Boundaries
+
+Meta: Mission=VIBE-CODING-AUDIT-20260917; Class=REVIEW; Outcome=FINDINGS_RECORDED; Stage=REVIEW_08; Scope=SECURITY_AND_TRUST_BOUNDARIES
+
+- Strong boundary: Work Orders re-derive the employee DepartmentId on the server, require an active Employee whose temporary password is already changed, filter update/delete by that department, overwrite scope on inserts, and enforce WorkYear/RowVersion checks. Browser-supplied scope is not authoritative.
+- Finding R8-F1 (Medium-High): forced temporary-password change is not a universal authorization invariant. Login redirects a signed-in `MustChangePassword` user to Change Password, but `/admin` requires only the Admin role; AdminPanel mutations and `UserManagementService.CreateBranchUserAsync` do not require `MustChangePassword == false`. A temporary-password Admin can therefore bypass the redirect by navigating directly to Admin functionality.
+- Finding R8-F2 (Medium): Interactive Server authentication is revalidated every 30 minutes. Work Order services independently recheck `IsActive`, but AdminPanel branch mutations use direct DbContext access and do not recheck account activity per operation. A disabled Admin circuit can therefore retain some Admin mutation capability until revalidation. Shorter revalidation plus server-side active/password-state enforcement at sensitive mutation boundaries is the safer production model.
+- Finding R8-F3 (Medium-High): canonical Revo imports executable runtime directly from jsDelivr at version 4.25.2. The version is pinned, but production still depends on a third-party network/runtime trust boundary. Revo's current official installation guidance presents package-manager installation as the standard flow and CDN as the no-build/prototype flow. For enterprise/offline deployment, self-host the pinned Revo assets.
+- Finding R8-F4 (Medium hardening): HSTS and HTTPS redirection are configured, but no application-level CSP / `frame-ancestors` / equivalent security-header policy was found. This is a deployment-hardening gap, not proof of an exploitable XSS; a reverse proxy may still add headers and must be checked before release.
+- Finding R8-F5 (Medium production-readiness): the login path explicitly treats two-factor authentication as unavailable in the current version. For the single highest-privilege Admin account, MFA should be a production prerequisite rather than a prototype-only omission.
+- Positive: Product raw SQL uses EF interpolated/parameterized APIs; no Product `FromSqlRaw`/`ExecuteSqlRaw` injection path was found. No `MarkupString`, `eval`, dynamic Function, or user-data `innerHTML` sink was proven in the canonical Revo path; observed Revo `innerHTML` templates are static and user-facing strings are assigned through safe text/native rendering paths.
+- Positive: initial Admin uniqueness is enforced, startup does not silently reactivate a disabled Admin, lockout is 5 failed attempts for 15 minutes, development uses local trusted SQL with no password in appsettings, User Secrets are configured, and no repository-stored production credential was proven.
+- Coverage gap: current security automation proves disabled Admin stays disabled across restart and Work Order cross-department writes are rejected, but does not cover temporary-password Admin bypass, stale disabled Admin circuits, response-header policy, or CDN/self-hosting closure.
+- Decision: no Product change during the audit. Carry the five security/hardening items into final synthesis. PRODUCT_CHANGE=NONE.
+
+## 2026-09-17 - Vibe Coding Audit Final Synthesis
+
+Meta: Mission=VIBE-CODING-AUDIT-20260917; Class=REVIEW; Outcome=COMPLETE; Stage=FINAL_SYNTHESIS; Scope=REVIEWS_1_TO_8
+
+- Overall: the project does not need a rewrite. The strongest foundations are server-authoritative Work Order scope, snapshot-safe transactional Save, RowVersion concurrency, native-first Width/Sort/Filter/Clipboard ownership, and generally sound Revo lifecycle cleanup.
+- P0 correctness: make Work-Year switching browser-atomic. A mid-switch failure can leave owners on mixed years while the selector returns to the old year. Fix must include an injected failure test proving full rollback/restoration.
+- P0 security: make `MustChangePassword`, `IsActive`, and Admin role server-side invariants for every Admin mutation, not login/UI redirect rules. Move direct AdminPanel mutations behind an authorized service boundary and cover stale/disabled circuits. Consider shorter Interactive Server revalidation as defense in depth.
+- P1 state ownership: remove legacy `DepartmentColumnLayout.IsHidden` as a persisted second visibility truth. Year-scoped `DepartmentColumnVisibility` becomes the single visibility owner; update Width payloads and compatibility tests accordingly.
+- P1 contract: decide the intended Custom Date year rule, then make browser/server validation and boundary tests identical. No code change should guess this business rule.
+- P1 production delivery: self-host pinned Revo assets instead of runtime jsDelivr imports before enterprise/offline deployment. Then apply/verify CSP including `frame-ancestors` and other security headers at the app or reverse proxy boundary. MFA for the sole Admin is a production prerequisite.
+- P1 evidence: create a canonical Revo long-session/performance gate using existing diagnostics. Include repeated year switching/navigation, filters/sort/edit/history/selection, and realistic 1.2k/5k datasets.
+- Performance optimizations are evidence-gated: Date Filter virtualization/lazy rendering, incremental Visible Aggregates, year-load query caching, and selection-refresh optimization should be changed only if the new Revo performance gate proves a material problem.
+- Test hardening: add an independent rendered-DOM Width oracle; after manual Width acceptance decide whether W00-W10 becomes part of the one-command regression. Reduce source-text/preflight coupling when safe.
+- Architecture cleanup is last, not first: simplify historical Gate/feature-flag scaffolding in `revoGridGate5B1.js`, align Header Selection with Revo BasePlugin lifecycle, and consolidate duplicated core-column metadata only after the behavior contracts above are protected.
+- No action required from historical patch-on-patch findings in Width/Rename; those failed layers were removed and ownership was re-anchored.
+- Final sequencing: (1) atomic year switch + Admin trust boundary, (2) visibility single owner + Custom Date contract, (3) self-host/security deployment closure, (4) Revo performance evidence, (5) only measured optimizations, (6) optional architecture simplification.
+- Width checkpoint `7b62e58` remains unchanged and still requires the user's manual browser acceptance before remote push or final Width closure.
+
+## 2026-09-17 - Admin Security Boundary automated closure
+
+Meta: Mission=ADMIN-SECURITY-BOUNDARY-20260917; Class=PRODUCT+SECURITY; Outcome=AUTOMATION_PASS; Stage=MANUAL_ACCEPTANCE_PENDING; Scope=ADMIN_TRUST_BOUNDARY
+
+- Added one fresh server-side Admin authorization owner requiring an existing active account, `MustChangePassword=false`, and current Admin role at mutation time.
+- Branch create/rename now execute through a guarded Admin service instead of direct page database writes; branch-user creation reuses the same guard.
+- Direct `/admin` navigation now applies the fresh account-state guard in addition to route role authorization.
+- SQL Integration proves valid Admin mutation succeeds while temporary-password Admin, inactive Admin, and Employee mutations are rejected without persistence.
+- Focused browser evidence proves valid Admin reaches `/admin`, temporary-password Admin is redirected to Change Password, and inactive Admin is denied.
+- Startup Security restart regression remains PASS.
+- Final one-command regression PASS: Workday, Rename, Visibility, Empty Sheet, B12, Startup Security, Admin Security Boundary, and Integration.
+- Two focused browser REDs during development were TEST/HARNESS setup/selector defects; neither justified a Product correction.
+- No remote push or checkpoint acceptance yet. User manual browser acceptance is the remaining gate.
+
+## 2026-09-17 — Atomic Work-Year Switch modification gate RED
+
+Meta: Mission=ATOMIC-YEAR-SWITCH-20260917; Class=PRODUCT; Outcome=RED; Stage=MODIFICATION_GATE; Scope=YEAR_SWITCH_ATOMICITY
+
+- User decision: defer all manual browser checks into one later consolidated manual-test batch; do not block each cleanup item on an immediate manual stop.
+- Added a focused E2E modification gate only; no Atomic Year Switch Product fix has been applied yet.
+- The gate starts from the canonical `/work-orders-revogrid` surface, captures the clean 2026 runtime dataset state, begins a dataset switch, then injects a deliberate failure after native row replacement but before Custom Column reset completes.
+- Build PASS with 0 warnings / 0 errors.
+- Focused gate result: **RED as expected**.
+- Proven failure: after the injected mid-switch exception, runtime Work Year changed from **2026 to 2025** instead of restoring 2026.
+- The gate also protects source rows, Custom Columns, Visibility, Dirty, Undo/Redo, and Row Structure so the future fix must restore the complete prior dataset state rather than only the year selector.
+- Classification: **PRODUCT**. The failure is the exact Review 5 atomicity defect, not a test/harness failure.
+- Next Product step is the smallest coherent rollback/transaction boundary inside the canonical Revo dataset replacement path, followed by this same focused gate.
+
+## 2026-09-17 - Atomic Work-Year Switch automated closure
+
+Meta: Mission=ATOMIC-YEAR-SWITCH-20260917; Class=PRODUCT+TEST; Outcome=AUTOMATION_PASS; Stage=MANUAL_ACCEPTANCE_DEFERRED; Scope=YEAR_SWITCH_ATOMICITY
+
+- Focused modification gate first reproduced the real Product defect: after `beginDatasetSwitch`, an injected failure after native row/year replacement changed runtime Work Year from 2026 to 2025 instead of restoring 2026.
+- Product correction makes the browser dataset replacement rollback-capable: before mutation it captures the previous rows/year, Custom Columns, Width layouts, year Visibility records, Filter, Sort, Change Engine dataset, Row Structure, persistence identity, and Sheet History.
+- Failure recovery now restores the captured owners as one previous-dataset state rather than only unlocking the sheet or restoring the selector value.
+- Sheet History gained snapshot restoration so a failed switch does not erase Undo/Redo; Visibility exposes full current records so rollback preserves Id/RowVersion rather than reconstructing hidden props only.
+- The same injected-failure gate is now **Y00 PASS**, proving Work Year, rows, Custom Columns, Visibility, Dirty, Undo/Redo, and Row Structure are unchanged after the deliberate failure.
+- Canonical browser runtime loaded `revoGridGate5B1.js?v=20260917-atomic-year-switch-1`.
+- Final one-command regression: **PASS** — Employee Workday, Rename, Visibility, Empty Sheet, B12 Real DB Save, Startup Security, Admin Security Boundary, Atomic Work-Year Switch, and Integration 37/37.
+- User decision remains active: manual checks are grouped for later; this automated cleanup item does not stop for immediate manual acceptance.
+- No commit or remote push was performed.
+
+## 2026-09-17 - Visibility Single-Owner modification gate RED
+
+Meta: Mission=VISIBILITY-SINGLE-OWNER-20260917; Class=PRODUCT; Outcome=RED; Stage=MODIFICATION_GATE; Scope=VISIBILITY_SINGLE_OWNER
+
+- Reviewed current `IsHidden` reads/writes, schema/model, the year-scoped visibility migration, and the compatibility integration test.
+- `DepartmentColumnLayouts` still contains `IsHidden`; the layout entity plus layout input/load contracts still expose it.
+- Intended visibility owner remains `DepartmentColumnVisibilities.IsHidden` scoped by `DepartmentId + WorkYear + FieldKey`.
+- Added isolated integration gate `--visibility-ownership-gate`; Build PASS with 0 warnings / 0 errors.
+- Focused gate result: **RED as expected** because legacy `DepartmentColumnLayouts.IsHidden` is still present.
+- No Visibility Product code or schema changed in this gate step.
+## 2026-09-17 - Visibility Single-Owner automated closure
+
+Meta: Mission=VISIBILITY-SINGLE-OWNER-20260917; Class=PRODUCT+SCHEMA+TEST; Outcome=AUTOMATION_PASS; Stage=MANUAL_ACCEPTANCE_DEFERRED; Scope=VISIBILITY_SINGLE_OWNER
+
+- Focused modification gate first proved the split-brain: `DepartmentColumnLayouts.IsHidden` still existed beside the intended year-scoped `DepartmentColumnVisibilities.IsHidden` owner.
+- The Product/schema correction removes legacy Layout visibility completely: migration `20260917190720_RemoveLegacyColumnLayoutVisibility` drops the old column; the layout entity, server input/output contracts, persistence preparation, and Revo Width payload are now width-only.
+- No old hidden-state values are copied into the year-scoped owner. This is intentional and preserves DEC-068: canonical Revo already ignored the department-wide bit and the year-scoped system started all-visible.
+- The compatibility test that deliberately preserved/asserted legacy Layout hidden state was replaced with a direct Work-Year visibility isolation test.
+- The original focused gate changed from **RED -> PASS** after the correction.
+- The first post-migration gate run used stale `--no-build` output and reported pending-model/drop-column mismatch; classification was **BUILD/STALE**. Rebuild fixed it without any additional Product behavior change.
+- Application, Integration, and E2E builds pass with 0 warnings / 0 errors; SQL Integration is **37/37 PASS**.
+- Final one-command regression is **PASS**: Employee Workday, Rename, Visibility H00-H05, Empty Sheet, B12, Startup Security, Admin Security Boundary, Atomic Work-Year Switch, Visibility Single Owner, and Integration.
+- Canonical browser runtime loaded `revoGridGate5B1.js?v=20260917-visibility-single-owner-1`.
+- Manual verification remains intentionally grouped with the later consolidated manual batch. No commit or remote push was performed.
+
+## 2026-09-17 — Custom Date Contract modification gate
+
+Meta: Mission=CUSTOM-DATE-CONTRACT-20260917; Class=PRODUCT; Outcome=RED; Stage=MODIFICATION_GATE; Scope=CUSTOM_DATE_CONTRACT
+
+- User kept WorkYear/Assignment Date on the existing 2000-2100 guard.
+- Product decision: Custom Date is independent of WorkYear and accepts any real `DD/MM/YYYY` calendar date using a four-digit year.
+- Review confirmed `revoGridValidation.js` uses one `validDateParts` helper for both Assignment Date and Custom Date, so Custom Date inherits the 2000-2100 range.
+- Server `CustomColumnService` uses `DateTime.TryParseExact("dd/MM/yyyy")` for Custom Date without the WorkYear range.
+- Added test-only `CustomDateContractModificationGate.mjs`; no Product file changed.
+- Gate protects valid dates outside WorkYear range, invalid calendar dates, and the unchanged Assignment Date guard.
+- Initial gate result: **RED as expected** on `01/01/0001`.
+- RED classification: **PRODUCT** — client Custom Date validation is stricter than the decided/server contract.
+
+## 2026-09-17 - Custom Date Contract automated closure
+
+Meta: Mission=CUSTOM-DATE-CONTRACT-20260917; Class=PRODUCT+TEST-HARNESS; Outcome=AUTOMATION_PASS; Stage=MANUAL_ACCEPTANCE_DEFERRED; Scope=CUSTOM_DATE_CONTRACT
+
+- Focused modification gate first proved the Product mismatch: valid Custom Dates outside 2000-2100 were rejected by the Revo client while the server accepted them.
+- Product correction split general calendar-date validation from Assignment Date validation. Custom Date now accepts real DD/MM/YYYY dates from 0001 through 9999; Assignment Date keeps the 2000-2100 WorkYear guard.
+- The same focused gate changed RED -> PASS and protects lower/upper valid dates, year 0000, impossible dates, and the unchanged Assignment Date guard.
+- Existing SQL integration now persists Custom Date `01/01/0001`, proving the server contract at the lower four-digit boundary.
+- During closure, the one-command regression's Integration step was found to use `dotnet test` against a console-runner project; it exited green without executing the 37 cases. Classified TEST-HARNESS and corrected to `dotnet run --project ...`.
+- Final one-command regression PASS now includes the real Integration runner with **37/37 PASS**, plus Workday, Rename, Visibility, Empty Sheet, B12, Startup Security, Admin Security Boundary, Atomic Work-Year Switch, Visibility Single Owner, and Custom Date Contract.
+- Canonical browser loaded `revoGridGate5B1.js?v=20260917-custom-date-contract-1`.
+- Manual verification remains intentionally grouped with the consolidated manual batch. No commit or remote push was performed.
+
+## 2026-09-17 - General Modification Gate hardening after Width manual escape
+
+Meta: Mission=GENERAL-MODIFICATION-GATE-20260917; Class=WORKFLOW; Outcome=PASS; Stage=PRE_PRODUCT_GUARD; Scope=ALL_PRODUCT_CHANGES; PRODUCT_CHANGE=NONE
+
+- User manual Width testing exposed a severe gap: automation had validated internal Revo width state while the visible RTL resize interaction was still wrong.
+- Root cause is recorded as a verification/oracle failure, not merely a Width bug: a self-confirming internal-state oracle carried too much acceptance weight, Width focused coverage was separate from the broader regression, and earlier `UNCLASSIFIED` interaction REDs did not stop subsequent Product iteration.
+- The existing project-wide modification concept is now explicit and risk-adaptive instead of spawning a special Width gate. Visual Interaction, Validation, Persistence, State/History, Security, and Ownership/Schema each require an independent oracle appropriate to the risk.
+- For employee-visible interactions, real input + rendered DOM/geometry tied to stable `prop`/FieldKey identity is mandatory; provider/store state is diagnostic only. Timing-sensitive gestures must prove before/during/after behavior.
+- The same Expected/oracle must prove RED before Product correction and GREEN after it. `UNCLASSIFIED` RED blocks Product edits; two consecutive failed Product corrections on the same interaction block a third until source/runtime forensics is repeated.
+- Full Regression may only be described as covering a focused feature when it actually runs that feature's focused gate. Acceptance states are explicit: `GATE_RED` -> `AUTOMATION_GREEN` -> `MANUAL_PENDING` -> `ACCEPTED`.
+- This step changes workflow/documentation only. Column Width Product runtime remains frozen and no Product source/schema behavior was modified.
+
+## 2026-09-18 - Width General Modification Gate rendered-interaction RED
+
+Meta: Mission=REVO-COLUMN-WIDTH-RECOVERY-20260917; Class=PRODUCT+TEST; Outcome=RED; Stage=GENERAL_MODIFICATION_GATE; Scope=COLUMN_WIDTH_RENDERED_INTERACTION; PRODUCT_CHANGE=NONE
+
+- User manual acceptance rejected the Width checkpoint as visibly broken in both drag directions. Product runtime remained frozen while the project-wide General Modification Gate was strengthened.
+- Existing W00-W10 relied too heavily on Revo dimension/provider state. Test-only hardening added real Playwright mouse input plus independent rendered header/body geometry bound to stable props, including before/during/after MouseUp and a Split-100% viewport probe.
+- Initial rendered before/after and Split/overflow geometry remained green. A setup-only Split positioning timeout was classified TEST/HARNESS and corrected without Product changes.
+- The decisive gate added during-drag rendered geometry. Result: **RED** at W06. The resize divider moved with the pointer, but the rendered Work Type column itself did not resize during the drag; its visible geometry changed only after MouseUp.
+- Exact RevoGrid 4.25.2 source confirms the native resize directive moves the resize handle during MouseMove and sends the resize callback on resize:end/MouseUp. Current ERP intercepts the final write and commits its own Width policy after that event.
+- Classification: **PRODUCT** against the employee-visible resize interaction. Build before the gate passed with 0 warnings / 0 errors; no Width Product runtime file was modified in this gate step.
+- Stop condition: user verification of this exact RED is required before Product edit. If confirmed, do not patch the current interaction layer; re-anchor from clean/native ownership while preserving independently proven Save/SQL/Dirty/History/scope foundations.
+
+## 2026-09-18 - Width interaction reset to pre-width native baseline
+
+Meta: Mission=REVO-COLUMN-WIDTH-RECOVERY-20260917; Class=PRODUCT+WORKFLOW; Outcome=RESET_FOR_MANUAL_PROBE; Stage=NATIVE_BASELINE; Scope=COLUMN_WIDTH_INTERACTION; PRODUCT_CHANGE=TARGETED
+
+- The rendered-DOM General Modification Gate first reproduced the manual Width escape as PRODUCT RED: the resize divider follows the pointer, but the rendered owner column does not resize until MouseUp.
+- Instead of stacking another Width patch, the canonical route was returned to the pre-width native interaction baseline from accepted commit 2101f41 for the Width-specific surface only.
+- Restored Width-specific files/regions: canonical route no longer enables ERP Column Width; revoGridNativeGate5A width-layout injection, min/max layout projection, stretch override, RTL underflow class, and width-aware replaceCustomColumns path were removed; app.css RTL underflow rule was removed.
+- Current revoGridGate5B1 and later fixes remain active. Its native module cache token was bumped to 20260918-width-native-reset-1, and the disabled-Width route still loads the current Gate5B1 token so Atomic Year Switch, Visibility, and Custom Date fixes are not rolled back.
+- The old revoGridColumnWidth module remains in source but is inactive on the canonical route; this is deliberate until the native manual probe decides the clean rebuild direction.
+- App build after the reset: PASS, 0 warnings / 0 errors. No commit or push. Manual browser probe is the next stop before any new Width implementation.
+
+## 2026-09-18 - Native RTL resize right-anchor correction
+
+Meta: Mission=REVO-COLUMN-WIDTH-RECOVERY-20260917; Class=PRODUCT+TEST; Outcome=AUTOMATION_GREEN; Stage=MANUAL_PENDING; Scope=RTL_NATIVE_RESIZE_INTERACTION
+
+- Manual retest found a second interaction defect after the first native mirror attempt: behavior was correct only while total column width fit the viewport. Once Basket reached the left edge and the sheet entered horizontal overflow, further left-growth moved the sheet right and Work Order Number disappeared.
+- Source/runtime forensics showed the exact threshold cause. Revo RTL reverses column order, but the central revogr-viewport-scroll remains physically LTR. Underflow alignment via margin-left:auto keeps the right edge stable only while contentWidth <= clientWidth. At the first overflow frame, the auto margin collapses, physical scrollLeft remains 0 (LTR left edge), and additional width therefore extends to the right.
+- Independent DOM probe reproduced the failure at clientWidth=1722 and realSize=1730: without correction, content snapped to the viewport left edge and Work Order right edge drifted right on every subsequent +80px grow.
+- Corrected native interaction keeps Revo ownership of width calculation. RTL only: use the native left resize handle, disable Stretch so spare width remains outside columns on the left, and preserve the existing right viewport anchor across headerresize by moving physical scrollLeft to its max only when the view was already right-anchored before the resize.
+- Same DOM probe was then run against Product with no test-time behavior injection. Seven +80px grows and seven -80px shrinks crossed Underflow/Overflow both ways. Work Order right edge remained fixed at 1736px in every step; overflow scrollLeft tracked max (8, 88, 168, 248) and returned cleanly to 0 when content fit again.
+- Temporary diagnostic runner was removed after evidence collection. Old ERP Width persistence/history owner remains disabled on canonical route; this change repairs the native interaction baseline only.
+- Build: PASS, 0 warnings / 0 errors. State: AUTOMATION_GREEN / MANUAL_PENDING. No commit or push.
+
+## 2026-10-05 - Width manual RED after right-anchor correction (third failed interaction attempt)
+
+Meta: Mission=REVO-COLUMN-WIDTH-RECOVERY-20260917; Class=PRODUCT+ENVIRONMENT; Outcome=MANUAL_RED; Stage=GATE_RED; Scope=RTL_NATIVE_RESIZE_INTERACTION; PRODUCT_CHANGE=NONE
+
+- Local safety backup of all uncommitted work: branch `wip/backup-20261005` (commit 6edd05b, 49 files), created via temporary index; working tree and current branch untouched; not pushed.
+- ENVIRONMENT (new machine): .NET 10 SDK 10.0.401 and SQL LocalDB 14.0 installed by the user. LocalDB default data path lacks a trailing backslash (`C:\Users\Hesham` + file), so EF CREATE DATABASE failed with OS error 5; registry fix needs admin and was not applied. Workaround without settings change: `ERP_TEST_SQLSERVER_CONNECTION` with `AttachDbFilename=%USERPROFILE%\LocalDBData\...mdf`. Playwright browsers are not installed on this machine yet.
+- Fresh runtime: bin/obj removed, App build PASS 0 warnings / 0 errors, run without --no-build on a kept seeded E2E DB (2000 rows). Browser loaded `revoGridNativeGate5A.js?v=20260918-rtl-native-anchor-1`.
+- User manual result: **RED** - "not Excel-like at all": while dragging the divider, the column looks fixed and the column(s) on its right move.
+- Independent reproduction (real mouse drag, rendered header geometry, overflowed RTL view, viewport 961px): WORK ORDER VALUE left divider dragged ~100px left. Width 225 -> 324, but left edge stayed at 650 and right edge moved 875 -> 974; ASSIGNMENT DATE and every column to the right shifted right. Excel RTL expectation: right edge fixed, left edge follows the pointer, columns to the left shift left.
+- Classification: **PRODUCT**. The right-anchor correction only protects a view that was already right-anchored; an overflowed view that is not at the right anchor still grows toward the right.
+- Stop condition: this is the third failed Product attempt on the same interaction (native mirror, right-anchor, now this). Per AGENTS.md no further Width patch until Expected is frozen with the user and source/runtime forensics is redone. No commit or push.
+
+## 2026-10-06 - RTL live column resize (fourth, approved correction)
+
+Meta: Mission=REVO-COLUMN-WIDTH-RECOVERY-20260917; Class=PRODUCT; Outcome=AUTOMATION_GREEN; Stage=MANUAL_PENDING; Scope=RTL_NATIVE_RESIZE_INTERACTION
+
+- Expected frozen by user: dragged column's right edge fixed, left edge follows pointer live, columns to its left shift left, columns to its right never move.
+- Forensics (Revo 4.25.2 package source): ResizeDirective only moves the handle during drag; width is committed at MouseUp (beforeheaderresize -> headerresize -> dimension.setCustomSizes). RTL viewport scrolls physically LTR; scroll content width renders a frame after header cells; horizontal scrollbar and viewport resync through throttled async setScroll, which can pull a just-set position back to a stale value.
+- GATE_RED with independent oracle (real mouse drag in browser pane + rendered header geometry sampled per frame), non-anchored overflow: during drag column unchanged; after release right edge and Assignment Date shifted right. PRODUCT.
+- Correction (revoGridNativeGate5A RTL block only): live setCustomSizes from Revo's own clamped delta; hidden right offset held constant using drag-derived content width; position written to viewport + horizontal scrollbar and routed via grid.scrollToCoordinate; commit re-applied synchronously and after two frames. Old right-anchor boolean generalized (non-drag headerresize keeps measured right offset).
+- Same oracle GREEN after clean rebuild (token 20261006-rtl-live-resize-3): non-anchored grow/shrink, right-anchored grow, underflow<->overflow crossing both ways; no jump in any sampled frame after release. Build 0 warnings / 0 errors.
+- Side observation (out of scope): initial RTL overflow view opens non-anchored, Work Order Number off-screen right.
+- No commit or push. Next: user hands-on acceptance.
+
+## 2026-10-06 - Mojibake regression fixed; Width W05/W06 fixed
+
+Meta: Mission=REVO-COLUMN-WIDTH-RECOVERY-20260917; Class=PRODUCT+TEST/HARNESS; Outcome=AUTOMATION_GREEN; Stage=MANUAL_PENDING; Scope=LTR_NATIVE_WIDTH
+
+- Mojibake (PRODUCT): uncommitted `revoGridGate5B1.js` and `WorkOrdersRevoGridNativeGate5A.razor.cs` held cp1252 mojibake. Wider than the reported dash: 6 Arabic UI messages and the Arabic-layout Undo/Redo keys (U+0626 / U+063A) were corrupted too. Reversed run-by-run; both files now match HEAD in every non-ASCII character. A scan of every modified/untracked file found no other corruption. UTF-8 BOM restored in 5 files (user-approved); LF needs no fix (autocrlf). Workday 00-17 PASS.
+- Root-cause candidate: Windows PowerShell 5.1 `Get-Content` (ANSI default) + `Set-Content -Encoding utf8` (adds BOM) mangles UTF-8 without BOM. Reproduced by accident on the Width runner during this mission and reversed before evidence was taken. Learning candidate only (one mission): edit source with UTF-8-safe tools and rescan for mojibake signatures before claiming GREEN.
+- W05 (PRODUCT): Revo 4.25.2 keys column widths by visible index; its dimension trim plugin restores pre-trim sizes only if no size was written while trimmed. A drag while a column is hidden therefore handed the dragged width to the hidden column on Unhide and shifted every column to its right. Fix in the existing trim owner `revoGridColumnVisibilityAdapter.applyHiddenProps`: remember each visible column's width by prop before a trim change, rewrite widths by visible index after it. Same oracle: RED (160 expected, 260 actual) -> GREEN.
+- W06 (PRODUCT): content minimum measured with the first `.rgCell` = a header cell (10px font, 10px padding). Now measured with a rendered body cell of the dragged column (font, padding, borders). Same oracle: RED (stop at 73 vs SQL+DOM 60.1) -> GREEN (62; 0/30 rendered cells overflow). RED re-proved by temporarily restoring the old measurement with the corrected harness.
+- W06 harness (TEST/HARNESS): W04 left the grid scrolled right, so Work Order Number body cells were unrendered and the oracle crashed. Runner restores the default viewport and scrolls the native scroller to 0 (Revo `scrollToCoordinate({x:0})` was a no-op) and asserts Work Order Number is first.
+- Cache token `20261006-width-identity-1`. Builds 0 warnings / 0 errors. PASS: Width W00-W06, Workday 00-17, Visibility, Rename, Empty Sheet, B12, Startup Security, Admin Security, Atomic Year, Visibility Owner, Custom Date. Integration NOT RUN (ENVIRONMENT, SQL 1857). Full script not run: preflight RED on the untracked Live Resize Lab route (user decision pending).
+- No commit or push. Next: user manual check of W05/W06.
+
+### 2026-10-06 - Work Order Find (Parity slice A) - AUTOMATION_GREEN / MANUAL_PENDING
+
+- Expected frozen with the user before code: Enter-only search, Enter cycles and wraps, lands on the Work Order Number cell; <9 digits = starts-with in the open year; 9 digits = exact across Work Types, other years reported with an "open year X and go" button (existing year switch, refused while Dirty); filter-hidden match = message + "clear filter and go" (one undoable History step); other departments = "not found"; rows are never filtered.
+- Data (TEST): `E2ETestDatabase` `findScenario` adds a third year (Y-2), a second department and fixed fixtures (duplicate types, year-only numbers, completed basket, filter-hidden type, prefix family + out-of-scope prefix decoys) interleaved through the sheet.
+- Oracle (TEST): `--revo-find-focused` drives real typing/Enter/clicks and reads the RENDERED `revogr-focus.focused-cell` box -> data cell under it -> header text bound to the `workOrderNumber` column name -> geometry inside the viewport. Self-check O00 = real mouse click. RED on current Product: control absent (PRODUCT, approved missing capability).
+- Harness corrections (TEST/HARNESS): header highlight also carries `.focused-cell` (restricted to `revogr-focus`); Revo clears its rendered focus on any outside click, so typing/not-found baselines are taken after clicking the Find box; scroll to top before editing row 0; year wait accepts any rendered row because Find scrolls to its target.
+- Product: Find box/status/action in the Native page; `findWorkOrders`/`focusWorkOrder`/`clearFilterForFind` in revoGridGate5B1.js (reveal via existing `revoGridHistoryFocus.focusTarget`); `clearAll` in revoGridExcelFilter.js (same `commitUserState` History step); `SwitchYearAsync` extracted as the single year-switch path; `WorkOrderQueryService.FindWorkOrderYearsAsync` (employee scope query mirrors LoadSheet). Cache tokens `20261006-find-1`. Manual pane check found an early Enter during grid initialization did nothing -> box disabled until the grid is initialized; gate re-run PASS.
+- Evidence: Find gate 13/13 PASS (twice); Integration Find security case PASS, suite 37/38 (Phase 9.3D migration gate = ENVIRONMENT, shared AttachDbFilename); Atomic Year Switch PASS; Employee Real Workday PASS. Find runner added to full regression (step 48.6 + preflight). Full script not run.
+- Manual: launch config `erp-find-3years` (kept DB `ERP_Manual_Find.mdf`). No commit or push.
+
+### 2026-10-06 - Open Work Orders KPI (Parity slice B) - AUTOMATION_GREEN / MANUAL_PENDING
+
+- Expected frozen with the user: 4 cards (Open count, Work Order Value, Partial, Remaining) over every loaded-year row not in "انتهاء امر العمل", blank new rows excluded, Filter-independent, updated live from unsaved edits (user: runtime, not after Save); "إجمالي الظاهر" line only while a Filter is active.
+- Oracle (TEST): `--revo-open-kpi-focused` on the 3-year Find seed; rendered card values vs SQL per department/year and independent arithmetic for live deltas (money edit, basket -> completed, blank/filled new row, Undo, year switch). RED: cards absent (PRODUCT, approved missing capability).
+- Product: route cards host `revogrid-open-kpi`; existing totals owner revoGridVisibleAggregates.js computes open totals from `getSource` in the same refresh pass, renders Tabulator-parity cards (compact M/B only in split layout, full value in title), toggles the filtered-line section, and refreshes on basket edits/history. Cache tokens `20261006-open-kpi-1`.
+- Evidence: KPI gate K01-K06 PASS (first Product attempt). Regression: Workday + B12 RED -> TEST/HARNESS (waited for the totals line to be visible; now attached + ready) -> PASS with exit 0; Visibility, Width, Find PASS. Runner in full regression step 48.7 + preflight. Manual batch section H added (37 checks). No commit or push.
+
+## 2026-10-06 - Current State compacted (archive of pre-compaction detail)
+
+Meta: Mission=REVO-COLUMN-WIDTH-RECOVERY-20260917; Class=DOCS; Outcome=PASS; Stage=MANUAL_PENDING; Scope=MEMORY_COMPACTION
+
+- Why: AI_CURRENT_STATE.md had grown to 16 KB and was costing tokens every chat. It was cut to a short pointer file; project-wide summary moved to Claude auto-memory `project-map`. Nothing below was deleted, only moved here verbatim.
+
+<details><summary>Archived Current State text (2026-10-06, before compaction)</summary>
+
+Stage: **ACCEPTED (manual, user 2026-10-06), uncommitted** on native LTR Width: LTR switch + live resize + content-minimum width. 2026-10-06 USER DECISION: the Work Orders sheet is fixed LTR regardless of UI language (surrounding UI stays Arabic; a separate Arabic sheet may come later as its own mission); RTL resize/anchor work is superseded. Step 1 done (uncommitted): `Rtl = false`, RTL live-resize block removed from revoGridNativeGate5A.js, RTL anchor/neighbor logic removed from revoGridColumnWidth.js (handle always right), `.erp-rtl-native-anchor` CSS removed, grid host `direction: ltr`; cache token `20261006-ltr-native-1`. Real-mouse browser check: grow 160->241 and shrink 241->122 kept left edge 414 and left columns fixed; scrolled (scrollLeft 456) grow kept scroll and left edge. Step 2 (user-approved 2026-10-06, uncommitted): live LTR resize in revoGridNativeGate5A.js - Revo's clamped handle delta applied every frame via dimension.setCustomSizes; Escape restores start width and cancels Revo's MouseUp write; cache token `20261006-ltr-live-2`. Real-mouse oracle: before = GATE_RED (width unchanged mid-drag, 160 -> 240 only at release); after = AUTOMATION_GREEN at mouseup-before-commit snapshot (grow 160->199->239, shrink 239->179->119, scrolled grow at scrollLeft 500 with no scroll change and no release jump). Not tested: Escape mid-drag (tool cannot hold the mouse). Step 3 (user rule 2026-10-06, uncommitted): drag minimum width = widest value in that column across all loaded-year rows (incl. filtered-out rows), measured with the rendered cell font + padding; header text excluded; a column already narrower is not forced wider; Revo's unclamped MouseUp write is replaced by the clamped width. Cache token `20261006-ltr-live-min-1`. Oracle: before, Work Order Number reached Revo min 30 ("92..."); after, far-left drags stop at 73 for Work Order Number and Assignment Date with 0/26 rendered cells overflowing. Width owner (revoGridColumnWidth.js) stays disabled on the canonical route; when re-enabled its commit must use the drag start width, because live writes already moved the store. Width runner rewritten 2026-10-06 to the LTR contract; its W05 (Hide/Unhide width identity) and W06 (body-cell minimum) defects were fixed the same day: AUTOMATION_GREEN / MANUAL_PENDING (see Width gate 2026-10-06 below). Cleanup plan agreed in principle: checkpoint the four automation-green cleanup items separately from Width work.
+
+## WORKFLOW GUARD - 2026-09-17
+
+- One project-wide General Modification Gate applies before Product edits; do not create a feature-specific gate framework.
+- Expected behavior is frozen before Product code changes and the same independent oracle must prove RED -> GREEN.
+- Employee-visible interactions require real browser input + rendered DOM/geometry; Revo/provider/store state is supplementary, not the acceptance oracle.
+- `UNCLASSIFIED` RED blocks Product edits; two failed Product corrections on the same interaction block a third until source/runtime forensics is redone.
+- Acceptance states stay explicit: `GATE_RED` -> `AUTOMATION_GREEN` -> `MANUAL_PENDING` -> `ACCEPTED`.
+
+## Live state
+
+- Vibe Coding Reviews 1-8 and final synthesis are complete.
+- Cleanup item 1, Admin Security Boundary, is automation-green; manual check deferred.
+- Cleanup item 2, Atomic Work-Year Switch, is automation-green; manual check deferred.
+- Cleanup item 3, Visibility Single Owner, is automation-green; manual check deferred.
+- Cleanup item 4, Custom Date Contract, is automation-green; manual check deferred.
+- Accepted baseline remains `2101f41`.
+- Column Width checkpoint `7b62e58` is **MANUAL RED / NOT ACCEPTED**. Its earlier Automation Green is insufficient because the visible RTL resize interaction escaped the oracle.
+- General Modification Gate reproduced a PRODUCT RED: the divider moves during drag while the rendered owner column waits until MouseUp.
+- ERP Width persistence/history owner remains disabled on the canonical route while interaction is rebuilt cleanly from the native baseline; old Width math/layout injection stays inactive.
+- Native RTL resize interaction now uses Revo's own width calculation with the left divider, disables Stretch only in RTL so spare width remains on the left, and preserves the right edge when crossing into horizontal overflow by keeping the viewport at its existing right anchor.
+- Runtime DOM probe reproduced the previous threshold failure exactly: at clientWidth 1722, realSize 1730 switched to overflow and without anchoring Work Order moved right. The corrected Product kept Work Order right edge fixed at 1736px through seven +80px grows and seven -80px shrinks, crossing Underflow/Overflow in both directions.
+- Product/E2E build after the corrected native interaction: PASS, 0 warnings / 0 errors.
+- 2026-10-05 manual acceptance: **RED**. User: not Excel-like; while dragging, the column looks fixed and columns on its right move. Reproduced with real mouse + rendered geometry in an overflowed RTL view: width grew but the left edge stayed put and the right edge plus every column to its right shifted right. Right-anchor fix only covers an already right-anchored view. Classification PRODUCT.
+- Excel RTL Expected (to confirm with user before any patch): dragged column's right edge stays fixed, its left edge follows the pointer live, columns to its left shift left, columns to its right never move.
+- Uncommitted work is backed up locally on branch `wip/backup-20261005` (not pushed).
+- New machine: LocalDB 14.0 default data path bug (missing trailing backslash) - use `ERP_TEST_SQLSERVER_CONNECTION` with `AttachDbFilename=%USERPROFILE%\LocalDBData\<name>.mdf`; Playwright browsers not installed yet.
+- No commit or remote push is authorized before pending manual acceptance gates are resolved.
+
+## Custom Date contract
+
+- WorkYear / Assignment Date keeps the existing 2000-2100 guard.
+- Custom Date is independent of WorkYear and accepts any real `DD/MM/YYYY` date with a four-digit year from 0001 through 9999.
+- Year 0000 and impossible calendar values such as `31/02/2026` remain invalid.
+- Client validation now separates general calendar-date validation from Assignment Date WorkYear validation.
+- Server `CustomColumnService` already matched this contract through `DateTime.TryParseExact("dd/MM/yyyy")`.
+## Automated evidence
+
+- Initial focused Custom Date gate: **RED as expected**; classification **PRODUCT**.
+- Same focused gate after the fix: **PASS**.
+- Gate protects `01/01/0001`, `31/12/1999`, `01/01/2101`, `31/12/9999`, year `0000`, impossible dates, and the unchanged Assignment Date 2000-2100 guard.
+- SQL integration persists Custom Date `01/01/0001`; Integration remains **37/37 PASS**.
+- App, Integration, and E2E builds: PASS with 0 warnings / 0 errors.
+- Canonical browser loaded `revoGridGate5B1.js?v=20260917-custom-date-contract-1`.
+- One-command full regression: **PASS** — Workday, Rename, Visibility, Empty Sheet, B12, Startup Security, Admin Security Boundary, Atomic Work-Year Switch, Visibility Single Owner, Custom Date Contract, and real Integration 37/37.
+- Test-harness correction: full regression step 50 now uses the executable Integration runner (`dotnet run`) instead of `dotnet test`, which did not execute the console-runner cases.
+
+## Remaining audit cleanup priority
+
+1. Admin Security Boundary — automation PASS; manual deferred.
+2. Atomic Work-Year Switch — automation PASS; manual deferred.
+3. Visibility Single Owner — automation PASS; manual deferred.
+4. Custom Date Contract — automation PASS; manual deferred.
+5. Self-host/pin Revo and close production security-header/CDN trust requirements.
+6. Add canonical Revo long-session/performance gate before optimizing measured hotspots.
+7. Architecture cleanup last: Gate orchestration, feature scaffolding, Header plugin lifecycle, repeated core metadata.
+
+## Protected foundations
+
+- WorkYear remains 2000-2100.
+- Snapshot-safe Save, SQL transaction, RowVersion concurrency, and year-scoped Visibility remain protected. Width runtime: native LTR live resize accepted 2026-10-06.
+## Workflow rules
+
+- Classify every RED before Product edits: PRODUCT, TEST/HARNESS, BUILD/STALE, TOOLING, or ENVIRONMENT.
+- Width returned through the General Modification Gate and was manually accepted 2026-10-06.
+- Do not commit or push yet.
+
+## Width gate 2026-10-06 (uncommitted)
+
+- Gate5C1ColumnWidthFocusedRunner (LTR contract, real mouse + rendered header/body geometry): **W00-W06 PASS**. Drags leave the sheet Clean with no History action.
+- W05 (PRODUCT, fixed): Revo keys widths by visible index and its trim plugin cannot restore them once a width is written while a column is hidden, so Unhide handed the dragged neighbour's width (260) to the hidden column (expected 160) and shifted every column to its right. Fix: `revoGridColumnVisibilityAdapter.applyHiddenProps` remembers each visible column's width by prop before a trim change and rewrites widths by visible index after it. Same oracle RED (160 vs 260) -> GREEN; the dragged neighbour also keeps its own width after Unhide.
+- W06 (PRODUCT, fixed): the content minimum is now measured with a rendered body cell of the dragged column (font, padding, borders), not the first `.rgCell` (a header cell). Same oracle RED (stop at 73 vs SQL+DOM 60.1) -> GREEN (stop at 62, 0/30 cells overflow).
+- W06 harness (TEST/HARNESS): W04 left the grid scrolled right so Work Order Number body cells were not rendered; the runner now restores the default viewport and scrolls to the first column before W06 (Revo `scrollToCoordinate({x:0})` was a no-op there).
+- Mojibake (PRODUCT, fixed): cp1252 mojibake in `revoGridGate5B1.js` and `WorkOrdersRevoGridNativeGate5A.razor.cs` covered the em dash, 6 Arabic UI messages and the Arabic-layout Undo/Redo keys (U+0626/U+063A). Both files now match HEAD in every non-ASCII character; no other corrupted file. UTF-8 BOM restored in AdminPanel.razor, UserManagementService.cs, 08_DECISIONS_LOG.md, Program.cs, app.css (LF needs no fix: autocrlf). Probable cause: round-tripping files through Windows PowerShell 5.1 `Get-Content`/`Set-Content` (reproduced by accident on the Width runner the same day, then reversed).
+- Cache token `20261006-width-identity-1` (Gate5B1, NativeGate5A, ColumnWidth, VisibilityAdapter).
+- Regression after all fixes (same commands as the script): Width W00-W06, Workday 00-17, Visibility, Rename, Empty Sheet, B12, Startup Security, Admin Security, Atomic Year, Visibility Owner, Custom Date = PASS. App/E2E/Integration builds 0 warnings / 0 errors.
+- Integration 37 = NOT RUN (ENVIRONMENT): the single-file AttachDbFilename workaround cannot host two DBs at once (SQL error 1857).
+- Not covered: Width Dirty/History/Save/Reload/AutoFit (owner disabled); minimum across filtered-out rows; already-narrower column; minimum for formatted (money) columns measures raw values; remembered widths of a still-hidden column survive a later column rebuild.
+- Full script preflight RED (correct): untracked `Components/Pages/WorkOrdersRevoGridLiveResizeLab.razor` exposes a second `/work-orders-revogrid-*` route. User decision pending: delete or keep. Width runner is NOT in the full regression script (gap).
+- Machine: Playwright Chromium 149 fails (Windows SxS error); `ERP_E2E_BROWSER_CHANNEL=chrome` uses installed Chrome. `dotnet` is not on the shell PATH (use `C:Program Filesdotnet`). Run with `ERP_TEST_SQLSERVER_CONNECTION=Server=(localdb)MSSQLLocalDB;Integrated Security=true;AttachDbFilename=%USERPROFILE%LocalDBDataERP_E2E_Test.mdf`.
+
+## Width persistence 2026-10-06 (uncommitted, AUTOMATION_GREEN / MANUAL_PENDING)
+
+- User-approved Expected (Tabulator parity): drag -> Dirty + one History action; Ctrl+Z/Ctrl+Y restore old/new width; Save stores the width per department; it survives Refresh and every Work Year. Escape records nothing.
+- Same oracle RED -> GREEN: Width runner P01 first failed "History count 0, expected 1" (PRODUCT: owner disabled on canonical route); then P03 failed "width stayed 130 after Refresh" (PRODUCT: layout injection had been removed from revoGridNativeGate5A.js during the live-resize cleanup). After fix: W00, P01-P03, W01-W06 PASS.
+- Product change: canonical page `EnableColumnWidth="true"`; NativeGate5A restores `applyColumnLayouts` (init + replaceCustomColumns) and stamps `erpLiveResize {cancelled,startWidth,width}` on the beforeheaderresize candidate; Width owner uses the ERP width as gesture start (live writes already moved Revo's store), commits the clamped live width, skips a cancelled (Escape) gesture, and reverts the live width when mutation is locked. Grid stretch stays on (forced true in NativeGate5A). Cache token `20261006-width-persist-1`.
+- Runner contract updated (TEST/HARNESS): Clean-after-drag assertions replaced by the persistence contract; W05 now undoes the width drag before the Hide. Width runner added to Run-ERP-Full-Regression.ps1 (step 48.5 + preflight wiring).
+- Regression after the change: Workday, Rename, Visibility, Empty Sheet, B12, Startup Security, Admin Security, Atomic Year, Visibility Owner, Custom Date = PASS; builds 0/0. Integration 37 NOT RUN (ENVIRONMENT, same LocalDB limit). Full script not run as one command (preflight still blocked by the Live Resize Lab page; user kept it).
+- Manual batch: A6 (persistence) and A7 (Escape records nothing) added; A2 now uses Unhide from the menu because Undo first reverts the widening.
+- Not covered: Auto Fit; stale width RowVersion conflict; default widths now come from the owner's CORE_DEFAULT_WIDTHS (e.g. Work Order Number 220).
+
+## Next action
+
+1. MANUAL (user): run `ERPPrototype/Documentation/MANUAL_TEST_BATCH_2026-10-06.md` - 37 checks: Width W05/W06 + Escape, mojibake, four deferred cleanup items, G = Find, H = Open KPI (G/H need the 3-year DB: launch config `erp-find-3years`, recreate with `--find-seed-manual` if data was changed). State: AUTOMATION_GREEN / MANUAL_PENDING.
+2. User decision on the untracked Live Resize Lab page; then run the full regression script (Width/Find/KPI runners already wired: 48.5/48.6/48.7).
+3. Checkpoint commits need user authorization: LTR Width work, the four cleanup items, and Parity A+B (Find + KPI) as separate commits.
+4. Tabulator -> Revo parity, approved order A Find (done, automation) -> B Open KPI (done, automation) -> C Selection summary -> D Basket panel; each through the General Modification Gate. Contracts: DEC-072 (Find), DEC-073 (KPI); receipts in AI_WORK_LOG 2026-10-06. NEXT = C: freeze Expected first. Open question already asked to the user: show the summary only for whole selected rows (Tabulator) or also for a selected cell range (Excel-like, Claude's recommendation)? Tabulator reference: tabulatorAggregates.js renderSelectionAggregate ("Selected Work Orders" + per visible money column incl. custom). Reuse the 3-year findScenario seed and revoGridVisibleAggregates.js as the single totals owner.
+5. Then continue Remaining audit cleanup priority.
+Machine notes for runs: Integration/E2E need `ERP_TEST_SQLSERVER_CONNECTION` with AttachDbFilename (LocalDB path bug) and `ERP_E2E_BROWSER_CHANNEL=chrome`; run from PowerShell. Integration 37/38 here = Phase 9.3D migration gate ENVIRONMENT. Stop the manual app (port 5265) before building - it locks the Debug output.
+Observation (pre-existing): clicking any control outside the grid clears Revo's rendered active cell.
+Side observation (not investigated): after a header-edge drag the dragged column appears column-selected; may be pre-existing.
+
+</details>

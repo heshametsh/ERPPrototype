@@ -35,6 +35,10 @@ Pro is an idea/reference source, never a parity target or proprietary implementa
 
 ## Failure boundary
 
+Before Product edits, apply the single **General modification gate** owned by `ERPPrototype/Documentation/AI_WORK_CYCLE.md`. It chooses evidence by risk instead of creating a new gate framework per feature. Expected is frozen before code changes; defect evidence must be independent of the Product state it judges; the same gate must move RED -> GREEN.
+
+For visible interactions, rendered DOM/geometry + real input is mandatory and Grid/provider/store values are supplementary only. `UNCLASSIFIED` RED blocks Product edits. Two failed Product corrections on one interaction force source/runtime forensics before a third. Keep `AUTOMATION_GREEN`, `MANUAL_PENDING`, and `ACCEPTED` separate.
+
 Classify every red result before changing product code:
 `PRODUCT`, `TEST/HARNESS`, `BUILD/STALE`, `TOOLING`, or `ENVIRONMENT`.
 

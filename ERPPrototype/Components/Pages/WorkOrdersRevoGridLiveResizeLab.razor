@@ -1,0 +1,70 @@
+@page "/work-orders-revogrid-live-resize-lab"
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+
+@using ERPPrototype.Data
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.JSInterop
+
+@attribute [Authorize(Roles = AppRoles.Employee)]
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+
+<PageTitle>RevoGrid Live Resize Lab</PageTitle>
+
+<div class="live-resize-lab-banner"
+     data-testid="live-resize-lab-banner">
+    Live Resize Lab — تجريبي فقط
+</div>
+
+<WorkOrdersRevoGridNativeGate5A EnableChangeEngine="true"
+                                  EnablePaste="true"
+                                  EnableRangeClear="true"
+                                  EnableExcelFilter="true"
+                                  EnableHeaderActions="true"
+                                  EnableRowStructure="true"
+                                  EnableUnifiedValidation="true"
+                                  EnablePersistenceIdentity="true"
+                                  EnableSelectionContext="true"
+                                  EnableStructureWorkspace="true"
+                                  EnableHeaderMultiSelection="true"
+                                  EnableClipboardRangeFill="true"
+                                  EnableSaveHandshake="true"
+                                  EnableRealDbSave="true"
+                                  EnableVisibleAggregates="false"
+                                  EnableColumnVisibility="true" />
+
+@code {
+    private const string GridElementId = "revogrid-native-gate5a-grid";
+    private IJSObjectReference? LabModule;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        LabModule = await JS.InvokeAsync<IJSObjectReference>(
+            "import",
+            "./js/revoGridLiveResizeLab.js?v=20260918-live-resize-lab-2");
+
+        await LabModule.InvokeVoidAsync("attach", GridElementId);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (LabModule is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await LabModule.InvokeVoidAsync("destroy", GridElementId);
+            await LabModule.DisposeAsync();
+        }
+        catch (JSDisconnectedException)
+        {
+        }
+    }
+}

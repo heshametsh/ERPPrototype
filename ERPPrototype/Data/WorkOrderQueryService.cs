@@ -25,6 +25,56 @@ public sealed class WorkOrderQueryService(
             cancellationToken,
             performanceStages);
 
+    /// <summary>
+    /// Find: the saved Work Years that hold this exact 9-digit Work Order
+    /// Number inside the employee's own department. Other departments are
+    /// never visible; an unknown/unscoped user gets an empty list.
+    /// </summary>
+    public async Task<IReadOnlyList<int>> FindWorkOrderYearsAsync(
+        string userId,
+        string workOrderNumber,
+        CancellationToken cancellationToken = default)
+    {
+        var number = (workOrderNumber ?? string.Empty).Trim();
+        if (number.Length != 9 || !number.All(char.IsAsciiDigit))
+        {
+            return [];
+        }
+
+        await using var dbContext =
+            await dbFactory.CreateDbContextAsync(cancellationToken);
+
+        var departmentId = await (
+            from user in dbContext.Users.AsNoTracking()
+            join userRole in dbContext.UserRoles.AsNoTracking()
+                on user.Id equals userRole.UserId
+            join role in dbContext.Roles.AsNoTracking()
+                on userRole.RoleId equals role.Id
+            where
+                user.Id == userId &&
+                user.IsActive &&
+                !user.MustChangePassword &&
+                user.DepartmentId != null &&
+                role.Name == AppRoles.Employee
+            select user.DepartmentId)
+            .SingleOrDefaultAsync(cancellationToken);
+
+        if (departmentId is null)
+        {
+            return [];
+        }
+
+        return await dbContext.WorkOrders
+            .AsNoTracking()
+            .Where(workOrder =>
+                workOrder.DepartmentId == departmentId &&
+                workOrder.WorkOrderNumber == number)
+            .Select(workOrder => workOrder.WorkYear)
+            .Distinct()
+            .OrderByDescending(year => year)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<WorkOrderSheetData?> LoadSheetAsync(
         string userId,
         int workYear,

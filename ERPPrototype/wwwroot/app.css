@@ -605,9 +605,3 @@ details[open] > .excel-date-summary::before {
 }
 
 /* Basket side-panel presentation is owned by WorkOrders.razor.css. */
-
-/* RevoGrid RTL underflow: keep real column widths anchored to the right. */
-revo-grid.erp-rtl-underflow-align revogr-viewport-scroll.rgCol:not([row-header]) .inner-content-table {
-    min-width: 0 !important;
-    margin-left: auto;
-}

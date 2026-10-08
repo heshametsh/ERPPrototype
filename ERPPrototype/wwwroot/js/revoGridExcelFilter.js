@@ -1463,6 +1463,12 @@ export function createRevoGridExcelFilter(options) {
         }
     }
 
+    // Employee command outside the popup (Find "clear filter and go"):
+    // the same single undoable Sheet History step as the popup Clear.
+    async function clearAll(label = "Clear Filter") {
+        return commitUserState({}, label);
+    }
+
     async function setFilterState(nextState, options = {}) {
         await applyNativeState(nextState, {
             remember: options.remember !== false,
@@ -1497,6 +1503,7 @@ export function createRevoGridExcelFilter(options) {
         getFilterState,
         refreshColumns,
         setFilterState,
+        clearAll,
         ownsKeyboardEvent,
         destroy
     });

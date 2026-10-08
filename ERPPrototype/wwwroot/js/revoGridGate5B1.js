@@ -1,20 +1,20 @@
-import * as nativeGate5A from "./revoGridNativeGate5A.js?v=20260916-rtl-underflow-1";
+import * as nativeGate5A from "./revoGridNativeGate5A.js?v=20261006-width-persist-1";
 import { createRevoGridChangeBridge } from "./revoGridChangeBridge.js?v=20260826-unified-validation-1";
 import { createRevoGridHistoryCoordinator } from "./revoGridHistoryCoordinator.js?v=20260821-minimal-reveal-1";
 import { createRevoGridHistoryFocus } from "./revoGridHistoryFocus.js?v=20260821-gate5b4-keyboard-sort-1";
-import { createRevoGridExcelFilter } from "./revoGridExcelFilter.js?v=20260912-rename-noselect-1";
+import { createRevoGridExcelFilter } from "./revoGridExcelFilter.js?v=20261006-find-1";
 import { createRevoGridSort } from "./revoGridSort.js?v=20260912-rename-noselect-1";
 import { createRevoGridColumnSelection } from "./revoGridColumnSelection.js?v=20260821-gate5b4-keyboard-sort-1";
 import { createRevoGridSelectionLifecycle } from "./revoGridSelectionLifecycle.js?v=20260821-gate5b4-keyboard-sort-1";
 import { createRevoGridSelectionContext } from "./revoGridSelectionContext.js?v=20260829-gate5b10-header-selection-1";
 import { createRevoGridRowStructure } from "./revoGridRowStructure.js?v=20260914-empty-sheet-1";
-import { createRevoGridValidation } from "./revoGridValidation.js?v=20260826-unified-validation-1";
+import { createRevoGridValidation } from "./revoGridValidation.js?v=20260917-custom-date-contract-1";
 import { createRevoGridPersistenceIdentity } from "./revoGridPersistenceIdentity.js?v=20260826-persistence-identity-1";
 import { createRevoGridColumnWorkspace } from "./revoGridColumnWorkspace.js?v=20260912-hide-atomic-1";
 import { createRevoGridColumnRename } from "./revoGridColumnRename.js?v=20260912-rename-noselect-4";
-import { createRevoGridColumnVisibilityAdapter } from "./revoGridColumnVisibilityAdapter.js?v=20260912-hide-atomic-1";
+import { createRevoGridColumnVisibilityAdapter } from "./revoGridColumnVisibilityAdapter.js?v=20261006-width-persist-1";
 import { createRevoGridColumnVisibility } from "./revoGridColumnVisibility.js?v=20260912-hide-atomic-1";
-import { createRevoGridColumnWidth } from "./revoGridColumnWidth.js?v=20260916-native-resize-commit-2";
+import { createRevoGridColumnWidth } from "./revoGridColumnWidth.js?v=20261006-width-persist-1";
 import { createRevoGridStructureMenu } from "./revoGridStructureMenu.js?v=20260914-empty-sheet-1";
 import { createRevoGridStructureCommands } from "./revoGridStructureCommands.js?v=20260914-empty-sheet-1";
 import {
@@ -536,6 +536,7 @@ export async function initialize(elementId, rows, customColumns, options) {
     };
 
     const historyFocus = createRevoGridHistoryFocus({ grid });
+    state.historyFocus = historyFocus;
 
     state.historyCoordinator = createRevoGridHistoryCoordinator({
         grid,
@@ -854,12 +855,15 @@ export async function initialize(elementId, rows, customColumns, options) {
         }
 
         const aggregateModule =
-            await import("./revoGridVisibleAggregates.js?v=20260912-hide-atomic-1");
+            await import("./revoGridVisibleAggregates.js?v=20261006-open-kpi-1");
 
         state.visibleAggregates =
             aggregateModule.createRevoGridVisibleAggregates({
                 grid,
                 host: state.visibleAggregateElement,
+                openHost: findElement(
+                    value(options, "openAggregateElementId", "OpenAggregateElementId", "")
+                ),
                 customColumns,
                 getCustomColumns: () =>
                     state.columnWorkspace?.getState?.().customColumns ??
@@ -1016,6 +1020,107 @@ export function cancelDatasetSwitch(elementId) {
     renderState(state);
 }
 
+async function captureDatasetSwitchSnapshot(elementId, state) {
+    const native = await nativeGate5A.getDiagnostics(elementId);
+    const workYear = Number(native?.workYear ?? 0);
+    const rows = cloneValue(await state.grid.getSource("rgRow"));
+
+    return {
+        workYear,
+        datasetKey: datasetKey(workYear),
+        rows,
+        customColumns: cloneValue(
+            state.columnWorkspace?.getState?.().customColumns ?? []
+        ),
+        columnLayouts: cloneValue(
+            state.columnWidth?.getRenderLayouts?.() ?? []
+        ),
+        columnVisibilities: cloneValue(
+            state.columnVisibility?.getDatasetRecords?.() ?? []
+        ),
+        filterState: cloneValue(
+            state.excelFilter?.getFilterState?.() ?? {}
+        ),
+        sortState: cloneValue(
+            state.sortController?.getSortState?.() ?? null
+        ),
+        history: cloneValue(
+            state.historyCoordinator.getSnapshot()
+        )
+    };
+}
+
+async function restoreDatasetSwitchSnapshot(elementId, state, snapshot) {
+    await nativeGate5A.replaceDataset(
+        elementId,
+        snapshot.rows,
+        snapshot.workYear
+    );
+
+    if (state.columnWorkspace) {
+        await state.columnWorkspace.resetColumns(
+            snapshot.customColumns,
+            { preserveViewState: false }
+        );
+    } else {
+        await nativeGate5A.replaceCustomColumns(
+            elementId,
+            snapshot.customColumns,
+            snapshot.columnLayouts
+        );
+    }
+
+    await state.columnWidth?.resetLayouts?.(
+        snapshot.columnLayouts,
+        { apply: true }
+    );
+    await state.columnVisibility?.resetDataset?.(
+        snapshot.columnVisibilities,
+        { apply: true }
+    );
+
+    state.changeBridge.resetDataset(
+        snapshot.rows,
+        snapshot.datasetKey
+    );
+
+    if (state.excelFilter) {
+        await state.excelFilter.resetDataset(
+            snapshot.rows,
+            snapshot.datasetKey
+        );
+        await state.excelFilter.setFilterState(
+            snapshot.filterState,
+            { remember: true, preserveSelection: false }
+        );
+    }
+
+    if (state.sortController) {
+        await state.sortController.resetDataset(
+            snapshot.datasetKey
+        );
+        await state.sortController.setSortState(
+            snapshot.sortState,
+            { remember: true, preserveSelection: false }
+        );
+    }
+
+    await state.rowStructure?.resetDataset?.(
+        snapshot.rows,
+        snapshot.datasetKey
+    );
+    state.persistenceIdentity?.replaceRows?.(snapshot.rows);
+    state.historyCoordinator.restoreSnapshot(
+        snapshot.datasetKey,
+        snapshot.history
+    );
+
+    await state.columnVisibility?.reapply?.();
+    await state.visibleAggregates?.refreshVisible?.(
+        "dataset-switch-rollback"
+    );
+}
+
 export async function replaceDataset(
     elementId,
     rows,
@@ -1034,21 +1139,18 @@ export async function replaceDataset(
     }
 
     const nextDatasetKey = datasetKey(workYear);
-
-    let filterSuspended = false;
-    let sortSuspended = false;
+    const rollbackSnapshot =
+        await captureDatasetSwitchSnapshot(elementId, state);
 
     try {
         validateClientKeys(rows);
 
         if (state.excelFilter) {
             await state.excelFilter.suspendForDatasetSwitch();
-            filterSuspended = true;
         }
 
         if (state.sortController) {
             await state.sortController.suspendForDatasetSwitch();
-            sortSuspended = true;
         }
         if (state.columnWidth) {
             await state.columnWidth.resetLayouts(
@@ -1103,12 +1205,10 @@ export async function replaceDataset(
 
         if (state.excelFilter) {
             await state.excelFilter.resetDataset(rows, nextDatasetKey);
-            filterSuspended = false;
         }
 
         if (state.sortController) {
             await state.sortController.resetDataset(nextDatasetKey);
-            sortSuspended = false;
         }
 
         if (state.rowStructure) {
@@ -1120,17 +1220,17 @@ export async function replaceDataset(
         await state.columnVisibility?.reapply?.();
         await state.visibleAggregates?.refreshVisible?.("dataset-switch");
     } catch (error) {
-        if (filterSuspended && state.excelFilter) {
-            try {
-                await state.excelFilter.resumeCurrentDataset();
-            } catch {
-            }
-        }
-        if (sortSuspended && state.sortController) {
-            try {
-                await state.sortController.resumeCurrentDataset();
-            } catch {
-            }
+        try {
+            await restoreDatasetSwitchSnapshot(
+                elementId,
+                state,
+                rollbackSnapshot
+            );
+        } catch (rollbackError) {
+            throw new Error(
+                `Dataset switch rollback failed after: ${String(error?.message ?? error)}`,
+                { cause: rollbackError }
+            );
         }
         throw error;
     } finally {
@@ -1797,6 +1897,63 @@ export function rejectSaveHandshake(elementId, saveId) {
     }
     renderState(state);
     return rejected;
+}
+
+/*
+ * Work Order Find (Excel-like, never filters rows).
+ * Searches the open sheet as the employee sees it, unsaved edits included.
+ * 9 digits = exact number; fewer = starts-with. Matches removed by the active
+ * Filter are reported separately and are never focused by this call.
+ */
+export async function findWorkOrders(elementId, query) {
+    const state = bindings.get(elementId);
+    if (!state) {
+        throw new Error(`Gate 5B-1 state '${elementId}' was not found.`);
+    }
+
+    const text = String(query ?? "").trim();
+    const exact = text.length === 9;
+    const isMatch = row => {
+        const number = String(row?.workOrderNumber ?? "").trim();
+        return number !== "" && (exact ? number === text : number.startsWith(text));
+    };
+    const describe = row => ({
+        clientKey: String(row?.clientKey ?? ""),
+        workOrderNumber: String(row?.workOrderNumber ?? "").trim(),
+        workTypeCode: String(row?.workTypeCode ?? "").trim()
+    });
+
+    const visible = (await state.grid.getVisibleSource("rgRow")) ?? [];
+    const source = (await state.grid.getSource("rgRow")) ?? [];
+    const visibleMatches = visible.filter(isMatch).map(describe);
+    const visibleKeys = new Set(visibleMatches.map(match => match.clientKey));
+    const hiddenMatches = source
+        .filter(row => isMatch(row) && !visibleKeys.has(String(row?.clientKey ?? "")))
+        .map(describe);
+
+    return { visibleMatches, hiddenMatches };
+}
+
+export async function focusWorkOrder(elementId, clientKey) {
+    const state = bindings.get(elementId);
+    if (!state?.historyFocus) {
+        return false;
+    }
+
+    return state.historyFocus.focusTarget({
+        clientKey,
+        field: "workOrderNumber"
+    });
+}
+
+export async function clearFilterForFind(elementId) {
+    const state = bindings.get(elementId);
+    if (!state?.excelFilter) {
+        return false;
+    }
+
+    await state.excelFilter.clearAll("Clear Filter (Find)");
+    return true;
 }
 
 export function clearSheetHistory(elementId) {

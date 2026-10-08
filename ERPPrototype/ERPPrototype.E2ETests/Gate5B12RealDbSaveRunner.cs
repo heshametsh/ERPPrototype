@@ -1615,10 +1615,12 @@ internal static class Gate5B12RealDbSaveRunner
             path,
             $"Closure browser journey opened '{path}' instead of the accepted Revo Gate 5C-1 surface.");
 
+        // Filtered-totals line is visible only while a Filter is active
+        // (Open KPI contract 2026-10-06); the closure check needs it attached.
         var aggregates = page.GetByTestId("gate5c1-visible-aggregates");
         await aggregates.WaitForAsync(new LocatorWaitForOptions
         {
-            State = WaitForSelectorState.Visible,
+            State = WaitForSelectorState.Attached,
             Timeout = 30_000
         });
         await page.WaitForFunctionAsync(

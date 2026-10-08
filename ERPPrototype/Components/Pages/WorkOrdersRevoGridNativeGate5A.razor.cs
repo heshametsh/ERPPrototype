@@ -4,6 +4,7 @@ using System.Text.Json;
 using ERPPrototype.Data;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.JSInterop;
 
@@ -24,6 +25,7 @@ public partial class WorkOrdersRevoGridNativeGate5A
     private const string SaveButtonId = "revogrid-gate5b11-save";
     private const string SaveStatusElementId = "revogrid-gate5b11-save-status";
     private const string VisibleAggregateElementId = "revogrid-gate5c1-visible-aggregates";
+    private const string OpenAggregateElementId = "revogrid-open-kpi";
 
     [Parameter]
     public bool EnableChangeEngine { get; set; }
@@ -266,8 +268,8 @@ public partial class WorkOrdersRevoGridNativeGate5A
             var gridModulePath = EnableChangeEngine
                 ? EnableSaveHandshake
                     ? EnableColumnWidth
-                        ? "./js/revoGridGate5B1.js?v=20260916-native-resize-commit-2"
-                        : "./js/revoGridGate5B1.js?v=20260914-empty-sheet-1"
+                        ? "./js/revoGridGate5B1.js?v=20261006-open-kpi-1"
+                        : "./js/revoGridGate5B1.js?v=20261006-open-kpi-1"
                     : EnableHeaderMultiSelection
                     ? "./js/revoGridGate5B1.js?v=20260830-selection-core-r2"
                     : EnableStructureWorkspace
@@ -293,7 +295,7 @@ public partial class WorkOrdersRevoGridNativeGate5A
                 {
                     Version = "4.25.2",
                     WorkYear = SelectedWorkYear,
-                    Rtl = true,
+                    Rtl = false,
                     EnablePaste,
                     EnableRangeClear,
                     EnableExcelFilter,
@@ -326,7 +328,8 @@ public partial class WorkOrdersRevoGridNativeGate5A
                     FinancialErrorElementId,
                     SaveButtonId,
                     SaveStatusElementId,
-                    VisibleAggregateElementId
+                    VisibleAggregateElementId,
+                    OpenAggregateElementId
                 });
 
             GridInitialized = true;
@@ -461,20 +464,31 @@ public partial class WorkOrdersRevoGridNativeGate5A
 
     private async Task HandleYearChangedAsync(ChangeEventArgs eventArgs)
     {
-        if (
-            IsLoading ||
-            IsYearLoading ||
-            string.IsNullOrWhiteSpace(CurrentUserId) ||
-            !int.TryParse(
+        if (!int.TryParse(
                 Convert.ToString(
                     eventArgs.Value,
                     CultureInfo.InvariantCulture),
                 NumberStyles.Integer,
                 CultureInfo.InvariantCulture,
-                out var requestedYear) ||
-            requestedYear == SelectedWorkYear)
+                out var requestedYear))
         {
             return;
+        }
+
+        await SwitchYearAsync(requestedYear);
+    }
+
+    // The single Work-Year switch path (year selector and Find "open year").
+    // Returns true only when the requested year is now the open dataset.
+    private async Task<bool> SwitchYearAsync(int requestedYear)
+    {
+        if (
+            IsLoading ||
+            IsYearLoading ||
+            string.IsNullOrWhiteSpace(CurrentUserId) ||
+            requestedYear == SelectedWorkYear)
+        {
+            return false;
         }
 
         var previousYear = SelectedWorkYear;
@@ -493,7 +507,7 @@ public partial class WorkOrdersRevoGridNativeGate5A
                     ? "احفظ أو ارجع التعديلات أولًا قبل تغيير السنة."
                     : "انتظر اكتمال التعديل الحالي ثم غيّر السنة.";
                 StateHasChanged();
-                return;
+                return false;
             }
 
             datasetSwitchStarted = true;
@@ -569,6 +583,212 @@ public partial class WorkOrdersRevoGridNativeGate5A
         {
             IsYearLoading = false;
             StateHasChanged();
+        }
+
+        return SelectedWorkYear == requestedYear;
+    }
+
+    // ---- Work Order Find (Excel-like; never filters rows) ----
+
+    private enum FindActionKind
+    {
+        None,
+        ClearFilter,
+        OpenYear
+    }
+
+    private sealed class FindSheetMatch
+    {
+        public string ClientKey { get; set; } = string.Empty;
+        public string WorkOrderNumber { get; set; } = string.Empty;
+        public string WorkTypeCode { get; set; } = string.Empty;
+    }
+
+    private sealed class FindSheetResult
+    {
+        public List<FindSheetMatch> VisibleMatches { get; set; } = [];
+        public List<FindSheetMatch> HiddenMatches { get; set; } = [];
+    }
+
+    private ElementReference FindInputElement;
+    private string FindQuery = string.Empty;
+    private string FindStatus = string.Empty;
+    private bool FindBusy;
+    private FindActionKind FindPendingAction = FindActionKind.None;
+    private string FindActionLabel = string.Empty;
+    private string FindActionClientKey = string.Empty;
+    private int FindActionYear;
+    private string FindLastQuery = string.Empty;
+    private string FindLastClientKey = string.Empty;
+
+    private void ResetFindResult()
+    {
+        FindStatus = string.Empty;
+        FindPendingAction = FindActionKind.None;
+        FindLastQuery = string.Empty;
+        FindLastClientKey = string.Empty;
+    }
+
+    private async Task HandleFindKeyDownAsync(KeyboardEventArgs eventArgs)
+    {
+        if (eventArgs.Key != "Enter" || FindBusy)
+        {
+            return;
+        }
+
+        await RunFindAsync(advance: true, preferClientKey: null);
+    }
+
+    private async Task HandleFindActionAsync()
+    {
+        if (FindBusy || GridModule is null)
+        {
+            return;
+        }
+
+        switch (FindPendingAction)
+        {
+            case FindActionKind.ClearFilter:
+                var target = FindActionClientKey;
+                FindBusy = true;
+                try
+                {
+                    await GridModule.InvokeAsync<bool>(
+                        "clearFilterForFind",
+                        GridElementId);
+                }
+                finally
+                {
+                    FindBusy = false;
+                }
+
+                await RunFindAsync(advance: false, preferClientKey: target);
+                break;
+
+            case FindActionKind.OpenYear:
+                // Same switch as the year selector: refuses while Dirty.
+                if (await SwitchYearAsync(FindActionYear))
+                {
+                    await RunFindAsync(advance: false, preferClientKey: null);
+                }
+                break;
+        }
+    }
+
+    private async Task RunFindAsync(bool advance, string? preferClientKey)
+    {
+        var query = (FindQuery ?? string.Empty).Trim();
+        FindPendingAction = FindActionKind.None;
+
+        if (query.Length == 0 || GridModule is null || !GridInitialized)
+        {
+            FindStatus = string.Empty;
+            return;
+        }
+
+        if (!query.All(char.IsAsciiDigit))
+        {
+            FindStatus = "اكتب أرقام بس";
+            return;
+        }
+
+        FindBusy = true;
+        try
+        {
+            var result =
+                await GridModule.InvokeAsync<FindSheetResult>(
+                    "findWorkOrders",
+                    GridElementId,
+                    query);
+
+            // Other years only for an exact 9-digit number (server read,
+            // scoped to the employee's own department).
+            var otherYears = query.Length == 9
+                ? (await WorkOrderService.FindWorkOrderYearsAsync(
+                        CurrentUserId,
+                        query))
+                    .Where(year => year != SelectedWorkYear)
+                    .ToList()
+                : [];
+
+            var matches = result.VisibleMatches;
+            var foundKey = string.Empty;
+
+            if (matches.Count > 0)
+            {
+                var index = 0;
+                if (!string.IsNullOrEmpty(preferClientKey))
+                {
+                    index = Math.Max(0, matches.FindIndex(match => match.ClientKey == preferClientKey));
+                }
+                else if (advance && query == FindLastQuery)
+                {
+                    var previous = matches.FindIndex(match => match.ClientKey == FindLastClientKey);
+                    index = previous < 0 ? 0 : (previous + 1) % matches.Count;
+                }
+
+                var match = matches[index];
+                await GridModule.InvokeAsync<bool>(
+                    "focusWorkOrder",
+                    GridElementId,
+                    match.ClientKey);
+                foundKey = match.ClientKey;
+
+                var status = $"{index + 1} من {matches.Count} - {match.WorkTypeCode}";
+                if (result.HiddenMatches.Count > 0)
+                {
+                    status += $" · {result.HiddenMatches.Count} مخفي بالفلتر";
+                }
+
+                if (otherYears.Count > 0)
+                {
+                    status += $" · موجود كمان في سنة {string.Join("، ", otherYears)}";
+                }
+
+                FindStatus = status;
+            }
+            else if (result.HiddenMatches.Count > 0)
+            {
+                FindStatus = "موجود لكن الفلتر مخبّيه";
+                FindPendingAction = FindActionKind.ClearFilter;
+                FindActionLabel = "امسح الفلتر وروح له";
+                FindActionClientKey = result.HiddenMatches[0].ClientKey;
+            }
+            else if (otherYears.Count > 0)
+            {
+                FindStatus = $"موجود في سنة {string.Join("، ", otherYears)}";
+                FindPendingAction = FindActionKind.OpenYear;
+                FindActionYear = otherYears[0];
+                FindActionLabel = $"افتح سنة {otherYears[0]} وروح له";
+            }
+            else
+            {
+                FindStatus = "غير موجود";
+            }
+
+            FindLastQuery = query;
+            FindLastClientKey = foundKey;
+        }
+        catch (JSDisconnectedException)
+        {
+        }
+        finally
+        {
+            FindBusy = false;
+        }
+
+        StateHasChanged();
+
+        // Keep typing / repeated Enter in the Find box.
+        try
+        {
+            await FindInputElement.FocusAsync();
+        }
+        catch (InvalidOperationException)
+        {
+        }
+        catch (JSException)
+        {
         }
     }
 

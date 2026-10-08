@@ -44,7 +44,8 @@ internal sealed class E2ETestDatabase : IAsyncDisposable
     public static async Task<E2ETestDatabase> CreateAsync(
         bool keepDatabase,
         int rowsPerYear = DefaultRowsPerYear,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool findScenario = false)
     {
         if (rowsPerYear is < 1_000 or > 10_000)
         {
@@ -99,6 +100,7 @@ internal sealed class E2ETestDatabase : IAsyncDisposable
             var seed = await SeedAsync(
                 dbContext,
                 rowsPerYear,
+                findScenario,
                 cancellationToken);
 
             return new E2ETestDatabase(
@@ -136,6 +138,7 @@ internal sealed class E2ETestDatabase : IAsyncDisposable
     private static async Task<E2ESeedData> SeedAsync(
         ApplicationDbContext dbContext,
         int rowsPerYear,
+        bool findScenario,
         CancellationToken cancellationToken)
     {
         var currentYear = DateTime.Now.Year;
@@ -222,6 +225,17 @@ internal sealed class E2ETestDatabase : IAsyncDisposable
         dbContext.WorkOrders.AddRange(previousRows);
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        var find = findScenario
+            ? await SeedFindScenarioAsync(
+                dbContext,
+                departmentType.Id,
+                employee.Id,
+                department.Id,
+                currentYear,
+                rowsPerYear,
+                cancellationToken)
+            : null;
+
         var currentFirst = currentRows[0];
         var currentMiddle = currentRows[rowsPerYear / 2 - 1];
         var currentLast = currentRows[^1];
@@ -245,7 +259,121 @@ internal sealed class E2ETestDatabase : IAsyncDisposable
             CurrentYearLastWorkOrderNumber: currentLast.WorkOrderNumber,
             PreviousYearFirstWorkOrderNumber: previousFirst.WorkOrderNumber,
             PreviousYearLastRowId: previousLast.Id,
-            PreviousYearLastWorkOrderNumber: previousLast.WorkOrderNumber);
+            PreviousYearLastWorkOrderNumber: previousLast.WorkOrderNumber,
+            Find: find);
+    }
+
+    // Find scenario: a third (older) Work Year, a second department, and
+    // fixed Work Order Numbers covering every frozen Find rule. Fixture rows
+    // are interleaved between generated rows so reaching them needs scrolling.
+    private static async Task<E2EFindScenario> SeedFindScenarioAsync(
+        ApplicationDbContext dbContext,
+        int departmentTypeId,
+        string employeeId,
+        int departmentId,
+        int currentYear,
+        int rowsPerYear,
+        CancellationToken cancellationToken)
+    {
+        var previousYear = currentYear - 1;
+        var oldestYear = currentYear - 2;
+
+        var otherBranch = new Branch
+        {
+            Name = "فرع آخر — اختبار البحث"
+        };
+
+        var otherDepartment = new Department
+        {
+            Branch = otherBranch,
+            DepartmentTypeId = departmentTypeId
+        };
+
+        dbContext.AddRange(otherBranch, otherDepartment);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        dbContext.WorkOrders.AddRange(
+            CreateYearRows(
+                employeeId,
+                departmentId,
+                oldestYear,
+                workOrderBase: 922_000_000,
+                rowsPerYear));
+
+        var fixtureIndex = 0;
+
+        WorkOrder Fixture(
+            string number,
+            string workTypeCode,
+            int year,
+            int ownerDepartmentId,
+            string basket = WorkOrderBuskets.InProgress)
+        {
+            fixtureIndex++;
+            var slot = (fixtureIndex * 137) % rowsPerYear;
+
+            return new WorkOrder
+            {
+                WorkOrderNumber = number,
+                WorkTypeCode = workTypeCode,
+                WorkYear = year,
+                DisplayOrder = slot * 1_000_000_000L + 500_000_000L,
+                AssignmentDate = new DateTime(year, 6, 15),
+                WorkOrderValue = 75_000m,
+                PartialAmount = null,
+                Busket = basket,
+                DepartmentId = ownerDepartmentId,
+                CreatedAt = DateTime.UtcNow,
+                CreatedBy = employeeId
+            };
+        }
+
+        var scenario = new E2EFindScenario(
+            OldestYear: oldestYear,
+            DuplicateTypesNumber: "930000001",
+            PreviousYearOnlyNumber: "930000002",
+            OldestYearOnlyNumber: "930000003",
+            CurrentAndPreviousNumber: "930000004",
+            OtherDepartmentNumber: "930000005",
+            OtherDepartmentPreviousYearNumber: "930000006",
+            CompletedBasketNumber: "930000007",
+            FilterHiddenNumber: "930000008",
+            FilterHiddenWorkTypeCode: "802",
+            PrefixQuery: "93000002",
+            PrefixOpenYearMatches:
+            [
+                "930000020",
+                "930000021",
+                "930000022",
+                "930000023",
+                "930000024"
+            ],
+            NotFoundNumber: "939999999");
+
+        dbContext.WorkOrders.AddRange(
+            Fixture(scenario.DuplicateTypesNumber, "401", currentYear, departmentId),
+            Fixture(scenario.DuplicateTypesNumber, "402", currentYear, departmentId),
+            Fixture(scenario.PreviousYearOnlyNumber, "401", previousYear, departmentId),
+            Fixture(scenario.OldestYearOnlyNumber, "801", oldestYear, departmentId),
+            Fixture(scenario.CurrentAndPreviousNumber, "402", currentYear, departmentId),
+            Fixture(scenario.CurrentAndPreviousNumber, "801", previousYear, departmentId),
+            Fixture(scenario.OtherDepartmentNumber, "401", currentYear, otherDepartment.Id),
+            Fixture(scenario.OtherDepartmentPreviousYearNumber, "401", previousYear, otherDepartment.Id),
+            Fixture(scenario.CompletedBasketNumber, "401", currentYear, departmentId, WorkOrderBuskets.WorkOrderCompleted),
+            Fixture(scenario.FilterHiddenNumber, scenario.FilterHiddenWorkTypeCode, currentYear, departmentId),
+            Fixture("930000020", "401", currentYear, departmentId),
+            Fixture("930000021", "402", currentYear, departmentId),
+            Fixture("930000022", "801", currentYear, departmentId),
+            Fixture("930000023", "802", currentYear, departmentId),
+            Fixture("930000024", "401", currentYear, departmentId),
+            // Same prefix but outside the open year / the department:
+            // a short (prefix) search must never count these.
+            Fixture("930000025", "401", previousYear, departmentId),
+            Fixture("930000026", "401", currentYear, otherDepartment.Id));
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return scenario;
     }
 
     private static List<WorkOrder> CreateYearRows(
@@ -338,4 +466,20 @@ internal sealed record E2ESeedData(
     string CurrentYearLastWorkOrderNumber,
     string PreviousYearFirstWorkOrderNumber,
     int PreviousYearLastRowId,
-    string PreviousYearLastWorkOrderNumber);
+    string PreviousYearLastWorkOrderNumber,
+    E2EFindScenario? Find = null);
+
+internal sealed record E2EFindScenario(
+    int OldestYear,
+    string DuplicateTypesNumber,
+    string PreviousYearOnlyNumber,
+    string OldestYearOnlyNumber,
+    string CurrentAndPreviousNumber,
+    string OtherDepartmentNumber,
+    string OtherDepartmentPreviousYearNumber,
+    string CompletedBasketNumber,
+    string FilterHiddenNumber,
+    string FilterHiddenWorkTypeCode,
+    string PrefixQuery,
+    IReadOnlyList<string> PrefixOpenYearMatches,
+    string NotFoundNumber);

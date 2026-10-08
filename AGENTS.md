@@ -39,6 +39,14 @@ Keep the workflow proportional to the risk. Do not require preview packages or a
 
 ## Verification
 
+### General modification gate
+
+Before any Product runtime/schema/business edit, use the single project-wide modification gate in `ERPPrototype/Documentation/AI_WORK_CYCLE.md`. The gate is risk-adaptive, not feature-specific: freeze Expected first, prove the current defect with an independent oracle, classify RED before Product code changes, and require the same oracle to move RED -> GREEN.
+
+For employee-visible interactions, internal Grid/provider/store state is never sufficient by itself. Use real browser input plus rendered DOM/geometry tied to stable `prop`/FieldKey identity; measure before/during/after when the interaction can jump on release. Any `UNCLASSIFIED` RED blocks Product edits. Two consecutive failed Product corrections on the same interaction block a third patch until source/runtime forensics is redone.
+
+Keep acceptance states distinct: `GATE_RED`, `AUTOMATION_GREEN`, `MANUAL_PENDING`, `ACCEPTED`. A broad regression does not claim coverage for a focused feature gate it did not actually run.
+
 Classify every red result before changing product code:
 
 - **PRODUCT** — runtime/business defect;
@@ -107,7 +115,7 @@ Stop before implementation when evidence conflicts on a material rule, a working
 
 ## Memory discipline
 
-Do not duplicate detailed memory rules here. `AI_LIVE_MEMORY_PROTOCOL.md` owns synchronization/closure and `AI_WORK_CYCLE.md` owns the engineering cycle.
+Do not duplicate detailed memory rules here. `AI_CONTROL_CENTER.md` routes the active memory owners, `AI_WORK_CYCLE.md` owns synchronization/closure mechanics, and `AI_LIVE_MEMORY_PROTOCOL.md` remains a compatibility pointer only.
 
 At closure, Current State must be compact, the Work Log must preserve the material receipts, and completed-mission Metrics must exist. Git truth is always read live instead of copied into Current State.
 

@@ -6,6 +6,70 @@ const CORE_MONEY_COLUMNS = Object.freeze([
     { field: "remainingAmount", label: "المتبقي", custom: false }
 ]);
 
+// Open Work Orders KPI (Tabulator parity): whole loaded year, every row whose
+// basket is not completed, core money fields only, independent of Filter.
+const COMPLETED_BASKET = "انتهاء امر العمل";
+const BASKET_FIELD = "basket";
+
+const OPEN_KPI_CARDS = Object.freeze([
+    { id: "workOrderValue", label: "Work Order Value", variant: "two" },
+    { id: "partialAmount", label: "Partial Amount", variant: "three" },
+    { id: "remainingAmount", label: "Remaining Amount", variant: "four" }
+]);
+
+const OPEN_KPI_ICONS = Object.freeze({
+    one: '<rect x="5" y="5" width="14" height="16" rx="2"></rect><path d="M9 5V3h6v2M8 10h8M8 14h8M8 18h5"></path>',
+    two: '<ellipse cx="12" cy="6" rx="7" ry="3"></ellipse><path d="M5 6v4c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 10v4c0 1.7 3.1 3 7 3s7-1.3 7-3v-4M5 14v4c0 1.7 3.1 3 7 3s7-1.3 7-3v-4"></path>',
+    three: '<path d="M4 7h14a2 2 0 0 1 2 2v10H6a2 2 0 0 1-2-2zM4 7l2-3h10l2 3"></path><path d="M15 12h7v4h-7a2 2 0 0 1 0-4z"></path>',
+    four: '<rect x="5" y="3" width="14" height="18" rx="2"></rect><path d="M8 7h8M8 11h2M12 11h2M16 11h.1M8 15h2M12 15h2M16 15h.1M8 18h2M12 18h2M16 18h.1"></path>'
+});
+
+function compactAmountText(fullText) {
+    const numeric = Number(String(fullText ?? "").replace(/,/g, ""));
+    if (!Number.isFinite(numeric)) {
+        return String(fullText ?? "");
+    }
+
+    const absolute = Math.abs(numeric);
+    if (absolute >= 1_000_000_000) {
+        return `${(numeric / 1_000_000_000).toFixed(2)}B`;
+    }
+    if (absolute >= 1_000_000) {
+        return `${(numeric / 1_000_000).toFixed(absolute >= 100_000_000 ? 1 : 2)}M`;
+    }
+    return String(fullText ?? "");
+}
+
+function createKpiCard(testId, label, fullText, variant, compactInSplit) {
+    const card = document.createElement("article");
+    card.className = `kpi-card kpi-card-${variant}`;
+    card.dataset.testid = testId;
+
+    const icon = document.createElement("div");
+    icon.className = "metric-icon";
+    icon.setAttribute("aria-hidden", "true");
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.innerHTML = OPEN_KPI_ICONS[variant] ?? "";
+    icon.append(svg);
+
+    const copy = document.createElement("div");
+    const caption = document.createElement("span");
+    caption.textContent = label;
+    caption.title = label;
+
+    const value = document.createElement("strong");
+    value.title = fullText;
+    value.textContent =
+        compactInSplit && window.erpAppLayout?.isSplit?.() === true
+            ? compactAmountText(fullText)
+            : fullText;
+
+    copy.append(caption, value);
+    card.append(icon, copy);
+    return card;
+}
+
 const CORE_CONTENT_FIELDS = Object.freeze([
     "workOrderNumber",
     "workTypeCode",
@@ -165,6 +229,13 @@ export function createRevoGridVisibleAggregates(options) {
             ? options.getHiddenProps
             : () => [];
 
+    const openHost = options?.openHost instanceof HTMLElement
+        ? options.openHost
+        : null;
+
+    // Route-owned section of the visible totals: shown only while filtering.
+    const filterSection = host.closest("[data-visible-filter-summary]");
+
     let destroyed = false;
     let scheduled = false;
     let scheduledReason = "initialize";
@@ -210,10 +281,44 @@ export function createRevoGridVisibleAggregates(options) {
         );
     }
 
+    function renderOpen(open) {
+        if (!openHost || !open) {
+            return;
+        }
+
+        const cards = [
+            createKpiCard(
+                "open-kpi-count",
+                "Open Work Orders",
+                new Intl.NumberFormat("en-US").format(open.rowCount),
+                "one",
+                false)
+        ];
+
+        for (const card of OPEN_KPI_CARDS) {
+            cards.push(
+                createKpiCard(
+                    `open-kpi-${card.id}`,
+                    card.label,
+                    formatCents(BigInt(open.totals[card.id] ?? "0")),
+                    card.variant,
+                    true));
+        }
+
+        openHost.replaceChildren(...cards);
+        openHost.dataset.aggregateReady = "true";
+    }
+
     function render(state, definitions) {
         if (destroyed) {
             return;
         }
+
+        if (filterSection) {
+            filterSection.hidden = !hasActiveFilters();
+        }
+
+        renderOpen(state.open);
 
         host.replaceChildren();
         host.dataset.aggregateReady = "true";
@@ -327,6 +432,49 @@ export function createRevoGridVisibleAggregates(options) {
             }
         }
 
+        let open = null;
+        if (openHost) {
+            const source = await grid.getSource("rgRow");
+            if (destroyed || token !== refreshToken) {
+                return lastState;
+            }
+
+            const openTotals = Object.fromEntries(
+                CORE_MONEY_COLUMNS.map(definition => [definition.field, 0n])
+            );
+            let openRowCount = 0;
+
+            for (const row of Array.isArray(source) ? source : []) {
+                if (
+                    !isAggregateWorkOrderRow(row, customColumns) ||
+                    text(row?.[BASKET_FIELD]) === COMPLETED_BASKET
+                ) {
+                    continue;
+                }
+
+                openRowCount++;
+
+                for (const definition of CORE_MONEY_COLUMNS) {
+                    const parsed = parseAmountToCents(row?.[definition.field]);
+                    if (
+                        parsed.valid &&
+                        !parsed.empty &&
+                        Number.isSafeInteger(parsed.cents)
+                    ) {
+                        openTotals[definition.field] += BigInt(parsed.cents);
+                    }
+                }
+            }
+
+            open = {
+                rowCount: openRowCount,
+                totals: Object.fromEntries(
+                    Object.entries(openTotals)
+                        .map(([field, cents]) => [field, cents.toString()])
+                )
+            };
+        }
+
         revision++;
         lastState = {
             ready: true,
@@ -336,6 +484,7 @@ export function createRevoGridVisibleAggregates(options) {
                 Object.entries(totals)
                     .map(([field, cents]) => [field, cents.toString()])
             ),
+            open,
             reason: String(reason || "refresh")
         };
 
@@ -387,7 +536,8 @@ export function createRevoGridVisibleAggregates(options) {
         pendingCell = {
             clientKey: text(detail.model?.clientKey),
             field,
-            money: moneyFieldSet().has(field),
+            // Basket decides Open KPI membership, so it refreshes like money.
+            money: moneyFieldSet().has(field) || field === BASKET_FIELD,
             newRow
         };
     };
@@ -412,7 +562,7 @@ export function createRevoGridVisibleAggregates(options) {
             }
 
             for (const field of Object.keys(proposed ?? {})) {
-                if (moneyFields.has(field)) {
+                if (moneyFields.has(field) || field === BASKET_FIELD) {
                     money = true;
                 }
             }
@@ -539,7 +689,8 @@ export function createRevoGridVisibleAggregates(options) {
         const moneyFields = moneyFieldSet();
 
         if (operations.some(operation =>
-            moneyFields.has(text(operation?.field)))) {
+            moneyFields.has(text(operation?.field)) ||
+            text(operation?.field) === BASKET_FIELD)) {
             scheduleRefresh("history-money");
             return;
         }

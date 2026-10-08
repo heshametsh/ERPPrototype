@@ -1,3 +1,14 @@
+## CURRENT REGRESSION OVERRIDE - 2026-09-17
+
+- Canonical Revo Work Orders route: /work-orders-revogrid. Historical Gate-stage routes/runners are retired.
+- Accepted Visibility behavior remains year-scoped; Width remains department-scoped. The focused H00-H05 browser suite remains PASS.
+- Visibility Single-Owner cleanup is automation-green: legacy `DepartmentColumnLayouts.IsHidden` is removed, the focused ownership gate is PASS, SQL Integration is 37/37 PASS, and the one-command full regression is PASS.
+- Custom Date Contract is automation-green: Custom Date accepts real `DD/MM/YYYY` dates from 0001 through 9999; Assignment Date / WorkYear remains 2000-2100. Focused Custom Date gate PASS, SQL Integration 37/37 PASS, and full regression PASS.
+- Full-regression Integration step now runs the executable Integration suite with `dotnet run`; the previous `dotnet test` call did not execute the console-runner cases and was a TEST-HARNESS gap.
+- Column Width (2026-10-06, uncommitted): focused runner `--revo-gate5c1-column-width-focused` W00-W06 PASS (LTR surface, live grow/shrink, Escape, scrolled grow, Hide/Unhide width identity, body-cell content minimum). Not yet in the full regression script. Checkpoint 7b62e58 (W00-W10) is MANUAL RED / superseded.
+- Older Phase 9.3E material is historical where it refers to pre-Revo visibility migration/counts or department-wide hidden state. DEC-068 plus the single-owner closure evidence is current.
+
+---
 # ACCEPTANCE OVERRIDE - 2026-09-15 - CANONICAL REVO CLEANUP + STARTUP SECURITY
 
 - User manual browser acceptance: **PASS** on `/work-orders-revogrid`.
@@ -726,12 +737,14 @@ Quantitative acceptance must use the Performance JSON reports, not the diagnosti
 
 ## Phase 9.3E — Custom Filters, Money Sort, and Hide/Unhide
 
+> Historical Tabulator-era checklist. Its department-wide hidden-state expectations are superseded by DEC-068 and the accepted Revo visibility closure: width is department-scoped, visibility is Work-Year-scoped. Current evidence is manual acceptance + H00-H05 + SQL Integration 36/36 + full regression PASS.
+
 Server gate:
 
 - [ ] Release Build succeeds.
-- [ ] Apply migration `20260805183000_AddDepartmentColumnVisibility`.
+- [x] Historical pre-Revo migration item; superseded by accepted `20260912193138_AddYearScopedColumnVisibility` evidence.
 - [ ] Core Integration suite reports `25/25 passed`.
-- [ ] The column-layout test proves Width and IsHidden persist across years, stay department-scoped, and can be unhidden.
+- [x] Historical department-wide visibility expectation; superseded by DEC-068: Width is department-scoped and Visibility is Work-Year-scoped.
 - [ ] The custom-column immutability test proves an attempted type change is rejected even when the column is empty.
 
 Focused browser check:
@@ -1209,3 +1222,12 @@ No product or test-runtime change is authorized by this checklist addition; it r
 - [x] `Run-ERP-Full-Regression.ps1` no longer references historical Gates or fixed B12 module tokens and includes Startup Security.
 - [x] Final one-command `ERP FULL REGRESSION : PASS` after the security fix.
 - [ ] Manual browser acceptance is still required before commit.
+
+### PARITY A/B — Find + Open KPI (2026-10-06)
+
+- [x] `--revo-find-focused` F01-F11 PASS (RED first: control absent); Integration "Find cross-year lookup is scoped to the own department" PASS.
+- [x] `--revo-open-kpi-focused` K01-K06 PASS vs SQL for 3 years (RED first: cards absent).
+- [x] Regression: Atomic Year Switch, Employee Real Workday, B12, Visibility, Width PASS (Workday/B12 harness now waits for totals attached+ready, not visible).
+- [x] Both runners wired in `Run-ERP-Full-Regression.ps1` (48.6, 48.7 + preflight). Full script not run.
+- [ ] Integration suite 37/38 on this machine: Phase 9.3D migration gate = ENVIRONMENT (single AttachDbFilename).
+- [ ] Manual acceptance: `MANUAL_TEST_BATCH_2026-10-06.md` sections G and H.

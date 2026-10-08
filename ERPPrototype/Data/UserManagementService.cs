@@ -8,13 +8,16 @@ public sealed class UserManagementService
 {
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly IDbContextFactory<ApplicationDbContext> _dbFactory;
+    private readonly AdminAuthorizationService _adminAuthorization;
 
     public UserManagementService(
         UserManager<ApplicationUser> userManager,
-        IDbContextFactory<ApplicationDbContext> dbFactory)
+        IDbContextFactory<ApplicationDbContext> dbFactory,
+        AdminAuthorizationService adminAuthorization)
     {
         _userManager = userManager;
         _dbFactory = dbFactory;
+        _adminAuthorization = adminAuthorization;
     }
 
     public async Task<UserCreationResult> CreateBranchUserAsync(
@@ -63,20 +66,11 @@ public sealed class UserManagementService
         await using var dbContext =
             await _dbFactory.CreateDbContextAsync(cancellationToken);
 
-        var actorIsAdmin = await (
-            from account in dbContext.Users.AsNoTracking()
-            join userRole in dbContext.UserRoles.AsNoTracking()
-                on account.Id equals userRole.UserId
-            join role in dbContext.Roles.AsNoTracking()
-                on userRole.RoleId equals role.Id
-            where
-                account.Id == actorUserId &&
-                account.IsActive &&
-                role.Name == AppRoles.Admin
-            select account.Id)
-            .AnyAsync(cancellationToken);
+        var authorization = await _adminAuthorization.AuthorizeAsync(
+            actorUserId,
+            cancellationToken);
 
-        if (!actorIsAdmin)
+        if (!authorization.Succeeded)
         {
             return UserCreationResult.Failure(
                 "غير مصرح لهذا الحساب بإنشاء مستخدمين.");

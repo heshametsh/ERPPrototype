@@ -651,6 +651,10 @@ export function createRevoGridColumnVisibility(options) {
         };
     }
 
+    function getDatasetRecords() {
+        return cloneValue(current);
+    }
+
     function destroy() {
         if (destroyed) {
             return;
@@ -669,6 +673,7 @@ export function createRevoGridColumnVisibility(options) {
         unhideColumn,
         describeContext,
         getState,
+        getDatasetRecords,
         getSaveSnapshot,
         acceptSavedVisibility,
         discardHistoryForMissingColumns,

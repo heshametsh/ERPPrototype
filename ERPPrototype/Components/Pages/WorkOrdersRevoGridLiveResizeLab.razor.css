@@ -1,0 +1,9 @@
+.live-resize-lab-banner {
+    margin: 8px 12px;
+    padding: 7px 12px;
+    border: 1px solid #c5d3dd;
+    border-radius: 7px;
+    background: #f7fafc;
+    color: #29485d;
+    font: 700 13px/1.2 "Segoe UI", Tahoma, Arial, sans-serif;
+}

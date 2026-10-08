@@ -16,6 +16,12 @@ internal static class IntegrationTestRunner
                 "--stress",
                 StringComparison.OrdinalIgnoreCase));
 
+        var visibilityOwnershipGate = args.Any(argument =>
+            string.Equals(
+                argument,
+                "--visibility-ownership-gate",
+                StringComparison.OrdinalIgnoreCase));
+
         Console.WriteLine(
             "ERPPrototype WorkOrder SQL Server integration tests");
         Console.WriteLine(
@@ -30,7 +36,27 @@ internal static class IntegrationTestRunner
 
         var planTests = new WorkOrderSavePlanBuilderTests();
         var integrationTests = new WorkOrderSaveIntegrationTests(database);
+        var adminSecurityTests = new AdminSecurityIntegrationTests(database);
+        var findYearsTests = new FindWorkOrderYearsIntegrationTests(database);
         var migrationTests = new CustomColumnMigrationIntegrationTests();
+        var visibilityOwnershipTests = new VisibilityOwnershipModificationGate(database);
+
+        if (visibilityOwnershipGate)
+        {
+            Console.WriteLine("Visibility single-owner modification gate\n");
+            try
+            {
+                await visibilityOwnershipTests.LayoutNoLongerOwnsVisibilityAsync();
+                Console.WriteLine("VISIBILITY SINGLE-OWNER GATE: PASS");
+                return 0;
+            }
+            catch (Exception exception)
+            {
+                Console.WriteLine("VISIBILITY SINGLE-OWNER GATE: RED");
+                Console.WriteLine(exception.Message);
+                return 1;
+            }
+        }
 
         var cases = new List<(string Name, Func<Task> Execute)>
         {
@@ -56,6 +82,11 @@ internal static class IntegrationTestRunner
                 "Save plan rejects missing RowVersion",
                 planTests.RejectsMissingRowVersionAsync),
             (
+                "Admin mutations require fresh server authorization",
+                adminSecurityTests.AdminMutationsRequireFreshAuthorizationAsync),
+            (
+                "Find cross-year lookup is scoped to the own department",
+                findYearsTests.CrossYearLookupIsScopedToOwnDepartmentAsync),            (
                 "Employee cannot modify another department",
                 integrationTests.EmployeeCannotModifyAnotherDepartmentAsync),
             (
@@ -131,8 +162,8 @@ internal static class IntegrationTestRunner
                 "Column layout persists across years and remains department-scoped",
                 integrationTests.ColumnLayoutPersistsAcrossYearsAndRemainsDepartmentScopedAsync),
             (
-                "Revo column visibility is isolated by work year and ignores legacy hidden state",
-                integrationTests.YearScopedColumnVisibilityIsIndependentFromLegacyLayoutAsync),
+                "Revo column visibility is isolated by work year",
+                integrationTests.YearScopedColumnVisibilityIsIndependentByYearAsync),
             (
                 "Revo column visibility rejects hide-all and stale RowVersion",
                 integrationTests.YearScopedColumnVisibilityRejectsHideAllAndStaleRowVersionAsync),

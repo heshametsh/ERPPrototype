@@ -5,11 +5,18 @@
 @using ERPPrototype.Data
 @using ERPPrototype.Data.Entities
 @using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Identity
 @using Microsoft.EntityFrameworkCore
 
 @attribute [Authorize(Roles = AppRoles.Admin)]
 
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject AdminAuthorizationService AdminAuthorizationService
+@inject AdminBranchService AdminBranchService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject UserManager<ApplicationUser> UserManager
+@inject NavigationManager NavigationManager
 
 <PageTitle>لوحة الإدارة</PageTitle>
 
@@ -168,6 +175,11 @@
 
     protected override async Task OnInitializedAsync()
     {
+        if (!await EnsureAdminAuthorizedAsync())
+        {
+            return;
+        }
+
         await LoadBranchesAsync();
     }
 
@@ -185,75 +197,25 @@
     private async Task AddBranchAsync()
     {
         Message = string.Empty;
-
-        var branchName = NewBranchName.Trim();
-
-        if (string.IsNullOrWhiteSpace(branchName))
-        {
-            ShowError("اكتب اسم الفرع أولًا.");
-            return;
-        }
-
         IsSaving = true;
 
         try
         {
-            await using var dbContext =
-                await DbFactory.CreateDbContextAsync();
+            var actorUserId = await GetCurrentActorUserIdAsync();
+            var result = await AdminBranchService.AddBranchAsync(
+                actorUserId,
+                NewBranchName);
 
-            var alreadyExists = await dbContext.Branches
-                .AnyAsync(branch => branch.Name == branchName);
-
-            if (alreadyExists)
+            if (!result.Succeeded)
             {
-                ShowError("يوجد فرع مسجل بنفس الاسم.");
+                ShowError(result.ErrorMessage);
                 return;
             }
-
-            var departmentTypes = await dbContext.DepartmentTypes
-                .AsNoTracking()
-                .Where(departmentType =>
-                    StandardDepartmentTypes.All.Contains(
-                        departmentType.Name))
-                .ToListAsync();
-
-            if (departmentTypes.Count !=
-                StandardDepartmentTypes.All.Count)
-            {
-                ShowError(
-                    "تعذر إنشاء الفرع لأن أنواع الأقسام الأساسية غير مكتملة.");
-
-                return;
-            }
-
-            var branch = new Branch
-            {
-                Name = branchName
-            };
-
-            foreach (var departmentType in departmentTypes)
-            {
-                branch.Departments.Add(new Department
-                {
-                    DepartmentTypeId = departmentType.Id
-                });
-            }
-
-            dbContext.Branches.Add(branch);
-
-            await dbContext.SaveChangesAsync();
 
             NewBranchName = string.Empty;
-
             await LoadBranchesAsync();
-
             ShowSuccess(
                 "تمت إضافة الفرع وإنشاء أقسامه الأساسية بنجاح.");
-        }
-        catch (DbUpdateException)
-        {
-            ShowError(
-                "تعذر حفظ الفرع. قد يكون الاسم مستخدمًا بالفعل.");
         }
         finally
         {
@@ -287,58 +249,25 @@
             return;
         }
 
-        var branchName = EditingBranchName.Trim();
-
-        if (string.IsNullOrWhiteSpace(branchName))
-        {
-            ShowError("اسم الفرع لا يمكن أن يكون فارغًا.");
-            return;
-        }
-
         IsSaving = true;
 
         try
         {
-            await using var dbContext =
-                await DbFactory.CreateDbContextAsync();
+            var actorUserId = await GetCurrentActorUserIdAsync();
+            var result = await AdminBranchService.RenameBranchAsync(
+                actorUserId,
+                EditingBranchId.Value,
+                EditingBranchName);
 
-            var branch = await dbContext.Branches
-                .SingleOrDefaultAsync(item =>
-                    item.Id == EditingBranchId.Value);
-
-            if (branch is null)
+            if (!result.Succeeded)
             {
-                ShowError("الفرع المطلوب تعديله غير موجود.");
-
-                CancelBranchEdit();
+                ShowError(result.ErrorMessage);
                 return;
             }
-
-            var alreadyExists = await dbContext.Branches
-                .AnyAsync(item =>
-                    item.Id != branch.Id &&
-                    item.Name == branchName);
-
-            if (alreadyExists)
-            {
-                ShowError("يوجد فرع آخر مسجل بنفس الاسم.");
-                return;
-            }
-
-            branch.Name = branchName;
-
-            await dbContext.SaveChangesAsync();
 
             CancelBranchEdit();
-
             await LoadBranchesAsync();
-
             ShowSuccess("تم تعديل اسم الفرع بنجاح.");
-        }
-        catch (DbUpdateException)
-        {
-            ShowError(
-                "تعذر تعديل الفرع. قد يكون الاسم مستخدمًا بالفعل.");
         }
         finally
         {
@@ -381,6 +310,33 @@
         Message = string.Empty;
     }
 
+    private async Task<string?> GetCurrentActorUserIdAsync()
+    {
+        var authenticationState =
+            await AuthenticationStateProvider.GetAuthenticationStateAsync();
+
+        return UserManager.GetUserId(authenticationState.User);
+    }
+
+    private async Task<bool> EnsureAdminAuthorizedAsync()
+    {
+        var actorUserId = await GetCurrentActorUserIdAsync();
+        var authorization = await AdminAuthorizationService.AuthorizeAsync(
+            actorUserId);
+
+        if (authorization.Succeeded)
+        {
+            return true;
+        }
+
+        var target = authorization.Failure ==
+            AdminAuthorizationFailure.MustChangePassword
+                ? "/Account/Manage/ChangePassword"
+                : "/Account/AccessDenied";
+
+        NavigationManager.NavigateTo(target, forceLoad: true);
+        return false;
+    }
     private void ShowSuccess(string message)
     {
         Message = message;

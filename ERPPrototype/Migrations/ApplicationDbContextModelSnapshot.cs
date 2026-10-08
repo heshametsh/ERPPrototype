@@ -235,11 +235,6 @@ namespace ERPPrototype.Migrations
                         .IsUnicode(false)
                         .HasColumnType("varchar(40)");
 
-                    b.Property<bool>("IsHidden")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bit")
-                        .HasDefaultValue(false);
-
                     b.Property<byte[]>("RowVersion")
                         .IsConcurrencyToken()
                         .IsRequired()

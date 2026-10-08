@@ -12,6 +12,27 @@ Read Current State, live Git, current code, and the latest relevant executed evi
 
 Describe employee-visible behavior and explicit non-goals before design. Ask the user only when materially different product behaviors remain possible.
 
+### 1.5. General modification gate - mandatory before Product edits
+
+This is one project-wide gate, not a feature-specific gate. Before changing Product runtime/schema/business behavior, freeze the expected employee-visible contract and prove the current defect or missing contract with independent evidence.
+
+1. **Choose the proof class from the risk** - Visual Interaction, Validation, Persistence/Transaction, State/History, Security/Authorization, or Ownership/Schema. Use the lowest independent oracle that can actually disprove the Product behavior.
+2. **RED before Product edit** - when fixing a defect, add or reuse test-only evidence that fails on the current Product for the decided contract. If the reported defect cannot be reproduced, do not edit Product code; investigate the oracle/environment first.
+3. **Independent oracle** - the acceptance oracle must not merely read the same internal state the Product path writes. A self-confirming store/provider assertion may supplement evidence, but cannot close employee-visible behavior by itself.
+4. **Visual interaction rule** - Resize/Drag/RTL/Scroll/Selection/Focus/Clipboard/render-lifecycle gates must use real browser input and rendered DOM/geometry. Bind the actual visible control/boundary to stable `prop`/FieldKey identity and measure the user-relevant result. When timing matters, capture before, during, and after the gesture/MouseUp. Internal Revo provider/store values are diagnostic/state evidence only, never the sole rendered-behavior oracle.
+5. **Validation rule** - exercise the same boundary values through client and server authority; include valid edges plus invalid calendar/type/business cases relevant to the contract.
+6. **Persistence rule** - prove database/RowVersion/transaction state independently and, when user-visible, reload the Product surface. In-memory Dirty/state alone is not persistence evidence.
+7. **State/History rule** - prove both History/Baseline state and the resulting visible/business state. Do not accept counters alone when the employee-visible result can diverge.
+8. **Security rule** - prove both allow and deny paths using fresh authoritative account/permission state; UI visibility alone is not authorization evidence.
+9. **Ownership/schema rule** - prove the unwanted owner is absent and the intended owner remains authoritative, then run behavior regression for the affected path.
+10. **Same gate RED -> GREEN** - freeze Expected before Product edit. The same employee contract/oracle that proves RED must turn GREEN after the correction; do not rewrite Expected to fit the implementation.
+11. **Unclassified means stop** - any `UNCLASSIFIED` RED blocks Product edits for that mission until classified as PRODUCT, TEST/HARNESS, BUILD/STALE, TOOLING, or ENVIRONMENT with evidence.
+12. **Two Product failures means freeze** - after two consecutive Product corrections on the same interaction/contract fail or create a new interaction defect, no third Product patch. Return to source/runtime forensics and the original behavior contract first.
+13. **Regression truthfulness** - a Full Regression may be called coverage for the changed feature only if it actually invokes that feature's focused gate. Otherwise report both truths separately: focused gate status and broader regression status.
+14. **Acceptance states are explicit** - `GATE_RED` -> `AUTOMATION_GREEN` -> `MANUAL_PENDING` (when hands-on is required) -> `ACCEPTED`. Never collapse Automation Green into Manual/Final acceptance.
+
+For employee-visible interaction work, manual acceptance happens immediately after focused Automation Green unless the user explicitly chooses to defer it. If deferred, keep the feature at `MANUAL_PENDING` and do not describe it as accepted.
+
 ### 2. Reference and ownership
 
 For high-risk Grid behavior/API decisions, run the focused legacy Tabulator → exact installed RevoGrid Community version/source → relevant PUBLIC RevoGrid Pro docs/demos/APIs → ERP ownership pass. Pro is a design/UX/architecture reference only; never assume proprietary source or chase parity for its own sake.
@@ -69,7 +90,9 @@ For Work Orders closure, prefer the existing `Run-ERP-Full-Regression.ps1` after
 
 ### Short-turn remote execution cadence
 
-For interactive Remote Desktop work, default to **one material change + one focused proof per assistant turn**, then report the result before chaining more work. Run broader regression in a separate turn/batch after the focused proof is green. Manual user acceptance is a separate stop point before checkpoint/commit.
+For interactive Remote Desktop **Product changes**, default to **one material change + one focused proof per assistant turn**, then report the result before chaining more Product changes. Run broader regression in a separate turn/batch after the focused proof is green. Manual user acceptance is a separate stop point before checkpoint/commit.
+
+For **Review / Research / Forensics / Audit** work, do not apply the short-turn stop rule. Continue the investigation automatically through its planned evidence-gathering steps and return only when the review is complete, a real user decision is required, or a genuine safety/access blocker prevents continuation. A parser error, unavailable command, failed probe, or other recoverable tooling error is **not** a stop point: use the simplest safe fallback, record the tooling issue when material, and continue the same review.
 
 Material Build/Test/Regression commands expected to take more than a few seconds must use `Tools/AI/Invoke-AITrackedStep.ps1` by default so `AI_EXECUTION_LOG.csv` receives timing/outcome/classification automatically. If a material run was not tracked, record the telemetry gap in `AI_WORK_LOG.md`; do not invent retrospective durations.
 

@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 namespace ERPPrototype.Data;
 
 /// <summary>
-/// Owns persisted column width and visibility for one department. Layouts are
+/// Owns persisted column width for one department. Layouts are
 /// shared by all years and cover both core and custom work-order fields.
 /// </summary>
 public static class DepartmentColumnLayoutService
@@ -73,10 +73,7 @@ public static class DepartmentColumnLayoutService
 
         if (!configurationChanged)
         {
-            return ValidateVisibleColumnExists(
-                allowedFields,
-                existingByField,
-                existing);
+            return DepartmentColumnLayoutPreparationResult.Success(existing);
         }
 
         var incoming = incomingLayouts ?? [];
@@ -119,12 +116,9 @@ public static class DepartmentColumnLayoutService
                         "The column layout was changed in another session. Refresh the sheet and try again.");
                 }
 
-                if (
-                    existingLayout.Width != input.Width ||
-                    existingLayout.IsHidden != input.IsHidden)
+                if (existingLayout.Width != input.Width)
                 {
                     existingLayout.Width = input.Width;
-                    existingLayout.IsHidden = input.IsHidden;
                     existingLayout.UpdatedAt = utcNow;
                     existingLayout.UpdatedBy = userId;
                 }
@@ -143,7 +137,6 @@ public static class DepartmentColumnLayoutService
                 DepartmentId = departmentId,
                 FieldKey = fieldKey,
                 Width = input.Width,
-                IsHidden = input.IsHidden,
                 UpdatedAt = utcNow,
                 UpdatedBy = userId
             };
@@ -153,27 +146,7 @@ public static class DepartmentColumnLayoutService
             existingByField[fieldKey] = added;
         }
 
-        return ValidateVisibleColumnExists(
-            allowedFields,
-            existingByField,
-            existing);
-    }
-
-    private static DepartmentColumnLayoutPreparationResult
-        ValidateVisibleColumnExists(
-            IReadOnlySet<string> allowedFields,
-            IReadOnlyDictionary<string, DepartmentColumnLayout> layoutsByField,
-            IEnumerable<DepartmentColumnLayout> layouts)
-    {
-        var allDataColumnsHidden = allowedFields.Count > 0 &&
-            allowedFields.All(fieldKey =>
-                layoutsByField.TryGetValue(fieldKey, out var layout) &&
-                layout.IsHidden);
-
-        return allDataColumnsHidden
-            ? DepartmentColumnLayoutPreparationResult.Failed(
-                "At least one data column must remain visible.")
-            : DepartmentColumnLayoutPreparationResult.Success(layouts);
+        return DepartmentColumnLayoutPreparationResult.Success(existing);
     }
 
     public static DepartmentColumnLayoutData MapLayout(
@@ -182,8 +155,7 @@ public static class DepartmentColumnLayoutService
             layout.Id,
             layout.FieldKey,
             layout.Width,
-            Convert.ToBase64String(layout.RowVersion),
-            layout.IsHidden);
+            Convert.ToBase64String(layout.RowVersion));
 
     private static bool RowVersionMatches(string? encoded, byte[] current)
     {
@@ -209,15 +181,13 @@ public sealed record DepartmentColumnLayoutInput(
     int Id,
     string FieldKey,
     int Width,
-    string RowVersion = "",
-    bool IsHidden = false);
+    string RowVersion = "");
 
 public sealed record DepartmentColumnLayoutData(
     int Id,
     string FieldKey,
     int Width,
-    string RowVersion,
-    bool IsHidden = false);
+    string RowVersion);
 
 public sealed record DepartmentColumnLayoutPreparationResult(
     bool Succeeded,

@@ -8,6 +8,16 @@ internal static class Program
                 argument =>
                     string.Equals(
                         argument,
+                        "--live-resize-v2-probe",
+                        StringComparison.OrdinalIgnoreCase)))
+        {
+            return await LiveResizeV2ProbeRunner.RunAsync();
+        }
+
+        if (args.Any(
+                argument =>
+                    string.Equals(
+                        argument,
                         "--revo-gate5b12-real-db",
                         StringComparison.OrdinalIgnoreCase)))
         {
@@ -26,8 +36,7 @@ internal static class Program
 
         if (args.Any(
                 argument =>
-                    string.Equals(
-                        argument,
+                    string.Equals(                        argument,
                         "--revo-gate5c1-column-width-focused",
                         StringComparison.OrdinalIgnoreCase)))
         {
@@ -54,6 +63,55 @@ internal static class Program
             return await EmptySheetLifecycleRunner.RunAsync();
         }
 
+        if (args.Any(                argument =>
+                    string.Equals(
+                        argument,
+                        "--admin-security-boundary",
+                        StringComparison.OrdinalIgnoreCase)))
+        {
+            return await AdminSecurityBoundaryRunner.RunAsync();
+        }
+
+        if (args.Any(
+                argument =>
+                    string.Equals(
+                        argument,
+                        "--atomic-year-switch-focused",
+                        StringComparison.OrdinalIgnoreCase)))
+        {
+            return await AtomicYearSwitchFocusedRunner.RunAsync();
+        }
+
+        if (args.Any(
+                argument =>
+                    string.Equals(
+                        argument,
+                        "--revo-find-focused",
+                        StringComparison.OrdinalIgnoreCase)))
+        {
+            return await FindFocusedRunner.RunAsync();
+        }
+
+        if (args.Any(
+                argument =>
+                    string.Equals(
+                        argument,
+                        "--revo-open-kpi-focused",
+                        StringComparison.OrdinalIgnoreCase)))
+        {
+            return await OpenKpiFocusedRunner.RunAsync();
+        }
+
+        if (args.Any(
+                argument =>
+                    string.Equals(
+                        argument,
+                        "--find-seed-manual",
+                        StringComparison.OrdinalIgnoreCase)))
+        {
+            return await FindFocusedRunner.SeedManualDatabaseAsync();
+        }
+
         if (args.Any(
                 argument =>
                     string.Equals(
@@ -64,8 +122,7 @@ internal static class Program
             return await StartupSecurityRunner.RunAsync();
         }
 
-        if (args.Any(
-                argument =>
+        if (args.Any(                argument =>
                     string.Equals(
                         argument,
                         "--grid-community",
@@ -83,7 +140,7 @@ internal static class Program
         {
             return await EmployeeRealWorkdayRunner.RunAsync();
         }
+
         return await Phase9FoundationRunner.RunAsync(args);
     }
 }
-

@@ -64,3 +64,88 @@
     flex-wrap: wrap;
     margin-inline-start: 8px;
 }
+
+.gate5c1-summary[hidden] {
+    display: none;
+}
+
+/* Open Work Orders KPI cards (Tabulator parity look, fixed sizes). */
+.gate5c1-kpis {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 9px;
+    min-height: 58px;
+    margin: 10px 0 0;
+    direction: ltr;
+}
+
+.gate5c1-kpis ::deep .kpi-card {
+    --accent: #075796;
+    --accent-alt: #0b73ad;
+    position: relative;
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    min-height: 58px;
+    padding: 5px 10px;
+    overflow: hidden;
+    border: 1px solid #d3dde5;
+    border-radius: 11px;
+    background: #fff;
+    box-shadow: 0 2px 7px rgba(5, 42, 96, .05);
+}
+
+.gate5c1-kpis ::deep .kpi-card > div:last-child {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+    padding-left: 10px;
+}
+
+.gate5c1-kpis ::deep .kpi-card span {
+    overflow: hidden;
+    color: #32495f;
+    font-size: 12px;
+    font-weight: 700;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.gate5c1-kpis ::deep .kpi-card strong {
+    margin-top: 4px;
+    overflow: hidden;
+    color: #075ca8;
+    font-size: 19px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 800;
+    line-height: 1;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.gate5c1-kpis ::deep .metric-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    flex: 0 0 34px;
+    border-radius: 11px;
+    background: linear-gradient(145deg, var(--accent), var(--accent-alt));
+    color: #fff;
+}
+
+.gate5c1-kpis ::deep .metric-icon svg {
+    width: 18px;
+    height: 18px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8px;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.gate5c1-kpis ::deep .kpi-card-two { --accent: #078ed0; --accent-alt: #23a5cc; }
+.gate5c1-kpis ::deep .kpi-card-three { --accent: #159ac8; --accent-alt: #42b9d7; }
+.gate5c1-kpis ::deep .kpi-card-four { --accent: #078ed0; --accent-alt: #42b9d7; }

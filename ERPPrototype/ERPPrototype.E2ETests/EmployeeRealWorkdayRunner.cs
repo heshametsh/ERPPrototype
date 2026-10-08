@@ -1277,7 +1277,10 @@ internal static class EmployeeRealWorkdayRunner
                 "[data-aggregate-ready=\"true\"]")
             .WaitForAsync(new LocatorWaitForOptions
             {
-                State = WaitForSelectorState.Visible,
+                // The filtered-totals line is shown only while a Filter is
+                // active (Open KPI contract 2026-10-06); readiness is the
+                // computed state, not visibility.
+                State = WaitForSelectorState.Attached,
                 Timeout = 15_000
             });
 

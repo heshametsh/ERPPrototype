@@ -59,7 +59,8 @@ export function createRevoGridColumnVisibilityAdapter(options) {
         if (
             !value?.column?.getRawColumns ||
             !value?.column?.stores ||
-            !value?.dimension?.setTrimmed
+            !value?.dimension?.setTrimmed ||
+            !value?.dimension?.setCustomSizes
         ) {
             throw new Error(
                 "RevoGrid column/dimension providers are unavailable."
@@ -110,6 +111,43 @@ export function createRevoGridColumnVisibilityAdapter(options) {
         );
     }
 
+    // Revo keys column widths by visible index, and its trim plugin cannot
+    // restore them once a width was written while a column is hidden. Keep
+    // the last width of every column by prop so Hide/Unhide never hands one
+    // column's width to another.
+    const widthByProp = new Map();
+
+    function visibleProps(source, dataStore) {
+        return visibleFromStore(source, dataStore)
+            .map(column => text(column?.prop));
+    }
+
+    function rememberWidths(value, type, source) {
+        const sizes =
+            value.dimension.stores?.[type]?.store?.get?.("sizes") ?? {};
+        visibleProps(source, value.column.stores?.[type])
+            .forEach((prop, visibleIndex) => {
+                const size = Number(sizes[visibleIndex]);
+                if (prop && Number.isFinite(size) && size > 0) {
+                    widthByProp.set(prop, size);
+                }
+            });
+    }
+
+    function restoreWidths(value, type, source) {
+        const sizes = {};
+        visibleProps(source, value.column.stores?.[type])
+            .forEach((prop, visibleIndex) => {
+                const size = widthByProp.get(prop);
+                if (size !== undefined) {
+                    sizes[visibleIndex] = size;
+                }
+            });
+        if (Object.keys(sizes).length > 0) {
+            value.dimension.setCustomSizes(type, sizes, true);
+        }
+    }
+
     async function applyHiddenProps(hiddenProps) {
         const value = await providers();
         const raw = value.column.getRawColumns();
@@ -131,6 +169,8 @@ export function createRevoGridColumnVisibilityAdapter(options) {
             ) {
                 continue;
             }
+
+            rememberWidths(value, type, source);
 
             const hiddenPhysical = {};
 
@@ -157,6 +197,8 @@ export function createRevoGridColumnVisibilityAdapter(options) {
                 nextTrimmed,
                 type
             );
+
+            restoreWidths(value, type, source);
         }
 
         await waitForRender();

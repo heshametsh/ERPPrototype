@@ -1,20 +1,25 @@
 # CURRENT SNAPSHOT REVIEW OVERRIDE - 2026-09-09
 
+# CURRENT IMPLEMENTATION OVERRIDE - 2026-09-17
+
+This override supersedes older current sections when they conflict. Canonical Work Orders is now /work-orders-revogrid; historical Gate routes are retired. Rename and year-scoped Hide/Unhide are accepted foundations. Visibility has one persisted owner, `DepartmentColumnVisibility`, keyed by `DepartmentId + WorkYear + FieldKey`; legacy `DepartmentColumnLayout.IsHidden` has been removed by migration `20260917190720_RemoveLegacyColumnLayoutVisibility`. Width remains `DepartmentId + FieldKey` and the layout contract is width-only. Custom Date now accepts any real `DD/MM/YYYY` date with a four-digit year from 0001 through 9999, while Assignment Date / WorkYear keeps the existing 2000-2100 guard. Column Width runtime is native, fixed-LTR live resize with a body-cell content minimum and widths that follow column identity across Hide/Unhide (DEC-071); manually accepted 2026-10-06 except the W05/W06 corrections (manual pending); the ERP Width persistence owner is disabled on the canonical route, so widths are session-only; uncommitted. Checkpoint 7b62e58 is MANUAL RED / superseded. Audit cleanup items Admin Security Boundary, Atomic Work-Year Switch, Visibility Single Owner, and Custom Date Contract are automation-green; their manual checks are deferred into the consolidated manual batch.
+
+
 **Reviewed baseline:** `recovery-last-known-20260908` @ `008c293` with clean worktree.
 
 The clean-machine recovery evidence supersedes older sections that describe Gate5B12 or Employee Real Workday as pending: Build PASS, SQL Core 34/34 PASS, Gate5B12 FULL PASS, and Employee Real Workday 00-17 FULL PASS.
 
-Review-only implementation observations (not fixes):
+Current cleanup state and remaining review observations:
 
-- Work Orders query/save server authorization correctly requires an active Employee whose temporary password has already been changed.
-- Admin mutation authorization is weaker than that Work Orders invariant: `UserManagementService` checks active Admin role but not `MustChangePassword`, and `AdminPanel.razor` still performs some branch mutations directly through the DbContext.
-- `ApplicationSeeder` currently forces the single initial Admin back to `IsActive = true` at startup if it was disabled.
+- Work Orders query/save server authorization requires an active Employee whose temporary password has already been changed.
+- Admin-sensitive mutations now use a fresh server-side Admin authorization boundary; direct `/admin` access also rechecks current account state, and a disabled Admin remains disabled after restart.
+- Failed Work-Year replacement now restores the complete prior browser-owned dataset state instead of leaving a partially switched sheet.
+- Visibility has one persisted owner and Custom Date now has one client/server contract.
 - The documented "minimum 8 simple characters; no forced complex mixture" temporary-password rule is not explicitly configured in the current `AddIdentityCore` options.
-- Later Revo Gate route wrappers are inconsistent about route-level `[Authorize(Roles = Employee)]`; the real Work Orders query/save services still perform server-side role/active/password/department checks.
 - Revo calculates the opening business year from Saudi UTC+3, while legacy/service defaults still call `DateTime.Now.Year`.
-- Revo 4.25.2 assets are still imported from jsDelivr CDN; production self-host/license closure remains separate.
+- Revo 4.25.2 assets are still imported from jsDelivr CDN; production self-host/license/security-header closure remains separate.
 
-These items are current review evidence only. No product change is authorized by this section.
+These remaining observations are review evidence only; production/deployment cleanup is handled as separate missions.
 
 ---
 
@@ -899,6 +904,12 @@ readiness. This removes the race where two years both contained 1,000 rows.
 - A custom-column type is immutable after creation. Properties allow rename only; deletion remains a separate confirmed operation.
 - Custom Text, Date, and whole-Number columns receive a client-side value filter automatically. Custom Money columns receive numeric sort only, starting largest-to-smallest.
 - Any data column can be hidden from its Header context menu. `Unhide Column` appears only while hidden columns exist and lists those columns on demand.
-- Hide/Unhide and width changes are local until the normal Save action, participate in Undo/Redo, and persist by department across all years.
+- Hide/Unhide and width changes are local until the normal Save action and participate in Undo/Redo. Width persists by `DepartmentId + FieldKey` across years; visibility persists separately by `DepartmentId + WorkYear + FieldKey`.
 - The custom-column value scan previously used to decide whether type conversion was allowed has been removed; opening and saving the sheet no longer runs that extra `OPENJSON` query.
 - Legacy `Status` and `Notes` fields were removed from the entity, schema, grid, filters, save pipeline, and tests in Phase 9.3D. Existing values in those database columns are intentionally deleted by the migration.
+
+## Parity slices A/B — Find and Open KPI on the canonical Revo sheet (2026-10-06, AUTOMATION_GREEN, manual pending)
+
+- Find box beside the Work Year selector (disabled until the grid is initialized). In-sheet matching: `revoGridGate5B1.js` `findWorkOrders`; reveal: existing `revoGridHistoryFocus.focusTarget`; filter clear: `revoGridExcelFilter.clearAll` (same History step as the popup Clear); year jump: `SwitchYearAsync` (shared with the year selector); other years: `WorkOrderQueryService.FindWorkOrderYearsAsync` (employee department scope, same rules as LoadSheet). See DEC-072.
+- Open KPI cards above the sheet (`revogrid-open-kpi`), computed by `revoGridVisibleAggregates.js` from the full source in the same refresh as the visible totals; basket edits refresh totals. The visible-totals line (`data-visible-filter-summary`) shows only while filtering. See DEC-073.
+- Test data: `E2ETestDatabase` `findScenario` (3 Work Years, second department, fixed fixtures); manual copy via `ERPPrototype.E2ETests -- --find-seed-manual` and launch config `erp-find-3years`.

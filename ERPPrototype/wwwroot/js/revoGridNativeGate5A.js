@@ -56,6 +56,7 @@ function customFilterType(dataType) {
         : "string";
 }
 
+// Saved department widths (ERP Width owner) keyed by stable FieldKey.
 function normalizeColumnLayouts(layouts) {
     return new Map(
         (Array.isArray(layouts) ? layouts : [])
@@ -74,13 +75,13 @@ function normalizeColumnLayouts(layouts) {
 
 function applyColumnLayouts(columns, layouts) {
     const widths = normalizeColumnLayouts(layouts);
+    if (widths.size === 0) return columns;
     return columns.map(column => ({
         ...column,
-        size: widths.get(String(column?.prop ?? "")) ?? column.size,
-        minSize: 45,
-        maxSize: 1000
+        size: widths.get(String(column?.prop ?? "")) ?? column.size
     }));
 }
+
 function mergeOrderedColumns(core, customDefinitions, customColumns) {
     const customByProp = new Map(
         (Array.isArray(customColumns) ? customColumns : [])
@@ -386,10 +387,10 @@ export async function initialize(elementId, rows, customColumns, options) {
     )
         ? { rangeFill: true }
         : true;
-    grid.rtl = Boolean(value(options, "rtl", "Rtl", true));
-    grid.classList.toggle("erp-rtl-underflow-align", grid.rtl);
+    // Work Orders sheet is fixed LTR (2026-10-06 decision): Revo native resize/scroll.
+    grid.rtl = Boolean(value(options, "rtl", "Rtl", false));
     grid.autoSizeColumn = true;
-    grid.stretch = Boolean(value(options, "stretch", "Stretch", true));
+    grid.stretch = true;
 
     const state = {
         grid,
@@ -417,6 +418,151 @@ export async function initialize(elementId, rows, customColumns, options) {
             .map(normalizeCustomColumn),
         columnLayouts: value(options, "columnLayouts", "ColumnLayouts", [])
     };
+
+    // Live column resize: Revo Community only moves the handle while dragging
+    // and writes the width at MouseUp. Apply Revo's own pointer delta every
+    // frame so the column and its right-hand neighbours follow the pointer.
+    // A drag never narrows a column below its widest value (all rows of the
+    // loaded year, header excluded); MouseUp commits that same final width.
+    // Escape restores the start width and cancels the MouseUp write.
+    let liveResize = null;
+    let measureContext = null;
+    const contentMinWidth = (providers, live, bodyCell) => {
+        const columnStore = providers?.column?.stores?.[live.type]?.store;
+        const items = columnStore?.get?.("items");
+        const column = columnStore?.get?.("source")?.[items?.[live.index] ?? live.index];
+        const prop = column?.prop;
+        if (prop === undefined || prop === null || !bodyCell) return 0;
+        // Measure with a rendered body cell: header cells use a smaller
+        // font and their own padding.
+        const style = getComputedStyle(bodyCell);
+        measureContext ??= document.createElement("canvas").getContext("2d");
+        measureContext.font = style.font;
+        let widest = 0;
+        for (const store of Object.values(providers?.data?.stores ?? {})) {
+            for (const row of store?.store?.get?.("source") ?? []) {
+                const text = row?.[prop];
+                if (text === undefined || text === null || text === "") continue;
+                widest = Math.max(widest, measureContext.measureText(String(text)).width);
+            }
+        }
+        if (widest === 0) return 0;
+        return Math.ceil(widest +
+            (parseFloat(style.paddingLeft) || 0) +
+            (parseFloat(style.paddingRight) || 0) +
+            (parseFloat(style.borderLeftWidth) || 0) +
+            (parseFloat(style.borderRightWidth) || 0) + 1);
+    };
+    // A column already narrower than its content is not forced wider.
+    const liveWidth = (live, width) =>
+        Math.max(width, Math.min(live.minWidth, live.startWidth));
+    const restoreLiveResize = live => {
+        if (live.frame) cancelAnimationFrame(live.frame);
+        live.frame = 0;
+        live.cancelled = true;
+        if (live.applied === live.startWidth) return;
+        live.applied = live.startWidth;
+        live.providers.then(providers => providers?.dimension?.setCustomSizes(
+            live.type, { [live.index]: live.startWidth }, true));
+    };
+
+    addListener(state, grid, "mousedown", event => {
+        liveResize = null;
+        const handle = event.target;
+        if (event.button !== 0 || !(handle instanceof HTMLElement) ||
+            !handle.classList.contains("resizable-r")) return;
+        const cell = handle.closest("[data-rgcol]");
+        const viewport = handle.closest("revogr-viewport-scroll");
+        const type = ["colPinStart", "rgCol", "colPinEnd"]
+            .find(item => viewport?.classList.contains(item));
+        if (!cell || !type) return;
+        liveResize = {
+            handle,
+            type,
+            index: Number(cell.getAttribute("data-rgcol")),
+            startWidth: cell.clientWidth,
+            applied: cell.clientWidth,
+            pendingWidth: cell.clientWidth,
+            minWidth: 0,
+            providers: grid.getProviders(),
+            frame: 0,
+            cancelled: false
+        };
+        const live = liveResize;
+        const bodyCell =
+            viewport.querySelector(`[data-rgrow][data-rgcol="${live.index}"]`) ??
+            viewport.querySelector("[data-rgrow]");
+        live.providers.then(providers => {
+            live.minWidth = contentMinWidth(providers, live, bodyCell);
+        });
+    }, true);
+
+    // Runs after Revo's own move handler has clamped its delta into the
+    // active handle's style.right.
+    addListener(state, window, "mousemove", () => {
+        const live = liveResize;
+        if (!live || live.cancelled) return;
+        const changeX = -parseFloat(live.handle.style.right);
+        if (!Number.isFinite(changeX)) return;
+        // The column now carries the edge, so the handle stays on it.
+        live.handle.style.right = "";
+        live.pendingWidth = liveWidth(live, live.startWidth + changeX);
+        if (live.frame) return;
+        live.frame = requestAnimationFrame(() => {
+            live.frame = 0;
+            if (liveResize !== live || live.cancelled ||
+                live.pendingWidth === live.applied) return;
+            live.applied = live.pendingWidth;
+            live.providers.then(providers => {
+                if (liveResize !== live || live.cancelled) return;
+                providers?.dimension?.setCustomSizes(
+                    live.type, { [live.index]: live.applied }, true);
+            });
+        });
+    });
+
+    addListener(state, window, "keydown", event => {
+        if (event.key === "Escape" && liveResize) restoreLiveResize(liveResize);
+    }, true);
+
+    addListener(state, grid, "beforeheaderresize", event => {
+        const live = liveResize;
+        liveResize = null;
+        if (!live) return;
+        if (live.frame) cancelAnimationFrame(live.frame);
+        live.frame = 0;
+        // Later listeners (the ERP Width owner) read the gesture result here:
+        // live writes already moved Revo's size store, so its start width is lost.
+        const candidate = event?.detail?.[0];
+        if (live.cancelled) {
+            if (candidate) candidate.erpLiveResize = { cancelled: true };
+            event.preventDefault();
+            return;
+        }
+        // Revo writes its own unclamped width after this event; replace it
+        // when the content minimum changed the result.
+        const size = Number(candidate?.size);
+        if (!Number.isFinite(size)) return;
+        const width = liveWidth(live, size);
+        candidate.erpLiveResize = { cancelled: false, startWidth: live.startWidth, width };
+        if (width === size) return;
+        event.preventDefault();
+        live.applied = width;
+        live.providers.then(providers => providers?.dimension?.setCustomSizes(
+            live.type, { [live.index]: width }, true));
+    });
+
+    addListener(state, window, "mouseup", () => {
+        const live = liveResize;
+        if (!live) return;
+        // Revo commits through beforeheaderresize during this MouseUp; a
+        // gesture it did not commit must not leave a live width behind.
+        requestAnimationFrame(() => {
+            if (liveResize !== live) return;
+            liveResize = null;
+            restoreLiveResize(live);
+        });
+    });
 
     addListener(state, grid, "viewportscroll", () => {
         state.scrollEvents += 1;

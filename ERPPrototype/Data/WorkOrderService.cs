@@ -36,6 +36,15 @@ public sealed class WorkOrderService(
             cancellationToken,
             performanceStages);
 
+    public Task<IReadOnlyList<int>> FindWorkOrderYearsAsync(
+        string userId,
+        string workOrderNumber,
+        CancellationToken cancellationToken = default) =>
+        queryService.FindWorkOrderYearsAsync(
+            userId,
+            workOrderNumber,
+            cancellationToken);
+
     public Task<WorkOrderSaveResult> SaveChangesAsync(
         string userId,
         IEnumerable<WorkOrder> addedRecords,

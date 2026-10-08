@@ -53,6 +53,8 @@ builder.Services.AddDbContextFactory<ApplicationDbContext>(
     ServiceLifetime.Scoped);
 
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
+builder.Services.AddScoped<AdminAuthorizationService>();
+builder.Services.AddScoped<AdminBranchService>();
 builder.Services.AddScoped<UserManagementService>();
 builder.Services.AddScoped<WorkOrderQueryService>();
 builder.Services.AddScoped<WorkOrderSavePlanBuilder>();

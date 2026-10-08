@@ -278,7 +278,12 @@ internal sealed class E2EBrowserSession : IAsyncDisposable
         {
             Headless = !headed,
             Args = arguments.Count > 0 ? arguments : null,
-            SlowMo = 0
+            SlowMo = 0,
+            // Opt-in (e.g. "chrome") for machines where the downloaded
+            // Playwright Chromium cannot start; unset keeps the default.
+            Channel = Environment.GetEnvironmentVariable("ERP_E2E_BROWSER_CHANNEL") is { Length: > 0 } channel
+                ? channel
+                : null
         };
 
         try

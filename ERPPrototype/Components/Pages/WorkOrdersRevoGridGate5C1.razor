@@ -8,10 +8,21 @@
 
 <PageTitle>RevoGrid Gate 5C-1</PageTitle>
 
+<section id="revogrid-open-kpi"
+         class="gate5c1-kpis"
+         data-testid="open-kpi"
+         data-aggregate-ready="false"
+         aria-label="ملخص أوامر العمل المفتوحة"
+         aria-live="polite">
+</section>
+
+@* Shown by the totals owner only while a Filter is active. *@
 <section class="gate5c1-summary"
+         data-visible-filter-summary
+         hidden
          aria-label="إجماليات الصفوف الظاهرة">
     <div class="gate5c1-summary__title">
-        إجمالي الظاهر
+        إجمالي الظاهر بالفلتر
     </div>
 
     <div id="revogrid-gate5c1-visible-aggregates"

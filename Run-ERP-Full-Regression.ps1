@@ -60,6 +60,7 @@ function Assert-TextContains {
 function Invoke-HarnessPreflight {
     $gate = Join-Path $RepoRoot "ERPPrototype\Components\Pages\WorkOrdersRevoGridGate5C1.razor"
     $program = Join-Path $RepoRoot "ERPPrototype\ERPPrototype.E2ETests\Program.cs"
+    $integrationRunner = Join-Path $RepoRoot "ERPPrototype\ERPPrototype.IntegrationTests\IntegrationTestRunner.cs"
     $b12Runner = Join-Path $RepoRoot "ERPPrototype\ERPPrototype.E2ETests\Gate5B12RealDbSaveRunner.cs"
     $canonicalSurface = Join-Path $RepoRoot "ERPPrototype\ERPPrototype.E2ETests\RevoCanonicalTestSurface.cs"
     Assert-TextContains $gate '@page "/work-orders-revogrid"' 'Canonical Revo Work Orders route changed or disappeared.'
@@ -74,6 +75,12 @@ function Invoke-HarnessPreflight {
     Assert-TextContains $program '"--revo-employee-real-workday"' 'Employee Real Workday runner is not wired in Program.cs.'
     Assert-TextContains $program '"--revo-empty-sheet"' 'Canonical Empty Sheet runner is not wired in Program.cs.'
     Assert-TextContains $program '"--startup-security"' 'Startup Security runner is not wired in Program.cs.'
+    Assert-TextContains $program '"--admin-security-boundary"' 'Admin Security Boundary runner is not wired in Program.cs.'
+    Assert-TextContains $program '"--atomic-year-switch-focused"' 'Atomic Work-Year Switch runner is not wired in Program.cs.'
+    Assert-TextContains $program '"--revo-gate5c1-column-width-focused"' 'Column Width runner is not wired in Program.cs.'
+    Assert-TextContains $program '"--revo-find-focused"' 'Work Order Find runner is not wired in Program.cs.'
+    Assert-TextContains $program '"--revo-open-kpi-focused"' 'Open KPI runner is not wired in Program.cs.'
+    Assert-TextContains $integrationRunner '"--visibility-ownership-gate"' 'Visibility Single-Owner gate is not wired in IntegrationTestRunner.cs.'
     Assert-TextContains $b12Runner 'using static ERPPrototype.E2ETests.RevoCanonicalTestSurface;' 'B12 no longer uses the canonical Revo test surface.'
     Assert-TextContains $canonicalSurface 'internal const string GatePath = "/work-orders-revogrid";' 'Canonical Revo test surface no longer targets /work-orders-revogrid.'
     Assert-TextContains $b12Runner 'ResolveActiveModulePathAsync(page)' 'B12 no longer verifies the browser-loaded Gate module dynamically.'
@@ -88,6 +95,8 @@ function Assert-E2EBuildFreshness {
         "ERPPrototype\ERPPrototype.E2ETests\EmployeeRealWorkdayRunner.cs",
         "ERPPrototype\ERPPrototype.E2ETests\EmptySheetLifecycleRunner.cs",
         "ERPPrototype\ERPPrototype.E2ETests\StartupSecurityRunner.cs",
+        "ERPPrototype\ERPPrototype.E2ETests\AdminSecurityBoundaryRunner.cs",
+        "ERPPrototype\ERPPrototype.E2ETests\AtomicYearSwitchFocusedRunner.cs",
         "ERPPrototype\ERPPrototype.E2ETests\Gate5C1RenameFocusedRunner.cs",
         "ERPPrototype\ERPPrototype.E2ETests\Gate5C1VisibilityFocusedRunner.cs",
         "ERPPrototype\ERPPrototype.E2ETests\Gate5B12RealDbSaveRunner.cs"
@@ -178,8 +187,36 @@ try {
         dotnet run --project $e2e -c Debug --no-build -- --startup-security
     }
 
+    Run-TestStep "47 - ADMIN SECURITY BOUNDARY" {
+        dotnet run --project $e2e -c Debug --no-build -- --admin-security-boundary
+    }
+
+    Run-TestStep "48 - ATOMIC WORK-YEAR SWITCH" {
+        dotnet run --project $e2e -c Debug --no-build -- --atomic-year-switch-focused
+    }
+
+    Run-TestStep "48.5 - COLUMN WIDTH (LIVE + PERSISTENCE)" {
+        dotnet run --project $e2e -c Debug --no-build -- --revo-gate5c1-column-width-focused
+    }
+
+    Run-TestStep "48.6 - WORK ORDER FIND (3 YEARS)" {
+        dotnet run --project $e2e -c Debug --no-build -- --revo-find-focused
+    }
+
+    Run-TestStep "48.7 - OPEN WORK ORDERS KPI (3 YEARS)" {
+        dotnet run --project $e2e -c Debug --no-build -- --revo-open-kpi-focused
+    }
+
+    Run-TestStep "49 - VISIBILITY SINGLE OWNER" {
+        dotnet run --project $integration -c Debug --no-build -- --visibility-ownership-gate
+    }
+
+    Run-TestStep "49.5 - CUSTOM DATE CONTRACT" {
+        node "ERPPrototype\ERPPrototype.IntegrationTests\CustomDateContractModificationGate.mjs"
+    }
+
     Run-TestStep "50 - INTEGRATION TESTS" {
-        dotnet test $integration -c Debug --no-build --no-restore
+        dotnet run --project $integration -c Debug --no-build
     }
 
     Write-Host ""
@@ -193,6 +230,11 @@ try {
         Write-Host "Canonical Empty Sheet .... PASS"
         Write-Host "B12 Real DB Save ......... PASS"
         Write-Host "Startup Security ......... PASS"
+        Write-Host "Admin Security Boundary . PASS"
+        Write-Host "Atomic Work-Year Switch . PASS"
+        Write-Host "Column Width ............ PASS"
+        Write-Host "Visibility Single Owner . PASS"
+        Write-Host "Custom Date Contract .... PASS"
         Write-Host "Integration .............. PASS"
         exit 0
     }
